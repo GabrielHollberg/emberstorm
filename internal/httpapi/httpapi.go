@@ -1,8 +1,8 @@
-// Package httpapi is atrium's only published surface.
+// Package httpapi is SoundStorm's only published surface.
 //
-// Everything a person touches comes through here: the UI, the login, the search,
-// and the media bytes. The backends are on the internal compose network with no
-// published ports, so this is the only door.
+// Everything a person touches comes through here: the UI, the login, the
+// search, and the media bytes. The backends are on the internal compose network
+// with no published ports, so this is the only door.
 //
 //	GET  /                              the UI
 //	GET  /healthz                       liveness, no upstream calls
@@ -28,15 +28,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GabrielHollberg/atrium/internal/auth"
-	"github.com/GabrielHollberg/atrium/internal/federate"
-	"github.com/GabrielHollberg/atrium/internal/library"
-	"github.com/GabrielHollberg/atrium/internal/media"
-	"github.com/GabrielHollberg/atrium/internal/provision"
-	"github.com/GabrielHollberg/atrium/internal/source"
-	"github.com/GabrielHollberg/atrium/internal/state"
-	"github.com/GabrielHollberg/atrium/internal/stream"
-	"github.com/GabrielHollberg/atrium/internal/webui"
+	"github.com/GabrielHollberg/soundstorm/internal/auth"
+	"github.com/GabrielHollberg/soundstorm/internal/federate"
+	"github.com/GabrielHollberg/soundstorm/internal/library"
+	"github.com/GabrielHollberg/soundstorm/internal/media"
+	"github.com/GabrielHollberg/soundstorm/internal/provision"
+	"github.com/GabrielHollberg/soundstorm/internal/source"
+	"github.com/GabrielHollberg/soundstorm/internal/state"
+	"github.com/GabrielHollberg/soundstorm/internal/stream"
+	"github.com/GabrielHollberg/soundstorm/internal/webui"
 )
 
 // maxCredentialBody caps a login or signup body. Credentials are short; this

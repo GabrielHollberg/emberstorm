@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/GabrielHollberg/atrium/internal/state"
+	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
 // provisionLocalBooks is the trivial case, and worth keeping in this package

@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GabrielHollberg/atrium/internal/httpx"
-	"github.com/GabrielHollberg/atrium/internal/media"
-	"github.com/GabrielHollberg/atrium/internal/source"
+	"github.com/GabrielHollberg/soundstorm/internal/httpx"
+	"github.com/GabrielHollberg/soundstorm/internal/media"
+	"github.com/GabrielHollberg/soundstorm/internal/source"
 )
 
 // Config configures an Audiobookshelf source.

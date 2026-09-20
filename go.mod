@@ -1,3 +1,3 @@
-module github.com/GabrielHollberg/atrium
+module github.com/GabrielHollberg/soundstorm
 
 go 1.24
