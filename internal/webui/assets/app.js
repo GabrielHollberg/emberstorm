@@ -2770,6 +2770,7 @@ function showPhoto(item) {
   // (the owner's asking); a clip is a film and stops it (playVideo).
   closeVideo();
   leaveClip();
+  tlPreview.stop();
   const stepping = Boolean(photoShown);
   photoShown = item;
   // Controlling a TV: the photo shows there too, and stepping here steps it -
@@ -2891,6 +2892,10 @@ function startClip(item) {
     $('audio-player').pause();
     clip.musicPaused = true;
   }
+  // Unseen until its first frame is playing: the still beneath stays on
+  // screen, so there is never the browser's grey video sign, and the video
+  // simply starts moving (fadeInWhenPlaying).
+  v.classList.add('pv-waiting');
   show(v, true);
   show($('photo-vbar'), true);
   $('photo-vseek').value = 0;
@@ -2899,6 +2904,13 @@ function startClip(item) {
   v.src = streamPath(item);
   v.play().catch(() => {});
 }
+// A video shown over its still appears only once it really plays.
+function fadeInWhenPlaying(v) {
+  const ready = () => { if (v.currentTime > 0 || !v.paused) v.classList.remove('pv-waiting'); };
+  v.addEventListener('playing', ready);
+  v.addEventListener('timeupdate', ready);
+}
+fadeInWhenPlaying($('photo-video'));
 function leaveClip() {
   const v = $('photo-video');
   if (v.getAttribute('src') !== null) {
@@ -2907,6 +2919,7 @@ function leaveClip() {
     v.load();
   }
   show(v, false);
+  v.classList.add('pv-waiting');
   show($('photo-vbar'), false);
   if (clip.musicPaused) {
     clip.musicPaused = false;
@@ -2941,6 +2954,7 @@ function leaveClip() {
 function closePhoto() {
   leaveClip();
   stopLive();
+  setTimeout(() => tlPreview.again(), 0);
   if (photoShown && CONTROL.target && !TV) controlSend({ type: 'control', action: 'closephoto' });
   photoShown = null;
   show($('photo-overlay'), false);
@@ -20763,6 +20777,7 @@ function tlFill(sec, items) {
     const tile = renderItem(it);
     // A video says so, with its length, as Google's tiles do.
     if (it.extra && it.extra.type === 'video') {
+      tlPreview.watch(tile, it);
       const wrap = tile.querySelector('.art-wrap');
       const len = document.createElement('span');
       len.className = 'tl-length';
@@ -20780,6 +20795,85 @@ function tlFill(sec, items) {
   markDownloads();
   if (TL.root) TL.root.dispatchEvent(new Event('tl-layout'));
 }
+
+// As the timeline is scrolled, one video in full view plays a silent preview
+// in its tile, as Google Photos does: the one nearest the middle of the
+// screen, once scrolling has rested half a second, its first eight seconds
+// round and round, shown only once it really plays (over its still, so
+// nothing grey ever shows). Not on a slow connection, on a TV, with the
+// viewer open or the app hidden.
+const tlPreview = (() => {
+  const visible = new Map(); // tile -> item, fully on screen
+  let current = null; // { tile, video }
+  let timer = 0;
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.intersectionRatio >= 0.99) visible.set(e.target, e.target.tlItem);
+      else visible.delete(e.target);
+    }
+    soon();
+  }, { threshold: [0, 0.99] });
+  const stop = () => {
+    if (!current) return;
+    const v = current.video;
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+    v.remove();
+    current = null;
+  };
+  const allowed = () => !TV && !slowLink && !photoShown && !document.hidden && !state.offline;
+  const choose = () => {
+    for (const tile of [...visible.keys()]) if (!tile.isConnected) visible.delete(tile);
+    if (current && (!current.tile.isConnected || !visible.has(current.tile))) stop();
+    if (!allowed()) { stop(); return; }
+    const mid = innerHeight / 2;
+    let best = null;
+    let bestD = Infinity;
+    for (const tile of visible.keys()) {
+      const r = tile.getBoundingClientRect();
+      const d = Math.abs(r.top + r.height / 2 - mid);
+      if (d < bestD) { best = tile; bestD = d; }
+    }
+    if (!best || (current && current.tile === best)) return;
+    stop();
+    const wrap = best.querySelector('.art-wrap');
+    if (!wrap) return;
+    const v = document.createElement('video');
+    v.className = 'tl-preview pv-waiting';
+    v.muted = true;
+    v.defaultMuted = true;
+    v.playsInline = true;
+    v.setAttribute('playsinline', '');
+    v.preload = 'auto';
+    v.disablePictureInPicture = true;
+    fadeInWhenPlaying(v);
+    v.addEventListener('timeupdate', () => { if (v.currentTime > 8) v.currentTime = 0; });
+    v.addEventListener('ended', () => { v.currentTime = 0; v.play().catch(() => {}); });
+    v.src = streamPath(visible.get(best));
+    wrap.append(v);
+    current = { tile: best, video: v };
+    v.play().catch(() => {});
+  };
+  const soon = () => {
+    clearTimeout(timer);
+    timer = setTimeout(choose, 500);
+  };
+  addEventListener('scroll', () => {
+    // Scrolling on: the preview carries on while its tile is in view, and
+    // the choice is made again once the page rests.
+    if (current || visible.size) soon();
+  }, { passive: true });
+  document.addEventListener('visibilitychange', soon);
+  return {
+    watch(tile, item) {
+      tile.tlItem = item;
+      io.observe(tile);
+    },
+    stop,
+    again: soon,
+  };
+})();
 
 // The handle down the right edge: the years marked where they begin, a thumb
 // showing where the page is, and dragging it - or a tap anywhere on the edge -
