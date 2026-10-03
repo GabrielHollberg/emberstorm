@@ -59,7 +59,36 @@ func VideoCamera(path string) Camera {
 	return videoCamera(f, info.Size())
 }
 
+// VideoDate is any date the video at path holds - the phone's own creation
+// date, else the movie header's - whoever wrote it: what a photo library
+// dates the video by. Nothing (a zero header, as a downloaded clip often has)
+// means it would be dated by its file.
+func VideoDate(path string) (time.Time, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return time.Time{}, false
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return time.Time{}, false
+	}
+	t := readVideo(f, info.Size()).Taken
+	return t, !t.IsZero()
+}
+
 func videoCamera(r io.ReadSeeker, size int64) Camera {
+	out := readVideo(r, size)
+	// A creation time on a video a device did not make is an encoder's, and
+	// says nothing about when anything was filmed.
+	if !out.Filmed {
+		out.Taken = time.Time{}
+	}
+	return out
+}
+
+// readVideo reads whether a device made the video and any date it holds.
+func readVideo(r io.ReadSeeker, size int64) Camera {
 	var out Camera
 	moovStart, moovEnd, ok := findBox(r, "moov", 0, size)
 	if !ok {
@@ -98,11 +127,6 @@ func videoCamera(r io.ReadSeeker, size int64) Camera {
 				out.Taken = t
 			}
 		}
-	}
-	// A creation time on a video a device did not make is an encoder's, and
-	// says nothing about when anything was filmed.
-	if !out.Filmed {
-		out.Taken = time.Time{}
 	}
 	return out
 }

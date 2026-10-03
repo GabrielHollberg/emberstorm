@@ -158,6 +158,42 @@ func TestABackedUpPictureKeepsThePhonesDate(t *testing.T) {
 	}
 }
 
+// A clip saved from the web or a message holds no date, so the photo library
+// dated it by its file - the day it was backed up; it keeps the phone's date
+// as a picture does. A video that holds a date is left to it.
+func TestABackedUpVideoWithNoDateKeepsThePhonesDate(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t)
+	box := func(name string, body []byte) []byte {
+		b := make([]byte, 8, 8+len(body))
+		binary.BigEndian.PutUint32(b, uint32(8+len(body)))
+		copy(b[4:], name)
+		return append(b, body...)
+	}
+	mp4 := func(created uint32) string {
+		mvhd := make([]byte, 100)
+		binary.BigEndian.PutUint32(mvhd[4:], created)
+		return string(append(box("ftyp", []byte("isom0000isom")), box("moov", box("mvhd", mvhd))...))
+	}
+	taken := time.Date(2019, 3, 14, 15, 9, 26, 0, time.UTC)
+	since1904 := uint32(time.Date(2021, 6, 1, 0, 0, 0, 0, time.UTC).Sub(time.Date(1904, 1, 1, 0, 0, 0, 0, time.UTC)) / time.Second)
+	for name, body := range map[string]string{"Saved.mp4": mp4(0), "Filmed.mp4": mp4(since1904)} {
+		req, _ := http.NewRequest(http.MethodPut, h.srv.URL+"/api/photos/backup?name="+name+"&taken="+strconv.FormatInt(taken.UnixMilli(), 10), strings.NewReader(body))
+		resp, err := h.client.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			t.Fatalf("backup %s: %v %v", name, err, resp)
+		}
+		resp.Body.Close()
+	}
+	dir := filepath.Join(h.libraryRoot(t), "pictures", "Personal", "gabe", "2019", "03")
+	if side, err := os.ReadFile(filepath.Join(dir, "Saved.mp4.xmp")); err != nil || !strings.Contains(string(side), "2019-03-14T15:09:26") {
+		t.Errorf("a clip with no date kept none: %v %s", err, side)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Filmed.mp4.xmp")); err == nil {
+		t.Error("a video with its own date was given the phone's")
+	}
+}
+
 // The phones keep no list of what they sent, so a photo deleted from a
 // person's folder must be one the server says it has, or the next backup run
 // sends it back; put back from the bin, it is wanted again.

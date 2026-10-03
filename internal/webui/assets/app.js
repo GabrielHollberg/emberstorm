@@ -6431,7 +6431,7 @@ function renderSearchHint() {
     ebook: 'ebooks', document: 'documents', picture: 'pictures',
     favorites: 'your favorites', playlists: 'your playlists', pairs: 'books to read along with',
     authors: 'authors', series: 'series', people: 'people', places: 'places',
-    'photo-videos': 'videos', 'photo-live': 'Live Photos',
+    'photo-videos': 'videos', 'photo-live': 'Live Photos', 'photo-stills': 'photos',
     'genres-music': 'genres', 'genres-watch': 'genres', 'genres-books': 'genres',
     'fav-music': 'your favorites', 'fav-watch': 'your favorites',
     'fav-books': 'your favorites', 'fav-photos': 'your favorites',
@@ -10324,7 +10324,8 @@ const TABS = {
     { kind: 'authors', label: 'Authors' }, { kind: 'series', label: 'Series' },
     { kind: 'pairs', label: 'Read Along' }, { kind: 'document', label: 'Documents' },
     { kind: 'fav-books', label: 'Favorites' }, { kind: 'genres-books', label: 'Genres' }],
-  photos: [{ kind: 'picture', label: 'Photos' }, { kind: 'people', label: 'People' },
+  photos: [{ kind: 'photo-stills', label: 'Photos' }, { kind: 'picture', label: 'Photos & videos' },
+    { kind: 'people', label: 'People' },
     { kind: 'places', label: 'Places' }, { kind: 'photo-videos', label: 'Videos' },
     { kind: 'photo-live', label: 'Live photos' }, { kind: 'fav-photos', label: 'Favorites' }],
 };
@@ -10337,14 +10338,14 @@ const FAV_KINDS = {
 };
 // Pages of groups rather than a shelf's list: books by author and series,
 // photos by who is in them and where.
-const BOOK_BROWSE = new Set(['authors', 'series', 'people', 'places', 'photo-videos', 'photo-live', 'genres-music', 'genres-watch', 'genres-books']);
+const BOOK_BROWSE = new Set(['authors', 'series', 'people', 'places', 'photo-stills', 'photo-videos', 'photo-live', 'genres-music', 'genres-watch', 'genres-books']);
 // Each tab's genres are of these shelves.
 const GENRE_KINDS = { 'genres-music': ['music'], 'genres-watch': ['video', 'tv'], 'genres-books': ['audiobook', 'ebook'] };
 // A category the + button starts with put away: nobody's tab changes until they add it.
 const DEFAULT_HIDDEN = { music: ['genres'], watch: ['genres-watch'], books: ['genres-books'] };
-const PHOTO_BROWSE = new Set(['people', 'places', 'photo-videos', 'photo-live']);
+const PHOTO_BROWSE = new Set(['people', 'places', 'photo-stills', 'photo-videos', 'photo-live']);
 // The Photos tab's kinds of picture, asked of the photo server by type.
-const PHOTO_TYPES = { 'photo-videos': 'video', 'photo-live': 'live' };
+const PHOTO_TYPES = { 'photo-stills': 'photo', 'photo-videos': 'video', 'photo-live': 'live' };
 state.tab = 'home';
 state.tabKind = {};
 
@@ -10372,7 +10373,15 @@ function shelfAvailable(kind) {
 function tabShelves(tab) {
   const order = pillOrder(tab);
   const put = hiddenPills(tab);
-  const rank = (kind) => { const i = order.indexOf(kind); return i < 0 ? 1e6 : i; };
+  const all = (TABS[tab] || []).map((o) => o.kind);
+  // A pill new since the order was saved goes where it stands by default:
+  // just before the next pill of the default row that the order names.
+  const rank = (kind) => {
+    const i = order.indexOf(kind);
+    if (i >= 0) return i;
+    const next = all.slice(all.indexOf(kind) + 1).find((k) => order.includes(k));
+    return next ? order.indexOf(next) - 0.5 : 1e6;
+  };
   return (TABS[tab] || []).filter((o) => shelfAvailable(o.kind) && !put.includes(o.kind))
     .map((o, i) => ({ o, i }))
     .sort((a, b) => (rank(a.o.kind) - rank(b.o.kind)) || (a.i - b.i))
@@ -13598,6 +13607,22 @@ async function showPhotoType(seq) {
   }
   $('status').textContent = '';
   if (!view.children.length) showSkeleton(view, 'grid');
+  // Photos with something typed: the library's own search (what is in the
+  // picture, the place), its clips left out.
+  if (type === 'photo' && state.query) {
+    const params = new URLSearchParams({ q: state.query, kind: 'picture', limit: '200' });
+    const found = await api(`/api/search?${params}`);
+    if (seq !== state.searchSeq) return;
+    const items = ((found.ok && found.body && found.body.items) || [])
+      .filter((it) => !(it.extra && it.extra.type === 'video'));
+    state.items = items;
+    const grid = document.createElement('div');
+    grid.className = 'grid browse-grid';
+    grid.append(...items.map(renderItem));
+    view.replaceChildren(grid);
+    $('status').textContent = items.length ? '' : 'Nothing matches.';
+    return;
+  }
   const { ok, body } = await api(`/api/photos/of?${new URLSearchParams({ type })}`);
   if (seq !== state.searchSeq) return;
   if (!ok || !body) {
@@ -13616,7 +13641,8 @@ async function showPhotoType(seq) {
   $('status').textContent = items.length ? ''
     : (state.query ? 'Nothing matches.'
       : (type === 'video' ? 'No videos in your photos yet.'
-        : 'No Live Photos yet. iPhone Live Photos and Android motion photos show here.'));
+        : type === 'photo' ? 'No photos yet.'
+          : 'No Live Photos yet. iPhone Live Photos and Android motion photos show here.'));
 }
 
 async function showPhotoGroup(group) {

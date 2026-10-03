@@ -136,12 +136,12 @@ func (s *Server) handlePlaces(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"places": groupsOut(places, src)})
 }
 
-// handlePhotosOfType is the Photos tab's Videos and Live photos: ?type=video
-// or ?type=live, newest first.
+// handlePhotosOfType is the Photos tab's Photos, Videos and Live photos:
+// ?type=photo (stills, Live Photos among them), video or live, newest first.
 func (s *Server) handlePhotosOfType(w http.ResponseWriter, r *http.Request) {
 	kind := r.URL.Query().Get("type")
-	if kind != "video" && kind != "live" {
-		writeError(w, http.StatusBadRequest, "expected type=video or type=live")
+	if kind != "photo" && kind != "video" && kind != "live" {
+		writeError(w, http.StatusBadRequest, "expected type=photo, video or live")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), photosDeadline)
@@ -246,8 +246,10 @@ func (s *Server) handlePhotoMonths(w http.ResponseWriter, r *http.Request) {
 		months, err = t.PhotoMonths(ctx)
 	case "video", "live":
 		months, err = s.typeMonths(r, t, kind)
+	case "photo":
+		months, err = s.stillMonths(r, t)
 	default:
-		writeError(w, http.StatusBadRequest, "expected type=video or type=live")
+		writeError(w, http.StatusBadRequest, "expected type=photo, video or live")
 		return
 	}
 	if err != nil {
@@ -281,8 +283,18 @@ func (s *Server) handlePhotoMonth(w http.ResponseWriter, r *http.Request) {
 		items, err = t.MonthPhotos(ctx, m)
 	case "video", "live":
 		items, err = t.MonthPhotosOf(ctx, kind, m)
+	case "photo":
+		// The month's own timeline without its clips: one call, no search.
+		items, err = t.MonthPhotos(ctx, m)
+		kept := items[:0]
+		for _, it := range items {
+			if it.Extra["type"] != "video" {
+				kept = append(kept, it)
+			}
+		}
+		items = kept
 	default:
-		writeError(w, http.StatusBadRequest, "expected type=video or type=live")
+		writeError(w, http.StatusBadRequest, "expected type=photo, video or live")
 		return
 	}
 	if err != nil {
@@ -303,6 +315,31 @@ var typeMonthCache struct {
 type typeMonths struct {
 	at     time.Time
 	months []source.PhotoMonth
+}
+
+// stillMonths counts the stills by month: every month's count less its clips,
+// so it costs the timeline's outline and the (smaller) count of videos rather
+// than a search of every photo.
+func (s *Server) stillMonths(r *http.Request, t source.PhotoTimeline) ([]source.PhotoMonth, error) {
+	all, err := t.PhotoMonths(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	clips, err := s.typeMonths(r, t, "video")
+	if err != nil {
+		return nil, err
+	}
+	videos := map[string]int{}
+	for _, m := range clips {
+		videos[m.Month] += m.Count
+	}
+	out := make([]source.PhotoMonth, 0, len(all))
+	for _, m := range all {
+		if m.Count -= videos[m.Month]; m.Count > 0 {
+			out = append(out, m)
+		}
+	}
+	return out, nil
 }
 
 func (s *Server) typeMonths(r *http.Request, t source.PhotoTimeline, kind string) ([]source.PhotoMonth, error) {

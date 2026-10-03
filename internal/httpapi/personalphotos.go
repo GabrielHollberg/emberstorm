@@ -23,6 +23,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/photoimport"
 	"github.com/GabrielHollberg/soundstorm/internal/source"
 	"github.com/GabrielHollberg/soundstorm/internal/state"
+	"github.com/GabrielHollberg/soundstorm/internal/tags"
 )
 
 // Everyone's own photos (the owner's design): each member has their own
@@ -546,18 +547,40 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 // picture by the file, which is the day it was backed up: years-old pictures
 // showed as yesterday (the owner's report, 2026-10-03). The phone's date is
 // its photo library's own record, ranked as a download's (Google's or
-// Apple's record). A video carries its own date, which Immich reads.
+// Apple's record). A video is dated the same way when it holds no date - a
+// clip saved from the web or a message has none, and showed as the day it
+// arrived.
 func (s *Server) backupDated(dest string, takenMs int64) {
 	s.datePicture(filepath.Join(s.library.Root(), filepath.FromSlash(dest)), takenMs)
 }
 
-// datedPictureExt is what backupDated dates: stills. A video carries its own.
+// datedPictureExt is what backupDated dates: stills, and the videos whose
+// date is read from inside them (MP4 and QuickTime).
 func datedPictureExt(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".jpg", ".jpeg", ".png", ".heic", ".heif", ".gif", ".webp", ".tif", ".tiff", ".dng":
+	case ".jpg", ".jpeg", ".png", ".heic", ".heif", ".gif", ".webp", ".tif", ".tiff", ".dng",
+		".mp4", ".mov", ".m4v", ".3gp":
 		return true
 	}
 	return false
+}
+
+// ownDate is whether a picture or video carries a date of its own.
+func ownDate(full string) bool {
+	switch strings.ToLower(filepath.Ext(full)) {
+	case ".mp4", ".mov", ".m4v", ".3gp":
+		_, ok := tags.VideoDate(full)
+		return ok
+	}
+	f, err := os.Open(full)
+	if err != nil {
+		return false
+	}
+	head := make([]byte, 512<<10)
+	n, _ := io.ReadFull(f, head)
+	f.Close()
+	_, ok := photoimport.FileTaken(full, head[:n])
+	return ok
 }
 
 // ownDated remembers pictures found to carry a date of their own, so the
@@ -607,13 +630,8 @@ func (s *Server) datePicture(full string, takenMs int64) bool {
 		return false
 	}
 	taken := time.UnixMilli(takenMs)
-	if f, err := os.Open(full); err == nil {
-		head := make([]byte, 512<<10)
-		n, _ := io.ReadFull(f, head)
-		f.Close()
-		if _, ok := photoimport.FileTaken(full, head[:n]); ok {
-			return false
-		}
+	if ownDate(full) {
+		return false
 	}
 	_ = os.Chtimes(full, taken, taken)
 	if _, err := os.Stat(full + ".xmp"); err == nil {

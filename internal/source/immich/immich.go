@@ -717,6 +717,8 @@ func typeFilter(kind string) (map[string]any, error) {
 	switch kind {
 	case "video":
 		return map[string]any{"type": "VIDEO"}, nil
+	case "photo":
+		return map[string]any{"type": "IMAGE"}, nil
 	case "live":
 		return map[string]any{"type": "IMAGE", "isMotion": true}, nil
 	}
