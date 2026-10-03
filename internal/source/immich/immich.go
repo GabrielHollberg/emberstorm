@@ -711,3 +711,103 @@ func (s *Source) MonthPhotos(ctx context.Context, month string) ([]media.Item, e
 	sort.SliceStable(out, func(a, c int) bool { return out[a].Extra["taken"] > out[c].Extra["taken"] })
 	return out, nil
 }
+
+// typeFilter is Immich's search filter for one kind of photo.
+func typeFilter(kind string) (map[string]any, error) {
+	switch kind {
+	case "video":
+		return map[string]any{"type": "VIDEO"}, nil
+	case "live":
+		return map[string]any{"type": "IMAGE", "isMotion": true}, nil
+	}
+	return nil, fmt.Errorf("no such kind of photo %q", kind)
+}
+
+// maxTypeTimeline is the most clips or Live Photos counted for a timeline:
+// far beyond a household's, and an end to what one count may cost.
+const maxTypeTimeline = 200000
+
+// PhotoMonthsOf counts the asker's clips or Live Photos by month, newest
+// first. Immich's timeline buckets cannot be asked for one kind, so it is a
+// search of them all, counted by the date each was taken (local time, as the
+// timeline's own months are).
+func (s *Source) PhotoMonthsOf(ctx context.Context, kind string) ([]source.PhotoMonth, error) {
+	filter, err := typeFilter(kind)
+	if err != nil {
+		return nil, err
+	}
+	_, lib, err := s.as(ctx)
+	if err != nil {
+		return nil, err
+	}
+	body := map[string]any{"libraryId": lib, "order": "desc", "isOffline": false}
+	for k, v := range filter {
+		body[k] = v
+	}
+	found, err := s.page(ctx, "/api/search/metadata", body, maxTypeTimeline)
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]int{}
+	for _, a := range found {
+		if a.IsOffline || a.IsTrashed || len(a.LocalDateTime) < 7 {
+			continue
+		}
+		counts[a.LocalDateTime[:7]]++
+	}
+	out := make([]source.PhotoMonth, 0, len(counts))
+	for m, n := range counts {
+		out = append(out, source.PhotoMonth{Month: m, Count: n})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Month > out[j].Month })
+	return out, nil
+}
+
+// MonthPhotosOf is one month's clips or Live Photos, newest first. Immich
+// searches by the moment taken (UTC) and files by local time, so the search
+// reaches a day past the month at each end and keeps the month's own.
+func (s *Source) MonthPhotosOf(ctx context.Context, kind, month string) ([]media.Item, error) {
+	filter, err := typeFilter(kind)
+	if err != nil {
+		return nil, err
+	}
+	start, err := time.Parse("2006-01", month)
+	if err != nil {
+		return nil, fmt.Errorf("no such month %q", month)
+	}
+	filter["takenAfter"] = start.AddDate(0, 0, -1).Format(time.RFC3339)
+	filter["takenBefore"] = start.AddDate(0, 1, 1).Format(time.RFC3339)
+	items, err := s.photos(ctx, filter, maxTypeTimeline)
+	if err != nil {
+		return nil, err
+	}
+	out := items[:0]
+	for _, it := range items {
+		if strings.HasPrefix(it.Extra["taken"], month) {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+// FindSidecars starts Immich's sidecar discovery, which looks beside every
+// photo that has none recorded and reads what it finds - how a date written
+// beside a photo Immich already has reaches it. /api/jobs/sidecar with
+// "start" is what starts it on 3.2.2 (checked: the photo took its date); the
+// newer /api/queues/sidecar answers the same request 200 and only reports the
+// queue - a trap, so it is not used.
+func (s *Source) FindSidecars(ctx context.Context) error {
+	resp, err := s.http.Do(ctx, httpx.Request{
+		Method:  http.MethodPut,
+		Path:    "/api/jobs/sidecar",
+		Body:    map[string]any{"command": "start", "force": false},
+		Headers: s.admin(),
+	})
+	if err == nil {
+		err = resp.Err()
+	}
+	if err != nil {
+		return fmt.Errorf("immich %q: sidecar discovery: %w", s.id, err)
+	}
+	return nil
+}

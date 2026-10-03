@@ -818,4 +818,16 @@ type PhotoTimeline interface {
 	PhotoMonths(ctx context.Context) ([]PhotoMonth, error)
 	// MonthPhotos is one month's photos, newest first.
 	MonthPhotos(ctx context.Context, month string) ([]media.Item, error)
+	// PhotoMonthsOf and MonthPhotosOf are the same for the clips ("video")
+	// or the Live Photos ("live") alone.
+	PhotoMonthsOf(ctx context.Context, kind string) ([]PhotoMonth, error)
+	MonthPhotosOf(ctx context.Context, kind, month string) ([]media.Item, error)
+}
+
+// SidecarFinder is an optional interface for a photo source that must be told
+// to look for date files (XMP sidecars) beside photos it already has: Immich
+// reads one only when it first takes a photo in, or when its discovery job
+// runs - a rescan does not (checked against 3.2.2).
+type SidecarFinder interface {
+	FindSidecars(ctx context.Context) error
 }

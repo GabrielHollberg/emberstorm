@@ -202,3 +202,40 @@ func TestADeletedBackupIsNotSentBack(t *testing.T) {
 		t.Errorf("put back and removed again by hand, it should be wanted: %v %v", err, got)
 	}
 }
+
+// A picture backed up before the phone's date was written beside it gets that
+// date when a phone next asks about it - on any install, with nothing sent
+// again: every backup run asks about every photo, with when it was taken.
+func TestAnOldBackupHealsOnTheNextCheck(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t)
+	taken := time.Date(2021, 6, 5, 10, 30, 0, 0, time.UTC)
+	dir := filepath.Join(h.libraryRoot(t), "pictures", "Personal", "gabe", "2021", "06")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	full := filepath.Join(dir, "Saved.png")
+	png := "\x89PNG\r\n\x1a\n saved from a message, no date inside"
+	if err := os.WriteFile(full, []byte(png), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ask := func() {
+		h.do(t, http.MethodPost, "/api/photos/backup/check",
+			`{"items":[{"name":"Saved.png","taken":`+strconv.FormatInt(taken.UnixMilli(), 10)+`,"size":`+strconv.Itoa(len(png))+`}]}`)
+	}
+	ask()
+	side, err := os.ReadFile(full + ".xmp")
+	if err != nil || !strings.Contains(string(side), "2021-06-05T10:30:00") {
+		t.Fatalf("the phone's date was not written beside it: %v\n%s", err, side)
+	}
+	if st, _ := os.Stat(full); !st.ModTime().Equal(taken) {
+		t.Errorf("file date %v, want %v", st.ModTime(), taken)
+	}
+	// Asked directly, another picture with no date inside is dated too.
+	cam := filepath.Join(dir, "IMG_1.jpg")
+	os.WriteFile(cam, []byte("not a real jpeg"), 0o644)
+	h.api.backupHeal("gabe", "2021/06/IMG_1.jpg", backupItem{Name: "IMG_1.jpg", Taken: taken.UnixMilli()})
+	if _, err := os.Stat(cam + ".xmp"); err != nil {
+		t.Errorf("a picture with no date inside should be dated: %v", err)
+	}
+}

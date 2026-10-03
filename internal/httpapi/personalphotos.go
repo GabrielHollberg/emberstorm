@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/library"
 	"github.com/GabrielHollberg/soundstorm/internal/media"
 	"github.com/GabrielHollberg/soundstorm/internal/photoimport"
+	"github.com/GabrielHollberg/soundstorm/internal/source"
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
@@ -359,6 +361,7 @@ func (s *Server) photoSaved(u state.User, dest string, pl *photoPlace) {
 	pl.ix.add(full, pl.size, pl.sum)
 	if !pl.exif && !pl.meta.Taken.IsZero() {
 		_ = os.WriteFile(full+".xmp", photoimport.XMPSidecarFrom(pl.meta, pl.src), 0o666)
+		s.findSidecarsSoon()
 	}
 	if !u.IsOwner() {
 		s.addPhotoBytes(u, pl.size)
@@ -444,6 +447,11 @@ func (s *Server) handleBackupCheck(w http.ResponseWriter, r *http.Request) {
 				have[i] = s.personalSentBefore(u.Name, rel, it.Size)
 			} else {
 				have[i] = s.library.PersonalHas(u.Name, rel, 0)
+			}
+			// Here already: given the phone's date if it has none of its own
+			// (backups before that was written heal on the next run).
+			if have[i] {
+				s.backupHeal(u.Name, rel, it)
 			}
 			// Deleted here: the phone is told it is here, so it is not sent back.
 			have[i] = have[i] || s.wasDeleted(u.Name, rel, it.Size)
@@ -540,29 +548,80 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 // its photo library's own record, ranked as a download's (Google's or
 // Apple's record). A video carries its own date, which Immich reads.
 func (s *Server) backupDated(dest string, takenMs int64) {
-	if takenMs <= 0 {
-		return
-	}
-	switch strings.ToLower(filepath.Ext(dest)) {
+	s.datePicture(filepath.Join(s.library.Root(), filepath.FromSlash(dest)), takenMs)
+}
+
+// datedPictureExt is what backupDated dates: stills. A video carries its own.
+func datedPictureExt(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
 	case ".jpg", ".jpeg", ".png", ".heic", ".heif", ".gif", ".webp", ".tif", ".tiff", ".dng":
-	default:
+		return true
+	}
+	return false
+}
+
+// ownDated remembers pictures found to carry a date of their own, so the
+// heal on every backup check reads each one once.
+var ownDated sync.Map
+
+// backupHeal gives a picture already backed up the date the phone gives for
+// it now, when it carries none of its own and has none beside it - what every
+// backup from before backupDated lacked, on any install: each phone asks about
+// all its photos every run (with when each was taken), so such pictures heal
+// on the next run, with the exact date, nothing sent again or deleted. Kept
+// cheap, as it runs for every photo of every run: a picture with a date beside
+// it, or whose file date is already the phone's (backupDated sets it), is
+// passed by its details alone; any other is read once and remembered.
+func (s *Server) backupHeal(name, rel string, it backupItem) {
+	if it.Taken <= 0 || !datedPictureExt(rel) {
 		return
 	}
-	full := filepath.Join(s.library.Root(), filepath.FromSlash(dest))
+	shelfRel, err := library.PersonalPath(name, rel)
+	if err != nil {
+		return
+	}
+	full := filepath.Join(s.library.PathFor(media.KindPicture), filepath.FromSlash(shelfRel))
+	st, err := os.Stat(full)
+	if err != nil || !st.Mode().IsRegular() || (it.Size > 0 && st.Size() != it.Size) {
+		return
+	}
+	if _, err := os.Stat(full + ".xmp"); err == nil {
+		return
+	}
+	if d := st.ModTime().Sub(time.UnixMilli(it.Taken)); d < 36*time.Hour && d > -36*time.Hour {
+		return
+	}
+	key := full + "|" + strconv.FormatInt(st.Size(), 10)
+	if _, ok := ownDated.Load(key); ok {
+		return
+	}
+	if !s.datePicture(full, it.Taken) {
+		ownDated.Store(key, true)
+	}
+}
+
+// datePicture writes the phone's date beside a picture with none inside it,
+// and onto the file; it answers false when the picture has its own.
+func (s *Server) datePicture(full string, takenMs int64) bool {
+	if takenMs <= 0 || !datedPictureExt(full) {
+		return false
+	}
 	taken := time.UnixMilli(takenMs)
 	if f, err := os.Open(full); err == nil {
 		head := make([]byte, 512<<10)
 		n, _ := io.ReadFull(f, head)
 		f.Close()
 		if _, ok := photoimport.ExifTaken(head[:n]); ok {
-			return
+			return false
 		}
 	}
 	_ = os.Chtimes(full, taken, taken)
 	if _, err := os.Stat(full + ".xmp"); err == nil {
-		return
+		return true
 	}
 	_ = os.WriteFile(full+".xmp", photoimport.XMPSidecarFrom(photoimport.Meta{Taken: taken}, photoimport.SourceDownload), 0o666)
+	s.findSidecarsSoon()
+	return true
 }
 
 // backupAccount refuses a phone's backup made for somebody else. The app
@@ -763,6 +822,7 @@ func (s *Server) improvePhoto(u state.User, existing string, inc photoimport.Met
 		// The date inside the photo stands; the sidecar adds only the place.
 		write.Taken = time.Time{}
 	}
+	s.findSidecarsSoon()
 	if err := os.WriteFile(existing+".xmp", photoimport.XMPSidecarFrom(write, src), 0o666); err != nil {
 		return false
 	}
@@ -803,4 +863,41 @@ func managedPhoto(personal, file string) bool {
 		return false
 	}
 	return datedFolder.MatchString(path.Dir(filepath.ToSlash(rel)))
+}
+
+// sidecarSoon gathers the date files written in a little while into one
+// request for the photo source to look for them (source.SidecarFinder): a
+// backup check healing hundreds asks once.
+var sidecarSoon struct {
+	sync.Mutex
+	timer *time.Timer
+}
+
+func (s *Server) findSidecarsSoon() {
+	sidecarSoon.Lock()
+	defer sidecarSoon.Unlock()
+	if sidecarSoon.timer != nil {
+		return
+	}
+	sidecarSoon.timer = time.AfterFunc(20*time.Second, func() {
+		sidecarSoon.Lock()
+		sidecarSoon.timer = nil
+		sidecarSoon.Unlock()
+		defer func() {
+			if r := recover(); r != nil {
+				s.log.Error("asking the photo library to read new date files stopped", "panic", r)
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		for _, src := range s.reg.All(ctx) {
+			if f, ok := src.(source.SidecarFinder); ok && src.Kind() == media.KindPicture {
+				if err := f.FindSidecars(ctx); err != nil {
+					s.log.Warn("asking the photo library to read new date files", "err", err)
+				} else {
+					s.log.Info("asked the photo library to read new date files", "source", src.ID())
+				}
+			}
+		}
+	})
 }

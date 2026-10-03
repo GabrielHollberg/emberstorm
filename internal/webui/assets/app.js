@@ -13590,6 +13590,12 @@ async function showPhotoBrowse(seq) {
 async function showPhotoType(seq) {
   const view = $('music-view');
   const type = PHOTO_TYPES[state.kind];
+  // Nothing typed: the same timeline as the Photos pill, month by month from
+  // the server (counted there, with no ceiling on how many).
+  if (!state.query && !TV) {
+    await showPhotoTimeline(seq, type);
+    return;
+  }
   $('status').textContent = '';
   if (!view.children.length) showSkeleton(view, 'grid');
   const { ok, body } = await api(`/api/photos/of?${new URLSearchParams({ type })}`);
@@ -20534,6 +20540,7 @@ const tlCols = () => {
 };
 
 function tlMonthName(month) {
+  if (!/^\d{4}-\d{2}$/.test(month)) return 'No date';
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
@@ -20552,10 +20559,11 @@ function tlGuessHeight(count, width) {
   return Math.ceil(count / cols) * tile + days * (tile * 0.35 + 34);
 }
 
-async function showPhotoTimeline(seq) {
+async function showPhotoTimeline(seq, type = '') {
   const view = $('music-view');
   $('status').textContent = '';
-  const { ok, body } = await api('/api/photos/months');
+  TL.type = type;
+  const { ok, body } = await api(`/api/photos/months${type ? `?type=${type}` : ''}`);
   if (seq !== state.searchSeq) return;
   if (!ok || !body) {
     view.replaceChildren();
@@ -20569,7 +20577,9 @@ async function showPhotoTimeline(seq) {
   state.items = [];
   if (!months.length) {
     view.replaceChildren();
-    $('status').textContent = 'No photos yet. Add some from Settings, or turn on this phone\u2019s backup.';
+    $('status').textContent = type === 'video' ? 'No videos in your photos yet.'
+      : type === 'live' ? 'No Live Photos yet. iPhone Live Photos and Android motion photos show here.'
+        : 'No photos yet. Add some from Settings, or turn on this phone\u2019s backup.';
     return;
   }
   const root = document.createElement('div');
@@ -20603,14 +20613,20 @@ async function tlLoad(sec, seq) {
   const month = sec.dataset.month;
   if (TL.loaded.has(month) || sec.dataset.loading) return;
   sec.dataset.loading = '1';
-  const { ok, body } = await api(`/api/photos/month?${new URLSearchParams({ m: month })}`);
+  const params = new URLSearchParams({ m: month });
+  if (TL.type) params.set('type', TL.type);
+  const { ok, body } = await api(`/api/photos/month?${params}`);
   if (seq !== state.searchSeq || !sec.isConnected) return;
   delete sec.dataset.loading;
   if (!ok || !body) return;
   const items = body.items || [];
   TL.loaded.set(month, items);
   TL.io.unobserve(sec);
-  // Days, newest first, each a heading and a grid.
+  tlFill(sec, items);
+}
+
+// Draws a month: its days, newest first, each a heading and a grid.
+function tlFill(sec, items) {
   const frag = document.createDocumentFragment();
   let day = '';
   let grid = null;
@@ -20625,7 +20641,17 @@ async function tlLoad(sec, seq) {
       grid.className = 'tl-grid';
       frag.append(h, grid);
     }
-    grid.append(renderItem(it));
+    const tile = renderItem(it);
+    // A video says so, with its length, as Google's tiles do.
+    if (it.extra && it.extra.type === 'video') {
+      const wrap = tile.querySelector('.art-wrap');
+      const len = document.createElement('span');
+      len.className = 'tl-length';
+      len.textContent = it.durationSeconds ? tlClock(it.durationSeconds) : '';
+      len.prepend(icon('play'));
+      if (wrap) wrap.append(len);
+    }
+    grid.append(tile);
   }
   const tlBody = sec.querySelector('.tl-body');
   tlBody.style.height = '';
@@ -20677,7 +20703,7 @@ function tlScrubber(root) {
     let lastY = -100;
     for (const sec of root.querySelectorAll('.tl-month')) {
       const year = sec.dataset.month.slice(0, 4);
-      if (year === last) continue;
+      if (year === last || !/^\d{4}$/.test(year)) continue;
       last = year;
       const y = Math.round(((sec.getBoundingClientRect().top + scrollY - top) / span) * h);
       if (y - lastY < 22) continue; // labels kept apart
@@ -20760,4 +20786,13 @@ function tlPinch(root) {
     }
   }, { passive: false });
   root.addEventListener('touchend', (event) => { if (event.touches.length < 2) start = 0; });
+}
+
+// A clip's length as a clock: 0:02, 4:31, 1:04:30.
+function tlClock(seconds) {
+  const t = Math.max(0, Math.round(seconds));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const sec = String(t % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
 }

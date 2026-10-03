@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/GabrielHollberg/soundstorm/internal/auth"
 	"github.com/GabrielHollberg/soundstorm/internal/media"
 	"github.com/GabrielHollberg/soundstorm/internal/source"
 )
@@ -238,7 +239,17 @@ func (s *Server) handlePhotoMonths(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"months": []any{}})
 		return
 	}
-	months, err := t.PhotoMonths(ctx)
+	var months []source.PhotoMonth
+	var err error
+	switch kind := r.URL.Query().Get("type"); kind {
+	case "":
+		months, err = t.PhotoMonths(ctx)
+	case "video", "live":
+		months, err = s.typeMonths(r, t, kind)
+	default:
+		writeError(w, http.StatusBadRequest, "expected type=video or type=live")
+		return
+	}
 	if err != nil {
 		s.photosError(w, err)
 		return
@@ -263,10 +274,59 @@ func (s *Server) handlePhotoMonth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}})
 		return
 	}
-	items, err := t.MonthPhotos(ctx, m)
+	var items []media.Item
+	var err error
+	switch kind := r.URL.Query().Get("type"); kind {
+	case "":
+		items, err = t.MonthPhotos(ctx, m)
+	case "video", "live":
+		items, err = t.MonthPhotosOf(ctx, kind, m)
+	default:
+		writeError(w, http.StatusBadRequest, "expected type=video or type=live")
+		return
+	}
 	if err != nil {
 		s.photosError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": nonNil(items)})
+}
+
+// typeMonthCache keeps a person's month counts of clips or Live Photos a few
+// minutes: counting them is a search of them all, and the timeline asks each
+// time the category opens.
+var typeMonthCache struct {
+	sync.Mutex
+	m map[string]typeMonths
+}
+
+type typeMonths struct {
+	at     time.Time
+	months []source.PhotoMonth
+}
+
+func (s *Server) typeMonths(r *http.Request, t source.PhotoTimeline, kind string) ([]source.PhotoMonth, error) {
+	key := kind
+	if u, ok := auth.FromContext(r.Context()); ok {
+		key = u.ID + "|" + kind
+	}
+	typeMonthCache.Lock()
+	if c, ok := typeMonthCache.m[key]; ok && time.Since(c.at) < 3*time.Minute {
+		typeMonthCache.Unlock()
+		return c.months, nil
+	}
+	typeMonthCache.Unlock()
+	ctx, cancel := context.WithTimeout(r.Context(), photosDeadline)
+	defer cancel()
+	months, err := t.PhotoMonthsOf(ctx, kind)
+	if err != nil {
+		return nil, err
+	}
+	typeMonthCache.Lock()
+	if typeMonthCache.m == nil || len(typeMonthCache.m) > 200 {
+		typeMonthCache.m = map[string]typeMonths{}
+	}
+	typeMonthCache.m[key] = typeMonths{at: time.Now(), months: months}
+	typeMonthCache.Unlock()
+	return months, nil
 }
