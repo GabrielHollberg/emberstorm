@@ -869,6 +869,7 @@
     <div id="photo-stage" class="pv-stage">
       <img id="photo-image" alt="" draggable="false">
       <video id="photo-live-video" class="pv-live-video hidden" playsinline preload="none"></video>
+      <video id="photo-video" class="pv-live-video pv-clip hidden" playsinline preload="auto"></video>
       <img id="photo-prev-image" class="pv-side" alt="" draggable="false">
       <img id="photo-next-image" class="pv-side" alt="" draggable="false">
     </div>
@@ -881,7 +882,17 @@
       <button id="photo-live" class="pv-live hidden" type="button" aria-label="Play the Live Photo">LIVE</button>
       <a id="photo-download" class="np-icon" href="#" aria-label="Download original" title="Download original"></a>
     </div>
-    <div class="pv-bottom"><span id="photo-caption"></span></div>
+    <div class="pv-bottom">
+      <!-- A video among the photos plays here, as in a phone's own photos:
+           play and pause, and a timeline. -->
+      <div id="photo-vbar" class="pv-vbar hidden">
+        <button id="photo-vplay" class="np-icon" type="button" aria-label="Pause"></button>
+        <span id="photo-vtime" class="pv-vtime">0:00</span>
+        <input id="photo-vseek" type="range" min="0" max="1000" step="1" value="0" aria-label="Position in the video">
+        <span id="photo-vlen" class="pv-vtime"></span>
+      </div>
+      <span id="photo-caption"></span>
+    </div>
     <button id="photo-prev" class="photo-nav photo-prev" type="button" aria-label="Previous photo"></button>
     <button id="photo-next" class="photo-nav photo-next" type="button" aria-label="Next photo"></button>
   </div>

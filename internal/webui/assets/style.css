@@ -2475,6 +2475,7 @@ body.photo-open { overflow: hidden; }
 .pv-count { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.8); font-variant-numeric: tabular-nums; }
 .pv-top .np-icon { color: #fff; display: grid; place-items: center; }
 .pv-bottom {
+  flex-direction: column;
   bottom: 0;
   justify-content: center;
   padding: 28px 18px max(16px, var(--safe-bottom));
@@ -2483,6 +2484,12 @@ body.photo-open { overflow: hidden; }
   color: rgba(255, 255, 255, 0.85);
   text-align: center;
 }
+/* A video among the photos: play and a timeline above the caption. */
+.pv-vbar { display: flex; align-items: center; gap: 10px; width: min(560px, 100%); }
+.pv-vbar.hidden { display: none; }
+.pv-vbar .np-icon { color: #fff; display: grid; place-items: center; flex: none; }
+.pv-vbar input[type="range"] { flex: 1; min-width: 0; accent-color: #fff; }
+.pv-vtime { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.85); flex: none; }
 .photo-viewer.pv-bare .pv-top,
 .photo-viewer.pv-bare .pv-bottom,
 .photo-viewer.pv-bare .photo-nav { opacity: 0; pointer-events: none; }
@@ -4302,11 +4309,12 @@ html, body { overscroll-behavior-y: none; }
 .photo-timeline { padding: 0 2px 40px; touch-action: pan-y; }
 .tl-month-head { margin: 22px 12px 6px; font-size: 20px; font-weight: 700; }
 .tl-day-head { margin: 12px 12px 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
-.tl-grid { display: grid; grid-template-columns: repeat(var(--tl-cols, 4), minmax(0, 1fr)); gap: 2px; }
+.tl-grid { display: grid; grid-template-columns: repeat(var(--tl-cols, 4), minmax(0, 1fr)); gap: 4px; padding: 0 4px; }
 .tl-grid .item-holder { min-width: 0; }
 .tl-grid .item { padding: 0; border-radius: 0; background: none; }
-.tl-grid .art-wrap { aspect-ratio: 1; border-radius: 0; margin: 0; }
-.tl-grid .art-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
+/* Rounded squares (the owner's liking), the corners smaller as more fit a row. */
+.tl-grid .art-wrap { aspect-ratio: 1; border-radius: clamp(4px, calc(40px / var(--tl-cols, 4)), 12px); overflow: hidden; margin: 0; }
+.tl-grid .art-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .tl-grid .meta, .tl-grid .item-more { display: none; }
 .tl-scrub {
   position: fixed; z-index: 12; right: 0; width: 46px;

@@ -2730,10 +2730,9 @@ function play(item, options = {}) {
       else playVideo(item);
       break;
     case 'picture':
-      // A clip from a camera roll plays like any video; everything else is a
-      // photo, shown in the viewer.
-      if (item.extra && item.extra.type === 'video') playVideo(item);
-      else showPhoto(item);
+      // Photo or video, the viewer: a video plays there, and a swipe goes on
+      // to what is either side, as in a phone's own photos.
+      showPhoto(item);
       break;
     case 'ebook':
     case 'document':
@@ -2754,9 +2753,12 @@ function play(item, options = {}) {
 // The photo viewer. Photos only: stepping onto a clip would mean switching
 // players mid-browse, so the arrows skip over clips and a click on one plays
 // it instead.
+// What the viewer walks: the photos and videos on the page, in order - a
+// video plays in place as it is swiped to, as in a phone's own photos.
 function photosOnScreen() {
-  return state.items.filter((i) => i.kind === 'picture' && !(i.extra && i.extra.type === 'video'));
+  return state.items.filter((i) => i.kind === 'picture');
 }
+const isClip = (item) => Boolean(item && item.extra && item.extra.type === 'video');
 
 let photoShown = null;
 let photoWaiting = false;
@@ -2767,6 +2769,7 @@ function showPhoto(item) {
   // The music plays on while photos are looked at, as it does over a book
   // (the owner's asking); a clip is a film and stops it (playVideo).
   closeVideo();
+  leaveClip();
   const stepping = Boolean(photoShown);
   photoShown = item;
   // Controlling a TV: the photo shows there too, and stepping here steps it -
@@ -2792,7 +2795,8 @@ function showPhoto(item) {
   download.href = streamPath(item);
   download.download = item.title;
   stopLive();
-  show($('photo-live'), Boolean(item.extra && item.extra.live) && !state.offline);
+  show($('photo-live'), Boolean(item.extra && item.extra.live) && !state.offline && !isClip(item));
+  if (isClip(item)) startClip(item);
 
   const photos = photosOnScreen();
   const at = photos.findIndex((p) => p.id === item.id && p.sourceId === item.sourceId);
@@ -2873,7 +2877,68 @@ $('photo-live').addEventListener('click', (event) => {
 });
 $('photo-live-video').addEventListener('ended', stopLive);
 
+// A video in the viewer: played over its still (the library's preview of
+// it), moving with it in a swipe. The music pauses for it and plays on after.
+// Controlling a TV it plays there, not here as well.
+const clip = { musicPaused: false };
+function startClip(item) {
+  const v = $('photo-video');
+  if (CONTROL.target && !TV) {
+    $('photo-caption').textContent += ` \u2014 playing on ${CONTROL.target.name}`;
+    return;
+  }
+  if (audio.item && !$('audio-player').paused) {
+    $('audio-player').pause();
+    clip.musicPaused = true;
+  }
+  show(v, true);
+  show($('photo-vbar'), true);
+  $('photo-vseek').value = 0;
+  $('photo-vtime').textContent = '0:00';
+  $('photo-vlen').textContent = item.durationSeconds ? tlClock(item.durationSeconds) : '';
+  v.src = streamPath(item);
+  v.play().catch(() => {});
+}
+function leaveClip() {
+  const v = $('photo-video');
+  if (v.getAttribute('src') !== null) {
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+  }
+  show(v, false);
+  show($('photo-vbar'), false);
+  if (clip.musicPaused) {
+    clip.musicPaused = false;
+    if (audio.item) $('audio-player').play().catch(() => {});
+  }
+}
+(() => {
+  const v = $('photo-video');
+  const btn = $('photo-vplay');
+  const paint = () => {
+    btn.replaceChildren(icon(v.paused ? 'play' : 'pause'));
+    btn.setAttribute('aria-label', v.paused ? 'Play' : 'Pause');
+  };
+  for (const ev of ['play', 'pause', 'ended', 'emptied']) v.addEventListener(ev, paint);
+  paint();
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (v.paused) v.play().catch(() => {}); else v.pause();
+  });
+  v.addEventListener('timeupdate', () => {
+    if (!v.duration) return;
+    if (document.activeElement !== $('photo-vseek')) $('photo-vseek').value = Math.round((v.currentTime / v.duration) * 1000);
+    $('photo-vtime').textContent = tlClock(v.currentTime);
+  });
+  v.addEventListener('loadedmetadata', () => { if (v.duration) $('photo-vlen').textContent = tlClock(v.duration); });
+  $('photo-vseek').addEventListener('input', () => {
+    if (v.duration) v.currentTime = (Number($('photo-vseek').value) / 1000) * v.duration;
+  });
+})();
+
 function closePhoto() {
+  leaveClip();
   stopLive();
   if (photoShown && CONTROL.target && !TV) controlSend({ type: 'control', action: 'closephoto' });
   photoShown = null;
@@ -2926,11 +2991,17 @@ const photoZoom = (() => {
     tx = Math.min(mx, Math.max(-mx, tx));
     ty = Math.min(my, Math.max(-my, ty));
   };
+  const clipEl = $('photo-video');
   const apply = (animate) => {
     img.style.transition = animate ? 'transform 0.22s ease-out, opacity 0.22s ease-out' : 'none';
     img.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+    // A video in the viewer moves with its still.
+    clipEl.style.transition = img.style.transition;
+    clipEl.style.transform = img.style.transform;
+    clipEl.style.opacity = img.style.opacity;
   };
   const zoomAbout = (p, next, animate) => {
+    if (isClip(photoShown)) next = 1; // a video is not zoomed
     next = Math.min(MAX, Math.max(1, next));
     // Keep the photo point under p where it is: p = t + q*s for the same q.
     tx = p.x - ((p.x - tx) * next) / s;
@@ -19557,7 +19628,7 @@ function remotePlay(c) {
   if (item.kind === 'music' && Array.isArray(c.queue) && c.queue.length) {
     const at = Math.max(0, Math.min(c.queue.length - 1, Number(c.index) || 0));
     playQueue(c.queue, at);
-  } else if (item.kind === 'picture' && !(item.extra && item.extra.type === 'video')) {
+  } else if (item.kind === 'picture') {
     state.items = [item];
     showPhoto(item);
     // The phone's next and last photos, fetched now: a swipe on the phone
