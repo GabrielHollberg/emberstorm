@@ -4313,8 +4313,14 @@ html, body { overscroll-behavior-y: none; }
 .tl-grid .item-holder { min-width: 0; }
 .tl-grid .item { padding: 0; border-radius: 0; background: none; }
 /* Rounded squares (the owner's liking), the corners smaller as more fit a row. */
-.tl-grid .art-wrap { aspect-ratio: 1; border-radius: clamp(4px, calc(40px / var(--tl-cols, 4)), 12px); overflow: hidden; margin: 0; }
-.tl-grid .art-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.tl-grid .art-wrap { aspect-ratio: 1; border-radius: clamp(4px, calc(40px / var(--tl-cols, 4)), 12px); overflow: hidden; margin: 0;
+  background-size: cover; background-position: center; }
+/* The thumbnail fades in over its blurred stand-in (tlStandIn). */
+.tl-grid .art-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; opacity: 0; transition: opacity 0.2s ease; }
+.tl-grid .art-wrap img.in { opacity: 1; }
+/* A month far off screen is not drawn until it comes near: thousands of
+   tiles scroll as lightly as a few hundred. Its size is remembered once seen. */
+.tl-month { content-visibility: auto; contain-intrinsic-size: auto 800px; }
 .tl-grid .meta, .tl-grid .item-more { display: none; }
 .tl-scrub {
   position: fixed; z-index: 12; right: 0; width: 46px;

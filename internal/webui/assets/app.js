@@ -20731,11 +20731,18 @@ async function showPhotoTimeline(seq, type = '') {
     const body = document.createElement('div');
     body.className = 'tl-body';
     body.style.height = `${Math.round(tlGuessHeight(count, width))}px`;
+    // Not drawn while far off (content-visibility): its size until then is
+    // this guess and its heading, so the handle and the page agree.
+    sec.style.containIntrinsicSize = `auto ${Math.round(tlGuessHeight(count, width)) + 60}px`;
     sec.append(h, body);
     root.append(sec);
   }
   root.append(tlScrubber(root));
+  TL.seq = seq;
   TL.io = new IntersectionObserver((entries) => {
+    // Dragging the handle flies past months: none are fetched until it is let
+    // go, then only those where it landed (tlLoadNear).
+    if (TL.dragging) return;
     for (const e of entries) if (e.isIntersecting) tlLoad(e.target, seq);
   }, { rootMargin: '1200px 0px' });
   for (const sec of root.querySelectorAll('.tl-month')) TL.io.observe(sec);
@@ -20758,6 +20765,15 @@ async function tlLoad(sec, seq) {
   tlFill(sec, items);
 }
 
+// The months within reach of the screen, fetched: after the handle is let go.
+function tlLoadNear() {
+  if (!TL.root || !TL.root.isConnected) return;
+  for (const sec of TL.root.querySelectorAll('.tl-month')) {
+    const r = sec.getBoundingClientRect();
+    if (r.bottom > -1200 && r.top < innerHeight + 1200) tlLoad(sec, TL.seq);
+  }
+}
+
 // Draws a month: its days, newest first, each a heading and a grid.
 function tlFill(sec, items) {
   const frag = document.createDocumentFragment();
@@ -20775,6 +20791,7 @@ function tlFill(sec, items) {
       frag.append(h, grid);
     }
     const tile = renderItem(it);
+    tlStandIn(tile, it);
     // A video says so, with its length, as Google's tiles do.
     if (it.extra && it.extra.type === 'video') {
       tlPreview.watch(tile, it);
@@ -20796,6 +20813,124 @@ function tlFill(sec, items) {
   if (TL.root) TL.root.dispatchEvent(new Event('tl-layout'));
 }
 
+// A tile's stand-in: the photo library keeps a tiny blurred picture of every
+// photo (a ThumbHash, about 30 bytes), sent with the month. It is painted
+// behind the tile the moment the tile exists, and the real thumbnail fades in
+// over it as it arrives - so scrolling through thousands shows the photos'
+// colours and shapes at once rather than grey squares, as Google's does.
+const standIns = new Map();
+function tlStandIn(tile, item) {
+  const wrap = tile.querySelector('.art-wrap');
+  const img = wrap && wrap.querySelector('img');
+  const hash = item.extra && item.extra.thumbhash;
+  if (!wrap) return;
+  if (hash) {
+    let url = standIns.get(hash);
+    if (url === undefined) {
+      url = thumbHashURL(hash);
+      if (standIns.size > 5000) standIns.clear();
+      standIns.set(hash, url);
+    }
+    if (url) wrap.style.backgroundImage = `url("${url}")`;
+  }
+  if (img) {
+    if (img.complete && img.naturalWidth) img.classList.add('in');
+    else img.addEventListener('load', () => img.classList.add('in'), { once: true });
+  }
+}
+
+// A ThumbHash's picture, as a small PNG address: the format's own decoding
+// (Evan Wallace's ThumbHash, written out here) - a low-frequency cosine image
+// of lightness, two colour channels and, if it has one, transparency.
+const thumbCanvas = document.createElement('canvas');
+function thumbHashURL(b64) {
+  try {
+    const hash = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    if (hash.length < 5) return '';
+    const { w, h, rgba } = thumbHashToRGBA(hash);
+    thumbCanvas.width = w;
+    thumbCanvas.height = h;
+    const ctx = thumbCanvas.getContext('2d');
+    const data = ctx.createImageData(w, h);
+    data.data.set(rgba);
+    ctx.putImageData(data, 0, 0);
+    return thumbCanvas.toDataURL();
+  } catch {
+    return '';
+  }
+}
+function thumbHashToRGBA(hash) {
+  const { PI, min, max, cos, round } = Math;
+  const header24 = hash[0] | (hash[1] << 8) | (hash[2] << 16);
+  const header16 = hash[3] | (hash[4] << 8);
+  const lDC = (header24 & 63) / 63;
+  const pDC = ((header24 >> 6) & 63) / 31.5 - 1;
+  const qDC = ((header24 >> 12) & 63) / 31.5 - 1;
+  const lScale = ((header24 >> 18) & 31) / 31;
+  const hasAlpha = header24 >> 23;
+  const pScale = ((header16 >> 3) & 63) / 63;
+  const qScale = ((header16 >> 9) & 63) / 63;
+  const isLandscape = header16 >> 15;
+  const lx = max(3, isLandscape ? (hasAlpha ? 5 : 7) : header16 & 7);
+  const ly = max(3, isLandscape ? header16 & 7 : (hasAlpha ? 5 : 7));
+  const aDC = hasAlpha ? (hash[5] & 15) / 15 : 1;
+  const aScale = (hash[5] >> 4) / 15;
+  const acStart = hasAlpha ? 6 : 5;
+  let acIndex = 0;
+  const channel = (nx, ny, scale) => {
+    const ac = [];
+    for (let cy = 0; cy < ny; cy++) {
+      for (let cx = cy ? 0 : 1; cx * ny < nx * (ny - cy); cx++) {
+        ac.push((((hash[acStart + (acIndex >> 1)] >> ((acIndex++ & 1) << 2)) & 15) / 7.5 - 1) * scale);
+      }
+    }
+    return ac;
+  };
+  const lAC = channel(lx, ly, lScale);
+  const pAC = channel(3, 3, pScale * 1.25);
+  const qAC = channel(3, 3, qScale * 1.25);
+  const aAC = hasAlpha ? channel(5, 5, aScale) : null;
+  const ratio = lx / ly;
+  const w = round(ratio > 1 ? 32 : 32 * ratio);
+  const h = round(ratio > 1 ? 32 / ratio : 32);
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  const fx = [];
+  const fy = [];
+  for (let y = 0, i = 0; y < h; y++) {
+    for (let x = 0; x < w; x++, i += 4) {
+      let l = lDC;
+      let pp = pDC;
+      let q = qDC;
+      let a = aDC;
+      for (let cx = 0, n = max(lx, hasAlpha ? 5 : 3); cx < n; cx++) fx[cx] = cos((PI / w) * (x + 0.5) * cx);
+      for (let cy = 0, n = max(ly, hasAlpha ? 5 : 3); cy < n; cy++) fy[cy] = cos((PI / h) * (y + 0.5) * cy);
+      for (let cy = 0, j = 0; cy < ly; cy++) {
+        for (let cx = cy ? 0 : 1, fy2 = fy[cy] * 2; cx * ly < lx * (ly - cy); cx++, j++) l += lAC[j] * fx[cx] * fy2;
+      }
+      for (let cy = 0, j = 0; cy < 3; cy++) {
+        for (let cx = cy ? 0 : 1, fy2 = fy[cy] * 2; cx < 3 - cy; cx++, j++) {
+          const f = fx[cx] * fy2;
+          pp += pAC[j] * f;
+          q += qAC[j] * f;
+        }
+      }
+      if (aAC) {
+        for (let cy = 0, j = 0; cy < 5; cy++) {
+          for (let cx = cy ? 0 : 1, fy2 = fy[cy] * 2; cx < 5 - cy; cx++, j++) a += aAC[j] * fx[cx] * fy2;
+        }
+      }
+      const b = l - (2 / 3) * pp;
+      const r = (3 * l - b + q) / 2;
+      const g = r - q;
+      rgba[i] = max(0, 255 * min(1, r));
+      rgba[i + 1] = max(0, 255 * min(1, g));
+      rgba[i + 2] = max(0, 255 * min(1, b));
+      rgba[i + 3] = max(0, 255 * min(1, a));
+    }
+  }
+  return { w, h, rgba };
+}
+
 // As the timeline is scrolled, one video in full view plays a silent preview
 // in its tile, as Google Photos does: the one nearest the middle of the
 // screen, once scrolling has rested half a second, its first eight seconds
@@ -20804,15 +20939,25 @@ function tlFill(sec, items) {
 // viewer open or the app hidden.
 const tlPreview = (() => {
   const visible = new Map(); // tile -> item, fully on screen
+  const half = new Set(); // tiles at least half on screen
   let current = null; // { tile, video }
+  let touched = null; // the video tile a finger last came down on
   let timer = 0;
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) {
       if (e.intersectionRatio >= 0.99) visible.set(e.target, e.target.tlItem);
       else visible.delete(e.target);
+      if (e.intersectionRatio >= 0.5) half.add(e.target);
+      else half.delete(e.target);
     }
     soon();
-  }, { threshold: [0, 0.99] });
+  }, { threshold: [0, 0.5, 0.99] });
+  // A swipe that starts on a video makes it the one that plays (the owner's
+  // asking), while it stays at least half on screen.
+  document.addEventListener('pointerdown', (event) => {
+    const tile = event.target.closest && event.target.closest('.tl-grid > *');
+    if (tile && tile.tlItem) { touched = tile; soon(); }
+  }, { capture: true, passive: true });
   const stop = () => {
     if (!current) return;
     const v = current.video;
@@ -20825,12 +20970,14 @@ const tlPreview = (() => {
   const allowed = () => !TV && !slowLink && !photoShown && !document.hidden && !state.offline;
   const choose = () => {
     for (const tile of [...visible.keys()]) if (!tile.isConnected) visible.delete(tile);
-    if (current && (!current.tile.isConnected || !visible.has(current.tile))) stop();
+    for (const tile of [...half]) if (!tile.isConnected) half.delete(tile);
+    if (touched && (!touched.isConnected || !half.has(touched))) touched = null;
+    if (current && (!current.tile.isConnected || !(visible.has(current.tile) || current.tile === touched))) stop();
     if (!allowed()) { stop(); return; }
     const mid = innerHeight / 2;
-    let best = null;
+    let best = touched;
     let bestD = Infinity;
-    for (const tile of visible.keys()) {
+    for (const tile of best ? [] : visible.keys()) {
       const r = tile.getBoundingClientRect();
       const d = Math.abs(r.top + r.height / 2 - mid);
       if (d < bestD) { best = tile; bestD = d; }
@@ -20850,7 +20997,7 @@ const tlPreview = (() => {
     fadeInWhenPlaying(v);
     v.addEventListener('timeupdate', () => { if (v.currentTime > 8) v.currentTime = 0; });
     v.addEventListener('ended', () => { v.currentTime = 0; v.play().catch(() => {}); });
-    v.src = streamPath(visible.get(best));
+    v.src = streamPath(best.tlItem);
     wrap.append(v);
     current = { tile: best, video: v };
     v.play().catch(() => {});
@@ -20945,6 +21092,7 @@ function tlScrubber(root) {
   };
   bar.addEventListener('pointerdown', (event) => {
     dragging = true;
+    TL.dragging = true;
     bar.classList.add('dragging');
     bar.setPointerCapture(event.pointerId);
     wake();
@@ -20955,7 +21103,9 @@ function tlScrubber(root) {
   const end = () => {
     if (!dragging) return;
     dragging = false;
+    TL.dragging = false;
     bar.classList.remove('dragging');
+    tlLoadNear();
     wake();
   };
   bar.addEventListener('pointerup', end);

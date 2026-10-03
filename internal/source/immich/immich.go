@@ -123,11 +123,17 @@ type asset struct {
 	// The moving part of a Live Photo (or an Android motion photo), a hidden
 	// video asset of its own; empty for anything else.
 	LivePhotoVideoID string `json:"livePhotoVideoId"`
-	ExifInfo         *struct {
+	// A tiny blurred picture of it, base64 (ThumbHash): the page draws it
+	// the moment the tile appears, while the real thumbnail arrives.
+	Thumbhash *string `json:"thumbhash"`
+	ExifInfo  *struct {
 		City    string `json:"city"`
 		Country string `json:"country"`
 	} `json:"exifInfo"`
 }
+
+// maxThumbhash bounds a ThumbHash passed on: a real one is about 30 bytes.
+const maxThumbhash = 64
 
 type searchResponse struct {
 	Assets struct {
@@ -263,6 +269,9 @@ func (s *Source) item(a asset, rank int) media.Item {
 	}
 	if a.Duration != nil && *a.Duration > 0 {
 		it.DurationSeconds = float64(*a.Duration) / 1000
+	}
+	if a.Thumbhash != nil && len(*a.Thumbhash) <= maxThumbhash {
+		it.Extra["thumbhash"] = *a.Thumbhash
 	}
 	if a.LivePhotoVideoID != "" && a.Type != "VIDEO" {
 		it.Extra["live"] = "1"
@@ -659,6 +668,7 @@ func (s *Source) MonthPhotos(ctx context.Context, month string) ([]media.Item, e
 		IsImage          []bool     `json:"isImage"`
 		IsTrashed        []bool     `json:"isTrashed"`
 		LivePhotoVideoID []*string  `json:"livePhotoVideoId"`
+		Thumbhash        []*string  `json:"thumbhash"`
 		FileCreatedAt    []string   `json:"fileCreatedAt"`
 		Ratio            []float64  `json:"ratio"`
 		Duration         []*float64 `json:"duration"`
@@ -677,6 +687,9 @@ func (s *Source) MonthPhotos(ctx context.Context, month string) ([]media.Item, e
 		it := media.Item{ID: id, SourceID: s.id, Kind: media.KindPicture, ArtID: id, Extra: map[string]string{"type": "image"}}
 		if i < len(b.IsImage) && !b.IsImage[i] {
 			it.Extra["type"] = "video"
+		}
+		if i < len(b.Thumbhash) && b.Thumbhash[i] != nil && len(*b.Thumbhash[i]) <= maxThumbhash {
+			it.Extra["thumbhash"] = *b.Thumbhash[i]
 		}
 		if i < len(b.LivePhotoVideoID) && b.LivePhotoVideoID[i] != nil && *b.LivePhotoVideoID[i] != "" && it.Extra["type"] == "image" {
 			it.Extra["live"] = "1"
