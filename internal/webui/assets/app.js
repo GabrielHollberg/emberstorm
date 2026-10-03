@@ -583,6 +583,28 @@ function forgetSetupCodeInAddress() {
   history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
 }
 
+// The app around the page (Android, iPhone) keeps its own opening screen - the
+// same icon - up until the page is ready to use: told once the loading screen
+// goes, or shows a message instead of the icon. Watched rather than called
+// from each place that hides it, so no new path can forget.
+(() => {
+  const boot = document.getElementById('boot');
+  const bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.soundstorm;
+  if (!boot || !bridge) return;
+  let told = false;
+  const check = () => {
+    if (told) return;
+    if (boot.classList.contains('hidden') || !boot.querySelector('.boot-mark')) {
+      told = true;
+      watch.disconnect();
+      try { bridge.postMessage({ type: 'ready' }); } catch { /* an older app */ }
+    }
+  };
+  const watch = new MutationObserver(check);
+  watch.observe(boot, { attributes: true, attributeFilter: ['class'], childList: true });
+  check();
+})();
+
 function showGate(hasAccount, setupCodeRequired) {
   show($('boot'), false);
   show($('app'), false);

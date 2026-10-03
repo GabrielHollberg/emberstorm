@@ -20,6 +20,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -82,6 +83,37 @@ class MainActivity : Activity() {
             packageManager.hasSystemFeature("android.software.leanback")
     }
 
+    // Whether there is something to show: the page has let its loading
+    // screen go (signed in, or the sign-in, or a message), or one of the
+    // app's own screens is up.
+    @Volatile private var ready = false
+
+    /**
+     * Keeps the system's opening screen (the icon on black) up until the app
+     * is ready to be used, so opening it goes from the icon straight to the
+     * app - it used to go icon, blank, icon (the owner). Eight seconds at most
+     * (the owner's choice): then the page's own loading screen, the same icon,
+     * carries on, and says what is wrong if anything is.
+     */
+    private fun holdOpeningScreen() {
+        val v = findViewById<View>(android.R.id.content)
+        val until = android.os.SystemClock.uptimeMillis() + OPENING_HOLD_MS
+        v.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                if (!ready && android.os.SystemClock.uptimeMillis() < until) return false
+                v.viewTreeObserver.removeOnPreDrawListener(this)
+                return true
+            }
+        })
+        v.postDelayed({ markReady() }, OPENING_HOLD_MS)
+    }
+
+    private fun markReady() {
+        if (ready) return
+        ready = true
+        findViewById<View>(android.R.id.content)?.invalidate()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Both bars hidden, everywhere (the owner's asking - the one thing
@@ -123,6 +155,7 @@ class MainActivity : Activity() {
             WindowInsetsCompat.CONSUMED
         }
         setContentView(root)
+        holdOpeningScreen()
         // Back, the new way. From Android 16 an app built for it no longer
         // gets onBackPressed: without this the system closed the app on
         // Back, from inside a menu or Now Playing - found on the TV.
@@ -269,6 +302,7 @@ class MainActivity : Activity() {
     private var connectScreen = 0
 
     private fun showConnect(prefill: Uri?) {
+        markReady()
         tearDownWeb()
         setStatusColor(Color.BLACK)
         val surface = Color.rgb(0x17, 0x1b, 0x22)
@@ -794,6 +828,8 @@ class MainActivity : Activity() {
         when (message.optString("type")) {
             // Posted, so the web view is not torn down inside its own callback.
             "changeServer" -> content.post { showConnect(server) }
+            // The page let its loading screen go: the opening screen may too.
+            "ready" -> content.post { markReady() }
             "media" -> MediaBridge.update(applicationContext, message)
             "audio" -> {
                 // Songs from the server now play natively: whatever the page
@@ -924,7 +960,11 @@ class MainActivity : Activity() {
         }
     }
 
+    // The longest the opening screen waits for the app to be ready.
+    private val OPENING_HOLD_MS = 8000L
+
     private fun showFailure(detail: String) {
+        markReady()
         failure?.let { content.removeView(it) }
         val host = server?.host ?: ""
         val accent = Color.rgb(0x6a, 0xa8, 0xff)
