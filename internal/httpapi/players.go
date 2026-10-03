@@ -314,6 +314,11 @@ func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 		Person string          `json:"person,omitempty"`
 		Busy   bool            `json:"busy"`
 		State  json.RawMessage `json:"state,omitempty"`
+		// Seconds since it was last heard from. An open player reports every
+		// few seconds; a TV switched off goes quiet at once, though it stays
+		// listed for playerGone - the phone controlling it takes the silence
+		// as off long before that.
+		Quiet int `json:"quiet"`
 	}
 	list := []out{}
 	for _, p := range h.m {
@@ -324,7 +329,7 @@ func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 		if !mine && !p.TV {
 			continue
 		}
-		o := out{ID: p.ID, Name: p.Name, TV: p.TV, Mine: mine}
+		o := out{ID: p.ID, Name: p.Name, TV: p.TV, Mine: mine, Quiet: int(now.Sub(p.Seen).Seconds())}
 		if mine {
 			o.State = p.State
 		} else {

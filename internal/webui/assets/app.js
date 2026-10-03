@@ -19761,6 +19761,9 @@ $('player-ask-no').addEventListener('click', () => answerPlayerAsk(false));
 // Browsing stays on the phone. Choosing the phone again leaves the TV
 // playing, and a chip says so, a tap choosing it again.
 const CONTROL_KEY = 'soundstorm-control';
+// Seconds without a word from the device controlled before it is taken for
+// switched off: it reports every few, and its long poll waits 25.
+const CONTROL_QUIET = 30;
 
 function renderControl() {
   const btn = $('ctl-btn');
@@ -19794,6 +19797,20 @@ async function watchControl() {
     }
     return;
   }
+  // Switched off: a TV that is on reports every few seconds, and one turned
+  // off goes quiet at once though the server lists it a while longer - the
+  // phone kept thinking it controlled it (the owner's report).
+  if (body.quiet > CONTROL_QUIET) {
+    if (CONTROL.target === t) {
+      showToast(`${t.name} seems to be off. Playing on this phone again.`);
+      setControl(null);
+      if (RA.on) dropMirror();
+    } else {
+      CONTROL.away = null;
+    }
+    renderControl();
+    return;
+  }
   CONTROL.st = body.state || {};
   const st = CONTROL.st;
   if (CONTROL.target === t && !RA.on && st.kind === 'audio' && st.item && st.playing) {
@@ -19803,14 +19820,11 @@ async function watchControl() {
   renderControlChip();
 }
 
+// The chip at the foot of the screen that said what was playing where is
+// gone (the owner's asking: two things said what was controlled); the
+// device button in the header says it, and opens the picker.
 function renderControlChip() {
-  const chip = $('rc-chip');
-  const st = CONTROL.st || {};
-  let text = '';
-  if (CONTROL.target && !RA.on && !shown('rc') && (st.kind === 'video' || st.kind === 'photo')) text = `On ${CONTROL.target.name}`;
-  else if (!CONTROL.target && CONTROL.away && st.kind) text = `Playing on ${CONTROL.away.name}`;
-  chip.textContent = text;
-  show(chip, Boolean(text));
+  show($('rc-chip'), false);
 }
 
 function setControl(target) {
