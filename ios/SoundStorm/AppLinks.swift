@@ -43,6 +43,23 @@ enum TVLink {
         return nil
     }
 
+    /// A family invitation's QR code opening the app
+    /// (`https://<id>.home.soundstorm.dev:8099/invite/<token>`, invites.go):
+    /// the server it is for - one this app knows (by address or install id),
+    /// or, as an invitation is how somebody new is shown the way in, that
+    /// soundstorm.dev name itself - and the token. Only the install names
+    /// the names service vouches for are taken.
+    static func invite(_ url: URL) -> (server: URL, token: String)? {
+        let host = url.host()?.lowercased() ?? ""
+        let parts = url.pathComponents
+        guard url.scheme == "https", host.hasSuffix(".home.soundstorm.dev") || host.hasSuffix(".net.soundstorm.dev"),
+              parts.count == 3, parts[1] == "invite",
+              parts[2].count == 22, parts[2].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }),
+              let server = ServerAddress.parse(host + (url.port.map { ":\($0)" } ?? ""))
+        else { return nil }
+        return (known(server) ?? server, parts[2])
+    }
+
     /// The saved server a link names - by address, or by the install's id
     /// for its home and away names alike - or nil (the app's own is used,
     /// where a stranger's code simply finds no TV).

@@ -17,16 +17,20 @@ final class WebViewController: UIViewController {
 
     /// A TV's sign-in code to hand the page when it has loaded.
     private var pendingLink: String?
+    /// An invitation's token, opened from its QR code: the page makes the
+    /// account it invites to.
+    private var pendingInvite: String?
     private let scanner = CodeScanner()
     private let volumeKeys = VolumeKeys()
     #if DEBUG
     private var audioTested = false
     #endif
 
-    init(server: URL, link: String? = nil) {
+    init(server: URL, link: String? = nil, invite: String? = nil) {
         self.server = server
         self.current = server
         self.pendingLink = link
+        self.pendingInvite = invite
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -151,6 +155,10 @@ final class WebViewController: UIViewController {
         if let code = pendingLink {
             pendingLink = nil
             address = server.appending(queryItems: [URLQueryItem(name: "link", value: code)])
+        }
+        if let token = pendingInvite {
+            pendingInvite = nil
+            address = server.appending(queryItems: [URLQueryItem(name: "invite", value: token)])
         }
         if let code = ServerAddress.pendingSetup {
             ServerAddress.pendingSetup = nil

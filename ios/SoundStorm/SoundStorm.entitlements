@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- A TV's sign-in code and a family invitation, scanned with the camera,
+	     open in the app: the names service answers for both names' roots
+	     (apple-app-site-association, /link/* and /invite/* only). -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:*.home.soundstorm.dev</string>
+		<string>applinks:*.net.soundstorm.dev</string>
+	</array>
+</dict>
+</plist>

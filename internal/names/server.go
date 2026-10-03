@@ -46,6 +46,12 @@ type Server struct {
 	// this service answers it: those two names point here.
 	AndroidCerts []string
 
+	// AppleApps are the iPhone app's ids ("<team>.<bundle>"), served as its
+	// apple-app-site-association so the camera opens a TV's sign-in code
+	// and a family invitation in the app. iOS too fetches a wildcard
+	// domain's file from its root (home.soundstorm.dev, net.soundstorm.dev).
+	AppleApps []string
+
 	// PublicLabel is the level for remote-access names, which point at a home's
 	// public address rather than its LAN one: an install is
 	// <id>.<PublicLabel>.<Zone>. Separate from Label so a device on the LAN and
@@ -154,6 +160,8 @@ func (s *Server) Handler() http.Handler {
 		})
 	})
 	mux.HandleFunc("GET /.well-known/assetlinks.json", s.handleAssetLinks)
+	mux.HandleFunc("GET /.well-known/apple-app-site-association", s.handleAppleLinks)
+	mux.HandleFunc("GET /apple-app-site-association", s.handleAppleLinks)
 	mux.HandleFunc("POST /v1/register", s.handleRegister)
 	mux.HandleFunc("PUT /v1/address", s.authed(s.handleAddress))
 	mux.HandleFunc("PUT /v1/public", s.authed(s.handlePublic))
@@ -185,6 +193,25 @@ func (s *Server) handleAssetLinks(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	writeJSON(w, http.StatusOK, out)
+}
+
+// handleAppleLinks lets the iPhone app open links to installs' names: a TV's
+// sign-in code (/link/...) and an invitation (/invite/...), nothing else -
+// every other page of an install stays the browser's.
+func (s *Server) handleAppleLinks(w http.ResponseWriter, r *http.Request) {
+	type component struct {
+		Path string `json:"/"`
+	}
+	type detail struct {
+		AppIDs     []string    `json:"appIDs"`
+		Components []component `json:"components"`
+	}
+	details := []detail{}
+	if len(s.AppleApps) > 0 {
+		details = append(details, detail{AppIDs: s.AppleApps, Components: []component{{"/link/*"}, {"/invite/*"}}})
+	}
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	writeJSON(w, http.StatusOK, map[string]any{"applinks": map[string]any{"details": details}})
 }
 
 // NameFor is the full name an id answers to.

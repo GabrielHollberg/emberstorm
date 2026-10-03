@@ -107,6 +107,12 @@ final class RootViewController: UIViewController {
     /// (known) server opened with the code - the app's own if the link named
     /// one it does not know.
     private func open(_ url: URL) {
+        // An invitation: that server's page, making the account.
+        if let invite = TVLink.invite(url) {
+            ServerAddress.remember(invite.server)
+            showWeb(invite.server, invite: invite.token)
+            return
+        }
         guard let link = TVLink.parse(url), let server = link.server ?? ServerAddress.saved else { return }
         if let web = current as? WebViewController, web.serverURL == server {
             web.handLink(link.code)
@@ -116,8 +122,8 @@ final class RootViewController: UIViewController {
         }
     }
 
-    private func showWeb(_ server: URL, link: String? = nil) {
-        let web = WebViewController(server: server, link: link)
+    private func showWeb(_ server: URL, link: String? = nil, invite: String? = nil) {
+        let web = WebViewController(server: server, link: link, invite: invite)
         web.onChangeServer = { [weak self] in
             self?.showConnect(prefill: server)
         }
