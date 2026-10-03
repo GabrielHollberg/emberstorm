@@ -23,7 +23,9 @@
   <!-- One shell for every state. app.js swaps which panel is visible after it
        asks /api/session, so there is no flash of the wrong screen. -->
   <div id="boot" class="centered">
-    <div class="spinner" aria-label="Loading"></div>
+    <!-- The icon alone, on black, the size and place of the app's own opening
+         screen, so opening the app runs straight on into it. -->
+    <div class="boot-mark" role="img" aria-label="SoundStorm, loading"></div>
     <p id="boot-text" class="muted"></p>
   </div>
 

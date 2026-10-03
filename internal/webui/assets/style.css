@@ -108,6 +108,20 @@ html:has(#boot:not(.hidden)), body:has(#boot:not(.hidden)) { overflow: hidden; }
 }
 .wordmark.small { font-size: 18px; white-space: nowrap; }
 
+/* The loading screen: the cloud and its bolt, white on black, 96px wide -
+   where and how big Android's own opening screen draws the app's icon. */
+#boot { background: #000; }
+.boot-mark {
+  width: 96px;
+  aspect-ratio: 148 / 125;
+  background: #fff;
+  -webkit-mask: url(/static/cloud.svg) center / contain no-repeat;
+  mask: url(/static/cloud.svg) center / contain no-repeat;
+}
+#boot:has(.boot-mark) { grid-template-rows: 1fr auto 1fr; }
+#boot:has(.boot-mark) .boot-mark { grid-row: 2; }
+#boot:has(.boot-mark) #boot-text { grid-row: 3; align-self: start; margin-top: 18px; }
+
 /* Spinner --------------------------------------------------------------- */
 
 .spinner {

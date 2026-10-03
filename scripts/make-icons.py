@@ -30,7 +30,9 @@ BOX = (176.5, 177.0, 324.5, 302.0)
 # screen icon looks like the app it opens. (The favicon keeps the logo's black,
 # turning white in a dark browser.)
 INK = (255, 255, 255, 255)
-PAPER = (14, 17, 22, 255)  # #0e1116, the app's background
+# Black, as the app's bars and loading screen are: the icon then runs straight
+# into the opening screen on Android and iPhone, with no lighter square.
+PAPER = (0, 0, 0, 255)
 
 
 def cloud_svg():
