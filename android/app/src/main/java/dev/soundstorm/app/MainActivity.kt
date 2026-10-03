@@ -583,6 +583,10 @@ class MainActivity : Activity() {
         // No stretch at the end of a page: the whole page is this one view,
         // so Android's stretch moved the tab bar and the header with it.
         view.overScrollMode = View.OVER_SCROLL_NEVER
+        // No scrollbar of the web view's own at the edge: the page hides its
+        // scrollbars, but this one is the view's, drawn over it (the owner).
+        view.isVerticalScrollBarEnabled = false
+        view.isHorizontalScrollBarEnabled = false
         view.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
