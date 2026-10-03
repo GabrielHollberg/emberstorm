@@ -2920,8 +2920,9 @@ function leaveClip() {
     btn.replaceChildren(icon(v.paused ? 'play' : 'pause'));
     btn.setAttribute('aria-label', v.paused ? 'Play' : 'Pause');
   };
-  for (const ev of ['play', 'pause', 'ended', 'emptied']) v.addEventListener(ev, paint);
-  paint();
+  // Painted as it plays, not here: the icons are not made yet as the page
+  // loads (painting here stopped the whole app loading).
+  for (const ev of ['play', 'pause', 'ended', 'emptied', 'loadstart']) v.addEventListener(ev, paint);
   btn.addEventListener('click', (event) => {
     event.stopPropagation();
     if (v.paused) v.play().catch(() => {}); else v.pause();
