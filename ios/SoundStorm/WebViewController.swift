@@ -85,10 +85,17 @@ final class WebViewController: UIViewController {
         webView.isOpaque = false
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
+        // No bounce at a page's ends (pulling down at the top moved the tab
+        // bar) and no scrollbars of the web view's own: the page draws none.
+        webView.scrollView.bounces = false
+        webView.scrollView.alwaysBounceVertical = false
+        webView.scrollView.showsVerticalScrollIndicator = false
+        webView.scrollView.showsHorizontalScrollIndicator = false
         #if DEBUG
         webView.isInspectable = true // Safari → Develop → this iPhone
         #endif
         view.addSubview(webView)
+        holdOpeningScreen()
         NativeAudio.shared.webView = webView
         NativeAudio.shared.isServer = { [weak self] url in self?.isServer(url) ?? false }
 
@@ -98,8 +105,38 @@ final class WebViewController: UIViewController {
         failure.onRetry = { [weak self] in self?.load() }
         failure.onChangeServer = { [weak self] in self?.onChangeServer?() }
         view.addSubview(failure)
+        if let opening { view.bringSubviewToFront(opening) }
 
         load()
+    }
+
+    /// The opening screen - the cloud on black, exactly as the launch screen
+    /// draws it - kept over the page until it says it is ready, so the opening
+    /// goes icon, then the app, with no blank between (as Android 0.40).
+    private var opening: UIView?
+
+    private func holdOpeningScreen() {
+        let cover = UIView(frame: view.bounds)
+        cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        cover.backgroundColor = .black
+        let mark = UIImageView(image: UIImage(named: "LaunchMark"))
+        mark.translatesAutoresizingMaskIntoConstraints = false
+        cover.addSubview(mark)
+        NSLayoutConstraint.activate([
+            mark.centerXAnchor.constraint(equalTo: cover.centerXAnchor),
+            mark.centerYAnchor.constraint(equalTo: cover.centerYAnchor),
+        ])
+        view.addSubview(cover)
+        opening = cover
+        // Eight seconds at most (the owner's limit): the page's own loading
+        // screen, the same cloud in the same place, carries on from there.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in self?.letGoOfOpeningScreen() }
+    }
+
+    private func letGoOfOpeningScreen() {
+        guard let cover = opening else { return }
+        opening = nil
+        UIView.animate(withDuration: 0.15, animations: { cover.alpha = 0 }, completion: { _ in cover.removeFromSuperview() })
     }
 
     /// The away twin has been tried since the last Try again.
@@ -472,6 +509,7 @@ final class WebViewController: UIViewController {
         }
         AppChrome.shared.statusBarHidden = false
         failure.show(host: server.host() ?? server.absoluteString, detail: error.localizedDescription)
+        letGoOfOpeningScreen() // the app's own failure screen: nothing to wait for
     }
 
     /// Calls a page function with a JSON argument.
@@ -501,6 +539,8 @@ final class WebViewController: UIViewController {
         else { return }
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
         switch type {
+        case "ready":
+            letGoOfOpeningScreen()
         case "changeServer":
             AppChrome.shared.statusBarHidden = false
             onChangeServer?()
@@ -557,8 +597,8 @@ final class WebViewController: UIViewController {
                 await PhotoBackup.shared.handle(command, options: options)
                 reportBackup()
                 // The page is up and signed in: a run that found no sign-in
-                // at launch can go now.
-                PhotoBackup.shared.start()
+                // at launch can go now - but not one per message.
+                PhotoBackup.shared.pageAsked()
             }
         default:
             break

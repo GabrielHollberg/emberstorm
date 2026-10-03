@@ -176,6 +176,19 @@ final class PhotoBackup: NSObject {
     private var startWhenSent = false
     /// The server said it was busy (429): nothing new until then.
     private var busyUntil = Date.distantPast
+    /// When the last run went through every photo, and whether one has.
+    private var lastWholeRun: Date?
+
+    /// The page sends a backup message every few seconds (its status), and
+    /// each one used to start a run - a question to the server about every
+    /// photo - which is most of what flooded the server on the first full
+    /// backup. From the page now, a run starts only when the last did not
+    /// get through (not signed in yet, the network, put away) or ten minutes
+    /// have passed; photos taken meanwhile start one of their own.
+    func pageAsked() {
+        if let last = lastWholeRun, Date().timeIntervalSince(last) < 600 { return }
+        start()
+    }
 
     /// Starts a run, unless one is going, backup is off, or files from the
     /// last run are still with iOS - a run then would ask the server about
@@ -193,6 +206,7 @@ final class PhotoBackup: NSObject {
             return
         }
         startWhenSent = false
+        lastWholeRun = nil
         if !watching {
             PHPhotoLibrary.shared().register(self)
             watching = true
@@ -337,6 +351,7 @@ final class PhotoBackup: NSObject {
                     try await enqueue(item, to: server, list: list, last: pendingOthers.allSatisfy { Uploader.shared.pending.keys.contains($0.key) })
                 }
             }
+            if !halted { lastWholeRun = Date() }
         } catch let e as Refused {
             stopFor(e)
         } catch is CancellationError {
@@ -463,16 +478,26 @@ final class PhotoBackup: NSObject {
     }
 
     /// Which of these the server already has, by name and when taken.
+    /// A resource's size as Photos records it, without reading the file (so
+    /// a photo kept in iCloud is not downloaded to ask). Photos has no public
+    /// call for it; the property is looked for first, and 0 if it is not there.
+    private static func size(of resource: PHAssetResource) -> Int64 {
+        guard resource.responds(to: Selector(("fileSize"))),
+              let n = resource.value(forKey: "fileSize") as? NSNumber else { return 0 }
+        return max(0, n.int64Value)
+    }
+
     private func check(_ server: URL, _ items: [Item]) async throws -> [Bool] {
         var request = URLRequest(url: address(server, "/api/photos/backup/check", query: account()))
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try await signIn(&request)
-        // Size 0: asked before any file is read, which for a photo kept in
-        // iCloud would mean downloading it to ask. The server then matches
-        // name and month, as it does for a same-named file it keeps beside.
-        let list = items.map { ["name": $0.name, "taken": $0.taken, "size": 0] as [String: Any] }
+        // The file's real size where the phone knows it, so a different
+        // picture of the same name and month (the camera's numbering starting
+        // over, another device's file) is not taken for the one already
+        // there. 0 where it does not: the server then matches name and month.
+        let list = items.map { ["name": $0.name, "taken": $0.taken, "size": Self.size(of: $0.resource)] as [String: Any] }
         request.httpBody = try JSONSerialization.data(withJSONObject: ["items": list])
         let (data, response) = try await Self.plain.data(for: request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0

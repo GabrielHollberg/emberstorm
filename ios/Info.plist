@@ -2,6 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Opening: the cloud on black, 96 points wide in the middle - where the
+	     page's own loading screen draws it, so the one runs into the other. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBlack</string>
+		<key>UIImageName</key>
+		<string>LaunchMark</string>
+	</dict>
 	<!-- Keeps music and audiobooks playing with the phone locked. -->
 	<key>UIBackgroundModes</key>
 	<array>

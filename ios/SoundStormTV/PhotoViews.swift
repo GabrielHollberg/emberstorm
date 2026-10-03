@@ -91,8 +91,17 @@ private struct Thumb: View {
 /// Which photos the viewer walks, and where it is.
 struct PhotoViewing: Identifiable {
     let id = UUID()
-    let photos: [Item]
+    var photos: [Item]
     var index: Int
+    /// Sent from a phone: said once, as the page's TV says it.
+    var fromPhone = false
+
+    /// A photo a phone sent, with the ones either side of it there (the
+    /// page sends the one before and the one after, either missing at an end).
+    static func around(_ item: Item, near: [Item], fromPhone: Bool = false) -> PhotoViewing {
+        let photos = near.count == 2 ? [near[0], item, near[1]] : [item] + near
+        return PhotoViewing(photos: photos, index: near.count == 2 ? 1 : 0, fromPhone: fromPhone)
+    }
 }
 
 /// One photo, the whole screen. Left and right step; down pauses or plays
@@ -103,6 +112,7 @@ struct PhotoViewing: Identifiable {
 struct PhotoViewer: View {
     @State var viewing: PhotoViewing
     @Environment(API.self) private var api
+    @Environment(AppModel.self) private var model
     @Environment(Player.self) private var player
     @Environment(\.dismiss) private var dismiss
     @State private var images: [String: UIImage] = [:]
@@ -135,8 +145,12 @@ struct PhotoViewer: View {
                     }
                     Text(caption(photo)).font(.headline).shadow(radius: 8)
                     Spacer()
-                    Text("\(viewing.index + 1) of \(viewing.photos.count)")
-                        .foregroundStyle(.secondary).shadow(radius: 8)
+                    // Not for photos a phone sends: it holds only the ones
+                    // either side, so "2 of 3" would say nothing true.
+                    if !viewing.fromPhone {
+                        Text("\(viewing.index + 1) of \(viewing.photos.count)")
+                            .foregroundStyle(.secondary).shadow(radius: 8)
+                    }
                 }
                 .opacity(captionShown ? 1 : 0)
             }
@@ -150,7 +164,21 @@ struct PhotoViewer: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onAppear { focused = true; showCaption() }
+        .onAppear {
+            focused = true
+            showCaption()
+            if viewing.fromPhone { say("Playing from your phone") }
+        }
+        // The phone stepped: here too, in place.
+        .onChange(of: model.phonePhoto) { _, sent in
+            guard let sent else { return }
+            let next = PhotoViewing.around(sent.item, near: sent.near)
+            viewing.photos = next.photos
+            viewing.index = next.index
+            showCaption()
+        }
+        // The phone pressed LIVE.
+        .onChange(of: model.phoneLive) { playLive(viewing.photos[viewing.index]) }
         .onMoveCommand { direction in
             switch direction {
             case .left: step(-1)
@@ -163,8 +191,10 @@ struct PhotoViewer: View {
         .onPlayPauseCommand { toggleMusic() }
         // OK on a Live Photo plays its moving part.
         .onTapGesture { playLive(photo) }
-        .onChange(of: viewing.index) { live = nil }
-        .task(id: viewing.index) { await load(around: viewing.index) }
+        // Keyed by the photo, not its place: a step sent from the phone keeps
+        // the photo in the middle of a list of three.
+        .onChange(of: viewing.photos[viewing.index].key) { live = nil }
+        .task(id: viewing.photos[viewing.index].key) { await load(around: viewing.index) }
         #if DEBUG
         // -autostep YES: a step right after three seconds, then down.
         .task {

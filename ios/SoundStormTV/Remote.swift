@@ -126,6 +126,14 @@ struct RemoteControlled: ViewModifier {
 
     private func play(_ c: [String: Any]) async {
         guard let item = Self.item(c["item"]) else { return }
+        // A photo stepped to on the phone while its viewer is open here: the
+        // viewer steps in place, the ones either side fetched ahead, with no
+        // closing and opening again (the page's TV does the same).
+        if item.kind == "picture", item.extra?["type"] != "video", model.photos != nil, model.video == nil {
+            let near = (c["near"] as? [Any])?.prefix(2).compactMap(Self.item) ?? []
+            model.phonePhoto = AppModel.PhonePhoto(item: item, near: near)
+            return
+        }
         // Whatever was open gives way to what was sent.
         if let video = model.video { video.stop(); model.video = nil }
         model.photos = nil
@@ -142,7 +150,8 @@ struct RemoteControlled: ViewModifier {
             await model.playBook(item)
         case "picture" where item.extra?["type"] != "video":
             model.showingNowPlaying = false
-            model.photos = PhotoViewing(photos: [item], index: 0)
+            let near = (c["near"] as? [Any])?.prefix(2).compactMap(Self.item) ?? []
+            model.photos = PhotoViewing.around(item, near: near, fromPhone: true)
         default:
             model.showingNowPlaying = false
             model.playVideo(item)
@@ -152,6 +161,10 @@ struct RemoteControlled: ViewModifier {
     private func control(_ action: String, value: Double) {
         if action == "closephoto" {
             model.photos = nil
+            return
+        }
+        if action == "live" {
+            model.phoneLive = UUID()
             return
         }
         if let video = model.video {

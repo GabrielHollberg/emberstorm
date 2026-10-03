@@ -37,6 +37,18 @@ final class AppModel {
     var video: VideoSession?
     /// The photo viewer, when open.
     var photos: PhotoViewing?
+    /// The next photo a phone controlling this TV stepped to, for the viewer
+    /// already open to step to in place (and the ones either side to fetch).
+    var phonePhoto: PhonePhoto?
+    /// Set when that phone pressed LIVE: the viewer plays the moving part.
+    var phoneLive: UUID?
+
+    struct PhonePhoto: Equatable {
+        let id = UUID()
+        let item: Item
+        let near: [Item]
+        static func == (a: PhonePhoto, b: PhonePhoto) -> Bool { a.id == b.id }
+    }
     /// A book being read, when open.
     var reading: Reading?
 
