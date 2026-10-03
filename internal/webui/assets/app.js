@@ -2767,9 +2767,17 @@ function showPhoto(item) {
   // The music plays on while photos are looked at, as it does over a book
   // (the owner's asking); a clip is a film and stops it (playVideo).
   closeVideo();
+  const stepping = Boolean(photoShown);
   photoShown = item;
-  // Controlling a TV: the photo shows there too, and stepping here steps it.
-  if (CONTROL.target && !TV) controlSend({ type: 'play', item });
+  // Controlling a TV: the photo shows there too, and stepping here steps it -
+  // with the photos either side, for the TV to fetch ahead, and without a
+  // "Playing from your phone" on every swipe.
+  if (CONTROL.target && !TV) {
+    const list = photosOnScreen();
+    const i = list.findIndex((p) => p.id === item.id && p.sourceId === item.sourceId);
+    const near = [list[i - 1], list[i + 1]].filter((p) => i >= 0 && p);
+    controlSend({ type: 'play', item, near, step: stepping });
+  }
 
   const img = $('photo-image');
   img.src = photoPreview(item);
@@ -2858,8 +2866,10 @@ function stopLive() {
 }
 $('photo-live').addEventListener('click', (event) => {
   event.stopPropagation();
-  if ($('photo-live-video').classList.contains('hidden')) playLive();
-  else stopLive();
+  if ($('photo-live-video').classList.contains('hidden')) {
+    playLive();
+    if (CONTROL.target && !TV) controlSend({ type: 'control', action: 'live' });
+  } else stopLive();
 });
 $('photo-live-video').addEventListener('ended', stopLive);
 
@@ -19541,7 +19551,8 @@ async function runPlayerCommand(c) {
 function remotePlay(c) {
   const item = c.item;
   if (!item || !item.sourceId || !item.id) return;
-  if (c.from && state.me && c.from !== state.me.name) showToast(`Playing from ${c.from}'s phone`);
+  if (c.step) { /* the next photo of those already being shown: no message */ }
+  else if (c.from && state.me && c.from !== state.me.name) showToast(`Playing from ${c.from}'s phone`);
   else if (c.from) showToast('Playing from your phone');
   if (item.kind === 'music' && Array.isArray(c.queue) && c.queue.length) {
     const at = Math.max(0, Math.min(c.queue.length - 1, Number(c.index) || 0));
@@ -19549,6 +19560,11 @@ function remotePlay(c) {
   } else if (item.kind === 'picture' && !(item.extra && item.extra.type === 'video')) {
     state.items = [item];
     showPhoto(item);
+    // The phone's next and last photos, fetched now: a swipe on the phone
+    // lands on a picture the TV already has.
+    for (const near of Array.isArray(c.near) ? c.near.slice(0, 2) : []) {
+      if (near && near.sourceId && near.artId) new Image().src = photoPreview(near);
+    }
     return;
   } else {
     play(item);
@@ -19567,6 +19583,11 @@ function remoteControl(c) {
   const value = Number(c.value) || 0;
   if (c.action === 'closephoto') {
     if (photoShown) closePhoto();
+    return;
+  }
+  // The phone played a Live Photo's moving part: so does the TV.
+  if (c.action === 'live') {
+    if (photoShown) playLive();
     return;
   }
   // The phone controlling this TV chose a look.
