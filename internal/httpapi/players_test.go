@@ -129,3 +129,48 @@ func TestPlayingOnSomebodyElsesTV(t *testing.T) {
 		t.Fatalf("the claimed TV should be told to switch: %s", body)
 	}
 }
+
+// Let in, the phone sends its music at once - before the TV has signed in
+// as it. That waits behind the switch; it used to become a second question,
+// and the music never came.
+func TestWhatIsSentAsATVSwitchesWaitsForIt(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t)
+	if resp, body := h.do(t, http.MethodPost, "/api/users", `{"username":"nathan","password":"violet tractor glacier"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("adding nathan: %d %s", resp.StatusCode, body)
+	}
+	phone := h.another(t)
+	if code, _ := signInAs(t, phone, "nathan", "violet tractor glacier"); code != http.StatusOK {
+		t.Fatalf("nathan signs in: %d", code)
+	}
+	tv := "eeeeeeeeeeeeeeee5555"
+	h.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+tv+`","name":"Apple TV","tv":true}`)
+	h.do(t, http.MethodPost, "/api/players/"+tv+"/state", `{"playing":true,"title":"Dune"}`)
+	resp, body := phone.do(t, http.MethodPost, "/api/players/"+tv+"/command", `{"type":"claim"}`)
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("a busy TV should ask: %d %s", resp.StatusCode, body)
+	}
+	ask := playerJSON(t, body)["asking"].(string)
+	h.do(t, http.MethodGet, "/api/players/"+tv+"/next", "")
+	h.do(t, http.MethodPost, "/api/players/"+tv+"/ask/"+ask, `{"allow":true}`)
+	if _, body := phone.do(t, http.MethodGet, "/api/players/"+tv+"/ask/"+ask, ""); playerJSON(t, body)["allowed"] != true {
+		t.Fatalf("yes should come back: %s", body)
+	}
+	resp, body = phone.do(t, http.MethodPost, "/api/players/"+tv+"/command", `{"type":"play","item":{"sourceId":"x","id":"song"}}`)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("music sent as the TV switches: %d %s", resp.StatusCode, body)
+	}
+	_, body = h.do(t, http.MethodGet, "/api/players/"+tv+"/next", "")
+	var next struct {
+		Commands []map[string]any `json:"commands"`
+	}
+	_ = json.Unmarshal(body, &next)
+	if len(next.Commands) != 1 || next.Commands[0]["type"] != "switch" {
+		t.Fatalf("the switch first: %s", body)
+	}
+	h.do(t, http.MethodPost, "/api/players/switch", `{"code":"`+next.Commands[0]["code"].(string)+`","id":"`+tv+`"}`)
+	_, body = h.do(t, http.MethodGet, "/api/players/"+tv+"/next", "")
+	if !strings.Contains(string(body), `"song"`) || strings.Contains(string(body), `"ask"`) {
+		t.Fatalf("then the music, not another question: %s", body)
+	}
+}

@@ -117,6 +117,16 @@ func (p *player) free(now time.Time) bool {
 	return !p.Playing && now.Sub(p.ActiveAt) > playerIdle || now.Sub(p.Seen) > playerGone
 }
 
+// switchingToLocked is whether the player has a switch to user waiting.
+func (h *playerHub) switchingToLocked(playerID, userID string, now time.Time) bool {
+	for _, c := range h.codes {
+		if c.player == playerID && c.user == userID && now.Before(c.until) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *player) enqueueLocked(cmd json.RawMessage) {
 	p.queue = append(p.queue, cmd)
 	if len(p.queue) > maxQueued {
@@ -377,6 +387,18 @@ func (s *Server) handlePlayerCommand(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.enqueueLocked(withFrom(raw, user.Name))
+		writeJSON(w, http.StatusOK, map[string]any{"sent": true})
+		return
+	}
+	// Already switching to this person - they were let in, and the TV has not
+	// yet signed in as them: what they send now waits behind the switch. It
+	// used to be taken for a new request to take somebody else's TV over, so
+	// the phone's music, sent the moment the answer was yes, became a second
+	// question and was lost (the owner: "they said yes, nothing happened").
+	if h.switchingToLocked(p.ID, user.ID, now) {
+		if head.Type != "claim" {
+			p.enqueueLocked(withFrom(raw, user.Name))
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"sent": true})
 		return
 	}
