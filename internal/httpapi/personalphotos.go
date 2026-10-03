@@ -293,7 +293,7 @@ func (s *Server) datedPhoto(u state.User, staged, dropped string, hint int64) (*
 	copy(pl.sum[:], h.Sum(nil))
 	pl.ix = s.photoIndexFor(u)
 	name := path.Base(dropped)
-	if t, ok := photoimport.ExifTaken(head); ok {
+	if t, ok := photoimport.FileTaken(staged, head); ok {
 		pl.meta.Taken, pl.src, pl.exif = t, photoimport.SourceExif, true
 	} else if cam := videoFilmed(staged, name); !cam.Taken.IsZero() {
 		// A phone's or camera's video: when it was filmed, from inside it.
@@ -611,7 +611,7 @@ func (s *Server) datePicture(full string, takenMs int64) bool {
 		head := make([]byte, 512<<10)
 		n, _ := io.ReadFull(f, head)
 		f.Close()
-		if _, ok := photoimport.ExifTaken(head[:n]); ok {
+		if _, ok := photoimport.FileTaken(full, head[:n]); ok {
 			return false
 		}
 	}
@@ -799,7 +799,7 @@ func (s *Server) improvePhoto(u state.User, existing string, inc photoimport.Met
 	var have photoimport.Meta
 	haveSrc := photoimport.SourceNone
 	exifDate := false
-	if t, ok := photoimport.ExifTaken(head); ok {
+	if t, ok := photoimport.FileTaken(existing, head); ok {
 		have.Taken, haveSrc, exifDate = t, photoimport.SourceExif, true
 	}
 	side, _ := os.ReadFile(existing + ".xmp")

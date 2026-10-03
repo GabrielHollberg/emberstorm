@@ -2,6 +2,7 @@ package photoimport
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -214,6 +215,15 @@ func one(f *zip.File, t Target, takeout *TakeoutIndex, icloud *ICloudIndex, soci
 	}
 	src := SourceNone
 	exifTaken, exifOK := ExifTaken(head)
+	if !exifOK && isHEIF(head) && f.UncompressedSize64 <= 64<<20 {
+		// A HEIC's date may be stored past the first bytes: the photo is
+		// read again, once, and its index followed (heic.go).
+		if rc, err := f.Open(); err == nil {
+			data, _ := io.ReadAll(io.LimitReader(rc, 64<<20))
+			rc.Close()
+			exifTaken, exifOK = ReadTaken(bytes.NewReader(data), int64(len(data)), head)
+		}
+	}
 	switch {
 	case exifOK:
 		// The photo's own clock wins, as it ranks first: Takeout's time is

@@ -68,7 +68,7 @@ func ReadTraits(kind media.Kind, r io.ReaderAt, size int64) (t Traits) {
 	switch kind {
 	case media.KindPicture:
 		t.Camera = photoimport.ExifCamera(head)
-		t.Taken, _ = photoimport.ExifTaken(head)
+		t.Taken, _ = photoimport.ReadTaken(r, size, head)
 	case media.KindVideo, media.KindTV:
 		if bytes.HasPrefix(head, []byte{0x1A, 0x45, 0xDF, 0xA3}) {
 			t.Width, t.Height, t.Seconds = mkvPicture(head)
