@@ -6251,6 +6251,16 @@ function renderMainMenu(item, opts = {}) {
   const faved = state.favorites.has(selectionKey(item));
   const entries = [menuHeader(item)];
   if (opts.nowPlaying) entries.push(...playerMenuItems(item, opts));
+  // Select: from here on taps tick more (a shelf's list or the photos).
+  const card = state.menuAnchor && state.menuAnchor.closest && state.menuAnchor.closest('#results .item, .photo-timeline .item');
+  if (card && !opts.nowPlaying && !opts.fromSelection && !state.selecting) {
+    entries.push(menuItem('check', 'Select', (event) => {
+      event.stopPropagation();
+      closeItemMenu();
+      setSelecting(true);
+      toggleSelected(item, card);
+    }));
+  }
   entries.push(
     menuItem('heart', faved ? 'Remove from favorites' : 'Add to favorites', async () => {
       const problem = await setFavorite(item, !faved);
@@ -7308,10 +7318,10 @@ function attachItemMenuGestures(card, item) {
     timer = null;
     card.classList.remove('pressing');
   };
-  // In a shelf's list a hold selects: the item is selected, and the finger
-  // may slide on across others to select them too, or lift and tap more.
-  // A hold on one already selected opens the menu for the selection. Where
-  // there is nothing to select (Home's rows, say) a hold opens the menu.
+  // A hold opens the item's menu, whose Select starts selecting (the owner's
+  // call, 2026-10-04: it used to select at once). While selecting, a hold on
+  // one already selected opens the menu for the selection, and a hold on
+  // another selects it and lets the finger slide on across more.
   const inList = () => Boolean(card.closest('#results, .photo-timeline'));
   card.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || (event.pointerType === 'mouse' && !inList())) return;
@@ -7328,9 +7338,8 @@ function attachItemMenuGestures(card, item) {
       if (inList() && state.selecting && state.selected.has(selectionKey(item))) {
         openSelectionMenu(anchor);
         followMenuFinger(event.pointerId, startX, startY);
-      } else if (inList()) {
-        if (!state.selecting) setSelecting(true);
-        if (!state.selected.has(selectionKey(item))) toggleSelected(item, card);
+      } else if (inList() && state.selecting) {
+        toggleSelected(item, card);
         armDragSelect(card, item, event.pointerId, startX, startY);
       } else {
         openItemMenu(item, anchor);
