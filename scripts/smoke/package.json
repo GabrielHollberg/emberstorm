@@ -1,0 +1,8 @@
+{
+  "name": "soundstorm-smoke",
+  "private": true,
+  "description": "The after-deploy check's one dependency: a browser to drive (scripts/after-deploy.sh). It uses the Chrome already installed.",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

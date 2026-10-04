@@ -53,3 +53,9 @@ android/app/build/
 android/local.properties
 android/.idea/
 *.iml
+
+# The after-deploy check: its browser library, and the throwaway test
+# server's media (scripts/smoke-stack.sh).
+/scripts/smoke/node_modules/
+/scripts/smoke/package-lock.json
+/.smoke/
