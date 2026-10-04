@@ -21350,26 +21350,34 @@ function tlScrubber(root) {
   bar.append(years, thumb, bubble);
   let dragging = false;
   let fade = 0;
+  // One scale for the handle, the months and the years: the top of the
+  // handle is the page scrolled to the very top, its foot the very end, and a
+  // month sits where the scroll that shows it under the pills is. It used to
+  // reckon from the timeline's own start less 80px, so the handle's top left
+  // the page about a hundred pixels down - the newest month's name hidden
+  // under the pills, and no way further up but to scroll by hand (the
+  // owner's report, in every category with a handle).
   const range = () => Math.max(1, document.documentElement.scrollHeight - innerHeight);
   const rootTop = () => root.getBoundingClientRect().top + scrollY;
-  const monthAt = (y) => {
+  // The scroll that shows a month at the timeline's own top, under the pills.
+  const scrollFor = (sec) => sec.getBoundingClientRect().top + scrollY - rootTop();
+  const monthAt = (target) => {
     let found = null;
     for (const sec of root.querySelectorAll('.tl-month')) {
-      if (sec.getBoundingClientRect().top + scrollY - 120 <= y) found = sec; else break;
+      if (scrollFor(sec) - 40 <= target) found = sec; else break;
     }
     return found || root.querySelector('.tl-month');
   };
   const place = () => {
     if (!bar.isConnected) return;
     const h = bar.clientHeight;
-    const share = Math.min(1, Math.max(0, (scrollY - rootTop() + 80) / Math.max(1, range() - rootTop() + 80)));
+    const share = Math.min(1, Math.max(0, scrollY / range()));
     thumb.style.transform = `translateY(${Math.round(share * (h - thumb.offsetHeight))}px)`;
   };
   const marks = () => {
     if (!bar.isConnected) return;
     const h = bar.clientHeight;
-    const top = rootTop();
-    const span = Math.max(1, range() - top + 80);
+    const span = range();
     years.replaceChildren();
     let last = '';
     let lastY = -100;
@@ -21377,7 +21385,7 @@ function tlScrubber(root) {
       const year = sec.dataset.month.slice(0, 4);
       if (year === last || !/^\d{4}$/.test(year)) continue;
       last = year;
-      const y = Math.round(((sec.getBoundingClientRect().top + scrollY - top) / span) * h);
+      const y = Math.round((Math.min(1, scrollFor(sec) / span)) * h);
       if (y - lastY < 22) continue; // labels kept apart
       lastY = y;
       const label = document.createElement('span');
@@ -21397,12 +21405,18 @@ function tlScrubber(root) {
   // a scroll settles, so through a drag the header kept vanishing, and the
   // months flown past are not fetched until let go anyway.
   let target = null;
+  // The handle is held by its middle, so it reaches both ends; and its ends
+  // snap - one pixel of handle is hundreds of pixels of a long timeline, so
+  // a finger at the top never landed exactly on the page's top.
+  let atEnd = 0;
   const go = (clientY) => {
     const r = bar.getBoundingClientRect();
-    const share = Math.min(1, Math.max(0, (clientY - r.top) / r.height));
-    const top = rootTop();
-    target = top - 80 + share * Math.max(1, range() - top + 80);
-    const sec = monthAt(target + 1);
+    const t = thumb.offsetHeight;
+    let share = Math.min(1, Math.max(0, (clientY - r.top - t / 2) / Math.max(1, r.height - t)));
+    atEnd = share < 0.015 ? -1 : share > 0.985 ? 1 : 0;
+    if (atEnd) share = atEnd < 0 ? 0 : 1;
+    target = share * range();
+    const sec = monthAt(target);
     bubble.textContent = sec ? tlMonthName(sec.dataset.month) : '';
     bubble.style.top = `${Math.round(clientY - r.top)}px`;
     thumb.style.transform = `translateY(${Math.round(share * (bar.clientHeight - thumb.offsetHeight))}px)`;
@@ -21437,6 +21451,9 @@ function tlScrubber(root) {
     wantY = null;
     bar.classList.remove('dragging');
     if (target !== null) scrollTo(0, target);
+    // At the foot, the months landed on load and grow the page: go to the
+    // new end once they have.
+    if (atEnd > 0) setTimeout(() => scrollTo(0, document.documentElement.scrollHeight), 700);
     target = null;
     tlLoadNear();
     wake();
