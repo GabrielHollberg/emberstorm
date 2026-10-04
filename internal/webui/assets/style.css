@@ -4435,3 +4435,20 @@ html, body { overscroll-behavior-y: none; }
 .photo-send-note:empty { display: none; }
 .photo-send-buttons .primary { background: var(--accent); border-color: var(--accent); color: #08131f; font-weight: 600; }
 .photo-send-buttons button:not(.primary) { background: var(--surface-2); border-color: var(--surface-2); color: var(--text); }
+
+/* Settings' cards fold up to their title (foldSettingsCards). */
+.account-section.foldable { padding: 0; overflow: hidden; }
+.account-section.foldable > :not(h2.card-head) { margin-left: 20px; margin-right: 20px; }
+.account-section.foldable:not(.folded) { padding-bottom: 20px; }
+.account-section.folded > :not(h2.card-head) { display: none !important; }
+.account-section h2.card-head { margin: 0; font-size: inherit; }
+.card-toggle { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px 20px; background: none;
+  border: none; color: var(--text); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.card-toggle-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.card-toggle-title { font-size: 17px; font-weight: 700; }
+.card-toggle-hint { font-size: 13px; font-weight: 400; color: var(--muted); }
+.card-toggle .icon-chevron { width: 18px; height: 18px; color: var(--muted); flex: none; transform: rotate(90deg); transition: transform 0.18s ease; }
+.account-section.folded .card-toggle .icon-chevron { transform: none; }
+.account-section:not(.folded) .card-toggle-hint { display: none; }
+.account-section.foldable:not(.folded) h2.card-head { margin-bottom: 6px; }
+.account-section.foldable { margin-top: 10px; }

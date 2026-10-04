@@ -10829,14 +10829,14 @@ async function renderWelcome() {
     done: library.ok && library.body && !library.body.empty,
     what: 'Add your music, films, books and photos',
     how: box ? 'From this device, or from a USB drive plugged into the box.' : 'From this device, or by copying them into the library folder.',
-    label: 'Add media', act: () => { selectTab('settings'); selectSettingsCat('library'); },
+    label: 'Add media', act: () => { selectTab('settings'); openSettingsCard($('choose-files').closest('.account-section')); },
   });
   if (remote && remote.available) {
     steps.push({
       done: Boolean(remote.enabled),
       what: 'Use it away from home',
       how: 'So the app works at work, on holiday, or at a friend\u2019s.',
-      label: 'Turn on', act: () => { selectTab('settings'); selectSettingsCat('devices'); setTimeout(() => $('remote-block').scrollIntoView({ block: 'center' }), 100); },
+      label: 'Turn on', act: () => { selectTab('settings'); openSettingsCard($('remote-block')); },
     });
   }
   steps.push({
@@ -12870,7 +12870,11 @@ async function refreshDownloadsCard() {
   if (!block || !('caches' in window)) return;
   show(block, true);
   if ($('account').classList.contains('hidden')) return;
-  $('downloads-manage').replaceChildren(await downloadsView(false));
+  const dlView = await downloadsView(false);
+  // The card has its own heading (it folds up to it).
+  const dlHead = dlView.querySelector('.downloads-head h2');
+  if (dlHead) dlHead.remove();
+  $('downloads-manage').replaceChildren(dlView);
   renderDownloadShelves();
   show($('downloads-clear'), hasDownloads());
 }
@@ -13417,6 +13421,54 @@ function settingsCategories() {
     .map(({ c }) => c);
 }
 
+// Each card folds up to its title and a line saying what is in it, and
+// opens when tapped (the owner's asking, 2026-10-04: Settings had grown to
+// twenty cards). What is open stays open while the app is; searching opens
+// every card that matches, and a pill of one card shows it open.
+state.settingsOpen = new Set();
+const cardKey = (card) => card.id || card.querySelector('.card-toggle-title')?.textContent || '';
+function foldSettingsCards() {
+  for (const card of settingsCards()) {
+    if (card.querySelector(':scope > h2.card-head')) continue;
+    const h2 = card.querySelector(':scope > h2');
+    if (!h2) continue; // Sign out: always shown
+    h2.classList.add('card-head');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'card-toggle';
+    const words = document.createElement('span');
+    words.className = 'card-toggle-words';
+    const title = document.createElement('span');
+    title.className = 'card-toggle-title';
+    title.append(...h2.childNodes);
+    words.append(title);
+    if (card.dataset.hint) {
+      const hint = document.createElement('span');
+      hint.className = 'card-toggle-hint';
+      hint.textContent = card.dataset.hint;
+      words.append(hint);
+    }
+    button.append(words, icon('chevron'));
+    h2.append(button);
+    card.classList.add('foldable');
+    button.addEventListener('click', () => {
+      const key = cardKey(card);
+      if (card.classList.contains('folded')) state.settingsOpen.add(key);
+      else state.settingsOpen.delete(key);
+      applySettingsView();
+    });
+  }
+}
+
+// Opens a card from elsewhere (the welcome's buttons), with its pill.
+function openSettingsCard(card) {
+  if (!card) return;
+  foldSettingsCards();
+  state.settingsOpen.add(cardKey(card));
+  selectSettingsCat(card.dataset.cat);
+  setTimeout(() => card.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120);
+}
+
 function selectSettingsCat(kind) {
   state.settingsCat = kind;
   $('search-input').value = '';
@@ -13436,6 +13488,15 @@ function applySettingsView() {
     if (!off && !card.classList.contains('hidden')) matches++;
   }
   show($('settings-none'), terms.length > 0 && matches === 0);
+  foldSettingsCards();
+  const shown = settingsCards().filter((c) => !c.classList.contains('off-cat') && !c.classList.contains('hidden') && c.classList.contains('foldable'));
+  for (const card of settingsCards()) {
+    if (!card.classList.contains('foldable')) continue;
+    const open = terms.length > 0 || shown.length === 1 || state.settingsOpen.has(cardKey(card));
+    if (card.classList.contains('folded') === open) card.classList.toggle('folded', !open);
+    const b = card.querySelector('.card-toggle');
+    if (b) b.setAttribute('aria-expanded', String(open));
+  }
   // Searching looks through every pill, so none is lit.
   for (const b of $('subtabs').querySelectorAll('button')) {
     const on = !terms.length && b.dataset.kind === state.settingsCat;
