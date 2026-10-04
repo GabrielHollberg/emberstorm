@@ -4363,6 +4363,8 @@ html, body { overscroll-behavior-y: none; }
   position: fixed; z-index: 12; right: 0; width: 46px;
   top: calc(var(--header-h, 120px) + 60px); bottom: calc(var(--tabbar, 0px) + 24px);
   opacity: 0; transition: opacity 0.3s; touch-action: none; cursor: grab;
+  /* Held, an iPhone selected the year labels and tinted the page blue. */
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .tl-scrub.shown, .tl-scrub.dragging { opacity: 1; }
 .tl-thumb {

@@ -21391,16 +21391,32 @@ function tlScrubber(root) {
     clearTimeout(fade);
     if (!dragging) fade = setTimeout(() => bar.classList.remove('shown'), 1500);
   };
+  // While held, only the handle and the month beside it follow the finger;
+  // the page jumps once, where it is let go. Scrolling the page on every move
+  // was what flickered on an iPhone: WebKit places a pinned header only once
+  // a scroll settles, so through a drag the header kept vanishing, and the
+  // months flown past are not fetched until let go anyway.
+  let target = null;
   const go = (clientY) => {
     const r = bar.getBoundingClientRect();
     const share = Math.min(1, Math.max(0, (clientY - r.top) / r.height));
     const top = rootTop();
-    const target = top - 80 + share * Math.max(1, range() - top + 80);
-    scrollTo(0, target);
+    target = top - 80 + share * Math.max(1, range() - top + 80);
     const sec = monthAt(target + 1);
     bubble.textContent = sec ? tlMonthName(sec.dataset.month) : '';
     bubble.style.top = `${Math.round(clientY - r.top)}px`;
-    place();
+    thumb.style.transform = `translateY(${Math.round(share * (bar.clientHeight - thumb.offsetHeight))}px)`;
+  };
+  // Drawn at most once a frame: a phone sends moves faster than it paints.
+  let wantY = null;
+  let frame = 0;
+  const follow = (clientY) => {
+    wantY = clientY;
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (dragging && wantY !== null) go(wantY);
+    });
   };
   bar.addEventListener('pointerdown', (event) => {
     dragging = true;
@@ -21411,12 +21427,17 @@ function tlScrubber(root) {
     go(event.clientY);
     event.preventDefault();
   });
-  bar.addEventListener('pointermove', (event) => { if (dragging) go(event.clientY); });
+  bar.addEventListener('pointermove', (event) => { if (dragging) follow(event.clientY); });
   const end = () => {
     if (!dragging) return;
     dragging = false;
     TL.dragging = false;
+    if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    if (wantY !== null) go(wantY);
+    wantY = null;
     bar.classList.remove('dragging');
+    if (target !== null) scrollTo(0, target);
+    target = null;
     tlLoadNear();
     wake();
   };
