@@ -27,6 +27,9 @@ final class VideoSession: Identifiable {
     private(set) var audioTracks: [API.Playback.Audio] = []
     private(set) var subtitleChoice: Int?
     private(set) var audioChoice: Int?
+    /// The film quality chosen from a phone controlling this TV (the page's
+    /// Quality picker); nil is the server's default for this device.
+    private(set) var quality: String?
     /// What is on screen now, drawn over the picture by SubtitleOverlay.
     private(set) var subtitleText = ""
     private var subtitles: Subtitles?
@@ -133,12 +136,25 @@ final class VideoSession: Identifiable {
 
     /// Another language is another stream (Jellyfin's HLS with that audio),
     /// played on from the same moment - what the page does.
+    /// Another quality, from the phone's picker: played on from the same
+    /// moment in the same language, as the TV's own picker does on the page.
+    func chooseQuality(_ value: String) async {
+        guard ["smart", "original", "standard", "saver"].contains(value), value != (quality ?? "smart") else { return }
+        let at = player.currentTime()
+        let wasPlaying = player.timeControlStatus != .paused
+        guard let playback = try? await api.playback(item, audio: audioChoice, quality: value) else { return }
+        quality = value
+        _ = try? load(playback)
+        await player.seek(to: at)
+        if wasPlaying { player.play() }
+    }
+
     func chooseAudio(_ index: Int) async {
         guard index != audioChoice else { return }
         let at = player.currentTime()
         let wasPlaying = player.timeControlStatus != .paused
         do {
-            let playback = try await api.playback(item, audio: index)
+            let playback = try await api.playback(item, audio: index, quality: quality)
             audioChoice = index
             _ = try load(playback)
             await player.seek(to: at)

@@ -105,6 +105,16 @@ struct RemoteControlled: ViewModifier {
                 if Looks.all.contains(style) { model.showLook(style) }
                 return
             }
+            // The phone's film pickers: done as the TV's own would be.
+            if let video = model.video, let action = c["action"] as? String, ["subtitle", "audio", "quality"].contains(action) {
+                let raw = c["value"].map { "\($0)" } ?? ""
+                switch action {
+                case "subtitle": await video.chooseSubtitle(Int(raw))
+                case "audio": if let n = Int(raw) { await video.chooseAudio(n) }
+                default: await video.chooseQuality(raw)
+                }
+                return
+            }
             control(c["action"] as? String ?? "", value: (c["value"] as? NSNumber)?.doubleValue ?? 0)
         case "volume":
             let v = Float((c["value"] as? NSNumber)?.doubleValue ?? 1)
@@ -219,7 +229,11 @@ struct RemoteControlled: ViewModifier {
             let d = p.currentItem?.duration.seconds ?? 0
             return ["playing": p.timeControlStatus != .paused, "kind": "video", "item": Self.card(video.item),
                     "position": p.currentTime().seconds.isFinite ? p.currentTime().seconds : 0,
-                    "duration": d.isFinite ? d : 0, "volume": p.volume]
+                    "duration": d.isFinite ? d : 0, "volume": p.volume,
+                    // What it plays with, for the phone's pickers to show.
+                    "subtitle": video.subtitleChoice.map(String.init) ?? "",
+                    "audio": video.audioChoice.map { $0 as Any } ?? NSNull(),
+                    "quality": video.quality ?? "smart"]
         }
         if let item = player.current {
             var out: [String: Any] = ["playing": player.isPlaying, "kind": "audio", "item": Self.card(item),

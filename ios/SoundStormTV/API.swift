@@ -797,9 +797,13 @@ final class API {
     /// How a film plays: the file itself, or Jellyfin's HLS through the
     /// server when the file is not something the TV can play as it is. Another
     /// audio language is always HLS with that stream (`audio`).
-    func playback(_ item: Item, audio: Int? = nil) async throws -> Playback {
-        try await get("api/playback/\(Self.part(item.sourceId))/\(Self.path(item.id))",
-                      query: audio.map { ["audio": String($0)] } ?? [:])
+    /// How to play it; `quality` is the page's film quality (`vq`: smart,
+    /// original, standard, saver), the server's own default when not given.
+    func playback(_ item: Item, audio: Int? = nil, quality: String? = nil) async throws -> Playback {
+        var query: [String: String] = [:]
+        if let audio { query["audio"] = String(audio) }
+        if let quality { query["vq"] = quality }
+        return try await get("api/playback/\(Self.part(item.sourceId))/\(Self.path(item.id))", query: query)
     }
 
     /// A subtitle track's text: WebVTT, fetched with the session like the rest.
