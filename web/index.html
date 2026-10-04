@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SoundStorm: your own private cloud, at home</title>
+  <meta name="description" content="One app for your family's photos, films, TV, music, audiobooks and books, on every phone and TV. Runs on your own computer at home. Free and open source, no subscriptions.">
+  <meta property="og:title" content="SoundStorm: your own private cloud, at home">
+  <meta property="og:description" content="One app for your family's photos, films, music and books, on every phone and TV. Free and open source.">
+  <meta property="og:image" content="https://soundstorm.dev/shots/tv.png">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#"><span class="mark" aria-hidden="true"></span>SoundStorm</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#box">The box</a>
+      <a href="docs/">Docs</a>
+      <a href="https://github.com/GabrielHollberg/soundstorm">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- The first screen: what it is, in plain words, and the two ways in. -->
+    <section class="hero">
+      <div class="hero-text">
+        <h1>Your own private cloud, at home.</h1>
+        <p class="lead">One app for your family's photos, films, TV, music, audiobooks and books, on every phone and TV.
+          It runs on a computer in your house, so your memories stay yours. Free, open source, and no subscriptions.</p>
+        <div class="cta">
+          <a class="button primary" href="#install">Install it free</a>
+          <a class="button" href="#box">Get the box</a>
+        </div>
+        <p class="small">Windows, Mac and Linux · Apps for Android, iPhone, Google TV and Apple TV</p>
+      </div>
+      <div class="hero-shots">
+        <img class="shot tv" src="shots/tv.png" alt="SoundStorm playing music on a TV, with a storm animation">
+        <img class="shot phone" src="shots/now-playing.png" alt="SoundStorm's Now Playing on a phone">
+      </div>
+    </section>
+
+    <!-- What is in it: six things people already pay several services for. -->
+    <section id="features" class="features">
+      <h2>Everything in one app</h2>
+      <p class="section-lead">Not a server to manage: one sign-in, one search, one app your whole family just uses.</p>
+      <div class="grid">
+        <article>
+          <h3>Photos</h3>
+          <p>Every phone backs up by itself. A timeline of months and days, people and places, videos and Live Photos.
+            Bring your library in from Google or Apple.</p>
+        </article>
+        <article>
+          <h3>Films &amp; TV</h3>
+          <p>Shows season by season, carry on where you stopped, subtitles and audio languages, Up next.
+            Start a film on your phone and send it to the TV.</p>
+        </article>
+        <article>
+          <h3>Music</h3>
+          <p>Albums, artists, playlists, radio and moods, synced lyrics, and animations that move with every beat.
+            Bring your playlists from Plex.</p>
+        </article>
+        <article>
+          <h3>Audiobooks &amp; books</h3>
+          <p>Chapters, speed and a sleep timer. Read along as the page turns with the narrator,
+            or read alone at your own pace.</p>
+        </article>
+        <article>
+          <h3>For the whole family</h3>
+          <p>Everyone gets their own sign-in, favorites, places in books and their own private photos.
+            Invite family with a QR code.</p>
+        </article>
+        <article>
+          <h3>At home and away</h3>
+          <p>Works on your Wi-Fi from the first minute, and away from home with a secure address of its own.
+            No account with anyone.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- The app itself, on a phone. -->
+    <section class="screens">
+      <figure><img src="shots/home.png" alt="Home: shuffle all music, new music and more"><figcaption>Home</figcaption></figure>
+      <figure><img src="shots/photos.png" alt="Photos as a timeline of months and days"><figcaption>Photos</figcaption></figure>
+      <figure><img src="shots/now-playing.png" alt="Now Playing with an animation that follows the music"><figcaption>Music</figcaption></figure>
+      <figure><img src="shots/reader.png" alt="A book read one line at a time"><figcaption>Books</figcaption></figure>
+    </section>
+
+    <!-- Why it is trustworthy. -->
+    <section class="privacy">
+      <h2>Yours, and private</h2>
+      <div class="grid two">
+        <article>
+          <h3>Nothing leaves your house</h3>
+          <p>Your photos, films, music, searches and passwords stay on your own computer.
+            SoundStorm only contacts the internet for its secure address, for updates, and for things you switch on.</p>
+        </article>
+        <article>
+          <h3>Free and open source</h3>
+          <p>Every line is <a href="https://github.com/GabrielHollberg/soundstorm">public</a>, under the GNU AGPL,
+            so anyone can check what it does. No subscriptions, no ads, no account to make.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Install: the actual steps, the same as the README's. -->
+    <section id="install" class="install">
+      <h2>Install it</h2>
+      <p class="section-lead">About 10 to 30 minutes, mostly downloading. You need a computer that stays on, ideally with 16 GB of memory.</p>
+      <div class="tabs" role="tablist">
+        <button class="tab on" role="tab" data-os="windows" aria-selected="true">Windows</button>
+        <button class="tab" role="tab" data-os="unix" aria-selected="false">Mac &amp; Linux</button>
+      </div>
+      <div class="os" data-os="windows">
+        <ol>
+          <li><a class="button primary" href="https://github.com/GabrielHollberg/soundstorm/releases/latest/download/SoundStorm-Setup.cmd">Download SoundStorm for Windows</a></li>
+          <li><strong>Right-click</strong> the downloaded file → <strong>Properties</strong> → tick <strong>Unblock</strong> → <strong>OK</strong>.
+            <span class="note">Windows blocks every downloaded script until you say you trust it.</span></li>
+          <li><strong>Double-click</strong> it. A setup window walks you through the rest, and opens SoundStorm when it's done.</li>
+        </ol>
+      </div>
+      <div class="os hidden" data-os="unix">
+        <ol>
+          <li>Install <a href="https://docs.docker.com/get-docker/">Docker</a> (on a Mac, Docker Desktop).</li>
+          <li>Run this in a terminal:
+            <div class="code"><code id="unix-cmd">curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh</code>
+              <button class="copy" type="button" data-copy="unix-cmd">Copy</button></div>
+          </li>
+          <li>It sets everything up and prints the address to open.</li>
+        </ol>
+      </div>
+      <h3 class="apps-head">Then get the apps</h3>
+      <ul class="apps">
+        <li><strong>Android, Google TV and Fire TV:</strong> <a href="https://github.com/GabrielHollberg/soundstorm/releases">from the releases page</a> (the android ones). They find your server by themselves.</li>
+        <li><strong>iPhone and Apple TV:</strong> coming to the App Store.</li>
+        <li><strong>Any phone or computer:</strong> works in the web browser too, and adds to the home screen.</li>
+      </ul>
+    </section>
+
+    <!-- The box: an idea being tested, said honestly. -->
+    <section id="box" class="box">
+      <div>
+        <h2>Or get the SoundStorm box</h2>
+        <p>A small, quiet box with SoundStorm already on it. Plug it into power and your router,
+          scan the code on the sticker with your phone, and make your account. Nothing to install, nothing to configure.</p>
+        <p class="small">The box is in testing now. Leave your email to hear when it's ready.</p>
+        <!-- PLACEHOLDER: the sign-up form's provider is still to be chosen
+             (Buttondown, Kit, Mailchimp...). Until then, an email. -->
+        <a class="button primary" href="mailto:hello@soundstorm.dev?subject=Tell%20me%20when%20the%20SoundStorm%20box%20is%20ready">Tell me when it's ready</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p><span class="mark" aria-hidden="true"></span> SoundStorm · Free software under the GNU AGPL 3.0 ·
+      <a href="https://github.com/GabrielHollberg/soundstorm">Source</a> · <a href="docs/">Docs</a></p>
+    <p class="small">Designed and directed by Gabriel Hollberg, built with Claude.</p>
+  </footer>
+
+  <script>
+    // The install tabs, starting on the visitor's own system, and the copy button.
+    const tabs = document.querySelectorAll('.tab');
+    const choose = (os) => {
+      tabs.forEach((t) => { const on = t.dataset.os === os; t.classList.toggle('on', on); t.setAttribute('aria-selected', String(on)); });
+      document.querySelectorAll('.os').forEach((p) => p.classList.toggle('hidden', p.dataset.os !== os));
+    };
+    tabs.forEach((t) => t.addEventListener('click', () => choose(t.dataset.os)));
+    if (!/Windows/.test(navigator.userAgent)) choose('unix');
+    document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); b.textContent = 'Copied'; } catch { b.textContent = 'Select and copy'; }
+      setTimeout(() => { b.textContent = 'Copy'; }, 2000);
+    }));
+  </script>
+</body>
+</html>
