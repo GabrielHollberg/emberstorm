@@ -908,6 +908,26 @@
            it forces CORS semantics that then fail for want of headers
            nobody needs to send. -->
       <video id="video-player" controls playsinline></video>
+      <!-- A film playing on a TV this phone controls: the phone's own player,
+           with no picture - the film's still blurred behind its controls -
+           acting on the TV (filmRemote). -->
+      <div id="vr" class="vr hidden">
+        <div id="vr-back" class="vr-back"></div>
+        <button id="vr-where" class="vr-where" type="button"></button>
+        <div class="vr-controls">
+          <div class="vr-row">
+            <button id="vr-rew" class="vr-skip" type="button" aria-label="Back 10 seconds">&minus;10</button>
+            <button id="vr-toggle" class="vr-play" type="button" aria-label="Pause"></button>
+            <button id="vr-ffw" class="vr-skip" type="button" aria-label="On 10 seconds">+10</button>
+          </div>
+          <div class="vr-time">
+            <span id="vr-at">0:00</span>
+            <input id="vr-seek" type="range" min="0" max="1" value="0" step="1" aria-label="Position in the film">
+            <span id="vr-len"></span>
+          </div>
+          <button id="vr-stop" class="ghost small" type="button">Stop on the TV</button>
+        </div>
+      </div>
       <figcaption>
         <span id="video-caption"></span>
         <button id="video-cast" class="ghost small hidden" type="button">Play on&hellip;</button>

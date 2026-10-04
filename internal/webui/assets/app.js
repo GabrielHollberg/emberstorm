@@ -487,6 +487,9 @@ function bookGainDb() {
 // kbps instead: a quarter of the data, and an MP3 has none of the ~600KB of
 // header an iTunes M4A must deliver before its first note.
 let slowLink = false;
+// The film remote's state (filmRemote, far below): here, as closeVideo reads it
+// and runs before that part of the file has.
+const FR = { on: false, target: null, item: null, timer: 0, heldUntil: 0, held: {}, seeking: false, chose: 0, openedAt: 0 };
 // Known before the first song where possible: an away-from-home address found
 // slow is remembered on this device for six hours, and otherwise the link is
 // timed when the app opens there (probeLink). Otherwise the first song of every
@@ -3314,11 +3317,12 @@ function detachHls() {
 }
 
 async function playVideo(item, options = {}) {
-  // Controlling a TV: the film plays there, and this phone is its remote.
+  // Controlling a TV: the film plays there, and this phone's own player is
+  // its remote (filmRemote).
   if (CONTROL.target && !TV) {
     if (RA.on) dropMirror();
     controlSend({ type: 'play', item });
-    openRemote(CONTROL.target);
+    openFilmRemote(CONTROL.target, item);
     return;
   }
   stopAudio();
@@ -3449,10 +3453,14 @@ function applySubtitleChoice(player, value) {
 }
 
 $('subtitle-select').addEventListener('change', (event) => {
+  if (FR.on) { filmRemoteChoose('subtitle', event.target.value); return; }
   applySubtitleChoice($('video-player'), event.target.value);
 });
 
 function closeVideo() {
+  // The film remote closing leaves the TV playing (as Now Playing's arrow
+  // does for music).
+  if (FR.on) { closeFilmRemote(); return; }
   hideUpNext();
   state.videoToken = (state.videoToken || 0) + 1;
   // A quality picked in the player was for this sitting only.
@@ -14103,6 +14111,7 @@ function attachAudioChoice(item, tracks, chosen) {
   const current = chosen !== undefined ? chosen : (tracks.find((t) => t.default) || tracks[0] || {}).index;
   if (current !== undefined) select.value = String(current);
   select.onchange = async () => {
+    if (FR.on) { filmRemoteChoose('audio', select.value); return; }
     await saveWatchPosition(true);
     playVideo(item, { audio: Number(select.value) });
   };
@@ -14116,6 +14125,7 @@ function attachQualityChoice(item, vq) {
   const select = $('video-quality-select');
   select.value = vq;
   select.onchange = async () => {
+    if (FR.on) { filmRemoteChoose('quality', select.value); return; }
     state.videoQuality = select.value;
     await saveWatchPosition(true);
     playVideo(item, state.videoAudio !== undefined ? { audio: state.videoAudio } : {});
@@ -19587,6 +19597,8 @@ function playerState() {
     return {
       playing: !v.paused, kind: 'video', item: card(state.watching.item),
       position: v.currentTime || 0, duration: Number.isFinite(v.duration) ? v.duration : 0, volume: v.volume,
+      // What it plays with, for the phone's pickers to show the TV's own.
+      subtitle: $('subtitle-select').value, audio: state.videoAudio, quality: state.videoQuality || filmQuality(),
     };
   }
   if (audio.item) {
@@ -19713,6 +19725,25 @@ function remoteControl(c) {
     else if (c.action === 'play') v.play().catch(() => {});
     else if (c.action === 'seek') v.currentTime = value;
     else if (c.action === 'skip') v.currentTime = Math.max(0, v.currentTime + value);
+    // The phone's pickers: done as the TV's own would be.
+    else if (c.action === 'subtitle') {
+      const sel = $('subtitle-select');
+      sel.value = String(c.value ?? '');
+      applySubtitleChoice(v, sel.value);
+    } else if ((c.action === 'audio' || c.action === 'quality') && state.watching) {
+      const item = state.watching.item;
+      if (c.action === 'quality' && ['smart', 'original', 'standard', 'saver'].includes(c.value)) state.videoQuality = c.value;
+      const audioIndex = c.action === 'audio' ? Number(c.value) : state.videoAudio;
+      // The subtitles chosen stay on through the change (playing again
+      // otherwise starts them off).
+      const sub = $('subtitle-select').value;
+      saveWatchPosition(true)
+        .then(() => playVideo(item, audioIndex !== undefined && !Number.isNaN(audioIndex) ? { audio: audioIndex } : {}))
+        .then(() => {
+          const sel = $('subtitle-select');
+          if (sub !== '' && [...sel.options].some((o) => o.value === sub)) { sel.value = sub; applySubtitleChoice(v, sub); }
+        });
+    }
     return;
   }
   if (!audio.item) return;
@@ -19909,7 +19940,7 @@ async function chooseDevice(p) {
     saveWatchPosition(true);
     closeVideo();
     controlSend({ type: 'play', item });
-    openRemote(target);
+    openFilmRemote(target, item);
     return;
   }
   // Paused here: left here, not started on the TV unasked.
@@ -20017,6 +20048,155 @@ async function restoreControl() {
 }
 
 // The remote: what the device is playing, and its buttons.
+// A film on a TV, controlled from this phone's own film player (the owner's
+// design with the Mac, 2026-10-03: what is controlled remotely is done as it
+// is on the phone). No picture is streamed here: the film's still, blurred,
+// behind play, the ten-second skips and the timeline, with the Subtitles,
+// Audio and Quality pickers acting on the TV. What the TV does comes back from
+// its reports each second - its time, playing or paused, and the episode Up
+// next moved it on to. Closing leaves the TV playing; Stop stops it.
+function openFilmRemote(target, item) {
+  FR.on = true;
+  FR.openedAt = Date.now();
+  FR.target = target;
+  FR.held = {};
+  FR.heldUntil = 0;
+  PLAYER.target = target; // the phone's volume buttons turn the TV's
+  PLAYER.targetState = null;
+  setTimeout(tellRemoteVolume, 0);
+  closeRemote();
+  PLAYER.target = target;
+  setTimeout(tellRemoteVolume, 0);
+  $('video-overlay').classList.add('vr-on');
+  show($('vr'), true);
+  show($('video-overlay'), true);
+  show($('video-cast'), false);
+  $('vr-where').replaceChildren(icon('cast'), document.createTextNode(`On ${target.name}`));
+  filmRemoteItem(item);
+  refreshFilmRemote();
+  clearInterval(FR.timer);
+  FR.timer = setInterval(refreshFilmRemote, 1000);
+}
+// What the phone shows for the film the TV plays: its name, its still, and
+// the tracks it has (from the server, as the TV's own player asks).
+async function filmRemoteItem(item) {
+  if (!item || (FR.item && FR.item.id === item.id && FR.item.sourceId === item.sourceId)) return;
+  FR.item = item;
+  $('video-caption').textContent = [item.title, subtitleFor(item)].filter(Boolean).join(' \u2014 ');
+  const art = artPath(item);
+  $('vr-back').style.backgroundImage = art ? `url("${art}")` : '';
+  show($('subtitle-picker'), false);
+  show($('audio-picker'), false);
+  show($('quality-picker'), false);
+  const { ok, body } = await api(`/api/playback/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}`);
+  if (!FR.on || FR.item !== item) return;
+  const subs = (ok && body && body.subtitles) || [];
+  const sel = $('subtitle-select');
+  sel.replaceChildren(new Option('Off', ''), ...subs.map((t, i) => new Option(t.label || `Track ${i + 1}`, String(i))));
+  show($('subtitle-picker'), subs.length > 0);
+  attachAudioChoice(item, (ok && body && body.audio) || []);
+  attachQualityChoice(item, filmQuality());
+}
+function filmRemoteChoose(action, value) {
+  FR.chose = Date.now();
+  filmRemoteSend({ type: 'control', action, value });
+}
+function filmRemoteSend(cmd) {
+  if (!FR.target) return;
+  api(`/api/players/${FR.target.id}/command`, { method: 'POST', body: JSON.stringify(cmd) }).then((r) => {
+    if (r.status === 404 || r.status === 403) {
+      showToast(`${FR.target ? FR.target.name : 'The TV'} is not open, or is not yours to control now.`);
+      closeFilmRemote();
+    }
+  });
+}
+async function refreshFilmRemote() {
+  const target = FR.target;
+  if (!FR.on || !target) return;
+  const { ok, status, body } = await api(`/api/players/${target.id}`);
+  if (!FR.on || FR.target !== target) return;
+  if (!ok) {
+    if (status === 404) { showToast(`${target.name} is not yours to control now.`); closeFilmRemote(); }
+    return;
+  }
+  const st = { ...(body.state || {}) };
+  PLAYER.targetState = st;
+  // The TV finished, or was stopped, or plays something else now - once it
+  // has had a few seconds to start the film it was sent.
+  if (st.kind !== 'video' || !st.item) {
+    if (Date.now() - FR.openedAt > 8000) closeFilmRemote();
+    return;
+  }
+  // Up next, or the TV moving on by itself: the phone follows.
+  filmRemoteItem(st.item);
+  if (Date.now() < FR.heldUntil) Object.assign(st, FR.held);
+  const position = (st.position || 0) + (st.playing && st.at ? (Date.now() - st.at) / 1000 : 0);
+  if (!FR.seeking) {
+    $('vr-seek').max = String(Math.max(1, Math.round(st.duration || 0)));
+    $('vr-seek').value = String(Math.round(position));
+  }
+  $('vr-at').textContent = clock(FR.seeking ? Number($('vr-seek').value) : position);
+  $('vr-len').textContent = st.duration ? clock(st.duration) : '';
+  $('vr-toggle').replaceChildren(icon(st.playing ? 'pause' : 'play'));
+  $('vr-toggle').setAttribute('aria-label', st.playing ? 'Pause' : 'Play');
+  // The TV's own choices, unless one was just made here.
+  if (Date.now() - FR.chose > 4000) {
+    if (typeof st.subtitle === 'string') $('subtitle-select').value = st.subtitle;
+    if (st.audio !== undefined && st.audio !== null) $('audio-select').value = String(st.audio);
+    if (st.quality) $('video-quality-select').value = st.quality;
+  }
+}
+function filmRemoteHold(what) {
+  Object.assign(FR.held, what);
+  FR.heldUntil = Date.now() + 3000;
+}
+function closeFilmRemote() {
+  FR.on = false;
+  clearInterval(FR.timer);
+  FR.target = null;
+  FR.item = null;
+  PLAYER.target = null;
+  PLAYER.targetState = null;
+  setTimeout(tellRemoteVolume, 0);
+  $('video-overlay').classList.remove('vr-on');
+  show($('vr'), false);
+  show($('subtitle-picker'), false);
+  show($('audio-picker'), false);
+  show($('quality-picker'), false);
+  show($('video-overlay'), false);
+}
+(() => {
+  const playing = () => Boolean(PLAYER.targetState && PLAYER.targetState.playing);
+  $('vr-toggle').addEventListener('click', () => {
+    const now = !playing();
+    filmRemoteHold({ playing: now });
+    filmRemoteSend({ type: 'control', action: now ? 'play' : 'pause' });
+    $('vr-toggle').replaceChildren(icon(now ? 'pause' : 'play'));
+  });
+  const skip = (by) => {
+    const st = PLAYER.targetState || {};
+    const at = Math.max(0, (st.position || 0) + (st.playing && st.at ? (Date.now() - st.at) / 1000 : 0) + by);
+    filmRemoteHold({ position: at, at: Date.now() });
+    filmRemoteSend({ type: 'control', action: 'skip', value: by });
+    $('vr-seek').value = String(Math.round(at));
+  };
+  $('vr-rew').addEventListener('click', () => skip(-10));
+  $('vr-ffw').addEventListener('click', () => skip(10));
+  const seek = $('vr-seek');
+  seek.addEventListener('input', () => { FR.seeking = true; $('vr-at').textContent = clock(Number(seek.value)); });
+  seek.addEventListener('change', () => {
+    FR.seeking = false;
+    const at = Number(seek.value);
+    filmRemoteHold({ position: at, at: Date.now() });
+    filmRemoteSend({ type: 'control', action: 'seek', value: at });
+  });
+  $('vr-stop').addEventListener('click', () => {
+    filmRemoteSend({ type: 'stop' });
+    closeFilmRemote();
+  });
+  $('vr-where').addEventListener('click', () => openControlSheet());
+})();
+
 function openRemote(target) {
   PLAYER.target = target;
   setTimeout(tellRemoteVolume, 0);
@@ -20118,7 +20298,9 @@ $('rc-next').replaceChildren(icon('skip'));
 $('rc-close').replaceChildren(icon('down'));
 $('rc-close').addEventListener('click', closeRemote);
 $('rc-chip').addEventListener('click', () => {
-  if (CONTROL.target) openRemote(CONTROL.target);
+  const st = CONTROL.st || {};
+  if (CONTROL.target && st.kind === 'video' && st.item) openFilmRemote(CONTROL.target, st.item);
+  else if (CONTROL.target) openRemote(CONTROL.target);
   else if (CONTROL.away) chooseDevice(CONTROL.away);
 });
 $('rc-toggle').addEventListener('click', () => {
