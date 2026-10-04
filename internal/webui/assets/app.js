@@ -21418,8 +21418,11 @@ function tlScrubber(root) {
     target = share * range();
     const sec = monthAt(target);
     bubble.textContent = sec ? tlMonthName(sec.dataset.month) : '';
-    bubble.style.top = `${Math.round(clientY - r.top)}px`;
-    thumb.style.transform = `translateY(${Math.round(share * (bar.clientHeight - thumb.offsetHeight))}px)`;
+    // Beside the handle, not the finger: past either end of the track the
+    // handle stops, and the month stops with it.
+    const at = Math.round(share * (bar.clientHeight - t));
+    thumb.style.transform = `translateY(${at}px)`;
+    bubble.style.top = `${at + Math.round(t / 2)}px`;
   };
   // Drawn at most once a frame: a phone sends moves faster than it paints.
   let wantY = null;
