@@ -348,4 +348,13 @@ and the decisions behind it. Open `site/index.html` in a browser.
 
 ## License
 
-SoundStorm is released under the [MIT License](LICENSE).
+SoundStorm is free software under the [GNU Affero General Public License,
+version 3](LICENSE) (AGPL-3.0): you may use, study, change and share it, and
+anyone who offers a changed version to others - including over a network -
+must share their changes under the same license.
+
+Versions published before 4 October 2026 were released under the MIT License,
+and remain available under it.
+
+The media servers it runs alongside (table above) and the vendored libraries
+keep their own licenses.
