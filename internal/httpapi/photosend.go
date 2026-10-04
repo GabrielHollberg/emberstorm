@@ -259,58 +259,13 @@ func (s *Server) handleSendPhotos(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not get them ready to send")
 		return
 	}
-	pictures := s.library.PathFor(media.KindPicture)
-	skipped := 0
+	type ref = struct{ SourceID, ID string }
+	refs := make([]ref, len(body.Items))
 	for i, it := range body.Items {
-		src, ok := s.reg.ByID(r.Context(), it.SourceID)
-		if !ok || src.Kind() != media.KindPicture {
-			skipped++
-			continue
-		}
-		lister, ok := src.(source.FileLister)
-		if !ok {
-			skipped++
-			continue
-		}
-		// Only the sender's own photos: their photo account answers for
-		// nothing else.
-		rels, err := lister.ItemFiles(r.Context(), it.ID)
-		if err != nil || len(rels) == 0 {
-			skipped++
-			continue
-		}
-		abs, err := inside(pictures, rels[0])
-		if err != nil {
-			skipped++
-			continue
-		}
-		name := path.Base(rels[0])
-		held := fmt.Sprintf("%03d-%s", i, name)
-		if err := holdFile(abs, filepath.Join(dir, held)); err != nil {
-			skipped++
-			continue
-		}
-		item := sendItem{Name: name, Held: held, Source: it.SourceID, Asset: it.ID, Video: !library.IsStillImage(name)}
-		if g, ok := src.(source.ItemGetter); ok {
-			if got, ok := g.ItemByID(r.Context(), it.ID); ok {
-				item.Taken = got.Extra["taken"]
-			}
-		}
-		// Its date file travels with it: where the sender's date came from.
-		_ = holdFile(abs+".xmp", filepath.Join(dir, held+".xmp"))
-		// A Live Photo's moving part goes with its still.
-		if lf, ok := src.(liveFiler); ok {
-			if rel, err := lf.LiveFile(r.Context(), it.ID); err == nil && rel != "" {
-				if labs, err := inside(pictures, rel); err == nil {
-					extra := fmt.Sprintf("%03d-live-%s", i, path.Base(rel))
-					if holdFile(labs, filepath.Join(dir, extra)) == nil {
-						item.Extras = append(item.Extras, extra)
-					}
-				}
-			}
-		}
-		sd.Items = append(sd.Items, item)
+		refs[i] = ref{it.SourceID, it.ID}
 	}
+	var skipped int
+	sd.Items, skipped = s.holdPhotos(r.Context(), dir, refs, false)
 	if len(sd.Items) == 0 {
 		_ = os.RemoveAll(dir)
 		writeError(w, http.StatusBadRequest, "none of those could be sent - only your own photos and videos can")
@@ -363,7 +318,7 @@ func (s *Server) handlePhotoInbox(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	p.mu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]any{"sends": out})
+	writeJSON(w, http.StatusOK, map[string]any{"sends": out, "shares": s.sharesFor(u.ID)})
 }
 
 // GET /api/photos/inbox/{id}/{n}/thumb: a waiting photo's thumbnail, from
@@ -439,9 +394,119 @@ func (s *Server) handlePhotoInboxAccept(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, desensitizeFSError(err))
 		return
 	}
+	added, already := s.fileHeld(u, dir, sd.Items)
+	if added > 0 {
+		s.scheduleRescan(media.KindPicture)
+	}
+	s.log.Info("sent photos added", "to", u.Name, "from", sd.FromName, "added", added, "already", already)
+	writeJSON(w, http.StatusOK, map[string]any{"added": added, "already": already, "from": sd.FromName})
+}
+
+// POST /api/photos/inbox/{id}/decline: not wanted; let go of them.
+func (s *Server) handlePhotoInboxDecline(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	sd, found := s.takeSend(r.PathValue("id"), u.ID)
+	if !found {
+		writeError(w, http.StatusNotFound, "those photos are no longer waiting")
+		return
+	}
+	_ = os.RemoveAll(s.sendDir(sd.ID))
+	writeJSON(w, http.StatusOK, map[string]any{"declined": true})
+}
+
+// restoreSend puts back a send that could not be taken after all.
+func (s *Server) restoreSend(sd photoSend) {
+	p := &s.photoSendsRec
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	s.loadSendsLocked()
+	p.sends = append(p.sends, sd)
+	_ = s.saveSendsLocked()
+}
+
+// holdPhotos puts these photos - the asker's own, or ones shared with them -
+// with their date files and a Live Photo's moving part into a holding
+// folder, linked where the drive allows. What cannot be found is skipped.
+// visibleLister finds the file of any photo the asker can see, their own or
+// one shared with them (immich.VisibleItemFiles).
+type visibleLister interface {
+	VisibleItemFiles(ctx context.Context, id string) ([]string, error)
+}
+
+func (s *Server) holdPhotos(ctx context.Context, dir string, refs []struct{ SourceID, ID string }, shared bool) ([]sendItem, int) {
+	var items []sendItem
+	pictures := s.library.PathFor(media.KindPicture)
+	skipped := 0
+	for i, it := range refs {
+		src, ok := s.reg.ByID(ctx, it.SourceID)
+		if !ok || src.Kind() != media.KindPicture {
+			skipped++
+			continue
+		}
+		lister, ok := src.(source.FileLister)
+		if !ok {
+			skipped++
+			continue
+		}
+		// Only the sender's own photos: their photo account answers for
+		// nothing else.
+		var rels []string
+		var err error
+		if v, ok := src.(visibleLister); ok && shared {
+			rels, err = v.VisibleItemFiles(ctx, it.ID)
+		} else {
+			rels, err = lister.ItemFiles(ctx, it.ID)
+		}
+		if err != nil || len(rels) == 0 {
+			skipped++
+			continue
+		}
+		abs, err := inside(pictures, rels[0])
+		if err != nil {
+			skipped++
+			continue
+		}
+		name := path.Base(rels[0])
+		held := fmt.Sprintf("%03d-%s", i, name)
+		if err := holdFile(abs, filepath.Join(dir, held)); err != nil {
+			skipped++
+			continue
+		}
+		item := sendItem{Name: name, Held: held, Source: it.SourceID, Asset: it.ID, Video: !library.IsStillImage(name)}
+		if g, ok := src.(source.ItemGetter); ok {
+			if got, ok := g.ItemByID(ctx, it.ID); ok {
+				item.Taken = got.Extra["taken"]
+			}
+		}
+		// Its date file travels with it: where the sender's date came from.
+		_ = holdFile(abs+".xmp", filepath.Join(dir, held+".xmp"))
+		// A Live Photo's moving part goes with its still.
+		if lf, ok := src.(liveFiler); ok {
+			if rel, err := lf.LiveFile(ctx, it.ID); err == nil && rel != "" {
+				if labs, err := inside(pictures, rel); err == nil {
+					extra := fmt.Sprintf("%03d-live-%s", i, path.Base(rel))
+					if holdFile(labs, filepath.Join(dir, extra)) == nil {
+						item.Extras = append(item.Extras, extra)
+					}
+				}
+			}
+		}
+		items = append(items, item)
+	}
+	return items, skipped
+}
+
+// fileHeld files held photos into the person's own folder by when each was
+// taken - the date inside it, else the date file that came with it, else
+// the date its library showed, else its name - and says how many were
+// added and how many they had already.
+func (s *Server) fileHeld(u state.User, dir string, items []sendItem) (int, int) {
 	added, already := 0, 0
 	root := s.library.Root()
-	for _, it := range sd.Items {
+	for _, it := range items {
 		held := filepath.Join(dir, it.Held)
 		// The sender's date, where it came from beside the photo.
 		var known photoimport.Meta
@@ -479,34 +544,5 @@ func (s *Server) handlePhotoInboxAccept(w http.ResponseWriter, r *http.Request) 
 		s.photoSaved(u, "pictures/"+pl.rel, pl)
 		added++
 	}
-	if added > 0 {
-		s.scheduleRescan(media.KindPicture)
-	}
-	s.log.Info("sent photos added", "to", u.Name, "from", sd.FromName, "added", added, "already", already)
-	writeJSON(w, http.StatusOK, map[string]any{"added": added, "already": already, "from": sd.FromName})
-}
-
-// POST /api/photos/inbox/{id}/decline: not wanted; let go of them.
-func (s *Server) handlePhotoInboxDecline(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.requireUser(w, r)
-	if !ok {
-		return
-	}
-	sd, found := s.takeSend(r.PathValue("id"), u.ID)
-	if !found {
-		writeError(w, http.StatusNotFound, "those photos are no longer waiting")
-		return
-	}
-	_ = os.RemoveAll(s.sendDir(sd.ID))
-	writeJSON(w, http.StatusOK, map[string]any{"declined": true})
-}
-
-// restoreSend puts back a send that could not be taken after all.
-func (s *Server) restoreSend(sd photoSend) {
-	p := &s.photoSendsRec
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	s.loadSendsLocked()
-	p.sends = append(p.sends, sd)
-	_ = s.saveSendsLocked()
+	return added, already
 }

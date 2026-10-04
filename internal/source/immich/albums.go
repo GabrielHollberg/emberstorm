@@ -31,6 +31,12 @@ type immichAlbum struct {
 	EndDate                    string  `json:"endDate"`
 	LastModifiedAssetTimestamp string  `json:"lastModifiedAssetTimestamp"`
 	UpdatedAt                  string  `json:"updatedAt"`
+	AlbumUsers                 []struct {
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
+		Role string `json:"role"`
+	} `json:"albumUsers"`
 }
 
 func (a immichAlbum) out() source.PhotoAlbum {
@@ -41,6 +47,14 @@ func (a immichAlbum) out() source.PhotoAlbum {
 	}
 	if a.AlbumThumbnailAssetID != nil {
 		al.ArtID = *a.AlbumThumbnailAssetID
+	}
+	// 3.2.2 names the owner among the album's users, as role "owner".
+	for _, u := range a.AlbumUsers {
+		if u.Role == "owner" {
+			al.Owner = u.User.ID
+		} else {
+			al.Members = append(al.Members, source.AlbumMember{UserID: u.User.ID, Role: u.Role})
+		}
 	}
 	return al
 }
@@ -169,4 +183,48 @@ func (s *Source) DeleteAlbum(ctx context.Context, id string) error {
 		return fmt.Errorf("no such album")
 	}
 	return s.do(ctx, http.MethodDelete, "/api/albums/"+url.PathEscape(id), nil, nil)
+}
+
+// PhotoUserID is the photo account's own id for the person asking.
+func (s *Source) PhotoUserID(ctx context.Context) (string, error) {
+	var me struct {
+		ID string `json:"id"`
+	}
+	if err := s.getJSON(ctx, "/api/users/me", nil, &me); err != nil {
+		return "", err
+	}
+	if !albumIDRE.MatchString(me.ID) {
+		return "", fmt.Errorf("immich %q: no id for this person", s.id)
+	}
+	return me.ID, nil
+}
+
+// ShareAlbum adds someone to the asker's album; somebody already in it has
+// their role changed instead.
+func (s *Source) ShareAlbum(ctx context.Context, albumID, photoUserID string, canAdd bool) error {
+	if !albumIDRE.MatchString(albumID) || !albumIDRE.MatchString(photoUserID) {
+		return fmt.Errorf("no such album or person")
+	}
+	role := "viewer"
+	if canAdd {
+		role = "editor"
+	}
+	err := s.do(ctx, http.MethodPut, "/api/albums/"+url.PathEscape(albumID)+"/users",
+		map[string]any{"albumUsers": []map[string]string{{"userId": photoUserID, "role": role}}}, nil)
+	if err == nil {
+		return nil
+	}
+	if again := s.do(ctx, http.MethodPut, "/api/albums/"+url.PathEscape(albumID)+"/user/"+url.PathEscape(photoUserID),
+		map[string]any{"role": role}, nil); again == nil {
+		return nil
+	}
+	return err
+}
+
+// UnshareAlbum takes someone off an album; "me" leaves one shared with the asker.
+func (s *Source) UnshareAlbum(ctx context.Context, albumID, photoUserID string) error {
+	if !albumIDRE.MatchString(albumID) || (photoUserID != "me" && !albumIDRE.MatchString(photoUserID)) {
+		return fmt.Errorf("no such album or person")
+	}
+	return s.do(ctx, http.MethodDelete, "/api/albums/"+url.PathEscape(albumID)+"/user/"+url.PathEscape(photoUserID), nil, nil)
 }

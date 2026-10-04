@@ -34,6 +34,13 @@ func (s *Server) photoAlbums(ctx context.Context) (source.PhotoAlbums, string, b
 type albumOut struct {
 	source.PhotoAlbum
 	SourceID string `json:"sourceId"`
+	// Owned: the asker's own (else OwnerName's, shared with them). CanAdd:
+	// they may add photos. SharedWith: who else is in it, and (on their own)
+	// who has not answered yet.
+	Owned      bool          `json:"owned"`
+	OwnerName  string        `json:"ownerName,omitempty"`
+	CanAdd     bool          `json:"canAdd"`
+	SharedWith []sharePerson `json:"sharedWith"`
 }
 
 // albumBody is what the album routes take: a name, and photos as the page
@@ -77,13 +84,18 @@ func (s *Server) handlePhotoAlbums(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"albums": []albumOut{}})
 		return
 	}
+	u, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
 	albums, err := a.Albums(ctx)
 	if err != nil {
 		s.photosError(w, err)
 		return
 	}
+	outs := s.albumsOut(ctx, u, albums, src)
 	if id := r.URL.Query().Get("id"); id != "" {
-		for _, al := range albums {
+		for _, al := range outs {
 			if al.ID != id {
 				continue
 			}
@@ -92,17 +104,13 @@ func (s *Server) handlePhotoAlbums(w http.ResponseWriter, r *http.Request) {
 				s.photosError(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"album": albumOut{al, src}, "items": nonNil(items)})
+			writeJSON(w, http.StatusOK, map[string]any{"album": al, "items": nonNil(items)})
 			return
 		}
 		writeError(w, http.StatusNotFound, "no such album")
 		return
 	}
-	out := make([]albumOut, len(albums))
-	for i, al := range albums {
-		out[i] = albumOut{al, src}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"albums": out})
+	writeJSON(w, http.StatusOK, map[string]any{"albums": outs})
 }
 
 // POST /api/photos/albums {name, items}: a new album, with these in it.
@@ -127,7 +135,7 @@ func (s *Server) handleCreatePhotoAlbum(w http.ResponseWriter, r *http.Request) 
 		s.photosError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"album": albumOut{al, src}, "added": len(ids)})
+	writeJSON(w, http.StatusOK, map[string]any{"album": albumOut{PhotoAlbum: al, SourceID: src, Owned: true, CanAdd: true, SharedWith: []sharePerson{}}, "added": len(ids)})
 }
 
 // POST /api/photos/albums/{id}/add and /remove {items}.

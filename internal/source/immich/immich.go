@@ -392,6 +392,18 @@ func (s *Source) Health(ctx context.Context) error {
 // way lives in Immich's own storage, which is not the pictures folder and not
 // SoundStorm's to delete.
 func (s *Source) ItemFiles(ctx context.Context, itemID string) ([]string, error) {
+	return s.itemFiles(ctx, itemID, true)
+}
+
+// VisibleItemFiles is ItemFiles for any photo the person asking can see -
+// one in an album shared with them, in its owner's library - for Save to my
+// photos, which copies it. Never for deleting or sending: those take only
+// the asker's own (ItemFiles).
+func (s *Source) VisibleItemFiles(ctx context.Context, itemID string) ([]string, error) {
+	return s.itemFiles(ctx, itemID, false)
+}
+
+func (s *Source) itemFiles(ctx context.Context, itemID string, ownOnly bool) ([]string, error) {
 	if s.cfg.MediaRoot == "" {
 		return nil, fmt.Errorf("immich %q: no media folder configured", s.id)
 	}
@@ -406,7 +418,7 @@ func (s *Source) ItemFiles(ctx context.Context, itemID string) ([]string, error)
 	if err := s.getJSON(ctx, "/api/assets/"+url.PathEscape(itemID), nil, &a); err != nil {
 		return nil, err
 	}
-	if a.LibraryID != "" && a.LibraryID != lib {
+	if ownOnly && a.LibraryID != "" && a.LibraryID != lib {
 		return nil, fmt.Errorf("immich %q: %q is not in the pictures folder", s.id, itemID)
 	}
 	rel, err := source.RelativeTo(s.cfg.MediaRoot, a.OriginalPath)

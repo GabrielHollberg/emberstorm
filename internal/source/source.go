@@ -768,6 +768,16 @@ type PhotoAlbum struct {
 	End   string `json:"end,omitempty"`
 	// Updated is when a photo was last added (for the newest first).
 	Updated string `json:"updated,omitempty"`
+	// Owner is the backend's own id for whose album it is, and Members who
+	// else is in it, with "editor" (may add photos) or "viewer".
+	Owner   string        `json:"-"`
+	Members []AlbumMember `json:"-"`
+}
+
+// AlbumMember is somebody an album is shared with, by the backend's own id.
+type AlbumMember struct {
+	UserID string
+	Role   string
 }
 
 // PhotoAlbums is a photo backend that keeps albums: each person's own, made
@@ -782,6 +792,19 @@ type PhotoAlbums interface {
 	RemoveFromAlbum(ctx context.Context, id string, itemIDs []string) (int, error)
 	RenameAlbum(ctx context.Context, id, name string) error
 	DeleteAlbum(ctx context.Context, id string) error
+}
+
+// PhotoAlbumSharing is a photo backend whose albums can be shared: the
+// photos stay their owner's, and the people it is shared with see them.
+type PhotoAlbumSharing interface {
+	// PhotoUserID is the backend's own id for the person asking.
+	PhotoUserID(ctx context.Context) (string, error)
+	// ShareAlbum lets someone (by PhotoUserID) see the asker's album, and add
+	// their own photos to it when canAdd.
+	ShareAlbum(ctx context.Context, albumID, photoUserID string, canAdd bool) error
+	// UnshareAlbum takes someone off an album; "me" is the asker leaving one
+	// shared with them.
+	UnshareAlbum(ctx context.Context, albumID, photoUserID string) error
 }
 
 type audioStreamKey struct{}

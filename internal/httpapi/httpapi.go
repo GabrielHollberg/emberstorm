@@ -127,8 +127,13 @@ type Server struct {
 	deleted        deletedPhotos
 	// photos sent from one person to another, waiting (photosend.go)
 	photoSendsRec photoSends
-	lookingUpMu   sync.Mutex
-	lookingUp     map[string]bool
+	// albums shared, waiting to be answered (photoshare.go), and the
+	// owner's photo account id, asked once
+	photoSharesRec photoShares
+	ownerUIDMu     sync.Mutex
+	ownerUID       string
+	lookingUpMu    sync.Mutex
+	lookingUp      map[string]bool
 	// imports limits how often somebody may import playlists (a file, or
 	// from Plex): each can write thousands of songs to their collections.
 	imports          allowance
@@ -333,6 +338,7 @@ func New(cfg Config) *Server {
 		trainingDir:      cfg.TrainingDir,
 		deleted:          deletedPhotos{file: stateFile(cfg.StateDir, "photos-deleted.json")},
 		photoSendsRec:    photoSends{file: stateFile(cfg.StateDir, sendsStateFile)},
+		photoSharesRec:   photoShares{file: stateFile(cfg.StateDir, sharesStateFile)},
 		drivesDir:        cfg.DrivesDir,
 		caretakerSocket:  cfg.CaretakerSocket,
 		rescanTimers:     map[media.Kind]*time.Timer{},
@@ -515,6 +521,13 @@ func (s *Server) Routes() http.Handler {
 	guarded.HandleFunc("POST /api/photos/albums/{id}/remove", s.limited(&s.listWrites, 60, time.Second, s.handlePhotoAlbumItems(false)))
 	guarded.HandleFunc("PATCH /api/photos/albums/{id}", s.limited(&s.listWrites, 60, time.Second, s.handleRenamePhotoAlbum))
 	guarded.HandleFunc("DELETE /api/photos/albums/{id}", s.limited(&s.listWrites, 60, time.Second, s.handleDeletePhotoAlbum))
+	guarded.HandleFunc("POST /api/photos/albums/{id}/share", s.limited(&s.listWrites, 60, time.Second, s.handleShareAlbum))
+	guarded.HandleFunc("DELETE /api/photos/albums/{id}/share/{user}", s.limited(&s.listWrites, 60, time.Second, s.handleUnshareAlbum))
+	guarded.HandleFunc("POST /api/photos/albums/{id}/leave", s.limited(&s.listWrites, 60, time.Second, s.handleLeaveAlbum))
+	guarded.HandleFunc("GET /api/photos/shares/{id}/{n}/thumb", s.handleShareThumb)
+	guarded.HandleFunc("POST /api/photos/shares/{id}/accept", s.limited(&s.listWrites, 60, time.Second, s.handleAcceptShare))
+	guarded.HandleFunc("POST /api/photos/shares/{id}/decline", s.limited(&s.listWrites, 60, time.Second, s.handleDeclineShare))
+	guarded.HandleFunc("POST /api/photos/save", s.limited(&s.listWrites, 60, time.Second, s.handleSavePhotos))
 	guarded.HandleFunc("GET /api/photos/send-to", s.handleSendTo)
 	guarded.HandleFunc("POST /api/photos/send", s.handleSendPhotos)
 	guarded.HandleFunc("GET /api/photos/inbox", s.handlePhotoInbox)
@@ -1124,6 +1137,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	// with somebody's listening history in it.
 	s.setup.ForgetUser(r.Context(), id)
 	s.forgetSendsTo(id)
+	s.forgetSharesOf(id)
 	defer s.photoPrivacy()
 	// Their favorites and playlists go with them. Best effort, like the
 	// backend accounts: a file that will not delete must not stop the removal.

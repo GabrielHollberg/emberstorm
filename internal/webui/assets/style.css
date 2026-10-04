@@ -4464,3 +4464,5 @@ html, body { overscroll-behavior-y: none; }
 .album-grid.selecting .item.selected .check { background: var(--accent); border-color: var(--accent); color: #08131f; }
 .album-grid.selecting .item.selected .art-wrap { transform: scale(0.88); transition: transform 0.12s ease; }
 .playlist-action.album-delete { color: #ff8a8a; }
+.photo-inbox { grid-template-columns: minmax(0, 1fr); }
+.photo-send { min-width: 0; }

@@ -5899,7 +5899,14 @@ function renderSelectMenu() {
       event.stopPropagation();
       renderAlbumMenu(items, () => renderSelectMenu(), () => setSelecting(false));
     }, { chevron: true }));
-    if (state.openAlbum && $('music-view').querySelector('.selectable')) {
+    if (state.openAlbum && !state.openAlbum.owned && $('music-view').querySelector('.selectable')) {
+      entries.push(menuItem('download', 'Save to my photos', (event) => {
+        event.stopPropagation();
+        setSelecting(false);
+        saveToMyPhotos(items);
+      }));
+    }
+    if (state.openAlbum && state.openAlbum.canAdd && $('music-view').querySelector('.selectable')) {
       entries.push(menuItem('close', 'Remove from album', async (event) => {
         event.stopPropagation();
         setSelecting(false);
@@ -6358,7 +6365,14 @@ function renderMainMenu(item, opts = {}) {
       event.stopPropagation();
       renderAlbumMenu([item], () => renderMainMenu(item, opts));
     }, { chevron: true }));
-    if (state.openAlbum && state.openAlbum.items.some((it) => selectionKey(it) === selectionKey(item))) {
+    if (state.openAlbum && !state.openAlbum.owned) {
+      entries.push(menuItem('download', 'Save to my photos', (event) => {
+        event.stopPropagation();
+        closeItemMenu();
+        saveToMyPhotos([item]);
+      }));
+    }
+    if (state.openAlbum && state.openAlbum.canAdd && state.openAlbum.items.some((it) => selectionKey(it) === selectionKey(item))) {
       entries.push(menuItem('close', 'Remove from album', async (event) => {
         event.stopPropagation();
         closeItemMenu();
@@ -6482,6 +6496,14 @@ function albumWhen(al) {
 
 const photoCount = (n) => `${n} ${n === 1 ? 'item' : 'items'}`;
 
+// Whose an album is, or who it is shared with.
+function albumWhose(al) {
+  if (!al.owned) return `Shared by ${al.ownerName || 'someone'}`;
+  const inIt = (al.sharedWith || []).filter((p) => !p.waiting);
+  if (!inIt.length) return '';
+  return inIt.length === 1 ? `Shared with ${inIt[0].name}` : `Shared with ${inIt.length}`;
+}
+
 async function newAlbum(items) {
   const name = (window.prompt('Name the new album', '') || '').trim();
   if (!name) return null;
@@ -6517,9 +6539,10 @@ async function showAlbums(seq) {
   grid.className = 'grid browse-grid';
   grid.append(...list.map((al) => bookGroupCard(
     { name: al.name, cover: al.artId ? { sourceId: al.sourceId, artId: al.artId } : null },
-    false, [photoCount(al.count), albumWhen(al)].filter(Boolean).join(' · '), () => showPhotoAlbum(al),
+    false, [albumWhose(al), photoCount(al.count)].filter(Boolean).join(' \u00b7 '), () => showPhotoAlbum(al),
   )));
   view.replaceChildren(bar, grid);
+  showPhotoInbox(view, seq);
   $('status').textContent = list.length ? ''
     : (state.query ? 'No album matches.'
       : 'No albums yet. Make one here, or hold a photo, choose Select, pick some and choose Add to album.');
@@ -6540,9 +6563,47 @@ async function showPhotoAlbum(al) {
   const items = body.items || [];
   state.items = items;
   state.openAlbum = { ...album, items };
-  const head = pageHead(album.name, [photoCount(items.length), albumWhen(album)].filter(Boolean).join(' · '));
+  const head = pageHead(album.name, [albumWhose(album), photoCount(items.length), albumWhen(album)].filter(Boolean).join(' \u00b7 '));
   const actions = document.createElement('div');
   actions.className = 'playlist-actions';
+  if (!album.owned) {
+    const saveAll = document.createElement('button');
+    saveAll.type = 'button';
+    saveAll.className = 'playlist-action';
+    saveAll.textContent = 'Save all to my photos';
+    saveAll.addEventListener('click', () => saveToMyPhotos(state.openAlbum.items));
+    const leave = document.createElement('button');
+    leave.type = 'button';
+    leave.className = 'playlist-action album-delete';
+    leave.textContent = 'Leave album';
+    let armedLeave = false;
+    leave.addEventListener('click', async () => {
+      if (!armedLeave) {
+        armedLeave = true;
+        leave.textContent = 'Tap again to leave';
+        setTimeout(() => { armedLeave = false; leave.textContent = 'Leave album'; }, 4000);
+        return;
+      }
+      const r = await api(`/api/photos/albums/${encodeURIComponent(album.id)}/leave`, { method: 'POST' });
+      if (!r.ok) { showToast((r.body && r.body.error) || 'Could not leave it.'); return; }
+      showToast(`Left "${album.name}".`);
+      runSearch();
+    });
+    actions.append(saveAll, leave);
+  }
+  const share = document.createElement('button');
+  share.type = 'button';
+  share.className = 'playlist-action';
+  share.textContent = 'Share';
+  share.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const menu = $('item-menu');
+    state.menuFor = 'album-share';
+    state.menuOpts = {};
+    state.menuAnchor = share;
+    renderShareAlbumMenu(state.openAlbum);
+    placeMenu(menu, share);
+  });
   const rename = document.createElement('button');
   rename.type = 'button';
   rename.className = 'playlist-action';
@@ -6573,7 +6634,7 @@ async function showPhotoAlbum(al) {
     showToast(`Deleted "${album.name}". The photos stay.`);
     runSearch();
   });
-  actions.append(rename, del);
+  if (album.owned) actions.append(share, rename, del);
   const grid = document.createElement('div');
   // Like the timeline: small rounded squares, a video saying so.
   grid.className = 'tl-grid album-grid selectable';
@@ -6612,6 +6673,78 @@ async function removeFromOpenAlbum(items) {
   if (sub) sub.textContent = [photoCount(al.items.length), albumWhen(al)].filter(Boolean).join(' · ');
   const n = items.length;
   showToast(`Removed ${n === 1 ? 'it' : n} from "${al.name}".`);
+}
+
+// Save to my photos: copies of photos in an album shared with you, into your
+// own folder (photoshare.go) - yours to keep whatever happens to the album.
+async function saveToMyPhotos(items) {
+  if (!items.length) return;
+  showToast(`Saving ${items.length === 1 ? 'it' : items.length} to your photos…`);
+  const r = await api('/api/photos/save', { method: 'POST', body: JSON.stringify({ items: albumPayload(items) }) });
+  if (!r.ok || !r.body) { showToast((r.body && r.body.error) || 'Could not save them.'); return; }
+  const { added, already } = r.body;
+  showToast(added
+    ? `Saved ${added === 1 ? 'it' : added} to your photos${already ? `; ${already} you had already` : ''}.`
+    : 'You had those already.');
+}
+
+// Share an album: people to invite, who is in it already (a tap, then
+// another, stops sharing with them), and whether they may add photos.
+async function renderShareAlbumMenu(album) {
+  const menu = $('item-menu');
+  const note = menuNote();
+  const say = (text) => { note.textContent = text; show(note, Boolean(text)); };
+  const head = document.createElement('div');
+  head.className = 'menu-head';
+  const title = document.createElement('strong');
+  title.textContent = `Share "${album.name}"`;
+  const sub = document.createElement('span');
+  sub.textContent = 'The photos stay yours';
+  head.append(title, sub);
+  let canAdd = Boolean(state.shareCanAdd);
+  const toggle = menuItem(canAdd ? 'check' : 'close', canAdd ? 'They can add photos' : 'They can only look', (event) => {
+    event.stopPropagation();
+    state.shareCanAdd = !canAdd;
+    renderShareAlbumMenu(album);
+  }, { detail: 'change' });
+  const list = document.createElement('div');
+  list.className = 'menu-scroll';
+  menu.replaceChildren(head, toggle, list, note);
+  const { ok, body } = await api('/api/photos/send-to');
+  const people = (ok && body && body.people) || [];
+  if (!people.length) say('Nobody else here has photos to share with.');
+  const inIt = new Map((album.sharedWith || []).map((p) => [p.id, p]));
+  list.append(...people.map((p) => {
+    const was = inIt.get(p.id);
+    let armed = false;
+    const row = menuItem('send', p.name, async (event) => {
+      event.stopPropagation();
+      if (was) {
+        if (!armed) {
+          armed = true;
+          row.querySelector('.menu-detail').textContent = was.waiting ? 'tap again to take back' : 'tap again to stop sharing';
+          return;
+        }
+        const r = await api(`/api/photos/albums/${encodeURIComponent(album.id)}/share/${encodeURIComponent(p.id)}`, { method: 'DELETE' });
+        if (!r.ok) { say((r.body && r.body.error) || 'Could not stop sharing.'); return; }
+        album.sharedWith = (album.sharedWith || []).filter((x) => x.id !== p.id);
+        showToast(was.waiting ? `Took back the invitation to ${p.name}.` : `Stopped sharing with ${p.name}.`);
+        renderShareAlbumMenu(album);
+        return;
+      }
+      const r = await api(`/api/photos/albums/${encodeURIComponent(album.id)}/share`, { method: 'POST', body: JSON.stringify({ to: p.id, canAdd }) });
+      if (!r.ok) { say((r.body && r.body.error) || 'Could not share it.'); return; }
+      album.sharedWith = [...(album.sharedWith || []), { id: p.id, name: p.name, canAdd, waiting: true }];
+      showToast(`Shared with ${p.name}. It shows in their albums once they add it.`);
+      renderShareAlbumMenu(album);
+    }, { detail: was ? (was.waiting ? 'waiting' : (was.canAdd ? 'can add' : 'can look')) : 'share' });
+    const face = document.createElement('span');
+    face.className = 'menu-avatar';
+    paintAvatar(face, p);
+    row.querySelector('.icon').replaceWith(face);
+    return row;
+  }));
+  if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
 }
 
 // Add to album: which album, or a new one.
@@ -6655,7 +6788,7 @@ async function renderAlbumMenu(items, back, done) {
     finish(`Made the album "${name}" with ${photoCount(items.length)}.`);
   });
   const { ok, body } = await api('/api/photos/albums');
-  const albums = (ok && body && body.albums) || [];
+  const albums = ((ok && body && body.albums) || []).filter((al) => al.canAdd);
   input.placeholder = albums.length ? 'New album' : 'Name your first album';
   if (!ok) say((body && body.error) || 'Could not load your albums.');
   list.append(...albums.map((al) => menuItem('photo', al.name, async (event) => {
@@ -6672,16 +6805,76 @@ async function renderAlbumMenu(items, back, done) {
   placeMenu(menu, state.menuAnchor);
 }
 
+// An album somebody shared, waiting: Add to my albums, or No thanks.
+function shareCard(sh, box) {
+  const card = document.createElement('section');
+  card.className = 'photo-send';
+  const title = document.createElement('h3');
+  title.textContent = `${sh.from} shared the album "${sh.album}" with you`;
+  const sub = document.createElement('p');
+  sub.className = 'photo-send-note';
+  sub.textContent = `${photoCount(sh.count)} \u00b7 ${sh.canAdd ? 'you can add your photos to it too' : 'you can look at its photos'}`;
+  const strip = document.createElement('div');
+  strip.className = 'photo-send-strip';
+  for (const url of sh.previews || []) {
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.alt = '';
+    img.src = url;
+    const cell = document.createElement('span');
+    cell.className = 'photo-send-thumb';
+    cell.append(img);
+    strip.append(cell);
+  }
+  const note = document.createElement('p');
+  note.className = 'photo-send-note';
+  const buttons = document.createElement('div');
+  buttons.className = 'photo-send-buttons';
+  const take = document.createElement('button');
+  take.type = 'button';
+  take.className = 'primary';
+  take.textContent = 'Add to my albums';
+  const no = document.createElement('button');
+  no.type = 'button';
+  no.textContent = 'No thanks';
+  const act = async (path) => {
+    take.disabled = true;
+    no.disabled = true;
+    const r = await api(`/api/photos/shares/${encodeURIComponent(sh.id)}/${path}`, { method: 'POST' });
+    if (!r.ok) {
+      note.textContent = (r.body && r.body.error) || 'That did not work. Try again.';
+      take.disabled = false;
+      no.disabled = false;
+      return false;
+    }
+    card.remove();
+    if (!box.querySelector('.photo-send')) box.remove();
+    return true;
+  };
+  take.addEventListener('click', async () => {
+    if (!(await act('accept'))) return;
+    showToast(`"${sh.album}" is in your albums now.`);
+    if (state.kind === 'photo-albums' && !state.openAlbum) runSearch();
+  });
+  no.addEventListener('click', () => act('decline'));
+  buttons.append(take, no);
+  card.append(title, sub, strip, buttons, note);
+  return card;
+}
+
 // Photos somebody sent, waiting at the top of the Photos tab: a few of them
 // to look at, Add to my photos, or No thanks.
 async function showPhotoInbox(view, seq) {
   const { ok, body } = await api('/api/photos/inbox');
   if (seq !== state.searchSeq || !ok || !body) return;
   const sends = body.sends || [];
+  const shares = body.shares || [];
   for (const old of view.querySelectorAll('.photo-inbox')) old.remove();
-  if (!sends.length) return;
+  if (!sends.length && !shares.length) return;
   const box = document.createElement('div');
   box.className = 'photo-inbox';
+  for (const sh of shares) box.append(shareCard(sh, box));
   for (const send of sends) {
     const card = document.createElement('section');
     card.className = 'photo-send';
