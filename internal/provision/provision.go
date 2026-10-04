@@ -123,6 +123,12 @@ type Manager struct {
 	// reads only that folder.
 	PhotoFolder func(userID string) (string, error)
 
+	// PersonalFolders lists the folders in pictures/Personal/ as they are on
+	// disk ("Personal/alice"), a removed member's kept one included: the
+	// owner's photo library leaves out every one but the owner's own
+	// (SyncPhotoPrivacy). Set by main.
+	PersonalFolders func() []string
+
 	// photoMu keeps two requests at once from making a person two Immich
 	// accounts.
 	photoMu sync.Mutex
@@ -694,8 +700,10 @@ func (m *Manager) TokenFor(ctx context.Context, backendID, userID string) (strin
 // Immich works out from them - are theirs alone: filtering one shared account
 // instead would leak through the faces, which Immich groups across every
 // photo it can see. The owner uses the administrator's account, whose library
-// is the whole pictures folder, members' folders included: the owner sees
-// everyone's.
+// is the whole pictures folder less everybody else's own folder
+// (SyncPhotoPrivacy): the owner sees their own and the household's shared
+// photos, never a member's - the owner's choice, 2026-10-04 (it used to be
+// everybody's).
 func (m *Manager) PhotoAccountFor(ctx context.Context, backendID, userID string) (key, libraryID string, err error) {
 	creds, ok := m.store.Backend(backendID)
 	if !ok {

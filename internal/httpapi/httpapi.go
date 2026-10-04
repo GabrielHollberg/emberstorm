@@ -1032,6 +1032,20 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"users": out})
 }
 
+// photoPrivacy keeps the owner's photo library leaving out everybody else's
+// own photos, in the background (provision.SyncPhotoPrivacy).
+func (s *Server) photoPrivacy() {
+	if s.setup == nil {
+		return
+	}
+	go func() {
+		defer func() { _ = recover() }()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		s.setup.SyncPhotoPrivacy(ctx)
+	}()
+}
+
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	actor, ok := s.requireUser(w, r)
 	if !ok {
@@ -1052,6 +1066,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("account created", "username", created.Name, "by", actor.Name)
+	s.photoPrivacy()
 	writeJSON(w, http.StatusOK, map[string]any{"user": publicUser(created)})
 }
 
@@ -1093,6 +1108,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	// after that nothing knows what to clean up - the orphan would sit there
 	// with somebody's listening history in it.
 	s.setup.ForgetUser(r.Context(), id)
+	defer s.photoPrivacy()
 	// Their favorites and playlists go with them. Best effort, like the
 	// backend accounts: a file that will not delete must not stop the removal.
 	if s.collections != nil {

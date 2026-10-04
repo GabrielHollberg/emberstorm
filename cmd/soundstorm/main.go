@@ -267,6 +267,19 @@ func run(log *slog.Logger) error {
 		}
 		return lib.EnsurePersonalFolder(u.Name)
 	}
+	setup.PersonalFolders = func() []string {
+		entries, err := os.ReadDir(filepath.Join(lib.PathFor(media.KindPicture), library.PersonalDir))
+		if err != nil {
+			return nil
+		}
+		var out []string
+		for _, e := range entries {
+			if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+				out = append(out, library.PersonalDir+"/"+e.Name())
+			}
+		}
+		return out
+	}
 
 	// Shut down cleanly on Ctrl-C or SIGTERM from the container runtime.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -276,6 +289,29 @@ func run(log *slog.Logger) error {
 	// and SoundStorm should be showing setup progress during it, not refusing to
 	// start. This is why the registry is populated asynchronously.
 	setup.Start(ctx)
+	// The owner's photo library leaves out everybody else's own photos
+	// (provision.SyncPhotoPrivacy): a minute after start, once the photo
+	// library has had time to set up, then every ten minutes for folders
+	// copied in by hand. Adding or removing somebody also runs it.
+	go func() {
+		defer func() {
+			if v := recover(); v != nil {
+				log.Error("photo privacy panicked", "panic", v)
+			}
+		}()
+		wait := time.Minute
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(wait):
+			}
+			sctx, cancel := context.WithTimeout(ctx, time.Minute)
+			setup.SyncPhotoPrivacy(sctx)
+			cancel()
+			wait = 10 * time.Minute
+		}
+	}()
 	// In auto mode, getting the real certificate - in the background too, and
 	// for the same reason.
 	tlsServer.Start(ctx)

@@ -182,6 +182,7 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 		writeError(w, statusFor(err), err.Error())
 		return
 	}
+	s.photoPrivacy()
 	_ = s.store.DeleteInvite(hash)
 	token, expiry, err := s.auth.SessionFor(created)
 	if err != nil {
