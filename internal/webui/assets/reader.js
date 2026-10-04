@@ -1047,7 +1047,7 @@ function drawWord(follow) {
 // reading got to. A word ending a sentence is given a little more time, a
 // comma a little, a long word a little; the speed is the average.
 const FREE_SPEED_KEY = 'soundstorm-read-speed';
-const free = { on: false, mode: 'line', secs: new Map(), ready: new Map(), sec: -1, unit: 0, playing: false, raf: 0, last: 0, shown: '', first: -1, spans: [] };
+const free = { on: false, mode: 'line', secs: new Map(), ready: new Map(), sec: -1, unit: 0, playing: false, raf: 0, last: 0, shown: '', first: -1, spans: [], track: [], cursor: 0, px: 0, wordPx: 0 };
 const freeSpeed = () => Math.min(800, Math.max(100, Number(localStorage.getItem(FREE_SPEED_KEY)) || 250));
 
 // A chapter's text nodes, leaving out what is never read (styles, scripts):
@@ -1239,18 +1239,15 @@ function drawFree(now) {
     if (session.view && free.sec < session.view.book.sections.length - 1) { free.sec++; free.unit = 0; free.letters = null; free.first = -1; }
     return;
   }
-  // The line glides at a steady pace - so many letters a second, the speed's
-  // average - where a word at a time keeps its pauses at full stops and
-  // commas (the owner: the line should flow at a constant rate). Both keep
-  // the place as the word timing's units, so switching keeps the place.
+  // The line glides at one steady speed (drawFreeLine); a word at a time
+  // keeps its pauses at full stops and commas. Both keep the place as the
+  // word timing's units, so switching keeps the place.
   if (free.mode === 'line') {
-    if (free.letters == null) free.letters = unitToLetters(sec, free.unit);
-    if (free.playing) free.letters += dt * (freeSpeed() / 60) * sec.perWord;
-    free.unit = lettersToUnit(sec, free.letters);
-  } else {
-    free.letters = null;
-    if (free.playing) free.unit += dt * (freeSpeed() / 60) * sec.mean;
+    drawFreeLine(dt);
+    return;
   }
+  free.letters = null;
+  if (free.playing) free.unit += dt * (freeSpeed() / 60) * sec.mean;
   const total = sec.cum[sec.cum.length - 1];
   if (free.unit >= total) {
     if (session.view && free.sec < session.view.book.sections.length - 1) {
@@ -1279,25 +1276,105 @@ function drawFree(now) {
     box.querySelector('.reader-word-next').textContent = k < sec.words.length - 1 ? sec.words[k + 1].w : '';
     return;
   }
-  // The line: the words around the one being read, laid out once and moved.
-  const BEFORE = 30;
-  const AFTER = 70;
-  if (free.first < 0 || k < free.first + 5 || k > free.first + BEFORE + AFTER - 25) {
-    free.first = Math.max(0, k - BEFORE);
-    const last = Math.min(sec.words.length, k + AFTER);
-    free.spans = sec.words.slice(free.first, last).map(({ w }) => {
-      const span = document.createElement('span');
-      span.textContent = w;
-      return span;
-    });
-    box.querySelector('.reader-line-track').replaceChildren(...free.spans);
+}
+
+// The endless line for a book read alone: it glides at one steady speed in
+// pixels - so many words a minute at the line's average word width - where it
+// used to move word by word, a long word sliding past faster than a short one,
+// and was thrown away and laid out again every few dozen words: both read as
+// a small glitch every few seconds (the owner). Now words are added ahead and
+// dropped behind as it goes, nothing already on the line ever moving, and it
+// runs on from one chapter into the next. The place is kept as the word
+// timing's units, so the pages and a word at a time pick up where it is.
+function drawFreeLine(dt) {
+  const box = $('reader-line');
+  const trackEl = box.querySelector('.reader-line-track');
+  if (free.first < 0) {
+    // Laid out afresh (opened, or back from a word at a time): from a few
+    // words before the place.
+    const sec = free.ready.get(free.sec);
+    if (!sec) return;
+    const k = freeWordAt(sec, free.unit);
+    const from = Math.max(0, k - 20);
+    free.track = [];
+    trackEl.replaceChildren();
+    freeLineAppend(trackEl, free.sec, from, 120);
+    const at = free.track.findIndex((t) => t.sec === free.sec && t.k === k);
+    const t = free.track[Math.max(0, at)];
+    const frac = (free.unit - sec.cum[k]) / Math.max(1e-6, sec.cum[k + 1] - sec.cum[k]);
+    free.cursor = Math.max(0, at);
+    free.px = t ? t.el.offsetLeft + Math.max(0, Math.min(1, frac)) * freeLineStep(free.cursor) : 0;
+    free.first = 0;
   }
-  const span = free.spans[k - free.first];
-  if (!span) return;
-  const nextSpan = free.spans[k - free.first + 1];
-  const step = nextSpan ? nextSpan.offsetLeft - span.offsetLeft : span.offsetWidth;
-  const x = span.offsetLeft + frac * step;
-  box.querySelector('.reader-line-track').style.transform = `translate3d(${(box.clientWidth * LINE_AT - x).toFixed(1)}px, -50%, 0)`;
+  const track = free.track;
+  if (!track.length) return;
+  if (free.playing) free.px += dt * (freeSpeed() / 60) * (free.wordPx || 60);
+  // Which word the middle of the screen is on.
+  while (free.cursor < track.length - 1 && track[free.cursor + 1].el.offsetLeft <= free.px) free.cursor++;
+  while (free.cursor > 0 && track[free.cursor].el.offsetLeft > free.px) free.cursor--;
+  const t = track[free.cursor];
+  const sec = free.ready.get(t.sec);
+  const frac = Math.max(0, Math.min(1, (free.px - t.el.offsetLeft) / Math.max(1, freeLineStep(free.cursor))));
+  free.sec = t.sec;
+  if (sec) free.unit = sec.cum[t.k] + frac * (sec.cum[t.k + 1] - sec.cum[t.k]);
+  // Words ahead: added before the line runs short, into the next chapter.
+  if (track.length - free.cursor < 60) {
+    const last = track[track.length - 1];
+    freeLineAppend(trackEl, last.sec, last.k + 1, 100);
+  }
+  // The end of the book: the last word reached.
+  if (free.cursor >= track.length - 1 && frac >= 1) {
+    free.playing = false;
+    renderFreeBar();
+  }
+  // Words long gone behind: dropped, the line moved by exactly what went.
+  if (free.cursor > 160) {
+    const cut = free.cursor - 40;
+    const shift = track[cut].el.offsetLeft;
+    for (let i = 0; i < cut; i++) track[i].el.remove();
+    track.splice(0, cut);
+    free.cursor -= cut;
+    free.px -= shift;
+  }
+  trackEl.style.transform = `translate3d(${(box.clientWidth * LINE_AT - free.px).toFixed(2)}px, -50%, 0)`;
+}
+
+// A word's width on the line, to the next word's start.
+function freeLineStep(i) {
+  const track = free.track;
+  const t = track[i];
+  if (!t) return 1;
+  const next = track[i + 1];
+  return next ? next.el.offsetLeft - t.el.offsetLeft : t.el.offsetWidth;
+}
+
+// Adds up to n words to the line from chapter sec, word k, carrying on into
+// the chapters after (those already read in; the rest are fetched and come
+// on the next frame), and keeps the average word width the speed uses.
+function freeLineAppend(trackEl, sec, k, n) {
+  const book = session.view && session.view.book;
+  const frag = document.createDocumentFragment();
+  const added = [];
+  while (n > 0 && book && sec < book.sections.length) {
+    if (!free.ready.has(sec)) { freeSection(sec); break; }
+    const data = free.ready.get(sec);
+    if (!data || k >= data.words.length) { sec++; k = 0; continue; }
+    const el = document.createElement('span');
+    el.textContent = data.words[k].w;
+    frag.append(el);
+    added.push({ el, sec, k });
+    k++;
+    n--;
+  }
+  if (!added.length) return;
+  trackEl.append(frag);
+  free.track.push(...added);
+  // The speed's word width: the line's own, eased so a run of long words
+  // does not change the pace at once.
+  const first = free.track[0].el;
+  const lastEl = added[added.length - 1].el;
+  const width = (lastEl.offsetLeft + lastEl.offsetWidth - first.offsetLeft) / free.track.length;
+  free.wordPx = free.wordPx ? free.wordPx * 0.7 + width * 0.3 : width;
 }
 
 function renderFreeBar() {
