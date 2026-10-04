@@ -129,7 +129,9 @@ struct RemoteControlled: ViewModifier {
         // A photo stepped to on the phone while its viewer is open here: the
         // viewer steps in place, the ones either side fetched ahead, with no
         // closing and opening again (the page's TV does the same).
-        if item.kind == "picture", item.extra?["type"] != "video", model.photos != nil, model.video == nil {
+        // A clip too: the phone's viewer plays it among the photos, and so
+        // does this one.
+        if item.kind == "picture", model.photos != nil, model.video == nil {
             let near = (c["near"] as? [Any])?.prefix(2).compactMap(Self.item) ?? []
             model.phonePhoto = AppModel.PhonePhoto(item: item, near: near)
             return
@@ -148,12 +150,19 @@ struct RemoteControlled: ViewModifier {
             model.showingNowPlaying = true
         case "audiobook":
             await model.playBook(item)
-        case "picture" where item.extra?["type"] != "video":
+        case "picture":
+            // A photo or a clip: the viewer, as on the phone.
             model.showingNowPlaying = false
             let near = (c["near"] as? [Any])?.prefix(2).compactMap(Self.item) ?? []
             model.photos = PhotoViewing.around(item, near: near, fromPhone: true)
         default:
+            // tvOS presents one full-screen view at a time: one still on its
+            // way out (Now Playing, a photo) left the film never shown - the
+            // owner's report, a video that would not play.
+            let covered = model.showingNowPlaying || model.photos != nil
             model.showingNowPlaying = false
+            model.photos = nil
+            if covered { try? await Task.sleep(for: .milliseconds(700)) }
             model.playVideo(item)
         }
     }

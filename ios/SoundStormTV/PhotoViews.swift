@@ -56,16 +56,19 @@ struct PhotosView: View {
         guard let page = try? await api.photos(offset: photos.count) else { return }
         photos += page.items
         hasMore = page.hasMore && !page.items.isEmpty
+        #if DEBUG
+        // For the simulator, which has no remote: -openPhoto <n> opens the
+        // n-th of the roll (a clip among them plays in the viewer).
+        if let n = Int(UserDefaults.standard.string(forKey: "openPhoto") ?? ""), photos.indices.contains(n), model.photos == nil {
+            open(photos[n], in: photos)
+        }
+        #endif
     }
 
+    /// The viewer steps through photos and clips alike, a clip playing in
+    /// its place - as the phone's viewer now does.
     private func open(_ item: Item, in list: [Item]) {
-        if item.isClip {
-            model.playVideo(item)
-        } else {
-            // The viewer steps through photos only; clips are skipped over.
-            let shown = list.filter(\.isPhoto)
-            model.photos = PhotoViewing(photos: shown, index: shown.firstIndex(of: item) ?? 0)
-        }
+        model.photos = PhotoViewing(photos: list, index: list.firstIndex(of: item) ?? 0)
     }
 }
 
@@ -122,6 +125,9 @@ struct PhotoViewer: View {
     @FocusState private var focused: Bool
     /// A Live Photo's moving part, while it plays.
     @State private var live: AVPlayer?
+    /// A clip among the photos, playing in its place (the phone's viewer
+    /// plays them there too).
+    @State private var clip: AVPlayer?
 
     var body: some View {
         let photo = viewing.photos[viewing.index]
@@ -134,6 +140,9 @@ struct PhotoViewer: View {
             }
             if let live {
                 LiveLayer(player: live).ignoresSafeArea()
+            }
+            if let clip {
+                LiveLayer(player: clip).ignoresSafeArea()
             }
             VStack {
                 Spacer()
@@ -189,12 +198,18 @@ struct PhotoViewer: View {
         }
         .onExitCommand { dismiss() }
         .onPlayPauseCommand { toggleMusic() }
-        // OK on a Live Photo plays its moving part.
-        .onTapGesture { playLive(photo) }
+        // OK on a clip plays and pauses it; on a Live Photo plays its moving part.
+        .onTapGesture {
+            if let clip { clip.timeControlStatus == .paused ? clip.play() : clip.pause() } else { playLive(photo) }
+        }
+        .onDisappear { clip?.pause(); clip = nil }
         // Keyed by the photo, not its place: a step sent from the phone keeps
         // the photo in the middle of a list of three.
         .onChange(of: viewing.photos[viewing.index].key) { live = nil }
-        .task(id: viewing.photos[viewing.index].key) { await load(around: viewing.index) }
+        .task(id: viewing.photos[viewing.index].key) {
+            playClip(viewing.photos[viewing.index])
+            await load(around: viewing.index)
+        }
         #if DEBUG
         // -autostep YES: a step right after three seconds, then down.
         .task {
@@ -212,6 +227,19 @@ struct PhotoViewer: View {
         guard viewing.photos.indices.contains(next) else { return }
         viewing.index = next
         showCaption()
+    }
+
+    /// The photo shown is a clip: it plays where it is, the music paused for
+    /// it (a clip is a film); a photo stops whatever clip was playing.
+    private func playClip(_ item: Item) {
+        clip?.pause()
+        clip = nil
+        guard item.isClip else { return }
+        let p = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset(url: api.streamURL(item),
+                                                                     options: [AVURLAssetHTTPCookiesKey: api.cookies])))
+        if player.isPlaying { player.togglePlay() }
+        clip = p
+        p.play()
     }
 
     private func playLive(_ photo: Item) {
