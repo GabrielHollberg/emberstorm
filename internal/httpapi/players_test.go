@@ -174,3 +174,39 @@ func TestWhatIsSentAsATVSwitchesWaitsForIt(t *testing.T) {
 		t.Fatalf("then the music, not another question: %s", body)
 	}
 }
+
+// Two phones of one person: A controls B, then B chooses A. The newer choice
+// wins - A is told to let go of B - or each sends the other's music back for
+// ever.
+func TestTwoPhonesDoNotControlEachOther(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t)
+	a, b := "aaaaaaaaaaaaaaaa7777", "bbbbbbbbbbbbbbbb8888"
+	h.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+a+`","name":"Phone A"}`)
+	h.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+b+`","name":"Phone B"}`)
+	send := func(from, to, body string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, h.srv.URL+"/api/players/"+to+"/command", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Soundstorm-Player", from)
+		resp, err := h.client.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			t.Fatalf("command %s to %s: %v %v", from, to, err, resp)
+		}
+		resp.Body.Close()
+	}
+	send(a, b, `{"type":"claim"}`)
+	send(a, b, `{"type":"play","item":{"sourceId":"x","id":"song"}}`)
+	h.do(t, http.MethodGet, "/api/players/"+b+"/next", "")
+	// B now chooses A.
+	send(b, a, `{"type":"claim"}`)
+	_, body := h.do(t, http.MethodGet, "/api/players/"+a+"/next", "")
+	if !strings.Contains(string(body), `"released"`) || !strings.Contains(string(body), b) {
+		t.Fatalf("A should be told to let go of B: %s", body)
+	}
+	// And only once: B choosing A again tells A nothing more.
+	send(b, a, `{"type":"control","action":"pause"}`)
+	if _, body := h.do(t, http.MethodGet, "/api/players/"+a+"/next", ""); strings.Contains(string(body), `"released"`) {
+		t.Fatalf("told twice: %s", body)
+	}
+}

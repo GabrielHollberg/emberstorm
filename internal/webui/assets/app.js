@@ -39,9 +39,15 @@ const state = {
 async function api(path, options = {}) {
   let resp;
   try {
+    const headers = options.body ? { 'Content-Type': 'application/json' } : {};
+    // A command to another device says which device sent it, so the server
+    // can stop two phones controlling each other at once (players.go).
+    if (path.startsWith('/api/players/') && path.endsWith('/command')) {
+      try { if (PLAYER.id) headers['X-Soundstorm-Player'] = PLAYER.id; } catch { /* not yet a player */ }
+    }
     resp = await fetch(path, {
       credentials: 'same-origin',
-      headers: options.body ? { 'Content-Type': 'application/json' } : {},
+      headers,
       ...options,
     });
   } catch (err) {
@@ -19646,6 +19652,18 @@ async function runPlayerCommand(c) {
       return;
     case 'claim':
       // A phone chose this device to control: nothing to do but be ready.
+      return;
+    case 'released':
+      // The device this one was controlling chose to control this one: the
+      // newer choice wins, so this one lets go (no command sent to it).
+      if (CONTROL.target && CONTROL.target.id === c.by) {
+        if (RA.on) dropMirror();
+        if (FR.on) closeFilmRemote();
+        forgetRemote();
+        CONTROL.away = null;
+        setControl(null);
+        showToast(`${c.name || 'That device'} is controlling this one now, so this one no longer controls it.`);
+      }
       return;
     case 'play':
       remotePlay(c);

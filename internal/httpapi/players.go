@@ -58,6 +58,39 @@ type player struct {
 	queue    []json.RawMessage
 	wake     chan struct{}
 	asks     map[string]*playerAsk
+	// Which of this person's devices last sent this one a command, and when:
+	// so two phones cannot control each other at once (controlLoopLocked).
+	controller   string
+	controllerAt time.Time
+}
+
+// controlFresh is how long a device counts as controlling another after its
+// last command: the phone's remote sends one at least every few seconds while
+// it shows, and a choice is kept far longer, so this is generous.
+const controlFresh = 30 * time.Minute
+
+// controlLoopLocked notes that the device sending this command (named by the
+// page in X-Soundstorm-Player) controls p - and, when p is in fact controlling
+// the sender, lets p go of it first: the newer choice wins. Two phones each
+// controlling the other sent each other's music back and forth for ever (the
+// owner: "weird stuff starts happening").
+func (h *playerHub) controlLoopLocked(r *http.Request, user state.User, p *player, now time.Time) {
+	from := r.Header.Get("X-Soundstorm-Player")
+	if from == "" || from == p.ID {
+		return
+	}
+	me, ok := h.m[from]
+	if !ok || me.UserID != user.ID {
+		return
+	}
+	if me.controller == p.ID && now.Sub(me.controllerAt) < controlFresh {
+		released, _ := json.Marshal(map[string]any{"type": "released", "by": me.ID, "name": me.Name})
+		p.enqueueLocked(released)
+		me.controller = ""
+	}
+	if p.UserID == user.ID {
+		p.controller, p.controllerAt = me.ID, now
+	}
 }
 
 type playerAsk struct {
@@ -386,6 +419,7 @@ func (s *Server) handlePlayerCommand(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "that device is not open")
 		return
 	}
+	h.controlLoopLocked(r, user, p, now)
 	if p.UserID == user.ID {
 		if head.Type == "claim" {
 			writeJSON(w, http.StatusOK, map[string]any{"sent": true})
