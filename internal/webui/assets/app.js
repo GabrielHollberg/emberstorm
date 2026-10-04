@@ -3802,6 +3802,9 @@ function trackContaining(seconds) {
 function startAt(url, offset) {
   const player = $('audio-player');
   audio.started = true;
+  // What is playing, for starting it again after the connection drops
+  // (audioRecover); kept without any retry mark of its own.
+  audio.currentURL = String(url).replace(/[?&]retry=\d+$/, '');
   // Start the clock now, or the first timeupdate is already older than the
   // interval and every play begins by writing back the position it just read.
   audio.savedAt = Date.now();
@@ -3851,6 +3854,9 @@ function setAudioSource(player, url) {
     if (!Hls || !Hls.isSupported() || audio.hlsPlayer) return;
     const h = new Hls({ enableWorker: true });
     audio.hlsPlayer = h;
+    // A piece that cannot be fetched stops hls.js without the element saying
+    // so: the same recovery as the element's own error.
+    h.on(Hls.Events.ERROR, (_e, data) => { if (data && data.fatal) audioRecover.schedule(); });
     h.loadSource(url);
     h.attachMedia(player);
   }).catch(() => showToast('This browser cannot play this book.'));
@@ -8634,9 +8640,78 @@ $('audio-player').addEventListener('volumechange', () => {
 })();
 $('dock-play').addEventListener('click', () => {
   const player = $('audio-player');
+  if (audioRecover.stuck()) { audioRecover.now(); return; }
   if (player.paused) player.play().catch(() => {});
   else player.pause();
 });
+
+// When the connection drops mid-song or mid-book - Wi-Fi blinking, a walk out
+// of range, the server restarting for an update - the player gives up on the
+// piece it could not fetch and stays stopped, loading for ever (the owner,
+// 2026-10-04: an audiobook stopped, loaded a while, and would not play until
+// the book was closed and opened again). So a failure, or loading that runs
+// past twenty seconds, starts the same file again from the moment it had
+// reached: after 2 seconds, then 4, 8, up to half a minute between tries,
+// for about five minutes, and at once when the device's connection comes
+// back. Quiet unless it takes a while; play, after it gives up, tries again.
+// The address carries a retry mark so a native player (the Android and iPhone
+// apps) loads it afresh rather than taking it for the file it already failed.
+const audioRecover = (() => {
+  const player = $('audio-player');
+  let tries = 0;
+  let timer = 0;
+  let lastT = 0;
+  let waitingSince = 0;
+  let gaveUp = false;
+  let failedAt = 0;
+  player.addEventListener('timeupdate', () => {
+    if (player.paused || !(player.currentTime > 0)) return;
+    lastT = player.currentTime;
+    if (tries && Date.now() - failedAt > 4000) {
+      if (tries >= 2) showToast('Playing again');
+      tries = 0;
+    }
+    gaveUp = false;
+  });
+  player.addEventListener('error', () => schedule());
+  player.addEventListener('waiting', () => { if (!waitingSince) waitingSince = Date.now(); });
+  for (const ev of ['playing', 'pause', 'emptied']) player.addEventListener(ev, () => { waitingSince = 0; });
+  setInterval(() => {
+    if (waitingSince && !player.paused && Date.now() - waitingSince > 20000) {
+      waitingSince = 0;
+      schedule();
+    }
+  }, 3000);
+  addEventListener('online', () => { if (timer) { clearTimeout(timer); timer = 0; retry(); } });
+  const playable = () => audio.item && audio.currentURL && !(typeof RA !== 'undefined' && RA.on);
+  function schedule() {
+    if (!playable() || timer) return;
+    failedAt = Date.now();
+    if (tries >= 12) {
+      gaveUp = true;
+      showToast('Lost the connection to your server. Press play to try again.');
+      return;
+    }
+    const wait = Math.min(30000, 2000 * 2 ** tries);
+    tries++;
+    if (tries === 2) showToast('Lost the connection - trying again\u2026');
+    timer = setTimeout(retry, wait);
+  }
+  function retry() {
+    timer = 0;
+    if (!playable()) return;
+    const url = audio.currentURL;
+    const kept = audio.urlMap && audio.urlMap[url];
+    const again = kept || !/^(\/|https?:)/.test(url) ? url : `${url}${url.includes('?') ? '&' : '?'}retry=${tries}`;
+    startAt(again, lastT);
+    audio.currentURL = url;
+  }
+  return {
+    schedule,
+    stuck: () => gaveUp || Boolean(player.error),
+    now() { gaveUp = false; tries = 0; clearTimeout(timer); timer = 0; retry(); },
+  };
+})();
 for (const event of ['play', 'pause']) {
   $('audio-player').addEventListener(event, () => {
     setIcon($('dock-play'), $('audio-player').paused ? 'play' : 'pause', true);
@@ -9039,6 +9114,7 @@ document.addEventListener('click', (event) => {
 $('np-exit').addEventListener('click', stopAudio);
 $('np-play').addEventListener('click', () => {
   const player = $('audio-player');
+  if (audioRecover.stuck()) { audioRecover.now(); return; }
   if (player.paused) player.play().catch(() => {});
   else player.pause();
 });
