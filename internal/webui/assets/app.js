@@ -13524,6 +13524,14 @@ function leaveSettingsSearch() {
   if (state.libraryPlaceholder) input.placeholder = state.libraryPlaceholder;
 }
 
+// Support SoundStorm: everywhere but the Apple apps (Apple takes tips only
+// through its in-app purchase) and a TV, which has nothing to open a link in.
+(function showSupport() {
+  const apple = /iPhone|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const inAppleApp = Boolean(window.soundstormApp) && apple;
+  show($('support-block'), !inAppleApp && !TV);
+})();
+
 // Cards appear as the server answers (the owner's, remote access, devices),
 // so the pills follow them - redrawn only when which pills exist changes.
 (function followSettingsCards() {
