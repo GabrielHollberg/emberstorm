@@ -691,6 +691,7 @@ func (s *Source) MonthPhotos(ctx context.Context, month string) ([]media.Item, e
 		LivePhotoVideoID []*string  `json:"livePhotoVideoId"`
 		Thumbhash        []*string  `json:"thumbhash"`
 		FileCreatedAt    []string   `json:"fileCreatedAt"`
+		LocalOffsetHours []float64  `json:"localOffsetHours"`
 		Ratio            []float64  `json:"ratio"`
 		Duration         []*float64 `json:"duration"`
 		City             []*string  `json:"city"`
@@ -715,10 +716,16 @@ func (s *Source) MonthPhotos(ctx context.Context, month string) ([]media.Item, e
 		if i < len(b.LivePhotoVideoID) && b.LivePhotoVideoID[i] != nil && *b.LivePhotoVideoID[i] != "" && it.Extra["type"] == "image" {
 			it.Extra["live"] = "1"
 		}
+		// fileCreatedAt is the moment in UTC; the photo's own clock - what
+		// the bucket's month and the day headings go by - is that plus its
+		// time zone. Without it an evening photo on 30 September in Mountain Time
+		// showed under "Thu, Oct 1" inside September.
 		if i < len(b.FileCreatedAt) && len(b.FileCreatedAt[i]) >= 19 {
-			taken := b.FileCreatedAt[i][:19]
-			it.Extra["taken"] = taken
-			if t, err := time.Parse("2006-01-02T15:04:05", taken); err == nil {
+			if t, err := time.Parse("2006-01-02T15:04:05", b.FileCreatedAt[i][:19]); err == nil {
+				if i < len(b.LocalOffsetHours) {
+					t = t.Add(time.Duration(b.LocalOffsetHours[i] * float64(time.Hour)))
+				}
+				it.Extra["taken"] = t.Format("2006-01-02T15:04:05")
 				it.Year = t.Year()
 				it.Subtitle = t.Format("2 Jan 2006")
 				it.Title = t.Format("2 Jan 2006, 15:04")

@@ -44,6 +44,16 @@ func (f *photoFake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			{"id": "c1", "exifInfo": map[string]any{"city": "Riverside", "state": "Oregon", "country": "United States of America"}},
 			{"id": "c0", "exifInfo": nil},
 		})
+	case r.URL.Path == "/api/timeline/bucket":
+		// Two September evenings in Mountain Time (UTC-6): the second is already
+		// 1 October in UTC. And one with no offset given.
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":               []string{"e1", "e2", "e3"},
+			"isImage":          []bool{true, true, true},
+			"isTrashed":        []bool{false, false, false},
+			"fileCreatedAt":    []string{"2026-09-29T20:00:00.000Z", "2026-10-01T02:30:00.000Z", "2026-09-15T12:00:00.000Z"},
+			"localOffsetHours": []float64{-6, -6},
+		})
 	case r.URL.Path == "/api/search/metadata":
 		f.searches = append(f.searches, body)
 		items := []asset{}
@@ -149,5 +159,26 @@ func TestOnThisDayAsksEachEarlierYearAndKeepsTheOnesWithPhotos(t *testing.T) {
 		if !strings.Contains(q["takenAfter"].(string), "-02-29T") {
 			t.Errorf("asked %s for 29 February", q["takenAfter"])
 		}
+	}
+}
+
+func TestATimelinePhotoIsDatedByItsOwnClock(t *testing.T) {
+	s, _ := photoSource(t)
+	items, err := s.MonthPhotos(context.Background(), "2026-09")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, it := range items {
+		got[it.ID] = it.Extra["taken"]
+	}
+	want := map[string]string{"e1": "2026-09-29T14:00:00", "e2": "2026-09-30T20:30:00", "e3": "2026-09-15T12:00:00"}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("%s taken %q, want %q (its local time)", id, got[id], w)
+		}
+	}
+	if len(items) != 3 || items[0].ID != "e2" {
+		t.Errorf("order = %v, want the evening of 30 September first", items)
 	}
 }
