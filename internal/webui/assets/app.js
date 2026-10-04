@@ -2399,6 +2399,7 @@ async function runSearch() {
   const query = $('search-input').value.trim();
   state.query = query;
   state.detailPage = false;
+  state.openAlbum = null;
 
   if (state.offline) {
     const seq = ++state.searchSeq;
@@ -5733,6 +5734,8 @@ function selectionKey(item) {
 // What can be selected from: a shelf's list, or the photo timeline when it is
 // the page shown (its tiles are selected the same way, to send them).
 function selectRoot() {
+  const own = document.querySelector('#music-view .selectable');
+  if (own && own.getClientRects().length) return own;
   const tl = TL.root;
   if (tl && tl.isConnected && tl.getClientRects().length) return tl;
   return $('results');
@@ -5746,6 +5749,7 @@ function setSelecting(on) {
   if (!on) state.selected.clear();
   $('results').classList.toggle('selecting', on);
   if (TL.root) TL.root.classList.toggle('selecting', on);
+  for (const g of document.querySelectorAll('.selectable')) g.classList.toggle('selecting', on);
   for (const card of document.querySelectorAll('#results .item.selected, .photo-timeline .item.selected')) {
     card.classList.remove('selected');
   }
@@ -5891,6 +5895,17 @@ function renderSelectMenu() {
     }));
   }
   if (n && items.every((it) => it.kind === 'picture') && !state.offline && state.me && !state.me.guest) {
+    entries.push(menuItem('photo', 'Add to album\u2026', (event) => {
+      event.stopPropagation();
+      renderAlbumMenu(items, () => renderSelectMenu(), () => setSelecting(false));
+    }, { chevron: true }));
+    if (state.openAlbum && $('music-view').querySelector('.selectable')) {
+      entries.push(menuItem('close', 'Remove from album', async (event) => {
+        event.stopPropagation();
+        setSelecting(false);
+        await removeFromOpenAlbum(items);
+      }));
+    }
     entries.push(menuItem('send', 'Send to\u2026', (event) => {
       event.stopPropagation();
       renderSendMenu(items, () => renderSelectMenu(), () => setSelecting(false));
@@ -6252,7 +6267,7 @@ function renderMainMenu(item, opts = {}) {
   const entries = [menuHeader(item)];
   if (opts.nowPlaying) entries.push(...playerMenuItems(item, opts));
   // Select: from here on taps tick more (a shelf's list or the photos).
-  const card = state.menuAnchor && state.menuAnchor.closest && state.menuAnchor.closest('#results .item, .photo-timeline .item');
+  const card = state.menuAnchor && state.menuAnchor.closest && state.menuAnchor.closest('#results .item, .photo-timeline .item, .selectable .item');
   if (card && !opts.nowPlaying && !opts.fromSelection && !state.selecting) {
     entries.push(menuItem('check', 'Select', (event) => {
       event.stopPropagation();
@@ -6339,6 +6354,17 @@ function renderMainMenu(item, opts = {}) {
     }, { chevron: true }));
   }
   if (item.kind === 'picture' && !state.offline) {
+    entries.push(menuItem('photo', 'Add to album\u2026', (event) => {
+      event.stopPropagation();
+      renderAlbumMenu([item], () => renderMainMenu(item, opts));
+    }, { chevron: true }));
+    if (state.openAlbum && state.openAlbum.items.some((it) => selectionKey(it) === selectionKey(item))) {
+      entries.push(menuItem('close', 'Remove from album', async (event) => {
+        event.stopPropagation();
+        closeItemMenu();
+        await removeFromOpenAlbum([item]);
+      }));
+    }
     entries.push(menuItem('send', 'Send to\u2026', (event) => {
       event.stopPropagation();
       renderSendMenu([item], () => renderMainMenu(item, opts));
@@ -6438,6 +6464,211 @@ async function renderSendMenu(items, back, done) {
     row.querySelector('.icon').replaceWith(face);
     return row;
   }));
+  placeMenu(menu, state.menuAnchor);
+}
+
+// Albums (photoalbums.go): each person's own, of their own photos and
+// videos, kept by the photo library. The Albums pill lists them; an album
+// opens as a page of its photos, which can be selected like the timeline's.
+const albumPayload = (items) => items.map((it) => ({ sourceId: it.sourceId, id: it.id }));
+
+function albumWhen(al) {
+  if (!al.start) return '';
+  const fmt = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  const a = fmt(al.start);
+  const b = al.end ? fmt(al.end) : a;
+  return a === b ? a : `${a} – ${b}`;
+}
+
+const photoCount = (n) => `${n} ${n === 1 ? 'item' : 'items'}`;
+
+async function newAlbum(items) {
+  const name = (window.prompt('Name the new album', '') || '').trim();
+  if (!name) return null;
+  const { ok, body } = await api('/api/photos/albums', { method: 'POST', body: JSON.stringify({ name, items: albumPayload(items || []) }) });
+  if (!ok || !body) {
+    showToast((body && body.error) || 'Could not make the album.');
+    return null;
+  }
+  return body.album;
+}
+
+async function showAlbums(seq) {
+  state.openAlbum = null;
+  const view = $('music-view');
+  $('status').textContent = '';
+  if (!view.children.length) showSkeleton(view, 'grid');
+  const { ok, body } = await api('/api/photos/albums');
+  if (seq !== state.searchSeq) return;
+  const words = state.query.toLowerCase().split(/\s+/).filter(Boolean);
+  const list = ((ok && body && body.albums) || []).filter((al) => words.every((w) => al.name.toLowerCase().includes(w)));
+  const bar = document.createElement('div');
+  bar.className = 'playlist-actions album-actions';
+  const make = document.createElement('button');
+  make.type = 'button';
+  make.className = 'playlist-action';
+  make.append(icon('plus'), document.createTextNode('New album'));
+  make.addEventListener('click', async () => {
+    const al = await newAlbum([]);
+    if (al) showPhotoAlbum(al);
+  });
+  bar.append(make);
+  const grid = document.createElement('div');
+  grid.className = 'grid browse-grid';
+  grid.append(...list.map((al) => bookGroupCard(
+    { name: al.name, cover: al.artId ? { sourceId: al.sourceId, artId: al.artId } : null },
+    false, [photoCount(al.count), albumWhen(al)].filter(Boolean).join(' · '), () => showPhotoAlbum(al),
+  )));
+  view.replaceChildren(bar, grid);
+  $('status').textContent = list.length ? ''
+    : (state.query ? 'No album matches.'
+      : 'No albums yet. Make one here, or hold a photo, choose Select, pick some and choose Add to album.');
+}
+
+async function showPhotoAlbum(al) {
+  const seq = ++state.searchSeq;
+  const view = $('music-view');
+  startLoading(view);
+  const { ok, body } = await api(`/api/photos/albums?${new URLSearchParams({ id: al.id })}`);
+  if (seq !== state.searchSeq) return;
+  if (!ok || !body) {
+    view.replaceChildren(backButton('Albums', () => runSearch()));
+    $('status').textContent = (body && body.error) || 'Could not open that album.';
+    return;
+  }
+  const album = body.album || al;
+  const items = body.items || [];
+  state.items = items;
+  state.openAlbum = { ...album, items };
+  const head = pageHead(album.name, [photoCount(items.length), albumWhen(album)].filter(Boolean).join(' · '));
+  const actions = document.createElement('div');
+  actions.className = 'playlist-actions';
+  const rename = document.createElement('button');
+  rename.type = 'button';
+  rename.className = 'playlist-action';
+  rename.textContent = 'Rename';
+  rename.addEventListener('click', async () => {
+    const name = (window.prompt('Rename the album', album.name) || '').trim();
+    if (!name || name === album.name) return;
+    const r = await api(`/api/photos/albums/${encodeURIComponent(album.id)}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+    if (!r.ok) { showToast((r.body && r.body.error) || 'Could not rename it.'); return; }
+    album.name = name;
+    state.openAlbum.name = name;
+    head.querySelector('h1').textContent = name;
+  });
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'playlist-action album-delete';
+  del.textContent = 'Delete album';
+  let armed = false;
+  del.addEventListener('click', async () => {
+    if (!armed) {
+      armed = true;
+      del.textContent = 'Tap again to delete the album (the photos stay)';
+      setTimeout(() => { armed = false; del.textContent = 'Delete album'; }, 4000);
+      return;
+    }
+    const r = await api(`/api/photos/albums/${encodeURIComponent(album.id)}`, { method: 'DELETE' });
+    if (!r.ok) { showToast((r.body && r.body.error) || 'Could not delete it.'); return; }
+    showToast(`Deleted "${album.name}". The photos stay.`);
+    runSearch();
+  });
+  actions.append(rename, del);
+  const grid = document.createElement('div');
+  // Like the timeline: small rounded squares, a video saying so.
+  grid.className = 'tl-grid album-grid selectable';
+  grid.style.setProperty('--tl-cols', tlCols());
+  for (const it of items) {
+    const tile = renderItem(it);
+    tlStandIn(tile, it);
+    if (it.extra && it.extra.type === 'video') {
+      const wrap = tile.querySelector('.art-wrap');
+      const len = document.createElement('span');
+      len.className = 'tl-length';
+      len.textContent = it.durationSeconds ? tlClock(it.durationSeconds) : '';
+      len.prepend(icon('play'));
+      if (wrap) wrap.append(len);
+    }
+    grid.append(tile);
+  }
+  state.openAlbum.head = head;
+  view.replaceChildren(backButton('Albums', () => runSearch()), head, actions, grid);
+  $('status').textContent = items.length ? '' : 'Nothing in this album yet. Hold a photo anywhere in Photos, choose Select, pick some and choose Add to album.';
+  window.scrollTo(0, 0);
+}
+
+async function removeFromOpenAlbum(items) {
+  const al = state.openAlbum;
+  if (!al) return;
+  const r = await api(`/api/photos/albums/${encodeURIComponent(al.id)}/remove`, { method: 'POST', body: JSON.stringify({ items: albumPayload(items) }) });
+  if (!r.ok) { showToast((r.body && r.body.error) || 'Could not take them out.'); return; }
+  const gone = new Set(items.map(selectionKey));
+  for (const card of $('music-view').querySelectorAll('.selectable .item')) {
+    if (gone.has(card.dataset.key)) (card.closest('.item-holder') || card).remove();
+  }
+  al.items = al.items.filter((it) => !gone.has(selectionKey(it)));
+  state.items = al.items;
+  const sub = al.head && al.head.querySelector('p');
+  if (sub) sub.textContent = [photoCount(al.items.length), albumWhen(al)].filter(Boolean).join(' · ');
+  const n = items.length;
+  showToast(`Removed ${n === 1 ? 'it' : n} from "${al.name}".`);
+}
+
+// Add to album: which album, or a new one.
+async function renderAlbumMenu(items, back, done) {
+  const menu = $('item-menu');
+  const note = menuNote();
+  const say = (text) => { note.textContent = text; show(note, Boolean(text)); };
+  const head = document.createElement('button');
+  head.type = 'button';
+  head.className = 'menu-back';
+  head.append(icon('back'));
+  const label = document.createElement('span');
+  label.textContent = items.length === 1 ? 'Add to album' : `Add ${items.length} to album`;
+  head.append(label);
+  head.addEventListener('click', (event) => { event.stopPropagation(); back(); });
+  const list = document.createElement('div');
+  list.className = 'menu-scroll';
+  const form = document.createElement('form');
+  form.className = 'menu-new';
+  const input = document.createElement('input');
+  input.maxLength = 100;
+  input.setAttribute('aria-label', 'New album name');
+  const create = document.createElement('button');
+  create.type = 'submit';
+  create.className = 'menu-create';
+  create.setAttribute('aria-label', 'Make the album');
+  create.append(icon('plus'));
+  form.append(input, create);
+  menu.replaceChildren(head, list, form, note);
+  const finish = (text) => {
+    closeItemMenu();
+    if (done) done();
+    showToast(text);
+  };
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name) return;
+    const { ok, body } = await api('/api/photos/albums', { method: 'POST', body: JSON.stringify({ name, items: albumPayload(items) }) });
+    if (!ok || !body) { say((body && body.error) || 'Could not make the album.'); return; }
+    finish(`Made the album "${name}" with ${photoCount(items.length)}.`);
+  });
+  const { ok, body } = await api('/api/photos/albums');
+  const albums = (ok && body && body.albums) || [];
+  input.placeholder = albums.length ? 'New album' : 'Name your first album';
+  if (!ok) say((body && body.error) || 'Could not load your albums.');
+  list.append(...albums.map((al) => menuItem('photo', al.name, async (event) => {
+    event.stopPropagation();
+    say('Adding…');
+    const r = await api(`/api/photos/albums/${encodeURIComponent(al.id)}/add`, { method: 'POST', body: JSON.stringify({ items: albumPayload(items) }) });
+    if (!r.ok || !r.body) { say((r.body && r.body.error) || 'Could not add them.'); return; }
+    const added = r.body.changed;
+    const there = items.length - added;
+    finish(added
+      ? `Added ${added === 1 ? 'it' : added} to "${al.name}"${there ? `; ${there} ${there === 1 ? 'was' : 'were'} in it already` : ''}.`
+      : `${items.length === 1 ? 'It is' : 'Those are all'} in "${al.name}" already.`);
+  }, { detail: `${al.count}` })));
   placeMenu(menu, state.menuAnchor);
 }
 
@@ -6733,7 +6964,7 @@ function renderSearchHint() {
     '': 'everything', music: 'music', video: 'films', tv: 'TV', audiobook: 'audiobooks',
     ebook: 'ebooks', document: 'documents', picture: 'pictures',
     favorites: 'your favorites', playlists: 'your playlists', pairs: 'books to read along with',
-    authors: 'authors', series: 'series', people: 'people', places: 'places',
+    authors: 'authors', series: 'series', people: 'people', places: 'places', 'photo-albums': 'albums',
     'photo-videos': 'videos', 'photo-live': 'Live Photos', 'photo-stills': 'photos',
     'genres-music': 'genres', 'genres-watch': 'genres', 'genres-books': 'genres',
     'fav-music': 'your favorites', 'fav-watch': 'your favorites',
@@ -7322,7 +7553,7 @@ function attachItemMenuGestures(card, item) {
   // call, 2026-10-04: it used to select at once). While selecting, a hold on
   // one already selected opens the menu for the selection, and a hold on
   // another selects it and lets the finger slide on across more.
-  const inList = () => Boolean(card.closest('#results, .photo-timeline'));
+  const inList = () => Boolean(card.closest('#results, .photo-timeline, .selectable'));
   card.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || (event.pointerType === 'mouse' && !inList())) return;
     startX = event.clientX;
@@ -10697,7 +10928,7 @@ const TABS = {
     { kind: 'pairs', label: 'Read Along' }, { kind: 'document', label: 'Documents' },
     { kind: 'fav-books', label: 'Favorites' }, { kind: 'genres-books', label: 'Genres' }],
   photos: [{ kind: 'photo-stills', label: 'Photos' }, { kind: 'picture', label: 'Photos & videos' },
-    { kind: 'people', label: 'People' },
+    { kind: 'photo-albums', label: 'Albums' }, { kind: 'people', label: 'People' },
     { kind: 'places', label: 'Places' }, { kind: 'photo-videos', label: 'Videos' },
     { kind: 'photo-live', label: 'Live photos' }, { kind: 'fav-photos', label: 'Favorites' }],
 };
@@ -10710,12 +10941,12 @@ const FAV_KINDS = {
 };
 // Pages of groups rather than a shelf's list: books by author and series,
 // photos by who is in them and where.
-const BOOK_BROWSE = new Set(['authors', 'series', 'people', 'places', 'photo-stills', 'photo-videos', 'photo-live', 'genres-music', 'genres-watch', 'genres-books']);
+const BOOK_BROWSE = new Set(['authors', 'series', 'people', 'places', 'photo-albums', 'photo-stills', 'photo-videos', 'photo-live', 'genres-music', 'genres-watch', 'genres-books']);
 // Each tab's genres are of these shelves.
 const GENRE_KINDS = { 'genres-music': ['music'], 'genres-watch': ['video', 'tv'], 'genres-books': ['audiobook', 'ebook'] };
 // A category the + button starts with put away: nobody's tab changes until they add it.
 const DEFAULT_HIDDEN = { music: ['genres'], watch: ['genres-watch'], books: ['genres-books'] };
-const PHOTO_BROWSE = new Set(['people', 'places', 'photo-stills', 'photo-videos', 'photo-live']);
+const PHOTO_BROWSE = new Set(['people', 'places', 'photo-albums', 'photo-stills', 'photo-videos', 'photo-live']);
 // The Photos tab's kinds of picture, asked of the photo server by type.
 const PHOTO_TYPES = { 'photo-stills': 'photo', 'photo-videos': 'video', 'photo-live': 'live' };
 state.tab = 'home';
@@ -10732,7 +10963,7 @@ function shelfAvailable(kind) {
   if (kind === 'pairs') return state.pairCount > 0 && shelfAvailable('ebook') && shelfAvailable('audiobook');
   // Books by author and series: wherever there are books.
   if (kind === 'authors' || kind === 'series') return shelfAvailable('ebook') || shelfAvailable('audiobook');
-  if (kind === 'people' || kind === 'places' || PHOTO_TYPES[kind]) return shelfAvailable('picture');
+  if (kind === 'people' || kind === 'places' || kind === 'photo-albums' || PHOTO_TYPES[kind]) return shelfAvailable('picture');
   if (GENRE_KINDS[kind]) return GENRE_KINDS[kind].some((k) => shelfAvailable(k));
   // A tab's favorites: while the tab has a shelf of its own to favorite from.
   if (FAV_KINDS[kind]) return FAV_KINDS[kind].some((k) => shelfAvailable(k));
@@ -13631,7 +13862,7 @@ function renderInfoMenu(item) {
 state.dragSelect = null;
 
 function armDragSelect(card, item, pointerId, x0, y0) {
-  if (!card.closest('#results, .photo-timeline')) return;
+  if (!card.closest('#results, .photo-timeline, .selectable')) return;
   const onMove = (event) => {
     if (event.pointerId !== pointerId) return;
     if (!state.dragSelect) {
@@ -13730,7 +13961,7 @@ function dragSelectTo(x, y0) {
   for (const dy of [0, 16, -16, 32, -32]) {
     const yy = Math.min(Math.max(y + dy, top + 1), bottom - 1);
     const under = document.elementFromPoint(x, yy);
-    const holder = under && under.closest('#results .item-holder, .photo-timeline .item-holder');
+    const holder = under && under.closest('#results .item-holder, .photo-timeline .item-holder, .selectable .item-holder');
     target = holder && holder.querySelector('.item');
     if (target) break;
   }
@@ -14003,6 +14234,10 @@ function showSkeleton(view, shape, round) {
 // style. Somebody it found but nobody has named yet can be named here, for
 // the whole household.
 async function showPhotoBrowse(seq) {
+  if (state.kind === 'photo-albums') {
+    await showAlbums(seq);
+    return;
+  }
   if (PHOTO_TYPES[state.kind]) {
     await showPhotoType(seq);
     return;

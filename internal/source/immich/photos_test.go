@@ -18,7 +18,15 @@ type photoFake struct {
 	mu       sync.Mutex
 	searches []map[string]any
 	renamed  map[string]string
+	created  map[string]any
 }
+
+const (
+	albumA = "11111111-1111-1111-1111-111111111111"
+	albumB = "22222222-2222-2222-2222-222222222222"
+	photoX = "33333333-3333-3333-3333-333333333333"
+	photoY = "44444444-4444-4444-4444-444444444444"
+)
 
 func (f *photoFake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
@@ -54,6 +62,16 @@ func (f *photoFake) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"fileCreatedAt":    []string{"2026-09-29T20:00:00.000Z", "2026-10-01T02:30:00.000Z", "2026-09-15T12:00:00.000Z"},
 			"localOffsetHours": []float64{-6, -6},
 		})
+	case r.URL.Path == "/api/albums" && r.Method == http.MethodGet:
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"id": albumA, "albumName": "Beach", "assetCount": 2, "albumThumbnailAssetId": photoX, "lastModifiedAssetTimestamp": "2026-08-01T10:00:00.000Z"},
+			{"id": albumB, "albumName": "Birthday", "assetCount": 1, "albumThumbnailAssetId": nil, "lastModifiedAssetTimestamp": "2026-09-01T10:00:00.000Z"},
+		})
+	case r.URL.Path == "/api/albums" && r.Method == http.MethodPost:
+		f.created = body
+		json.NewEncoder(w).Encode(map[string]any{"id": albumA, "albumName": body["albumName"], "assetCount": 1})
+	case r.URL.Path == "/api/albums/"+albumA+"/assets" && r.Method == http.MethodPut:
+		json.NewEncoder(w).Encode([]map[string]any{{"id": photoX, "success": true}, {"id": photoY, "success": false, "error": "duplicate"}})
 	case r.URL.Path == "/api/search/metadata":
 		f.searches = append(f.searches, body)
 		items := []asset{}
@@ -180,5 +198,41 @@ func TestATimelinePhotoIsDatedByItsOwnClock(t *testing.T) {
 	}
 	if len(items) != 3 || items[0].ID != "e2" {
 		t.Errorf("order = %v, want the evening of 30 September first", items)
+	}
+}
+
+func TestAlbumsAreTheBackendsOwn(t *testing.T) {
+	s, f := photoSource(t)
+	ctx := context.Background()
+	albums, err := s.Albums(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(albums) != 2 || albums[0].Name != "Birthday" || albums[1].ArtID != photoX || albums[1].Count != 2 {
+		t.Fatalf("albums = %+v, want Birthday (newest) then Beach with its cover", albums)
+	}
+	if _, err := s.AlbumPhotos(ctx, albumA, 100); err != nil {
+		t.Fatal(err)
+	}
+	got := f.searches[len(f.searches)-1]
+	if ids, _ := got["albumIds"].([]any); len(ids) != 1 || ids[0] != albumA {
+		t.Errorf("album search %v, want albumIds [%s]", got, albumA)
+	}
+	if _, has := got["libraryId"]; has {
+		t.Errorf("album search %v keeps the library filter; an album shared later holds another's photos", got)
+	}
+	al, err := s.CreateAlbum(ctx, "Summer", []string{photoX})
+	if err != nil || al.ID != albumA || f.created["albumName"] != "Summer" {
+		t.Fatalf("created %+v (%v), sent %v", al, err, f.created)
+	}
+	n, err := s.AddToAlbum(ctx, albumA, []string{photoX, photoY})
+	if err != nil || n != 1 {
+		t.Errorf("added %d (%v), want 1: one was in already", n, err)
+	}
+	if _, err := s.AddToAlbum(ctx, "../../api/users", []string{photoX}); err == nil {
+		t.Error("an album id that is a path was taken")
+	}
+	if _, err := s.CreateAlbum(ctx, "x", []string{"not-an-id"}); err == nil {
+		t.Error("a photo id that is not one was taken")
 	}
 }

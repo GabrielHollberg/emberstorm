@@ -757,6 +757,33 @@ type PhotoBrowser interface {
 	PhotosOfType(ctx context.Context, kind string, limit int) ([]media.Item, error)
 }
 
+// PhotoAlbum is one album of photos and videos somebody made.
+type PhotoAlbum struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+	ArtID string `json:"artId,omitempty"` // its cover, a photo in it
+	// The first and last moment its photos were taken, RFC 3339, when known.
+	Start string `json:"start,omitempty"`
+	End   string `json:"end,omitempty"`
+	// Updated is when a photo was last added (for the newest first).
+	Updated string `json:"updated,omitempty"`
+}
+
+// PhotoAlbums is a photo backend that keeps albums: each person's own, made
+// of their own photos. Item ids are the backend's own photo ids.
+type PhotoAlbums interface {
+	Albums(ctx context.Context) ([]PhotoAlbum, error)
+	AlbumPhotos(ctx context.Context, id string, limit int) ([]media.Item, error)
+	CreateAlbum(ctx context.Context, name string, itemIDs []string) (PhotoAlbum, error)
+	// AddToAlbum and RemoveFromAlbum say how many changed (one already in,
+	// or not in, does not count).
+	AddToAlbum(ctx context.Context, id string, itemIDs []string) (int, error)
+	RemoveFromAlbum(ctx context.Context, id string, itemIDs []string) (int, error)
+	RenameAlbum(ctx context.Context, id, name string) error
+	DeleteAlbum(ctx context.Context, id string) error
+}
+
 type audioStreamKey struct{}
 
 // WithAudioStream asks a Negotiator for a particular audio stream, by its

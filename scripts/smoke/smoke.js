@@ -142,6 +142,23 @@ async function app(browser) {
     }
     noErrors(page, 'Photos');
   });
+  await step('phone: Albums opens, and an album can be made and opened', async () => {
+    await page.evaluate(() => { const b = [...document.querySelectorAll('#subtabs button')].find((x) => x.textContent.trim() === 'Albums'); b.click(); });
+    await until(page, () => Boolean(document.querySelector('.album-actions')), 'the Albums page', 10000);
+    const id = await page.evaluate(async () => {
+      const r = await (await fetch('/api/photos/month?m=' + (await (await fetch('/api/photos/months')).json()).months[0].month)).json();
+      const made = await api('/api/photos/albums', { method: 'POST', body: JSON.stringify({ name: 'After-deploy check', items: [{ sourceId: r.items[0].sourceId, id: r.items[0].id }] }) });
+      if (!made.ok) throw new Error('making an album answered ' + made.status);
+      showPhotoAlbum(made.body.album);
+      return made.body.album.id;
+    });
+    try {
+      await until(page, () => document.querySelectorAll('.album-grid .item').length === 1, 'the album to show its photo', 10000);
+    } finally {
+      await page.evaluate((i) => api('/api/photos/albums/' + i, { method: 'DELETE' }), id);
+    }
+    noErrors(page, 'Albums');
+  });
   await step('phone: Watch lists a film, and it plays', async () => {
     await tab(page, 'watch');
     await until(page, () => document.querySelectorAll('#results .item, #music-view .item').length > 0, 'films to list', 20000);

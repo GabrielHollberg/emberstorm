@@ -645,6 +645,10 @@ func (s *Source) photos(ctx context.Context, filter map[string]any, limit int) (
 	}
 	body := map[string]any{"libraryId": lib, "order": "desc", "isOffline": false, "withExif": true}
 	for k, v := range filter {
+		if v == nil { // a default taken away (libraryId, for an album)
+			delete(body, k)
+			continue
+		}
 		body[k] = v
 	}
 	found, err := s.page(ctx, "/api/search/metadata", body, limit)
