@@ -1,12 +1,5 @@
 <p align="center">
-  <img src="internal/webui/assets/icons/icon-192.png" width="96" alt="SoundStorm logo">
-</p>
-
-<h1 align="center">SoundStorm</h1>
-
-<p align="center">
-  <strong>Your music, films, TV, audiobooks, ebooks and photos in one app.<br>
-  One login, one search box. It runs at home on your own computer.</strong>
+  <img src="web/social-preview.png" alt="SoundStorm: your music, films, TV, audiobooks, ebooks and photos. One app, in your own home.">
 </p>
 
 <p align="center">
@@ -19,14 +12,16 @@
   <a href="https://github.com/GabrielHollberg/soundstorm/releases">What's new</a>
 </p>
 
-<!-- The phone screenshots predate the Lyrics look, the play orb and Home's
-     one-tap music row; they want re-taking. -->
+<!-- The same screenshots as soundstorm.dev (web/shots), from test servers
+     with made-up music and free stock photos. -->
 <p align="center">
-  <img src="docs/shots/phone-home.png" width="230" alt="Home on a phone">
+  <img src="web/shots/home.png" width="190" alt="Home on a phone: shuffle all music, new music">
   &nbsp;
-  <img src="docs/shots/phone-now-playing.png" width="230" alt="Now Playing with lyrics on a phone">
+  <img src="web/shots/photos.png" width="190" alt="Photos as a timeline of months and days">
   &nbsp;
-  <img src="docs/shots/phone-playlists.png" width="230" alt="Playlists on a phone">
+  <img src="web/shots/now-playing.png" width="190" alt="Now Playing with a storm animation that follows the music">
+  &nbsp;
+  <img src="web/shots/reader.png" width="190" alt="A book read one line at a time">
 </p>
 
 SoundStorm turns a computer at home into your own streaming service. Put your
@@ -66,14 +61,21 @@ but yourself, and nothing to set up by hand.
 - Audiobooks get a table of contents, a timeline for the chapter you're in,
   thirty-second skips and a speed control.
 - **Read along**: when you have a book as both an ebook and an audiobook, the
-  pages turn by themselves with the narration.
+  pages turn by themselves with the narration - or read it as one line gliding
+  by, or a word at a time, with the narrator or at your own speed.
+- **Make an audiobook from an ebook** with a natural AI voice, or **an ebook
+  from an audiobook** - made on your own computer, nothing sent anywhere.
 
 **Photos**
-- Browse by date, people and places. Search by what's *in* a picture ("beach",
-  "dog"). iPhone HEIC photos just work.
+- A timeline of months and days, like Google Photos: a handle to fly through
+  years, pinch to zoom, and videos that play as you scroll past. Browse people
+  and places, and search by what's *in* a picture ("beach", "dog"). iPhone HEIC
+  photos just work.
 - **Everyone has their own photos.** Each person's go in a folder of their own,
-  sorted by when they were taken, and only they (and the owner) can see them.
-  The owner sets how much space each person gets.
+  sorted by when they were taken, and only they see them in the app. The owner
+  sets how much space each person gets.
+- **Send photos and videos to someone in the house.** They choose whether to
+  add them, and get a copy of their own.
 - **Back up your phone** automatically with the Android or iPhone app.
 - **Bring your photos in from anywhere**: Google Photos, iCloud, Facebook,
   Instagram, Snapchat, Flickr, WhatsApp and Telegram downloads, cloud drives,
@@ -87,6 +89,9 @@ but yourself, and nothing to set up by hand.
   yourself instead of typing a password, with an optional PIN.
 - **Sign a TV in from your phone** by scanning a QR code or typing a short code,
   instead of typing a password with a remote.
+- **Use your phone as the TV's remote**: choose the TV, and the music, films and
+  photos you pick play there while your phone controls them.
+- **Invite family with a QR code**: they scan it and choose their own password.
 - Choose which shelves each person can see, so the kids can have no films, for
   example.
 - Apps for **Android** (phones, Google TV, Android TV, Fire TV), **iPhone** and
@@ -99,7 +104,7 @@ but yourself, and nothing to set up by hand.
   switch between them.
 
 <p align="center">
-  <img src="docs/shots/desktop-home.png" width="780" alt="SoundStorm's home page on a computer">
+  <img src="web/shots/tv.png" width="780" alt="SoundStorm playing music on a TV, with a storm animation">
 </p>
 
 ## What you need
@@ -345,6 +350,11 @@ How it fits together, how to build it and how to add a backend:
 **How SoundStorm works, in depth:** the [`site/`](site/index.html) folder is a
 small website explaining the whole project, from the overview down to each part
 and the decisions behind it. Open `site/index.html` in a browser.
+
+## Support SoundStorm
+
+SoundStorm is free and made by one person. If it's useful to you, you can help
+keep it going on [GitHub Sponsors](https://github.com/sponsors/GabrielHollberg).
 
 ## License
 
