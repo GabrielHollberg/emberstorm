@@ -177,7 +177,7 @@ button {
   cursor: pointer;
   border-color: transparent;
 }
-button:hover { filter: brightness(1.08); }
+@media (hover: hover) { button:hover { filter: brightness(1.08); } }
 /* Pressed: a gentle dim while the finger or mouse is down, on every button -
    in place of the browser's tap rectangle, which is switched off. Cards keep
    their own press (the cover settling). */
@@ -302,8 +302,8 @@ header {
   flex-direction: column;
   gap: 8px;
 }
-.item:hover .art-wrap { border-color: var(--accent); }
-.item:hover .title { color: var(--accent); }
+@media (hover: hover) { .item:hover .art-wrap { border-color: var(--accent); } }
+@media (hover: hover) { .item:hover .title { color: var(--accent); } }
 
 .art-wrap {
   position: relative;
@@ -711,7 +711,7 @@ header {
   text-align: left;
   cursor: pointer;
 }
-.track-list button:hover { background: var(--surface-2); }
+@media (hover: hover) { .track-list button:hover { background: var(--surface-2); } }
 .track-list .current button {
   background: var(--accent-dim);
   color: var(--accent);
@@ -1065,7 +1065,7 @@ code {
 .grid.selecting .check { display: grid; }
 .grid.selecting .item.selected .check { background: var(--accent); border-color: var(--accent); color: #08131f; }
 .grid.selecting .item.selected .art-wrap { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-.grid.selecting .item:hover .title { color: inherit; }
+@media (hover: hover) { .grid.selecting .item:hover .title { color: inherit; } }
 
 /* Many selected: the item menu, fixed at the bottom of the screen. */
 .item-menu.select-menu {
@@ -1166,7 +1166,8 @@ button.danger {
 .item-more:hover { filter: none; background: rgba(10, 13, 18, 0.85); }
 .item-more:active { transform: scale(0.92); }
 .item-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.item-holder:hover .item-more, .item-more:focus-visible { opacity: 1; }
+@media (hover: hover) { .item-holder:hover .item-more { opacity: 1; } }
+.item-more:focus-visible { opacity: 1; }
 /* On a touch screen the menu is a press and hold; the button is for a
    mouse, which cannot hold anything down usefully. */
 @media (pointer: coarse) { .item-more { display: none; } }
