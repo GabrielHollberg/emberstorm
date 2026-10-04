@@ -5730,6 +5730,14 @@ function selectionKey(item) {
   return `${item.sourceId}\n${item.id}`;
 }
 
+// What can be selected from: a shelf's list, or the photo timeline when it is
+// the page shown (its tiles are selected the same way, to send them).
+function selectRoot() {
+  const tl = TL.root;
+  if (tl && tl.isConnected && tl.getClientRects().length) return tl;
+  return $('results');
+}
+
 function setSelecting(on) {
   state.selecting = on;
   // Selecting is for the library below; the Continue row is not part of it.
@@ -5737,7 +5745,8 @@ function setSelecting(on) {
   else refreshContinue();
   if (!on) state.selected.clear();
   $('results').classList.toggle('selecting', on);
-  for (const card of $('results').querySelectorAll('.item.selected')) {
+  if (TL.root) TL.root.classList.toggle('selecting', on);
+  for (const card of document.querySelectorAll('#results .item.selected, .photo-timeline .item.selected')) {
     card.classList.remove('selected');
   }
   if (!on && state.menuFor === 'selection') closeItemMenu();
@@ -5881,9 +5890,15 @@ function renderSelectMenu() {
       showToast(`Removed ${kept.length} from this device.`);
     }));
   }
+  if (n && items.every((it) => it.kind === 'picture') && !state.offline && state.me && !state.me.guest) {
+    entries.push(menuItem('send', 'Send to\u2026', (event) => {
+      event.stopPropagation();
+      renderSendMenu(items, () => renderSelectMenu(), () => setSelecting(false));
+    }, { chevron: true }));
+  }
   entries.push(menuItem('check', 'Select all shown', () => {
     for (const item of state.items || []) state.selected.set(selectionKey(item), item);
-    for (const card of $('results').querySelectorAll('.item')) card.classList.add('selected');
+    for (const card of selectRoot().querySelectorAll('.item')) card.classList.add('selected');
     resetSelectBar();
   }));
   if (n && state.me && state.me.owner && !state.offline) {
@@ -5975,7 +5990,7 @@ async function renderSelectDelete() {
       return;
     }
     for (const key of deleted) {
-      const card = $('results').querySelector(`.item[data-key="${CSS.escape(key)}"]`);
+      const card = selectRoot().querySelector(`.item[data-key="${CSS.escape(key)}"]`);
       if (card) (card.closest('.item-holder') || card).remove();
     }
     state.items = (state.items || []).filter((item) => !deleted.includes(selectionKey(item)));
@@ -6145,6 +6160,7 @@ const ICONS = {
   move: '<path d="M4 7h6l2 2h8v9H4zM12 13.5h5M15 11l2.5 2.5L15 16"/>',
   device: '<rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/>',
   cast: '<path d="M3 17.5a3.5 3.5 0 0 1 3.5 3.5M3 13.5A7.5 7.5 0 0 1 10.5 21M3 9.5A11.5 11.5 0 0 1 14.5 21M7 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/>',
+  send: '<path d="M4 12l16-8-6 16-2.5-6.5zM11.5 13.5L20 4"/>',
   radio: '<path d="M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8" stroke-width="2.2"/>',
 };
 
@@ -6312,6 +6328,12 @@ function renderMainMenu(item, opts = {}) {
       renderCoverMenu({ song: item }, () => renderMainMenu(item, opts));
     }, { chevron: true }));
   }
+  if (item.kind === 'picture' && !state.offline) {
+    entries.push(menuItem('send', 'Send to\u2026', (event) => {
+      event.stopPropagation();
+      renderSendMenu([item], () => renderMainMenu(item, opts));
+    }, { chevron: true }));
+  }
   entries.push(menuItem('info', 'Info', (event) => {
     event.stopPropagation();
     renderInfoMenu(item);
@@ -6356,6 +6378,139 @@ function renderMainMenu(item, opts = {}) {
     }, { className: 'menu-danger' }));
   }
   menu.replaceChildren(...entries, note);
+}
+
+// Send to: photos and videos to another person in the house (photosend.go).
+// They wait for that person to take them; taken, they are a copy of their
+// own, in their own folder.
+async function renderSendMenu(items, back, done) {
+  const menu = $('item-menu');
+  const note = menuNote();
+  const say = (text) => { note.textContent = text; show(note, Boolean(text)); };
+  const head = document.createElement('button');
+  head.type = 'button';
+  head.className = 'menu-back';
+  head.append(icon('back'));
+  const label = document.createElement('span');
+  label.textContent = items.length === 1 ? 'Send to' : `Send ${items.length} to`;
+  head.append(label);
+  head.addEventListener('click', (event) => { event.stopPropagation(); back(); });
+  const list = document.createElement('div');
+  list.className = 'menu-scroll';
+  menu.replaceChildren(head, list, note);
+  const { ok, body } = await api('/api/photos/send-to');
+  const people = (ok && body && body.people) || [];
+  if (!people.length) {
+    say(ok ? 'Nobody else here has photos to send to.' : ((body && body.error) || 'Could not ask who is here.'));
+  }
+  list.append(...people.map((p) => {
+    const row = menuItem('send', p.name, async (event) => {
+      event.stopPropagation();
+      say(`Sending to ${p.name}…`);
+      for (const b of list.querySelectorAll('button')) b.disabled = true;
+      const r = await api('/api/photos/send', {
+        method: 'POST',
+        body: JSON.stringify({ to: p.id, items: items.map((it) => ({ sourceId: it.sourceId, id: it.id })) }),
+      });
+      if (!r.ok || !r.body) {
+        say((r.body && r.body.error) || 'Could not send them.');
+        for (const b of list.querySelectorAll('button')) b.disabled = false;
+        return;
+      }
+      closeItemMenu();
+      if (done) done();
+      const sent = r.body.sent || items.length;
+      showToast(`Sent ${sent === 1 ? 'it' : `${sent}`} to ${p.name}. ${sent === 1 ? 'It shows' : 'They show'} in their photos once they take ${sent === 1 ? 'it' : 'them'}.`);
+    });
+    const face = document.createElement('span');
+    face.className = 'menu-avatar';
+    paintAvatar(face, p);
+    row.querySelector('.icon').replaceWith(face);
+    return row;
+  }));
+  placeMenu(menu, state.menuAnchor);
+}
+
+// Photos somebody sent, waiting at the top of the Photos tab: a few of them
+// to look at, Add to my photos, or No thanks.
+async function showPhotoInbox(view, seq) {
+  const { ok, body } = await api('/api/photos/inbox');
+  if (seq !== state.searchSeq || !ok || !body) return;
+  const sends = body.sends || [];
+  for (const old of view.querySelectorAll('.photo-inbox')) old.remove();
+  if (!sends.length) return;
+  const box = document.createElement('div');
+  box.className = 'photo-inbox';
+  for (const send of sends) {
+    const card = document.createElement('section');
+    card.className = 'photo-send';
+    const title = document.createElement('h3');
+    const photos = send.count - send.videos;
+    const what = [photos ? `${photos} photo${photos === 1 ? '' : 's'}` : '', send.videos ? `${send.videos} video${send.videos === 1 ? '' : 's'}` : '']
+      .filter(Boolean).join(' and ');
+    title.textContent = `${send.from} sent you ${what}`;
+    const strip = document.createElement('div');
+    strip.className = 'photo-send-strip';
+    for (const pv of send.previews || []) {
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = '';
+      img.src = pv.thumb;
+      const cell = document.createElement('span');
+      cell.className = 'photo-send-thumb';
+      cell.append(img);
+      if (pv.video) cell.append(icon('play'));
+      strip.append(cell);
+    }
+    if (send.count > (send.previews || []).length) {
+      const more = document.createElement('span');
+      more.className = 'photo-send-more';
+      more.textContent = `+${send.count - send.previews.length}`;
+      strip.append(more);
+    }
+    const note = document.createElement('p');
+    note.className = 'photo-send-note';
+    const buttons = document.createElement('div');
+    buttons.className = 'photo-send-buttons';
+    const take = document.createElement('button');
+    take.type = 'button';
+    take.className = 'primary';
+    take.textContent = 'Add to my photos';
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.textContent = 'No thanks';
+    const act = async (path, busy) => {
+      take.disabled = true;
+      no.disabled = true;
+      note.textContent = busy;
+      const r = await api(`/api/photos/inbox/${encodeURIComponent(send.id)}/${path}`, { method: 'POST' });
+      if (!r.ok) {
+        note.textContent = (r.body && r.body.error) || 'That did not work. Try again.';
+        take.disabled = false;
+        no.disabled = false;
+        return null;
+      }
+      card.remove();
+      if (!box.querySelector('.photo-send')) box.remove();
+      return r.body || {};
+    };
+    take.addEventListener('click', async () => {
+      const r = await act('accept', 'Adding them to your photos…');
+      if (!r) return;
+      const added = r.added || 0;
+      showToast(added
+        ? `Added ${added} to your photos${r.already ? `; ${r.already} you had already` : ''}. ${added === 1 ? 'It shows' : 'They show'} by date once your photos have looked.`
+        : 'You had all of those already.');
+      // The timeline picks them up after the photo library's scan.
+      setTimeout(() => { if (TL.root && TL.root.isConnected) runSearch(); }, 8000);
+    });
+    no.addEventListener('click', () => act('decline', 'Saying no thanks…'));
+    buttons.append(take, no);
+    card.append(title, strip, buttons, note);
+    box.append(card);
+  }
+  view.prepend(box);
 }
 
 // Move to: another shelf for something filed in the wrong one - a film that
@@ -7157,7 +7312,7 @@ function attachItemMenuGestures(card, item) {
   // may slide on across others to select them too, or lift and tap more.
   // A hold on one already selected opens the menu for the selection. Where
   // there is nothing to select (Home's rows, say) a hold opens the menu.
-  const inList = () => Boolean(card.closest('#results'));
+  const inList = () => Boolean(card.closest('#results, .photo-timeline'));
   card.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || (event.pointerType === 'mouse' && !inList())) return;
     startX = event.clientX;
@@ -13398,7 +13553,7 @@ function renderInfoMenu(item) {
 state.dragSelect = null;
 
 function armDragSelect(card, item, pointerId, x0, y0) {
-  if (!card.closest('#results')) return;
+  if (!card.closest('#results, .photo-timeline')) return;
   const onMove = (event) => {
     if (event.pointerId !== pointerId) return;
     if (!state.dragSelect) {
@@ -13497,12 +13652,12 @@ function dragSelectTo(x, y0) {
   for (const dy of [0, 16, -16, 32, -32]) {
     const yy = Math.min(Math.max(y + dy, top + 1), bottom - 1);
     const under = document.elementFromPoint(x, yy);
-    const holder = under && under.closest('#results .item-holder');
+    const holder = under && under.closest('#results .item-holder, .photo-timeline .item-holder');
     target = holder && holder.querySelector('.item');
     if (target) break;
   }
   if (!target) return;
-  const cards = [...$('results').querySelectorAll('.item')];
+  const cards = [...selectRoot().querySelectorAll('.item')];
   const a = cards.findIndex((c) => c.dataset.key === d.from);
   const b = cards.indexOf(target);
   if (a < 0 || b < 0) return;
@@ -21025,6 +21180,7 @@ async function showPhotoTimeline(seq, type = '') {
     $('status').textContent = type === 'video' ? 'No videos in your photos yet.'
       : type === 'live' ? 'No Live Photos yet. iPhone Live Photos and Android motion photos show here.'
         : 'No photos yet. Add some from Settings, or turn on this phone\u2019s backup.';
+    if (type !== 'video' && type !== 'live') showPhotoInbox(view, seq);
     return;
   }
   const root = document.createElement('div');
@@ -21032,6 +21188,7 @@ async function showPhotoTimeline(seq, type = '') {
   root.style.setProperty('--tl-cols', tlCols());
   TL.root = root;
   view.replaceChildren(root);
+  if (type !== 'video' && type !== 'live') showPhotoInbox(view, seq);
   const width = root.clientWidth || view.clientWidth || innerWidth;
   for (const { month, count } of months) {
     const sec = document.createElement('section');

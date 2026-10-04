@@ -125,8 +125,10 @@ type Server struct {
 	voices         *voices.Manager
 	voicesDirPath  string
 	deleted        deletedPhotos
-	lookingUpMu    sync.Mutex
-	lookingUp      map[string]bool
+	// photos sent from one person to another, waiting (photosend.go)
+	photoSendsRec photoSends
+	lookingUpMu   sync.Mutex
+	lookingUp     map[string]bool
 	// imports limits how often somebody may import playlists (a file, or
 	// from Plex): each can write thousands of songs to their collections.
 	imports          allowance
@@ -330,6 +332,7 @@ func New(cfg Config) *Server {
 		beats:            newBeatStore(cfg.BeatsDir),
 		trainingDir:      cfg.TrainingDir,
 		deleted:          deletedPhotos{file: stateFile(cfg.StateDir, "photos-deleted.json")},
+		photoSendsRec:    photoSends{file: stateFile(cfg.StateDir, sendsStateFile)},
 		drivesDir:        cfg.DrivesDir,
 		caretakerSocket:  cfg.CaretakerSocket,
 		rescanTimers:     map[media.Kind]*time.Timer{},
@@ -506,6 +509,12 @@ func (s *Server) Routes() http.Handler {
 	// Everyone's own photos: their space, and their phone's backup.
 	guarded.HandleFunc("GET /api/photos/usage", s.handlePhotoUsage)
 	guarded.HandleFunc("POST /api/photos/backup/check", s.handleBackupCheck)
+	guarded.HandleFunc("GET /api/photos/send-to", s.handleSendTo)
+	guarded.HandleFunc("POST /api/photos/send", s.handleSendPhotos)
+	guarded.HandleFunc("GET /api/photos/inbox", s.handlePhotoInbox)
+	guarded.HandleFunc("GET /api/photos/inbox/{id}/{n}/thumb", s.handlePhotoInboxThumb)
+	guarded.HandleFunc("POST /api/photos/inbox/{id}/accept", s.handlePhotoInboxAccept)
+	guarded.HandleFunc("POST /api/photos/inbox/{id}/decline", s.handlePhotoInboxDecline)
 	guarded.HandleFunc("PUT /api/photos/backup", s.handleBackup)
 	// Bringing a photo library in: a Google or Apple download, in pieces.
 	guarded.HandleFunc("GET /api/photos/import", s.handleImports)
@@ -1108,6 +1117,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	// after that nothing knows what to clean up - the orphan would sit there
 	// with somebody's listening history in it.
 	s.setup.ForgetUser(r.Context(), id)
+	s.forgetSendsTo(id)
 	defer s.photoPrivacy()
 	// Their favorites and playlists go with them. Best effort, like the
 	// backend accounts: a file that will not delete must not stop the removal.

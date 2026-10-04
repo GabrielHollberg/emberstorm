@@ -276,6 +276,13 @@ type photoPlace struct {
 }
 
 func (s *Server) datedPhoto(u state.User, staged, dropped string, hint int64) (*photoPlace, error) {
+	return s.datedPhotoKnown(u, staged, dropped, hint, photoimport.Meta{}, photoimport.SourceNone)
+}
+
+// datedPhotoKnown is datedPhoto with a date already known about the photo -
+// the date file beside a photo sent from someone else's folder - used when
+// the photo has none inside it, ahead of one in its name.
+func (s *Server) datedPhotoKnown(u state.User, staged, dropped string, hint int64, known photoimport.Meta, knownSrc photoimport.DateSource) (*photoPlace, error) {
 	f, err := os.Open(staged)
 	if err != nil {
 		return nil, err
@@ -300,6 +307,8 @@ func (s *Server) datedPhoto(u state.User, staged, dropped string, hint int64) (*
 		// A phone's or camera's video: when it was filmed, from inside it.
 		// Immich reads the same, so nothing is written beside it.
 		pl.meta.Taken, pl.src, pl.exif = cam.Taken, photoimport.SourceExif, true
+	} else if !known.Taken.IsZero() {
+		pl.meta, pl.src = known, knownSrc
 	} else if t, ok := photoimport.NameTaken(name); ok {
 		pl.meta.Taken, pl.src = t, photoimport.SourceName
 	} else if hint > 0 && time.UnixMilli(hint).Year() > 1990 && !library.IsStillImage(name) {

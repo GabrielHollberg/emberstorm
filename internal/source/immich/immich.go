@@ -416,6 +416,27 @@ func (s *Source) ItemFiles(ctx context.Context, itemID string) ([]string, error)
 	return []string{rel}, nil
 }
 
+// LiveFile is a Live Photo's moving part's file, relative to the pictures
+// folder ("" for any other photo): sent to someone with its still, so their
+// copy is a Live Photo too. Looked up as the person asking, like ItemFiles.
+func (s *Source) LiveFile(ctx context.Context, itemID string) (string, error) {
+	if s.cfg.MediaRoot == "" || itemID == "" {
+		return "", nil
+	}
+	var a asset
+	if err := s.getJSON(ctx, "/api/assets/"+url.PathEscape(itemID), nil, &a); err != nil {
+		return "", err
+	}
+	if a.LivePhotoVideoID == "" {
+		return "", nil
+	}
+	var v asset
+	if err := s.getJSON(ctx, "/api/assets/"+url.PathEscape(a.LivePhotoVideoID), nil, &v); err != nil {
+		return "", err
+	}
+	return source.RelativeTo(s.cfg.MediaRoot, v.OriginalPath)
+}
+
 // ItemByID describes one photo or clip, for a favorite, which knows it only
 // by id. Its sort key is left empty: a favorites list is ordered by when
 // something was added, not by Immich's timeline.
