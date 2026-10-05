@@ -7265,7 +7265,7 @@ async function showPlaylists(report) {
   });
   actions.append(make, importPlaylistButton());
   view.append(actions, form);
-  if (report) view.append(report);
+  if (report instanceof Node) view.append(report);
 
   const grid = document.createElement('div');
   grid.className = 'grid browse-grid mix-grid playlist-grid';
@@ -7464,7 +7464,7 @@ async function showPlaylist(id) {
   back.type = 'button';
   back.className = 'back';
   back.textContent = '\u2190 All playlists';
-  back.addEventListener('click', showPlaylists);
+  back.addEventListener('click', () => showPlaylists());
 
   // The header is an album's: a cover, the name, what is in it, and Play,
   // Shuffle and Download. The name renames in place.
