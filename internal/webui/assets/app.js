@@ -16768,12 +16768,21 @@ function pickServerPhoto() {
     close.className = 'ghost';
     close.textContent = 'Cancel';
     bar.append(title, close);
+    // The list scrolls invisibly (grid, only its height in it); the cards are
+    // drawn on a still layer over it (stage), placed from how far it has
+    // scrolled - inside the scrolling list they moved with it and then were
+    // moved again a frame later, which jittered (the owner: "glitchy").
+    const body = document.createElement('div');
+    body.className = 'pick-photos-body';
     const grid = document.createElement('div');
     grid.className = 'pick-photos-grid';
+    const stage = document.createElement('div');
+    stage.className = 'pick-stage';
+    body.append(grid, stage);
     const note = document.createElement('p');
     note.className = 'muted pick-photos-note';
     note.textContent = 'Loading your photos…';
-    sheet.append(bar, note, grid);
+    sheet.append(bar, note, body);
     document.body.append(sheet);
     let finished = false;
     const done = (v) => {
@@ -16840,22 +16849,38 @@ function pickServerPhoto() {
       if (half + F(focus) < c) c = half + F(focus); // a short list: from the top
       for (let r = 0; r < deck.rows; r++) {
         const k = r - focus;
-        const y = top + c + F(k) - deck.T / 2;
-        // Off the screen, or deep in a pile (40 slivers either end are drawn).
-        const off = y + deck.T < top - 4 || y > top + deck.H + 4 || Math.abs(k) > X1 + 40;
-        for (let c = 0; c < deck.cols; c++) {
-          const t = tiles[r * deck.cols + c];
+        const y = c + F(k) - deck.T / 2;
+        // Off the screen, or deep in a pile (14 slivers either end are drawn).
+        const off = y + deck.T < -4 || y > deck.H + 4 || Math.abs(k) > X1 + 14;
+        // Nearer the middle lies on top: by row, so it changes only as a row
+        // passes the middle, not every frame.
+        const z = String(100000 - Math.round(Math.abs(k)) * 10 - (k < 0 ? 1 : 0));
+        for (let col = 0; col < deck.cols; col++) {
+          const t = tiles[r * deck.cols + col];
           if (!t) break;
-          t.style.visibility = off ? 'hidden' : '';
+          if (t.deckOff !== off) { t.deckOff = off; t.style.visibility = off ? 'hidden' : ''; }
           if (off) continue;
-          t.style.transform = `translate3d(0, ${y}px, 0)`;
-          // Nearer the middle lies on top.
-          t.style.zIndex = String(100000 - Math.round(Math.abs(k) * 100));
+          t.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0)`;
+          if (t.deckZ !== z) { t.deckZ = z; t.style.zIndex = z; }
         }
       }
     };
     const soon = () => { if (!frame) frame = requestAnimationFrame(layout); };
     grid.addEventListener('scroll', soon, { passive: true });
+    // The cards take no touches (the list under them scrolls): a tap is the
+    // card on top at that point.
+    grid.addEventListener('click', (event) => {
+      let best = null;
+      let bestZ = -1;
+      for (const t of tiles) {
+        if (t.deckOff !== false) continue;
+        const r = t.getBoundingClientRect();
+        if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) continue;
+        const z = Number(t.deckZ) || 0;
+        if (z > bestZ) { best = t; bestZ = z; }
+      }
+      if (best && best.pick) best.pick();
+    });
     const onResize = () => { measure(); layout(); };
     window.addEventListener('resize', onResize);
     api('/api/photos/of?type=photo').then(({ ok, body }) => {
@@ -16873,7 +16898,7 @@ function pickServerPhoto() {
         img.decoding = 'async';
         img.src = artPath(it);
         b.append(img);
-        b.addEventListener('click', async () => {
+        b.pick = async () => {
           note.textContent = 'Getting that photo…';
           show(note, true);
           try {
@@ -16885,9 +16910,9 @@ function pickServerPhoto() {
           } catch {
             note.textContent = 'That photo could not be used. Try another.';
           }
-        });
+        };
         tiles.push(b);
-        track.append(b);
+        stage.append(b);
       }
       measure();
       layout();
