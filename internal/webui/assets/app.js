@@ -7350,19 +7350,9 @@ function playlistCard(list) {
     }
     showPlaylist(list.id);
   });
-  // Shuffle it from here, as a mix plays from its card.
-  const shuffle = document.createElement('button');
-  shuffle.type = 'button';
-  shuffle.className = 'playlist-shuffle';
-  shuffle.setAttribute('aria-label', `Shuffle ${list.name}`);
-  shuffle.title = 'Shuffle';
-  shuffle.append(icon('shuffle'));
-  shuffle.disabled = !list.count;
-  shuffle.addEventListener('click', (event) => {
-    event.stopPropagation();
-    playPlaylist(list.id, true);
-  });
-  holder.append(card, shuffle);
+  // No shuffle button on the cover (the owner's asking): Shuffle is in the
+  // card's hold menu and on the playlist's page.
+  holder.append(card);
   attachHoldMenu(card, () => openPlaylistMenu(list, card.querySelector('.art-wrap') || card));
   return holder;
 }
@@ -7508,7 +7498,7 @@ async function showPlaylist(id) {
   const facts = document.createElement('span');
   facts.className = 'muted';
   facts.textContent = [`${songs.length} song${songs.length === 1 ? '' : 's'}`, formatLength(total)].filter(Boolean).join(' \u00b7 ');
-  const buttons = playButtons(async () => songs, { noShuffle: true });
+  const buttons = playButtons(async () => songs);
   buttons.append(downloadButton({
     id: `playlist:${id}`, type: 'playlist', title: body.name, subtitle: 'Playlist',
     sourceId: first.sourceId, artId: first.artId,
@@ -8374,7 +8364,7 @@ function shuffled(items) {
   return out;
 }
 
-function playButtons(getSongs, opts = {}) {
+function playButtons(getSongs) {
   const row = document.createElement('div');
   row.className = 'play-row';
   const play = document.createElement('button');
@@ -8393,9 +8383,7 @@ function playButtons(getSongs, opts = {}) {
     const songs = await getSongs();
     if (songs.length) playQueue(shuffled(songs), 0);
   });
-  row.append(play);
-  // Not on a playlist's page (the owner's asking): Play, and Download.
-  if (!opts.noShuffle) row.append(shuffle);
+  row.append(play, shuffle);
   return row;
 }
 
