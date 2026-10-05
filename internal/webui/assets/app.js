@@ -16778,6 +16778,33 @@ function pickServerPhoto() {
     let finished = false;
     const done = (v) => { if (finished) return; finished = true; sheet.remove(); resolve(v); };
     close.addEventListener('click', () => done(null));
+    // Near the middle of the screen a photo shows whole; towards the top and
+    // bottom it is cropped to fill its square, easing between the two as the
+    // grid scrolls (the owner's idea).
+    let frame = 0;
+    const reveal = () => {
+      frame = 0;
+      const box = grid.getBoundingClientRect();
+      const mid = box.top + box.height / 2;
+      const reach = box.height / 2;
+      for (const b of grid.children) {
+        const img = b.firstChild;
+        if (!img || !img.naturalWidth) continue;
+        const r = b.getBoundingClientRect();
+        if (r.bottom < box.top - 50 || r.top > box.bottom + 50) continue;
+        // 1 at the middle, 0 a little short of the edges, eased.
+        const d = Math.min(1, Math.abs(r.top + r.height / 2 - mid) / (reach * 0.8));
+        const t = (1 - d) * (1 - d) * (3 - 2 * (1 - d));
+        // The photo is shown whole; scaled up by its longer side over its
+        // shorter, it fills the square (the rest cropped by the tile).
+        const a = img.naturalWidth / img.naturalHeight;
+        const fill = a >= 1 ? a : 1 / a;
+        img.style.transform = `scale(${1 + (fill - 1) * (1 - t)})`;
+      }
+    };
+    const soon = () => { if (!frame) frame = requestAnimationFrame(reveal); };
+    grid.addEventListener('scroll', soon, { passive: true });
+    window.addEventListener('resize', soon);
     api('/api/photos/of?type=photo').then(({ ok, body }) => {
       if (finished) return;
       const items = ((ok && body && body.items) || []).filter((it) => it.artId && !(it.extra && it.extra.type === 'video'));
@@ -16792,6 +16819,7 @@ function pickServerPhoto() {
         img.loading = 'lazy';
         img.decoding = 'async';
         img.src = artPath(it);
+        img.addEventListener('load', soon, { once: true });
         b.append(img);
         b.addEventListener('click', async () => {
           note.textContent = 'Getting that photo…';
