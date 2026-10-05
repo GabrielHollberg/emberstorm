@@ -37,7 +37,7 @@ struct SideBar: View {
         VStack(spacing: 12) {
             entry("settings", label: "Settings", icon: "gear")
             if let user = api.user {
-                // Who is watching: their circle, opening "Who's listening?".
+                // Who is watching: their picture, opening "Who's listening?".
                 Button { Task { await model.showProfiles() } } label: {
                     tabLabel(selected: false, lit: true) {
                         Avatar(name: user.name, picture: user.picture, size: 80)

@@ -552,7 +552,7 @@ struct ProfilesView: View {
     private func tile(_ person: API.Profile) -> some View {
         VStack(spacing: 14) {
             Avatar(name: person.name, picture: person.picture, size: 180)
-                .ring(radius: 98, width: 8, inset: -8)
+                .ring(radius: 180 * 0.24 + 8, width: 8, inset: -8)
             Text(person.name)
                 .font(.system(size: 32, weight: .semibold))
                 .foregroundStyle(Theme.text)
@@ -593,8 +593,9 @@ struct ProfilesView: View {
     }
 }
 
-/// A person's circle: their own picture, or their initial on a colour of
-/// their own - the same colour the page gives them (app.js `paintAvatar`).
+/// A person's picture: a rounded square (corners a quarter of its side, the
+/// page's `border-radius: 24%`) of their own picture, or their initial on a
+/// colour of their own - the same colour the page gives them (app.js `paintAvatar`).
 struct Avatar: View {
     let name: String
     let picture: String?
@@ -610,7 +611,7 @@ struct Avatar: View {
             .foregroundStyle(.white)
             .frame(width: size, height: size)
         ZStack {
-            Circle().fill(Color(hue: Self.hues[Int(hash % UInt32(Self.hues.count))] / 360, saturation: 0.55, brightness: 0.62))
+            Rectangle().fill(Color(hue: Self.hues[Int(hash % UInt32(Self.hues.count))] / 360, saturation: 0.55, brightness: 0.62))
             if let picture, let url = try? model.api?.absolute(picture) {
                 SafeImage(url: url, maxPixels: Int(size * 2)) { image in
                     image.resizable().scaledToFill()
@@ -620,12 +621,12 @@ struct Avatar: View {
             }
         }
         .frame(width: size, height: size)
-        .clipShape(Circle())
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
     }
 }
 
-/// The signed-in person's circle as an image, for a place that takes only
-/// an image (the side bar's entry): their picture cropped round, or their
+/// The signed-in person's picture as an image, for a place that takes only
+/// an image: their picture cropped to a rounded square, or their
 /// initial on their colour.
 enum AvatarImage {
     static let hues: [Double] = [210, 340, 28, 140, 265, 190, 5, 95]
@@ -641,7 +642,7 @@ enum AvatarImage {
         let colour = UIColor(hue: hues[Int(hash % UInt32(hues.count))] / 360, saturation: 0.55, brightness: 0.62, alpha: 1)
         let rect = CGRect(x: 0, y: 0, width: size, height: size)
         return UIGraphicsImageRenderer(size: rect.size).image { _ in
-            UIBezierPath(ovalIn: rect).addClip()
+            UIBezierPath(roundedRect: rect, cornerRadius: size * 0.24).addClip()
             colour.setFill()
             UIRectFill(rect)
             if let picture {
