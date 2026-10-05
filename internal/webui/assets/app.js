@@ -16784,38 +16784,42 @@ function pickServerPhoto() {
       resolve(v);
     };
     close.addEventListener('click', () => done(null));
-    // A deck of cards (the owner's design): the squares overlap, each row
-    // tucked under the next, and around the middle of the screen they spread
-    // apart so the photos there show in full; scrolling carries rows through
-    // the middle, opening as they arrive and tucking under as they leave. A
-    // row's place is worked out each frame: rows sit P apart (P under a
-    // square's side T), and a smooth spread round the middle - g(u) = u +
-    // (k - 1) w atan(u / w), k = T / P - opens that gap out to a full T there.
+    // A deck of cards (the owner's design): around the middle of the screen
+    // the rows sit fully apart, and towards the top and bottom they are
+    // squeezed until each shows only a sliver, the ones nearer the middle on
+    // top; scrolling carries rows through the middle. Laid out from the
+    // middle outwards: a row k rows from the one in focus is drawn F(k) from
+    // the middle, where F's slope - the room each row gets - is a full card
+    // (A) within X0 rows, eases down to a sliver (B) by X1, and stays B.
     const track = document.createElement('div');
     track.className = 'pick-deck';
     grid.append(track);
     const tiles = [];
-    const deck = { T: 100, P: 45, cols: 3, gap: 6, W: 0, H: 0, rows: 0, pad: 0 };
-    // w is how far either side of the middle the opening reaches: narrow,
-    // so the rows beyond it stack tight (the owner asked for more drama).
-    const g = (u) => { const w = deck.T * 0.55; return u + (deck.T / deck.P - 1) * w * Math.atan(u / w); };
-    const gInv = (y) => { // g only grows, so a bisection finds where y comes from
-      let lo = -1e6;
-      let hi = 1e6;
-      for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (g(m) < y) lo = m; else hi = m; }
-      return (lo + hi) / 2;
+    const deck = { T: 100, cols: 3, gap: 6, W: 0, H: 0, rows: 0, A: 106, B: 5 };
+    const X0 = 1;
+    const X1 = 2.5;
+    const F = (k) => {
+      const x = Math.abs(k);
+      const { A, B } = deck;
+      let y;
+      if (x <= X0) y = A * x;
+      else if (x < X1) {
+        const t = (x - X0) / (X1 - X0);
+        y = A * x + (B - A) * (X1 - X0) * (t * t * t - (t * t * t * t) / 2);
+      } else y = A * X1 + (B - A) * (X1 - X0) * 0.5 + B * (x - X1);
+      return k < 0 ? -y : y;
     };
     const measure = () => {
       deck.W = grid.clientWidth;
       deck.H = grid.clientHeight;
       deck.cols = Math.max(3, Math.round(deck.W / 120));
       deck.T = (deck.W - deck.gap * (deck.cols + 1)) / deck.cols;
-      deck.P = deck.T * 0.18; // more overlapped, at the owner's asking (0.42 first)
+      deck.A = deck.T + deck.gap;
+      deck.B = deck.T * 0.05; // almost entirely overlapped, at the owner's asking
       deck.rows = Math.ceil(tiles.length / deck.cols);
-      // Room at the top so the first row starts at the top of the screen
-      // (not at its middle), and the same at the foot for the last.
-      deck.pad = deck.H / 2 + gInv(deck.gap + deck.T / 2 - deck.H / 2) - deck.T / 2;
-      track.style.height = `${deck.pad * 2 + (deck.rows - 1) * deck.P + deck.T}px`;
+      // The focus runs from the first row to the last; a finger moves the
+      // cards in the middle at its own speed.
+      track.style.height = `${Math.max(0, deck.rows - 1) * deck.A + deck.H}px`;
       tiles.forEach((t, i) => {
         t.style.width = `${deck.T}px`;
         t.style.height = `${deck.T}px`;
@@ -16826,14 +16830,19 @@ function pickServerPhoto() {
     const layout = () => {
       frame = 0;
       const top = grid.scrollTop;
-      const mid = top + deck.H / 2;
+      const focus = Math.min(Math.max(0, deck.rows - 1), top / deck.A);
+      // Where the focus is drawn: the middle of the screen, except near the
+      // ends of the list, where the first row stays at the top (the open part
+      // starting there and sliding down to the middle) and the last at the foot.
+      const half = deck.gap + deck.T / 2;
+      let c = Math.min(deck.H / 2, half + F(focus));
+      c = Math.max(c, deck.H - half - F(deck.rows - 1 - focus));
+      if (half + F(focus) < c) c = half + F(focus); // a short list: from the top
       for (let r = 0; r < deck.rows; r++) {
-        // The row's centre where the rows sit P apart, from the middle...
-        const u = deck.pad + r * deck.P + deck.T / 2 - mid;
-        // ...and where it is drawn, spread round the middle.
-        const y = mid + g(u) - deck.T / 2;
-        const near = Math.abs(u);
-        const off = y + deck.T < top - 40 || y > top + deck.H + 40;
+        const k = r - focus;
+        const y = top + c + F(k) - deck.T / 2;
+        // Off the screen, or deep in a pile (40 slivers either end are drawn).
+        const off = y + deck.T < top - 4 || y > top + deck.H + 4 || Math.abs(k) > X1 + 40;
         for (let c = 0; c < deck.cols; c++) {
           const t = tiles[r * deck.cols + c];
           if (!t) break;
@@ -16841,7 +16850,7 @@ function pickServerPhoto() {
           if (off) continue;
           t.style.transform = `translate3d(0, ${y}px, 0)`;
           // Nearer the middle lies on top.
-          t.style.zIndex = String(100000 - Math.round(near));
+          t.style.zIndex = String(100000 - Math.round(Math.abs(k) * 100));
         }
       }
     };
