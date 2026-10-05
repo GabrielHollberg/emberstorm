@@ -16595,7 +16595,7 @@ function pickCoverImage() {
     cancel.type = 'button';
     cancel.className = 'ghost';
     cancel.textContent = 'Cancel';
-    card.append(h, here, photos, cancel);
+    card.append(h, photos, here, cancel);
     sheet.append(card);
     document.body.append(sheet);
     const done = (v) => { sheet.remove(); resolve(v); };
