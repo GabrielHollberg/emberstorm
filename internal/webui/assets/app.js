@@ -9020,7 +9020,8 @@ const npSwipe = (() => {
   panel.addEventListener('touchmove', (event) => {
     if (!armed) return;
     // A hold put up the menu or the icons: the finger is theirs now.
-    if (shown('item-menu') || shown('np-hold-layer')) {
+    // (Not the options kept on screen while every button shows: a swipe still changes song then.)
+    if (shown('item-menu') || $('now-playing').classList.contains('hold-icons')) {
       armed = false;
       return;
     }
