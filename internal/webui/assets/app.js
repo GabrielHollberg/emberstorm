@@ -16796,7 +16796,9 @@ function pickServerPhoto() {
     grid.append(track);
     const tiles = [];
     const deck = { T: 100, P: 45, cols: 3, gap: 6, W: 0, H: 0, rows: 0, pad: 0 };
-    const g = (u) => u + (deck.T / deck.P - 1) * deck.T * Math.atan(u / deck.T);
+    // w is how far either side of the middle the opening reaches: narrow,
+    // so the rows beyond it stack tight (the owner asked for more drama).
+    const g = (u) => { const w = deck.T * 0.55; return u + (deck.T / deck.P - 1) * w * Math.atan(u / w); };
     const gInv = (y) => { // g only grows, so a bisection finds where y comes from
       let lo = -1e6;
       let hi = 1e6;
@@ -16808,7 +16810,7 @@ function pickServerPhoto() {
       deck.H = grid.clientHeight;
       deck.cols = Math.max(3, Math.round(deck.W / 120));
       deck.T = (deck.W - deck.gap * (deck.cols + 1)) / deck.cols;
-      deck.P = deck.T * 0.42;
+      deck.P = deck.T * 0.18; // more overlapped, at the owner's asking (0.42 first)
       deck.rows = Math.ceil(tiles.length / deck.cols);
       // Room at the top so the first row starts at the top of the screen
       // (not at its middle), and the same at the foot for the last.
