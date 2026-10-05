@@ -4155,7 +4155,7 @@ html.tv .profiles-card:has(#profiles-secret:not(.hidden)) #profiles-secret { mar
   place-items: center;
   width: 76px;
   height: 76px;
-  border-radius: 50%;
+  border-radius: 24%; /* a rounded square, as the header's (the owner's choice) */
   font-size: 32px;
   font-weight: 800;
   color: #fff;
@@ -4163,7 +4163,7 @@ html.tv .profiles-card:has(#profiles-secret:not(.hidden)) #profiles-secret { mar
 .profile-avatar { overflow: hidden; flex: none; }
 .profile-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* The circle at the top left of the search box: who is signed in, opening switching and
+/* The picture at the top of the page: who is signed in, opening switching and
    Settings - which is why Settings is no longer a tab, except on a TV, where
    the side bar is where the remote goes. */
 .me-btn {
@@ -4415,7 +4415,7 @@ html, body { overscroll-behavior-y: none; }
 .photo-timeline .art-wrap { transition: transform 0.12s ease; }
 
 /* A person in the Send to list. */
-.menu-avatar { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center;
+.menu-avatar { width: 26px; height: 26px; border-radius: 24%; flex: none; display: grid; place-items: center;
   overflow: hidden; color: #fff; font-size: 13px; font-weight: 700; }
 .menu-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
