@@ -3809,9 +3809,6 @@ function startAt(url, offset) {
   // Start the clock now, or the first timeupdate is already older than the
   // interval and every play begins by writing back the position it just read.
   audio.savedAt = Date.now();
-  // A downloaded audiobook plays from the device: its files' server
-  // addresses map to copies kept here.
-  setAudioSource(player, (audio.urlMap && audio.urlMap[url]) || url);
 
   // Taking over a song the app's player has paused leaves it paused.
   const begin = () => {
@@ -3823,18 +3820,50 @@ function startAt(url, offset) {
   // the old place (a review).
   if (audio.pendingSeek) player.removeEventListener('loadedmetadata', audio.pendingSeek);
   audio.pendingSeek = null;
+  audio.resumeTo = null;
   if (offset > 0) {
     audio.pendingSeek = () => {
       audio.pendingSeek = null;
-      // Landing exactly on the end would fire 'ended' and skip the chapter.
-      player.currentTime = Math.min(offset, Math.max(0, player.duration - 1));
+      // Landing exactly on the end would fire 'ended' and skip the chapter -
+      // but only a length that is known caps it: one not known yet capped a
+      // resumed book at 0:00, and it started again from the beginning (the
+      // owner's report, a read-along sent to the projector).
+      const d = player.duration;
+      player.currentTime = Number.isFinite(d) && d > 1 ? Math.min(offset, d - 1) : offset;
       begin();
     };
+    // Listened for before the file is handed over: the Android app's player
+    // says it has it at once when it is already in that file, and heard
+    // after, the jump never came.
     player.addEventListener('loadedmetadata', audio.pendingSeek, { once: true });
-  } else {
-    begin();
+    // And a book that should carry on well into it, found playing at its
+    // very start in the next while, is moved there once more - or the
+    // regular saves would write the start back as its place.
+    if (offset > 60 && audio.item && audio.item.kind === 'audiobook') {
+      audio.resumeTo = { url: audio.currentURL, offset, until: Date.now() + 30000, tries: 0 };
+    }
   }
+  // A downloaded audiobook plays from the device: its files' server
+  // addresses map to copies kept here.
+  setAudioSource(player, (audio.urlMap && audio.urlMap[url]) || url);
+  if (!(offset > 0)) begin();
 }
+
+// The resumed book's safety net (startAt): checked as it plays.
+$('audio-player').addEventListener('timeupdate', () => {
+  const r = audio.resumeTo;
+  if (!r || RA.on) return;
+  const player = $('audio-player');
+  if (Date.now() > r.until || audio.currentURL !== r.url) { audio.resumeTo = null; return; }
+  if (player.seeking || player.paused) return;
+  if (player.currentTime < 15) {
+    if (r.tries >= 2) { audio.resumeTo = null; return; }
+    r.tries++;
+    player.currentTime = r.offset;
+  } else if (Math.abs(player.currentTime - r.offset) < 60) {
+    audio.resumeTo = null; // where it should be
+  }
+});
 
 // setAudioSource hands the player a file, or a book's pieces (a playlist,
 // .m3u8). Safari, Chrome on Android and recent desktop Chrome play the pieces
