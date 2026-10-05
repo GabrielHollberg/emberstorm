@@ -517,6 +517,10 @@ const LiveSuffix = "@live"
 // first.
 func (s *Source) PhotosOfType(ctx context.Context, kind string, limit int) ([]media.Item, error) {
 	switch kind {
+	case "photo":
+		// Stills, Live Photos among them: the Photos pill on a TV (which has
+		// no timeline) and the photos to pick a picture from.
+		return s.photos(ctx, map[string]any{"type": "IMAGE"}, limit)
 	case "video":
 		return s.photos(ctx, map[string]any{"type": "VIDEO"}, limit)
 	case "live":

@@ -16570,7 +16570,113 @@ function repaintCovers() {
 
 // pickCoverImage asks for a picture and hands back a square JPEG of it, at
 // most 1000px: covers are square, and a phone photo is several megabytes.
+// Where a picture for a cover, a playlist or a profile comes from: this
+// device's own files, or the person's photos on the server (the owner's
+// asking) - asked first whenever they have Photos. Either way it is cropped
+// square here, as before.
 function pickCoverImage() {
+  if (state.offline || TV || !shelfAvailable('picture')) return pickCoverFile();
+  return new Promise((resolve) => {
+    const sheet = document.createElement('div');
+    sheet.className = 'pick-source';
+    const card = document.createElement('div');
+    card.className = 'pick-source-card';
+    const h = document.createElement('h3');
+    h.textContent = 'Choose a picture';
+    const here = document.createElement('button');
+    here.type = 'button';
+    here.className = 'primary';
+    here.textContent = touchScreen() ? 'From this phone' : 'From this computer';
+    const photos = document.createElement('button');
+    photos.type = 'button';
+    photos.className = 'primary';
+    photos.textContent = 'From your photos';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'ghost';
+    cancel.textContent = 'Cancel';
+    card.append(h, here, photos, cancel);
+    sheet.append(card);
+    document.body.append(sheet);
+    const done = (v) => { sheet.remove(); resolve(v); };
+    // The file picker is opened from this tap, as a browser requires.
+    here.addEventListener('click', () => { sheet.remove(); pickCoverFile().then(resolve); });
+    photos.addEventListener('click', () => { sheet.remove(); pickServerPhoto().then(resolve); });
+    cancel.addEventListener('click', () => done(null));
+    sheet.addEventListener('click', (event) => { if (event.target === sheet) done(null); });
+  });
+}
+
+// Squared and shrunk to 1000px, as JPEG: from a file or a photo's preview.
+async function squarePicture(source) {
+  const bmp = await createImageBitmap(source);
+  const side = Math.min(bmp.width, bmp.height);
+  const out = Math.min(1000, side);
+  const c = document.createElement('canvas');
+  c.width = out;
+  c.height = out;
+  c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
+  return new Promise((res) => c.toBlob((blob) => res(blob), 'image/jpeg', 0.9));
+}
+
+// The person's photos, newest first, a tap choosing one (its large preview,
+// which is a JPEG whatever the original was - a HEIC included).
+function pickServerPhoto() {
+  return new Promise((resolve) => {
+    const sheet = document.createElement('div');
+    sheet.className = 'pick-photos';
+    const bar = document.createElement('div');
+    bar.className = 'pick-photos-bar';
+    const title = document.createElement('strong');
+    title.textContent = 'Your photos';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'ghost';
+    close.textContent = 'Cancel';
+    bar.append(title, close);
+    const grid = document.createElement('div');
+    grid.className = 'pick-photos-grid';
+    const note = document.createElement('p');
+    note.className = 'muted pick-photos-note';
+    note.textContent = 'Loading your photos…';
+    sheet.append(bar, note, grid);
+    document.body.append(sheet);
+    let finished = false;
+    const done = (v) => { if (finished) return; finished = true; sheet.remove(); resolve(v); };
+    close.addEventListener('click', () => done(null));
+    api('/api/photos/of?type=photo').then(({ ok, body }) => {
+      if (finished) return;
+      const items = ((ok && body && body.items) || []).filter((it) => it.artId && !(it.extra && it.extra.type === 'video'));
+      note.textContent = items.length ? '' : (ok ? 'No photos yet.' : 'Could not load your photos.');
+      show(note, !items.length);
+      for (const it of items) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pick-photo';
+        const img = document.createElement('img');
+        img.alt = it.title || '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = artPath(it);
+        b.append(img);
+        b.addEventListener('click', async () => {
+          note.textContent = 'Getting that photo…';
+          show(note, true);
+          try {
+            const resp = await fetch(photoPreview(it), { credentials: 'same-origin' });
+            if (!resp.ok) throw new Error(String(resp.status));
+            done(await squarePicture(await resp.blob()));
+          } catch {
+            note.textContent = 'That photo could not be used. Try another.';
+          }
+        });
+        grid.append(b);
+      }
+    });
+  });
+}
+
+function pickCoverFile() {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -16580,14 +16686,7 @@ function pickCoverImage() {
       const file = input.files && input.files[0];
       if (!file) { resolve(null); return; }
       try {
-        const bmp = await createImageBitmap(file);
-        const side = Math.min(bmp.width, bmp.height);
-        const out = Math.min(1000, side);
-        const c = document.createElement('canvas');
-        c.width = out;
-        c.height = out;
-        c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
-        c.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+        resolve(await squarePicture(file));
       } catch {
         showToast("That picture can't be opened here. Try a JPEG or PNG.");
         resolve(null);
