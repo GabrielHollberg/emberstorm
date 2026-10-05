@@ -15815,6 +15815,11 @@ function renderSleepCustom(item, opts) {
 // touch - play, the header's buttons, the timeline, Up next (a hold there
 // moves a song), a menu.
 const NP_HOLD_SKIP = 'input, a, #np-queue, .np-bar button, .np-controls button, .np-hold-icons button, #np-speed-wrap, #item-menu, #np-looks, #np-chapters';
+// While every button shows, a hold starts anywhere, on the buttons too, and
+// works as it always does - slide over them to see each, let go on one to
+// use it; a quick tap still presses the button under the finger.
+const NP_HOLD_SKIP_EASY = 'input, a, #np-queue, #np-speed-wrap, #item-menu, #np-looks, #np-chapters';
+const npHoldSkip = (target) => target.closest($('now-playing').classList.contains('np-easy') ? NP_HOLD_SKIP_EASY : NP_HOLD_SKIP);
 (() => {
   const panel = $('now-playing');
   $('np-cover').draggable = false;
@@ -15826,7 +15831,7 @@ const NP_HOLD_SKIP = 'input, a, #np-queue, .np-bar button, .np-controls button, 
     timer = null;
   };
   panel.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || event.target.closest(NP_HOLD_SKIP)) return;
+    if (event.button !== 0 || npHoldSkip(event.target)) return;
     x = event.clientX;
     y = event.clientY;
     cancel();
@@ -15844,7 +15849,7 @@ const NP_HOLD_SKIP = 'input, a, #np-queue, .np-bar button, .np-controls button, 
   });
   for (const type of ['pointerup', 'pointercancel']) panel.addEventListener(type, cancel);
   panel.addEventListener('contextmenu', (event) => {
-    if (event.target.closest(NP_HOLD_SKIP)) return;
+    if (npHoldSkip(event.target)) return;
     event.preventDefault();
     cancel();
     if (state.holding) return; // a long press Android also reports; answered above
@@ -16115,8 +16120,13 @@ function showHoldIcons(pointerId, x0, y0) {
   const box = $('np-hold-icons');
   const caption = $('np-hold-caption');
   const cover = $('np-cover');
-  layer.classList.remove('easy');
-  placeHoldLayer(item, false);
+  // While every button shows, the hold uses the buttons already there: put
+  // new ones in their place and a finger that came down on one is cut off
+  // (its touch goes on to the removed button, never reaching the page).
+  if (!(layer.classList.contains('easy') && box.querySelector('button'))) {
+    layer.classList.remove('easy');
+    placeHoldLayer(item, false);
+  }
   // On a touch screen the screen's own buttons - close, looks, stop, play,
   // and speed for an audiobook - are invisible (asked for so nothing sits on
   // the screen but the music), and appear here while the finger is down,
