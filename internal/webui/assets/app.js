@@ -16776,35 +16776,77 @@ function pickServerPhoto() {
     sheet.append(bar, note, grid);
     document.body.append(sheet);
     let finished = false;
-    const done = (v) => { if (finished) return; finished = true; sheet.remove(); resolve(v); };
+    const done = (v) => {
+      if (finished) return;
+      finished = true;
+      window.removeEventListener('resize', onResize);
+      sheet.remove();
+      resolve(v);
+    };
     close.addEventListener('click', () => done(null));
-    // Near the middle of the screen a photo shows whole; towards the top and
-    // bottom it is cropped to fill its square, easing between the two as the
-    // grid scrolls (the owner's idea).
+    // A deck of cards (the owner's design): the squares overlap, each row
+    // tucked under the next, and around the middle of the screen they spread
+    // apart so the photos there show in full; scrolling carries rows through
+    // the middle, opening as they arrive and tucking under as they leave. A
+    // row's place is worked out each frame: rows sit P apart (P under a
+    // square's side T), and a smooth spread round the middle - g(u) = u +
+    // (k - 1) w atan(u / w), k = T / P - opens that gap out to a full T there.
+    const track = document.createElement('div');
+    track.className = 'pick-deck';
+    grid.append(track);
+    const tiles = [];
+    const deck = { T: 100, P: 45, cols: 3, gap: 6, W: 0, H: 0, rows: 0, pad: 0 };
+    const g = (u) => u + (deck.T / deck.P - 1) * deck.T * Math.atan(u / deck.T);
+    const gInv = (y) => { // g only grows, so a bisection finds where y comes from
+      let lo = -1e6;
+      let hi = 1e6;
+      for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (g(m) < y) lo = m; else hi = m; }
+      return (lo + hi) / 2;
+    };
+    const measure = () => {
+      deck.W = grid.clientWidth;
+      deck.H = grid.clientHeight;
+      deck.cols = Math.max(3, Math.round(deck.W / 120));
+      deck.T = (deck.W - deck.gap * (deck.cols + 1)) / deck.cols;
+      deck.P = deck.T * 0.42;
+      deck.rows = Math.ceil(tiles.length / deck.cols);
+      // Room at the top so the first row starts at the top of the screen
+      // (not at its middle), and the same at the foot for the last.
+      deck.pad = deck.H / 2 + gInv(deck.gap + deck.T / 2 - deck.H / 2) - deck.T / 2;
+      track.style.height = `${deck.pad * 2 + (deck.rows - 1) * deck.P + deck.T}px`;
+      tiles.forEach((t, i) => {
+        t.style.width = `${deck.T}px`;
+        t.style.height = `${deck.T}px`;
+        t.style.left = `${deck.gap + (i % deck.cols) * (deck.T + deck.gap)}px`;
+      });
+    };
     let frame = 0;
-    const reveal = () => {
+    const layout = () => {
       frame = 0;
-      const box = grid.getBoundingClientRect();
-      const mid = box.top + box.height / 2;
-      const reach = box.height / 2;
-      for (const b of grid.children) {
-        const img = b.firstChild;
-        if (!img || !img.naturalWidth) continue;
-        const r = b.getBoundingClientRect();
-        if (r.bottom < box.top - 50 || r.top > box.bottom + 50) continue;
-        // 1 at the middle, 0 a little short of the edges, eased.
-        const d = Math.min(1, Math.abs(r.top + r.height / 2 - mid) / (reach * 0.8));
-        const t = (1 - d) * (1 - d) * (3 - 2 * (1 - d));
-        // The photo is shown whole; scaled up by its longer side over its
-        // shorter, it fills the square (the rest cropped by the tile).
-        const a = img.naturalWidth / img.naturalHeight;
-        const fill = a >= 1 ? a : 1 / a;
-        img.style.transform = `scale(${1 + (fill - 1) * (1 - t)})`;
+      const top = grid.scrollTop;
+      const mid = top + deck.H / 2;
+      for (let r = 0; r < deck.rows; r++) {
+        // The row's centre where the rows sit P apart, from the middle...
+        const u = deck.pad + r * deck.P + deck.T / 2 - mid;
+        // ...and where it is drawn, spread round the middle.
+        const y = mid + g(u) - deck.T / 2;
+        const near = Math.abs(u);
+        const off = y + deck.T < top - 40 || y > top + deck.H + 40;
+        for (let c = 0; c < deck.cols; c++) {
+          const t = tiles[r * deck.cols + c];
+          if (!t) break;
+          t.style.visibility = off ? 'hidden' : '';
+          if (off) continue;
+          t.style.transform = `translate3d(0, ${y}px, 0)`;
+          // Nearer the middle lies on top.
+          t.style.zIndex = String(100000 - Math.round(near));
+        }
       }
     };
-    const soon = () => { if (!frame) frame = requestAnimationFrame(reveal); };
+    const soon = () => { if (!frame) frame = requestAnimationFrame(layout); };
     grid.addEventListener('scroll', soon, { passive: true });
-    window.addEventListener('resize', soon);
+    const onResize = () => { measure(); layout(); };
+    window.addEventListener('resize', onResize);
     api('/api/photos/of?type=photo').then(({ ok, body }) => {
       if (finished) return;
       const items = ((ok && body && body.items) || []).filter((it) => it.artId && !(it.extra && it.extra.type === 'video'));
@@ -16819,7 +16861,6 @@ function pickServerPhoto() {
         img.loading = 'lazy';
         img.decoding = 'async';
         img.src = artPath(it);
-        img.addEventListener('load', soon, { once: true });
         b.append(img);
         b.addEventListener('click', async () => {
           note.textContent = 'Getting that photo…';
@@ -16834,8 +16875,11 @@ function pickServerPhoto() {
             note.textContent = 'That photo could not be used. Try another.';
           }
         });
-        grid.append(b);
+        tiles.push(b);
+        track.append(b);
       }
+      measure();
+      layout();
     });
   });
 }
