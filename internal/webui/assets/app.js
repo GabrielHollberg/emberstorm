@@ -16768,121 +16768,28 @@ function pickServerPhoto() {
     close.className = 'ghost';
     close.textContent = 'Cancel';
     bar.append(title, close);
-    // The list scrolls invisibly (grid, only its height in it); the cards are
-    // drawn on a still layer over it (stage), placed from how far it has
-    // scrolled - inside the scrolling list they moved with it and then were
-    // moved again a frame later, which jittered (the owner: "glitchy").
-    const body = document.createElement('div');
-    body.className = 'pick-photos-body';
-    const grid = document.createElement('div');
-    grid.className = 'pick-photos-grid';
-    const stage = document.createElement('div');
-    stage.className = 'pick-stage';
-    body.append(grid, stage);
     const note = document.createElement('p');
     note.className = 'muted pick-photos-note';
     note.textContent = 'Loading your photos…';
-    sheet.append(bar, note, body);
+    // A plain grid of squares, newest first (the deck of cards was tried and
+    // set aside at the owner's asking).
+    const grid = document.createElement('div');
+    grid.className = 'pick-photos-grid';
+    // The list only scrolls; the grid inside it is free to be as tall as its
+    // rows (in a list of fixed height the grid squeezed its rows to 40px).
+    const tiles = document.createElement('div');
+    tiles.className = 'pick-photos-tiles';
+    grid.append(tiles);
+    sheet.append(bar, note, grid);
     document.body.append(sheet);
     let finished = false;
     const done = (v) => {
       if (finished) return;
       finished = true;
-      window.removeEventListener('resize', onResize);
       sheet.remove();
       resolve(v);
     };
     close.addEventListener('click', () => done(null));
-    // A deck of cards (the owner's design): around the middle of the screen
-    // the rows sit fully apart, and towards the top and bottom they are
-    // squeezed until each shows only a sliver, the ones nearer the middle on
-    // top; scrolling carries rows through the middle. Laid out from the
-    // middle outwards: a row k rows from the one in focus is drawn F(k) from
-    // the middle, where F's slope - the room each row gets - is a full card
-    // (A) within X0 rows, eases down to a sliver (B) by X1, and stays B.
-    const track = document.createElement('div');
-    track.className = 'pick-deck';
-    grid.append(track);
-    const tiles = [];
-    const deck = { T: 100, cols: 3, gap: 6, W: 0, H: 0, rows: 0, A: 106, B: 5 };
-    const X0 = 1;
-    const X1 = 2.5;
-    const F = (k) => {
-      const x = Math.abs(k);
-      const { A, B } = deck;
-      let y;
-      if (x <= X0) y = A * x;
-      else if (x < X1) {
-        const t = (x - X0) / (X1 - X0);
-        y = A * x + (B - A) * (X1 - X0) * (t * t * t - (t * t * t * t) / 2);
-      } else y = A * X1 + (B - A) * (X1 - X0) * 0.5 + B * (x - X1);
-      return k < 0 ? -y : y;
-    };
-    const measure = () => {
-      deck.W = grid.clientWidth;
-      deck.H = grid.clientHeight;
-      deck.cols = Math.max(3, Math.round(deck.W / 120));
-      deck.T = (deck.W - deck.gap * (deck.cols + 1)) / deck.cols;
-      deck.A = deck.T + deck.gap;
-      deck.B = deck.T * 0.05; // almost entirely overlapped, at the owner's asking
-      deck.rows = Math.ceil(tiles.length / deck.cols);
-      // The focus runs from the first row to the last; a finger moves the
-      // cards in the middle at its own speed.
-      track.style.height = `${Math.max(0, deck.rows - 1) * deck.A + deck.H}px`;
-      tiles.forEach((t, i) => {
-        t.style.width = `${deck.T}px`;
-        t.style.height = `${deck.T}px`;
-        t.style.left = `${deck.gap + (i % deck.cols) * (deck.T + deck.gap)}px`;
-      });
-    };
-    let frame = 0;
-    const layout = () => {
-      frame = 0;
-      const top = grid.scrollTop;
-      const focus = Math.min(Math.max(0, deck.rows - 1), top / deck.A);
-      // Where the focus is drawn: the middle of the screen, except near the
-      // ends of the list, where the first row stays at the top (the open part
-      // starting there and sliding down to the middle) and the last at the foot.
-      const half = deck.gap + deck.T / 2;
-      let c = Math.min(deck.H / 2, half + F(focus));
-      c = Math.max(c, deck.H - half - F(deck.rows - 1 - focus));
-      if (half + F(focus) < c) c = half + F(focus); // a short list: from the top
-      for (let r = 0; r < deck.rows; r++) {
-        const k = r - focus;
-        const y = c + F(k) - deck.T / 2;
-        // Off the screen, or deep in a pile (14 slivers either end are drawn).
-        const off = y + deck.T < -4 || y > deck.H + 4 || Math.abs(k) > X1 + 14;
-        // Nearer the middle lies on top: by row, so it changes only as a row
-        // passes the middle, not every frame.
-        const z = String(100000 - Math.round(Math.abs(k)) * 10 - (k < 0 ? 1 : 0));
-        for (let col = 0; col < deck.cols; col++) {
-          const t = tiles[r * deck.cols + col];
-          if (!t) break;
-          if (t.deckOff !== off) { t.deckOff = off; t.style.visibility = off ? 'hidden' : ''; }
-          if (off) continue;
-          t.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0)`;
-          if (t.deckZ !== z) { t.deckZ = z; t.style.zIndex = z; }
-        }
-      }
-    };
-    const soon = () => { if (!frame) frame = requestAnimationFrame(layout); };
-    grid.addEventListener('scroll', soon, { passive: true });
-    // The cards take no touches (the list under them scrolls): a tap is the
-    // card on top at that point.
-    grid.addEventListener('click', (event) => {
-      let best = null;
-      let bestZ = -1;
-      for (const t of tiles) {
-        if (t.deckOff !== false) continue;
-        const r = t.getBoundingClientRect();
-        if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) continue;
-        const z = Number(t.deckZ) || 0;
-        if (z > bestZ) { best = t; bestZ = z; }
-      }
-      if (best && best.pick) best.pick();
-    });
-    const onResize = () => { measure(); layout(); };
-    window.addEventListener('resize', onResize);
     api('/api/photos/of?type=photo').then(({ ok, body }) => {
       if (finished) return;
       const items = ((ok && body && body.items) || []).filter((it) => it.artId && !(it.extra && it.extra.type === 'video'));
@@ -16898,7 +16805,7 @@ function pickServerPhoto() {
         img.decoding = 'async';
         img.src = artPath(it);
         b.append(img);
-        b.pick = async () => {
+        b.addEventListener('click', async () => {
           note.textContent = 'Getting that photo…';
           show(note, true);
           try {
@@ -16910,12 +16817,9 @@ function pickServerPhoto() {
           } catch {
             note.textContent = 'That photo could not be used. Try another.';
           }
-        };
-        tiles.push(b);
-        stage.append(b);
+        });
+        tiles.append(b);
       }
-      measure();
-      layout();
     });
   });
 }
