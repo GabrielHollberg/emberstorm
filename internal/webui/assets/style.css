@@ -4487,3 +4487,13 @@ html, body { overscroll-behavior-y: none; }
 .pick-photos-grid::-webkit-scrollbar { display: none; }
 .pick-photo { padding: 0; border: 0; background: var(--surface-2); aspect-ratio: 1; border-radius: 8px; overflow: hidden; -webkit-tap-highlight-color: transparent; }
 .pick-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Placing a picture in its square (squarePicture). */
+.crop-sheet { position: fixed; inset: 0; z-index: 310; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: calc(16px + var(--safe-top, 0px)) 16px calc(16px + var(--safe-bottom, 0px)); }
+.crop-hint { margin: 0; color: var(--muted); font-size: 14px; }
+.crop-frame { width: min(88vw, 62vh, 520px); aspect-ratio: 1; border-radius: 16px; overflow: hidden; touch-action: none; cursor: grab; background: #111; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85); }
+.crop-frame:active { cursor: grabbing; }
+.crop-frame canvas { width: 100%; height: 100%; display: block; }
+.crop-zoom { width: min(88vw, 520px); accent-color: var(--accent); }
+.crop-buttons { display: flex; gap: 12px; width: min(88vw, 520px); }
+.crop-buttons button { flex: 1; padding: 12px; font-weight: 600; }
+.crop-buttons .primary { background: var(--accent); border-color: var(--accent); color: #08131f; }

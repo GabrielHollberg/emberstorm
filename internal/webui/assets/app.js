@@ -16607,16 +16607,150 @@ function pickCoverImage() {
   });
 }
 
-// Squared and shrunk to 1000px, as JPEG: from a file or a photo's preview.
+// Squared and shrunk to 1000px, as JPEG, from a file or a photo's preview -
+// placed by the person first (the owner's asking): the picture in a square
+// frame, dragged to move, pinched (or scrolled, or the slider) to zoom, always
+// filling the frame. Null if they cancel.
 async function squarePicture(source) {
   const bmp = await createImageBitmap(source);
-  const side = Math.min(bmp.width, bmp.height);
-  const out = Math.min(1000, side);
-  const c = document.createElement('canvas');
-  c.width = out;
-  c.height = out;
-  c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
-  return new Promise((res) => c.toBlob((blob) => res(blob), 'image/jpeg', 0.9));
+  return new Promise((resolve) => {
+    const sheet = document.createElement('div');
+    sheet.className = 'crop-sheet';
+    const hint = document.createElement('p');
+    hint.className = 'crop-hint';
+    hint.textContent = touchScreen() ? 'Drag to move, pinch to zoom' : 'Drag to move, scroll to zoom';
+    const frame = document.createElement('div');
+    frame.className = 'crop-frame';
+    const canvas = document.createElement('canvas');
+    frame.append(canvas);
+    const zoom = document.createElement('input');
+    zoom.type = 'range';
+    zoom.className = 'crop-zoom';
+    zoom.min = '1';
+    zoom.max = '4';
+    zoom.step = '0.01';
+    zoom.value = '1';
+    zoom.setAttribute('aria-label', 'Zoom');
+    const buttons = document.createElement('div');
+    buttons.className = 'crop-buttons';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'ghost';
+    cancel.textContent = 'Cancel';
+    const use = document.createElement('button');
+    use.type = 'button';
+    use.className = 'primary';
+    use.textContent = 'Use';
+    buttons.append(cancel, use);
+    sheet.append(hint, frame, zoom, buttons);
+    document.body.append(sheet);
+
+    // The view: the frame's side V (CSS px), the picture's scale (CSS px per
+    // picture px) as a multiple z of the scale that just covers the frame,
+    // and its centre's offset from the frame's centre.
+    let V = frame.clientWidth;
+    let z = 1;
+    let cx = 0;
+    let cy = 0;
+    const cover = () => V / Math.min(bmp.width, bmp.height);
+    const clamp = () => {
+      z = Math.max(1, Math.min(4, z));
+      const sc = cover() * z;
+      const mx = Math.max(0, (bmp.width * sc - V) / 2);
+      const my = Math.max(0, (bmp.height * sc - V) / 2);
+      cx = Math.max(-mx, Math.min(mx, cx));
+      cy = Math.max(-my, Math.min(my, cy));
+    };
+    const draw = () => {
+      clamp();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      V = frame.clientWidth;
+      if (canvas.width !== Math.round(V * dpr)) {
+        canvas.width = Math.round(V * dpr);
+        canvas.height = Math.round(V * dpr);
+      }
+      const ctx = canvas.getContext('2d');
+      const sc = cover() * z * dpr;
+      const w = bmp.width * sc;
+      const h = bmp.height * sc;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bmp, (V * dpr - w) / 2 + cx * dpr, (V * dpr - h) / 2 + cy * dpr, w, h);
+      zoom.value = String(z);
+    };
+    draw();
+    const onResize = () => draw();
+    window.addEventListener('resize', onResize);
+
+    // Zoom about a point in the frame (CSS px from its top left): that point
+    // of the picture stays under it.
+    const zoomAt = (nz, px, py) => {
+      const before = z;
+      z = Math.max(1, Math.min(4, nz));
+      const k = z / before;
+      const ox = px - V / 2;
+      const oy = py - V / 2;
+      cx = ox - (ox - cx) * k;
+      cy = oy - (oy - cy) * k;
+      draw();
+    };
+    const pointers = new Map();
+    let pinch = null;
+    frame.addEventListener('pointerdown', (e) => {
+      frame.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z };
+      }
+    });
+    frame.addEventListener('pointermove', (e) => {
+      const was = pointers.get(e.pointerId);
+      if (!was) return;
+      const now = { x: e.clientX, y: e.clientY };
+      pointers.set(e.pointerId, now);
+      if (pointers.size === 1) {
+        cx += now.x - was.x;
+        cy += now.y - was.y;
+        draw();
+      } else if (pinch && pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const r = frame.getBoundingClientRect();
+        zoomAt(pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d), (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+      }
+    });
+    const lift = (e) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+    };
+    frame.addEventListener('pointerup', lift);
+    frame.addEventListener('pointercancel', lift);
+    frame.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const r = frame.getBoundingClientRect();
+      zoomAt(z * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+    zoom.addEventListener('input', () => zoomAt(Number(zoom.value), V / 2, V / 2));
+
+    const finish = (blob) => {
+      window.removeEventListener('resize', onResize);
+      sheet.remove();
+      resolve(blob);
+    };
+    cancel.addEventListener('click', () => finish(null));
+    use.addEventListener('click', () => {
+      // The part of the picture inside the frame, in picture pixels.
+      const sc = cover() * z;
+      const side = V / sc;
+      const sx = bmp.width / 2 - cx / sc - side / 2;
+      const sy = bmp.height / 2 - cy / sc - side / 2;
+      const out = Math.max(1, Math.min(1000, Math.round(side)));
+      const c = document.createElement('canvas');
+      c.width = out;
+      c.height = out;
+      c.getContext('2d').drawImage(bmp, sx, sy, side, side, 0, 0, out, out);
+      c.toBlob((blob) => finish(blob), 'image/jpeg', 0.9);
+    });
+  });
 }
 
 // The person's photos, newest first, a tap choosing one (its large preview,
@@ -16665,7 +16799,9 @@ function pickServerPhoto() {
           try {
             const resp = await fetch(photoPreview(it), { credentials: 'same-origin' });
             if (!resp.ok) throw new Error(String(resp.status));
-            done(await squarePicture(await resp.blob()));
+            const out = await squarePicture(await resp.blob());
+            show(note, false);
+            if (out) done(out);
           } catch {
             note.textContent = 'That photo could not be used. Try another.';
           }
