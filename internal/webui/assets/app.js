@@ -16771,55 +16771,116 @@ function pickServerPhoto() {
     const note = document.createElement('p');
     note.className = 'muted pick-photos-note';
     note.textContent = 'Loading your photos…';
-    // A plain grid of squares, newest first (the deck of cards was tried and
-    // set aside at the owner's asking).
-    const grid = document.createElement('div');
-    grid.className = 'pick-photos-grid';
-    // The list only scrolls; the grid inside it is free to be as tall as its
-    // rows (in a list of fixed height the grid squeezed its rows to 40px).
-    const tiles = document.createElement('div');
-    tiles.className = 'pick-photos-tiles';
-    grid.append(tiles);
-    sheet.append(bar, note, grid);
+    // A plain grid of squares by month, newest first, with the timeline's own
+    // handle down the right edge to fly through months and years (the deck of
+    // cards was tried and set aside at the owner's asking). The list only
+    // scrolls; the grids inside it are free to be as tall as their rows.
+    const body = document.createElement('div');
+    body.className = 'pick-photos-body';
+    const list = document.createElement('div');
+    list.className = 'pick-photos-grid';
+    const root = document.createElement('div');
+    root.className = 'pick-photos-months';
+    list.append(root);
+    body.append(list);
+    sheet.append(bar, note, body);
     document.body.append(sheet);
     let finished = false;
+    let io = null;
+    let dragging = false;
     const done = (v) => {
       if (finished) return;
       finished = true;
+      if (io) io.disconnect();
       sheet.remove();
       resolve(v);
     };
     close.addEventListener('click', () => done(null));
-    api('/api/photos/of?type=photo').then(({ ok, body }) => {
+    const tile = (it) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pick-photo';
+      const img = document.createElement('img');
+      img.alt = it.title || '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.src = artPath(it);
+      b.append(img);
+      b.addEventListener('click', async () => {
+        note.textContent = 'Getting that photo…';
+        show(note, true);
+        try {
+          const resp = await fetch(photoPreview(it), { credentials: 'same-origin' });
+          if (!resp.ok) throw new Error(String(resp.status));
+          const out = await squarePicture(await resp.blob());
+          show(note, false);
+          if (out) done(out);
+        } catch {
+          note.textContent = 'That photo could not be used. Try another.';
+        }
+      });
+      return b;
+    };
+    // A month's height before its photos arrive, so the handle lands near it.
+    const guess = (count) => {
+      const w = Math.max(1, list.clientWidth - 8);
+      const cols = Math.max(1, Math.floor((w + 4) / 114));
+      return Math.ceil(count / cols) * ((w - (cols - 1) * 4) / cols + 4);
+    };
+    const load = async (sec) => {
+      if (sec.dataset.state) return;
+      sec.dataset.state = 'loading';
+      const { ok, body: got } = await api(`/api/photos/month?m=${encodeURIComponent(sec.dataset.month)}&type=photo`);
       if (finished) return;
-      const items = ((ok && body && body.items) || []).filter((it) => it.artId && !(it.extra && it.extra.type === 'video'));
-      note.textContent = items.length ? '' : (ok ? 'No photos yet.' : 'Could not load your photos.');
-      show(note, !items.length);
-      for (const it of items) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'pick-photo';
-        const img = document.createElement('img');
-        img.alt = it.title || '';
-        img.loading = 'lazy';
-        img.decoding = 'async';
-        img.src = artPath(it);
-        b.append(img);
-        b.addEventListener('click', async () => {
-          note.textContent = 'Getting that photo…';
-          show(note, true);
-          try {
-            const resp = await fetch(photoPreview(it), { credentials: 'same-origin' });
-            if (!resp.ok) throw new Error(String(resp.status));
-            const out = await squarePicture(await resp.blob());
-            show(note, false);
-            if (out) done(out);
-          } catch {
-            note.textContent = 'That photo could not be used. Try another.';
-          }
-        });
-        tiles.append(b);
+      if (!ok || !got) { delete sec.dataset.state; return; }
+      sec.dataset.state = 'done';
+      if (io) io.unobserve(sec);
+      const grid = sec.querySelector('.pick-photos-tiles');
+      grid.style.height = '';
+      grid.replaceChildren(...(got.items || [])
+        .filter((it) => it.artId && !(it.extra && it.extra.type === 'video')).map(tile));
+      root.dispatchEvent(new Event('tl-layout'));
+    };
+    const loadNear = () => {
+      const r = list.getBoundingClientRect();
+      for (const sec of root.querySelectorAll('.tl-month')) {
+        const q = sec.getBoundingClientRect();
+        if (q.bottom > r.top - 1200 && q.top < r.bottom + 1200) load(sec);
       }
+    };
+    api('/api/photos/months?type=photo').then(({ ok, body: got }) => {
+      if (finished) return;
+      const months = ((ok && got && got.months) || []).filter((m) => m.count > 0);
+      note.textContent = months.length ? '' : (ok ? 'No photos yet.' : 'Could not load your photos.');
+      show(note, !months.length);
+      if (!months.length) return;
+      for (const { month, count } of months) {
+        const sec = document.createElement('section');
+        sec.className = 'tl-month';
+        sec.dataset.month = month;
+        const h = document.createElement('h2');
+        h.className = 'tl-month-head';
+        h.textContent = tlMonthName(month);
+        const grid = document.createElement('div');
+        grid.className = 'pick-photos-tiles';
+        grid.style.height = `${Math.round(guess(count))}px`;
+        // Not drawn while far off (.tl-month): its size until then is the guess.
+        sec.style.containIntrinsicSize = `auto ${Math.round(guess(count)) + 50}px`;
+        sec.append(h, grid);
+        root.append(sec);
+      }
+      const scrub = tlScrubber(root, {
+        scroller: list,
+        drag: (held) => { dragging = held; },
+        land: loadNear,
+      });
+      scrub.classList.add('pick-scrub');
+      body.append(scrub);
+      io = new IntersectionObserver((entries) => {
+        if (dragging) return;
+        for (const e of entries) if (e.isIntersecting) load(e.target);
+      }, { root: list, rootMargin: '1200px 0px' });
+      for (const sec of root.querySelectorAll('.tl-month')) io.observe(sec);
     });
   });
 }
@@ -22308,7 +22369,14 @@ const tlPreview = (() => {
 // showing where the page is, and dragging it - or a tap anywhere on the edge -
 // goes there, the month showing in a bubble beside the finger. It shows while
 // the page scrolls and fades a moment after.
-function tlScrubber(root) {
+// opts.scroller: a box that scrolls instead of the page; opts.drag(held) and
+// opts.land() in place of the timeline's own fetching.
+function tlScrubber(root, opts = {}) {
+  const sc = opts.scroller || null;
+  const top = () => (sc ? sc.scrollTop : scrollY);
+  const jump = (y) => { if (sc) sc.scrollTop = y; else scrollTo(0, y); };
+  const dragHeld = opts.drag || ((held) => { TL.dragging = held; });
+  const land = opts.land || tlLoadNear;
   const bar = document.createElement('div');
   bar.className = 'tl-scrub';
   const thumb = document.createElement('div');
@@ -22327,10 +22395,9 @@ function tlScrubber(root) {
   // the page about a hundred pixels down - the newest month's name hidden
   // under the pills, and no way further up but to scroll by hand (the
   // owner's report, in every category with a handle).
-  const range = () => Math.max(1, document.documentElement.scrollHeight - innerHeight);
-  const rootTop = () => root.getBoundingClientRect().top + scrollY;
+  const range = () => Math.max(1, sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - innerHeight);
   // The scroll that shows a month at the timeline's own top, under the pills.
-  const scrollFor = (sec) => sec.getBoundingClientRect().top + scrollY - rootTop();
+  const scrollFor = (sec) => sec.getBoundingClientRect().top - root.getBoundingClientRect().top;
   const monthAt = (target) => {
     let found = null;
     for (const sec of root.querySelectorAll('.tl-month')) {
@@ -22341,7 +22408,7 @@ function tlScrubber(root) {
   const place = () => {
     if (!bar.isConnected) return;
     const h = bar.clientHeight;
-    const share = Math.min(1, Math.max(0, scrollY / range()));
+    const share = Math.min(1, Math.max(0, top() / range()));
     thumb.style.transform = `translateY(${Math.round(share * (h - thumb.offsetHeight))}px)`;
   };
   const marks = () => {
@@ -22407,7 +22474,7 @@ function tlScrubber(root) {
   };
   bar.addEventListener('pointerdown', (event) => {
     dragging = true;
-    TL.dragging = true;
+    dragHeld(true);
     bar.classList.add('dragging');
     bar.setPointerCapture(event.pointerId);
     wake();
@@ -22418,27 +22485,27 @@ function tlScrubber(root) {
   const end = () => {
     if (!dragging) return;
     dragging = false;
-    TL.dragging = false;
+    dragHeld(false);
     if (frame) { cancelAnimationFrame(frame); frame = 0; }
     if (wantY !== null) go(wantY);
     wantY = null;
     bar.classList.remove('dragging');
-    if (target !== null) scrollTo(0, target);
+    if (target !== null) jump(target);
     // At the foot, the months landed on load and grow the page: go to the
     // new end once they have.
-    if (atEnd > 0) setTimeout(() => scrollTo(0, document.documentElement.scrollHeight), 700);
+    if (atEnd > 0) setTimeout(() => jump(sc ? sc.scrollHeight : document.documentElement.scrollHeight), 700);
     target = null;
-    tlLoadNear();
+    land();
     wake();
   };
   bar.addEventListener('pointerup', end);
   bar.addEventListener('pointercancel', end);
   const onScroll = () => {
-    if (!bar.isConnected) { removeEventListener('scroll', onScroll); return; }
+    if (!bar.isConnected) { (sc || window).removeEventListener('scroll', onScroll); return; }
     place();
     wake();
   };
-  addEventListener('scroll', onScroll, { passive: true });
+  (sc || window).addEventListener('scroll', onScroll, { passive: true });
   root.addEventListener('tl-layout', () => { marks(); place(); });
   requestAnimationFrame(() => { marks(); place(); });
   return bar;
