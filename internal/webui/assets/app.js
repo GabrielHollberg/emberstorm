@@ -2400,6 +2400,7 @@ async function runSearch() {
   state.query = query;
   state.detailPage = false;
   state.openAlbum = null;
+  state.openPlaylist = null;
 
   if (state.offline) {
     const seq = ++state.searchSeq;
@@ -5763,8 +5764,8 @@ function selectionKey(item) {
 // What can be selected from: a shelf's list, or the photo timeline when it is
 // the page shown (its tiles are selected the same way, to send them).
 function selectRoot() {
-  const own = document.querySelector('#music-view .selectable');
-  if (own && own.getClientRects().length) return own;
+  const own = [...document.querySelectorAll('#music-view .selectable, #playlists-view .selectable')].find((g) => g.getClientRects().length);
+  if (own) return own;
   const tl = TL.root;
   if (tl && tl.isConnected && tl.getClientRects().length) return tl;
   return $('results');
@@ -5884,6 +5885,13 @@ function renderSelectMenu() {
       const { ok, body } = await api('/api/playlists');
       renderSelectPlaylists(items, (ok && body && body.playlists) || []);
     }, { chevron: true }));
+    if (state.openPlaylist && $('playlists-view').querySelector('.playlist-rows.selecting')) {
+      entries.push(menuItem('close', 'Remove from playlist', (event) => {
+        event.stopPropagation();
+        setSelecting(false);
+        removeFromOpenPlaylist(items);
+      }));
+    }
   }
   if (n) {
     const allFaved = items.every((it) => state.favorites.has(selectionKey(it)));
@@ -6357,6 +6365,14 @@ function renderMainMenu(item, opts = {}) {
       renderPlaylistMenu(item, (ok && body && body.playlists) || []);
     }, { chevron: true }));
   }
+  if (item.kind === 'music' && state.openPlaylist && !opts.nowPlaying && $('playlists-view').querySelector('.playlist-rows')
+      && state.openPlaylist.songs.some((s) => selectionKey(s) === selectionKey(item))) {
+    entries.push(menuItem('close', 'Remove from playlist', (event) => {
+      event.stopPropagation();
+      closeItemMenu();
+      removeFromOpenPlaylist([item]);
+    }));
+  }
   if (canDownload(item)) {
     const downloaded = isDownloaded(item);
     const asks = !downloaded && isVideoItem(item) && !(item.extra && item.extra.type === 'video');
@@ -6546,6 +6562,7 @@ async function newAlbum(items) {
 
 async function showAlbums(seq) {
   state.openAlbum = null;
+  state.openPlaylist = null;
   const view = $('music-view');
   $('status').textContent = '';
   if (!view.children.length) showSkeleton(view, 'grid');
@@ -7449,6 +7466,8 @@ async function showPlaylist(id) {
   }
   const path = `/api/playlists/${encodeURIComponent(id)}`;
   const songs = body.items;
+  state.openPlaylist = { id, path, name: body.name, songs };
+  state.items = songs;
   view.replaceChildren();
 
   const back = document.createElement('button');
@@ -7547,7 +7566,7 @@ async function showPlaylist(id) {
   }
 
   const list = document.createElement('ol');
-  list.className = 'playlist-rows';
+  list.className = 'playlist-rows selectable';
   songs.forEach((song, i) => {
     const li = document.createElement('li');
     li.className = 'playlist-row';
@@ -7570,29 +7589,26 @@ async function showPlaylist(id) {
     sub.textContent = subtitleFor(song);
     words.append(t, sub);
     play.append(thumb, words);
-    play.addEventListener('click', () => playQueue(songs, i));
-
-    const drop = document.createElement('button');
-    drop.type = 'button';
-    drop.className = 'np-icon playlist-remove';
-    drop.setAttribute('aria-label', `Remove ${song.title}`);
-    drop.append(icon('close'));
-    drop.addEventListener('click', async () => {
-      await api(`${path}/items/${song.position}`, { method: 'DELETE' });
-      showPlaylist(id);
-      showToast(`Removed \u201c${song.title}\u201d`, 'Undo', async () => {
-        // Back where it was: added at the end, then moved into its place.
-        const added = await api(`${path}/items`, { method: 'POST', body: JSON.stringify({ source: song.sourceId, id: song.id }) });
-        // The answer is the new length; the song went on the end.
-        const at = added.ok && added.body && typeof added.body.count === 'number' ? added.body.count - 1 : null;
-        if (at !== null && at !== song.position) {
-          await api(`${path}/move`, { method: 'POST', body: JSON.stringify({ from: at, to: song.position }) });
-        }
-        showPlaylist(id);
-      });
+    // A card as far as holding and selecting go: a hold opens the song's
+    // menu (Remove from playlist, Select and the rest) in place of the x it
+    // had, and while selecting a tap ticks it (the owner's asking).
+    play.classList.add('item');
+    play.dataset.key = selectionKey(song);
+    play.soundstormItem = song;
+    play.classList.toggle('selected', state.selected.has(selectionKey(song)));
+    play.addEventListener('click', (event) => {
+      if (state.suppressClick) {
+        state.suppressClick = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (state.selecting) toggleSelected(song, play);
+      else playQueue(songs, i);
     });
+    attachItemMenuGestures(play, song);
 
-    li.append(play, drop);
+    li.append(play);
     // Moving a song by hand is what Custom order is; in the others the
     // order is worked out, so there is nothing to drag.
     if (sortBy === 'custom') {
@@ -7610,6 +7626,31 @@ async function showPlaylist(id) {
     list.append(li);
   });
   view.append(list);
+}
+
+// Remove from playlist: the songs (each at its place) go, and Undo puts them
+// back where they were - each added at the end, then moved into its place,
+// in the order they had.
+async function removeFromOpenPlaylist(items) {
+  const pl = state.openPlaylist;
+  if (!pl) return;
+  const keys = new Set(items.map(selectionKey));
+  const gone = pl.songs.filter((s) => keys.has(selectionKey(s))).sort((a, b) => b.position - a.position);
+  if (!gone.length) return;
+  for (const song of gone) await api(`${pl.path}/items/${song.position}`, { method: 'DELETE' });
+  showPlaylist(pl.id);
+  const what = gone.length === 1 ? `\u201c${gone[0].title}\u201d` : `${gone.length} songs`;
+  showToast(`Removed ${what}`, 'Undo', async () => {
+    for (const song of [...gone].reverse()) {
+      const added = await api(`${pl.path}/items`, { method: 'POST', body: JSON.stringify({ source: song.sourceId, id: song.id }) });
+      // The answer is the new length; the song went on the end.
+      const at = added.ok && added.body && typeof added.body.count === 'number' ? added.body.count - 1 : null;
+      if (at !== null && at !== song.position) {
+        await api(`${pl.path}/move`, { method: 'POST', body: JSON.stringify({ from: at, to: song.position }) });
+      }
+    }
+    showPlaylist(pl.id);
+  });
 }
 
 // Renaming happens where the name is: it becomes a text box, Enter or leaving

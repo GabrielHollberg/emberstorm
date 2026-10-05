@@ -2262,7 +2262,7 @@ body.np-open { overflow: hidden; }
   background: var(--surface-2);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
 }
-.playlist-row:hover { background: var(--surface); }
+@media (hover: hover) { .playlist-row:hover { background: var(--surface); } }
 .playlist-play {
   flex: 1;
   min-width: 0;
@@ -2276,8 +2276,14 @@ body.np-open { overflow: hidden; }
   text-align: left;
   font: inherit;
   -webkit-tap-highlight-color: transparent;
+  flex-direction: row; /* it is an .item too (holding and selecting), whose cards stack */
+  border-radius: 10px;
 }
 .playlist-play:hover { filter: none; }
+/* A song held (its menu open) or selected. */
+.playlist-play.pressing { background: var(--surface); }
+.playlist-rows.selecting .playlist-play.selected { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.playlist-rows.selecting .playlist-play.selected img { outline: 2px solid var(--accent); outline-offset: 1px; }
 .playlist-play img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: 0 0 auto; }
 .playlist-words { flex: 1; min-width: 0; display: grid; }
 .playlist-words strong, .playlist-words span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
