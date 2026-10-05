@@ -3421,23 +3421,9 @@ body.np-open .toast { z-index: 76; bottom: calc(var(--safe-bottom) + 24px); }
 @media not all and (pointer: coarse) { .np-easy-btn { display: none !important; } }
 html.tv .np-easy-btn { display: none !important; }
 .np-easy-btn.on { color: var(--accent); }
-.np-easy-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); justify-items: center; gap: 2px; margin: 2px 0 8px; position: relative; z-index: 2; }
-.np-easy-row.hidden { display: none; }
-/* Beside the play controls, where Now Playing orders its column. */
-.now-playing.panel-on .np-easy-row, .now-playing.strip-on .np-easy-row { order: 3; }
-/* And previous and next come back: a phone swipes for them, which is no way to change song while driving. */
-@media (pointer: coarse) {
-  html:not(.tv) .now-playing.np-music.np-easy #np-prev, html:not(.tv) .now-playing.np-music.np-easy #np-next { display: grid !important; }
-}
-.np-easy-opt {
-  position: relative; width: min(40px, 100%); aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%;
-  display: grid; place-items: center; color: #fff; background: rgba(255, 255, 255, 0.12);
-  -webkit-tap-highlight-color: transparent;
-}
-.np-easy-opt .icon { width: 20px; height: 20px; }
-.np-easy-opt.on { color: var(--accent); }
-.np-easy-opt.faved { color: #ff3b5c; }
-.np-easy-opt.one::after { content: "1"; position: absolute; top: 6px; right: 7px; font-size: 9px; font-weight: 800; }
+/* The options over the cover, kept on screen and tapped while every button shows. */
+.np-hold-layer.easy { animation: none; }
+.np-hold-layer.easy .np-hold-icon { pointer-events: auto; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .np-hold-icon {
   position: absolute;
   width: 54px; height: 54px;

@@ -9409,7 +9409,7 @@ function renderNowPlaying() {
   // until a hold is for music (np-music).
   const music = item.kind === 'music';
   $('now-playing').classList.toggle('np-music', music);
-  renderEasyRow();
+  renderEasyLayer();
   show($('np-chapters-btn'), !music && (audio.chapters || []).length > 1);
   renderSkipButtons(music);
   playOrb.start();
@@ -9580,11 +9580,10 @@ setIcon($('np-looks-btn'), 'sparkle');
 setIcon($('np-cast'), 'cast');
 // Every button showing, for when holding down is hard - driving, say (the
 // owner's asking): a button among those a hold brings up turns it on, and the
-// same button, then showing, turns it off. Kept on this device. On, nothing
-// waits for a hold: the bar, the controls, the timeline, and the hold's own
-// options (shuffle, repeat, favorite...) as a row of buttons to tap.
+// same button, then showing, turns it off. Kept on this device. On, what a
+// hold brings up simply stays, in its own places, and takes a plain tap: the
+// bar's buttons, the timeline, and the options over the cover. Nothing new.
 const NP_EASY_KEY = 'soundstorm-np-easy';
-const EASY_ORDER = ['ml', 'mr', 'tr', 'c', 'tm', 'bm', 'br', 'bl', 'tl'];
 setIcon($('np-easy-btn'), 'tap');
 function npEasy() { return localStorage.getItem(NP_EASY_KEY) === '1'; }
 function applyNpEasy() {
@@ -9594,29 +9593,24 @@ function applyNpEasy() {
   $('np-easy-btn').setAttribute('aria-label', label);
   $('np-easy-btn').title = label;
   $('np-easy-btn').classList.toggle('on', on);
-  renderEasyRow();
+  renderEasyLayer();
 }
-function renderEasyRow() {
-  const row = $('np-easy-row');
-  const on = $('now-playing').classList.contains('np-easy') && Boolean(audio.item);
-  show(row, on);
-  if (!on) { row.replaceChildren(); return; }
-  const list = holdIconList(audio.item).sort((a, b) => EASY_ORDER.indexOf(a.spot) - EASY_ORDER.indexOf(b.spot));
-  row.replaceChildren(...list.map((it) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = `np-easy-opt${it.on ? ' on' : ''}${it.heart && it.filled ? ' faved' : ''}${it.one ? ' one' : ''}`;
-    b.setAttribute('aria-label', it.label);
-    b.title = it.label;
-    b.append(icon(it.icon, it.filled));
-    b.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      await it.run();
-      renderEasyRow();
-    });
-    return b;
-  }));
+// The hold's options, kept on screen while every button shows.
+function renderEasyLayer() {
+  const np = $('now-playing');
+  const layer = $('np-hold-layer');
+  if (np.classList.contains('hold-icons')) return; // a hold has them now
+  const on = np.classList.contains('np-easy') && !np.classList.contains('hidden') && Boolean(audio.item);
+  if (!on) {
+    if (layer.classList.contains('easy')) { layer.classList.remove('easy'); show(layer, false); }
+    return;
+  }
+  layer.classList.add('easy');
+  placeHoldLayer(audio.item, true);
+  $('np-hold-caption').textContent = '';
+  show(layer, true);
 }
+addEventListener('resize', () => renderEasyLayer());
 $('np-easy-btn').addEventListener('click', (event) => {
   event.stopPropagation();
   localStorage.setItem(NP_EASY_KEY, npEasy() ? '0' : '1');
@@ -15819,7 +15813,7 @@ function renderSleepCustom(item, opts) {
 // the title or the lyrics opens the menu too. Not on what already answers a
 // touch - play, the header's buttons, the timeline, Up next (a hold there
 // moves a song), a menu.
-const NP_HOLD_SKIP = 'input, a, #np-queue, .np-bar button, .np-controls button, #np-easy-row, #np-speed-wrap, #item-menu, #np-looks, #np-chapters';
+const NP_HOLD_SKIP = 'input, a, #np-queue, .np-bar button, .np-controls button, .np-hold-icons button, #np-speed-wrap, #item-menu, #np-looks, #np-chapters';
 (() => {
   const panel = $('now-playing');
   $('np-cover').draggable = false;
@@ -16068,12 +16062,11 @@ function holdButtonList() {
     { id: 'np-next', label: book ? 'Forward 30 seconds' : 'Next' },
   ];
 }
-function showHoldIcons(pointerId, x0, y0) {
-  const item = audio.item;
-  if (!item) return;
+// Places the options over the cover (or a square in the middle) and draws
+// them: as spans for a hold, as buttons to tap while every button shows.
+function placeHoldLayer(item, tappable) {
   const layer = $('np-hold-layer');
   const box = $('np-hold-icons');
-  const caption = $('np-hold-caption');
   // Over the cover where it shows; otherwise a square in the middle.
   const cover = $('np-cover');
   let r = null;
@@ -16097,12 +16090,32 @@ function showHoldIcons(pointerId, x0, y0) {
   layer.classList.toggle('viz', $('now-playing').classList.contains('cover-viz'));
   const icons = holdIconList(item);
   box.replaceChildren(...icons.map((it) => {
-    const b = document.createElement('span');
+    const b = document.createElement(tappable ? 'button' : 'span');
     b.className = `np-hold-icon at-${it.spot}${it.on ? ' on' : ''}${it.heart && it.filled ? ' faved' : ''}${it.one ? ' one' : ''}`;
     b.append(icon(it.icon, it.filled));
     b.soundstormHold = it;
+    if (tappable) {
+      b.type = 'button';
+      b.setAttribute('aria-label', it.label);
+      b.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await it.run();
+        renderEasyLayer();
+      });
+    }
     return b;
   }));
+}
+
+function showHoldIcons(pointerId, x0, y0) {
+  const item = audio.item;
+  if (!item) return;
+  const layer = $('np-hold-layer');
+  const box = $('np-hold-icons');
+  const caption = $('np-hold-caption');
+  const cover = $('np-cover');
+  layer.classList.remove('easy');
+  placeHoldLayer(item, false);
   // On a touch screen the screen's own buttons - close, looks, stop, play,
   // and speed for an audiobook - are invisible (asked for so nothing sits on
   // the screen but the music), and appear here while the finger is down,
@@ -16200,6 +16213,7 @@ function showHoldIcons(pointerId, x0, y0) {
     show(layer, false);
     show(extra, false);
     $('now-playing').classList.remove('hold-icons');
+    renderEasyLayer();
     // The lift is not a tap on whatever is under it.
     state.swallowClickUntil = performance.now() + 500;
     setTimeout(() => { state.suppressClick = false; }, 500);
