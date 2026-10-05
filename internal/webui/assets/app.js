@@ -7508,7 +7508,7 @@ async function showPlaylist(id) {
   const facts = document.createElement('span');
   facts.className = 'muted';
   facts.textContent = [`${songs.length} song${songs.length === 1 ? '' : 's'}`, formatLength(total)].filter(Boolean).join(' \u00b7 ');
-  const buttons = playButtons(async () => songs);
+  const buttons = playButtons(async () => songs, { noShuffle: true });
   buttons.append(downloadButton({
     id: `playlist:${id}`, type: 'playlist', title: body.name, subtitle: 'Playlist',
     sourceId: first.sourceId, artId: first.artId,
@@ -8374,7 +8374,7 @@ function shuffled(items) {
   return out;
 }
 
-function playButtons(getSongs) {
+function playButtons(getSongs, opts = {}) {
   const row = document.createElement('div');
   row.className = 'play-row';
   const play = document.createElement('button');
@@ -8393,7 +8393,9 @@ function playButtons(getSongs) {
     const songs = await getSongs();
     if (songs.length) playQueue(shuffled(songs), 0);
   });
-  row.append(play, shuffle);
+  row.append(play);
+  // Not on a playlist's page (the owner's asking): Play, and Download.
+  if (!opts.noShuffle) row.append(shuffle);
   return row;
 }
 
