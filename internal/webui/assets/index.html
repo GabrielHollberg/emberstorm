@@ -1180,6 +1180,9 @@
              the visualizers and the full-screen ones. -->
         <!-- Play on another device: on a phone, invisible until a hold, like
              the rest of this bar (players.go). -->
+        <!-- Every button showing, without a hold (driving): see applyNpEasy. -->
+        <button id="np-easy-btn" class="np-icon np-easy-btn" type="button" aria-label="Show all the buttons"
+                title="Show all the buttons"></button>
         <button id="np-cast" class="np-icon" type="button" aria-label="Play on another device"
                 title="Play on another device"></button>
         <button id="np-looks-btn" class="np-icon" type="button" aria-label="Cover looks"
@@ -1204,6 +1207,8 @@
             </div>
           </div>
           <!-- The controls above the timeline, at the owner's asking. -->
+          <!-- The hold's options as buttons, while every button shows. -->
+          <div id="np-easy-row" class="np-easy-row hidden"></div>
           <div class="np-controls">
             <button id="np-prev" class="np-icon" type="button" aria-label="Previous"></button>
             <button id="np-play" class="np-icon np-play" type="button" aria-label="Play or pause"></button>

@@ -6220,6 +6220,8 @@ const ICONS = {
   device: '<rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/>',
   cast: '<path d="M3 17.5a3.5 3.5 0 0 1 3.5 3.5M3 13.5A7.5 7.5 0 0 1 10.5 21M3 9.5A11.5 11.5 0 0 1 14.5 21M7 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/>',
   send: '<path d="M4 12l16-8-6 16-2.5-6.5zM11.5 13.5L20 4"/>',
+  // Four squares: every button showing (Now Playing's easy mode).
+  tap: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
   radio: '<path d="M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8" stroke-width="2.2"/>',
 };
 
@@ -9407,6 +9409,7 @@ function renderNowPlaying() {
   // until a hold is for music (np-music).
   const music = item.kind === 'music';
   $('now-playing').classList.toggle('np-music', music);
+  renderEasyRow();
   show($('np-chapters-btn'), !music && (audio.chapters || []).length > 1);
   renderSkipButtons(music);
   playOrb.start();
@@ -9575,6 +9578,53 @@ $('np-close').addEventListener('click', closeNowPlaying);
 setIcon($('np-exit'), 'close');
 setIcon($('np-looks-btn'), 'sparkle');
 setIcon($('np-cast'), 'cast');
+// Every button showing, for when holding down is hard - driving, say (the
+// owner's asking): a button among those a hold brings up turns it on, and the
+// same button, then showing, turns it off. Kept on this device. On, nothing
+// waits for a hold: the bar, the controls, the timeline, and the hold's own
+// options (shuffle, repeat, favorite...) as a row of buttons to tap.
+const NP_EASY_KEY = 'soundstorm-np-easy';
+const EASY_ORDER = ['ml', 'mr', 'tr', 'c', 'tm', 'bm', 'br', 'bl', 'tl'];
+setIcon($('np-easy-btn'), 'tap');
+function npEasy() { return localStorage.getItem(NP_EASY_KEY) === '1'; }
+function applyNpEasy() {
+  const on = npEasy() && touchScreen();
+  $('now-playing').classList.toggle('np-easy', on);
+  const label = on ? 'Hide the buttons again' : 'Show all the buttons';
+  $('np-easy-btn').setAttribute('aria-label', label);
+  $('np-easy-btn').title = label;
+  $('np-easy-btn').classList.toggle('on', on);
+  renderEasyRow();
+}
+function renderEasyRow() {
+  const row = $('np-easy-row');
+  const on = $('now-playing').classList.contains('np-easy') && Boolean(audio.item);
+  show(row, on);
+  if (!on) { row.replaceChildren(); return; }
+  const list = holdIconList(audio.item).sort((a, b) => EASY_ORDER.indexOf(a.spot) - EASY_ORDER.indexOf(b.spot));
+  row.replaceChildren(...list.map((it) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `np-easy-opt${it.on ? ' on' : ''}${it.heart && it.filled ? ' faved' : ''}${it.one ? ' one' : ''}`;
+    b.setAttribute('aria-label', it.label);
+    b.title = it.label;
+    b.append(icon(it.icon, it.filled));
+    b.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      await it.run();
+      renderEasyRow();
+    });
+    return b;
+  }));
+}
+$('np-easy-btn').addEventListener('click', (event) => {
+  event.stopPropagation();
+  localStorage.setItem(NP_EASY_KEY, npEasy() ? '0' : '1');
+  applyNpEasy();
+  showToast(npEasy() ? 'All the buttons are showing. Tap the squares at the top to hide them again.'
+    : 'Buttons hidden. Hold down on the screen to bring them up.');
+});
+applyNpEasy();
 // Play on another device, from Now Playing and the film player: the device
 // picker, where choosing a TV moves what is playing here to it.
 $('np-cast').addEventListener('click', (event) => {
@@ -15769,7 +15819,7 @@ function renderSleepCustom(item, opts) {
 // the title or the lyrics opens the menu too. Not on what already answers a
 // touch - play, the header's buttons, the timeline, Up next (a hold there
 // moves a song), a menu.
-const NP_HOLD_SKIP = 'input, a, #np-queue, .np-bar button, .np-controls button, #np-speed-wrap, #item-menu, #np-looks, #np-chapters';
+const NP_HOLD_SKIP = 'input, a, #np-queue, .np-bar button, .np-controls button, #np-easy-row, #np-speed-wrap, #item-menu, #np-looks, #np-chapters';
 (() => {
   const panel = $('now-playing');
   $('np-cover').draggable = false;
@@ -16008,6 +16058,7 @@ function holdButtonList() {
   const book = Boolean(audio.item && audio.item.kind !== 'music');
   return [
     { id: 'np-close', label: 'Close Now Playing' },
+    { id: 'np-easy-btn', label: npEasy() ? 'Hide the buttons again' : 'Show all the buttons', icon: 'tap' },
     { id: 'np-chapters-btn', label: 'Chapters', icon: 'queue' },
     { id: 'np-speed', label: 'Playback speed' },
     { id: 'np-cast', label: 'Play on another device', icon: 'cast' },
