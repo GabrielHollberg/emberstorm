@@ -76,7 +76,8 @@ but yourself, and nothing to set up by hand.
   sets how much space each person gets.
 - **Send photos and videos to someone in the house.** They choose whether to
   add them, and get a copy of their own.
-- **Back up your phone** automatically with the Android or iPhone app.
+- **Back up your phone** automatically with the Android app (and the iPhone
+  app, once it is out).
 - **Bring your photos in from anywhere**: Google Photos, iCloud, Facebook,
   Instagram, Snapchat, Flickr, WhatsApp and Telegram downloads, cloud drives,
   SD cards and old computers. Dates and places are kept, and a photo you
@@ -94,8 +95,9 @@ but yourself, and nothing to set up by hand.
 - **Invite family with a QR code**: they scan it and choose their own password.
 - Choose which shelves each person can see, so the kids can have no films, for
   example.
-- Apps for **Android** (phones, Google TV, Android TV, Fire TV), **iPhone** and
-  **Apple TV**, or install the web app on any phone with its own icon.
+- An app for **Android** (phones, Google TV, Android TV, Fire TV), or install
+  the web app on any phone with its own icon. Apps for **iPhone** and **Apple
+  TV** are in testing and coming to the App Store.
 - Secure (HTTPS) automatically, with nothing to set up. Reaching it from outside
   the house is optional and off until you turn it on. Passwords must be strong,
   and you can make every new device wait for approval from one already signed
@@ -117,10 +119,11 @@ but yourself, and nothing to set up by hand.
 | **Internet** | For the first install (a large download); afterwards it runs at home |
 
 Phones, tablets and other computers need nothing installed: they use SoundStorm
-in their web browser, or add it to their home screen as an app. There are also
-apps: Android (from the [releases page](https://github.com/GabrielHollberg/soundstorm/releases),
-the `android-` ones, which also run on Google TV, Android TV and Fire TV),
-iPhone and Apple TV.
+in their web browser, or add it to their home screen as an app. There is also
+an Android app (from the [releases page](https://github.com/GabrielHollberg/soundstorm/releases),
+the `android-` ones, which also run on Google TV, Android TV and Fire TV). The
+iPhone and Apple TV apps are in testing and not in the App Store yet; until
+then, an iPhone uses the web app.
 
 ## Install
 
@@ -227,7 +230,8 @@ like.
 computer. It shows the address to type on your phone (your phone must be on the
 same Wi-Fi). Then either install the app (Android: the newest `android-` file on
 the [releases page](https://github.com/GabrielHollberg/soundstorm/releases)),
-which also backs up the phone's photos (the iPhone app does too), or add the web app to your home screen:
+which also backs up the phone's photos, or add the web app to your home screen
+(on an iPhone, for now, this is the way):
 - **iPhone:** Share → **Add to Home Screen**.
 - **Android:** Chrome menu → **Install app**. Use the secure address, the one
   ending in `.home.soundstorm.dev`.
@@ -350,6 +354,15 @@ How it fits together, how to build it and how to add a backend:
 **How SoundStorm works, in depth:** the [`site/`](site/index.html) folder is a
 small website explaining the whole project, from the overview down to each part
 and the decisions behind it. Open `site/index.html` in a browser.
+
+## How it is made
+
+SoundStorm is designed and run by one person, and most of its code is written
+with an AI assistant ([Claude](https://www.anthropic.com/claude)), working to
+that person's decisions. Each change is checked on a running server before it
+ships, the code has had several rounds of security review, and the reasons
+behind each design choice are written down in [`site/`](site/index.html) and
+[`CLAUDE.md`](CLAUDE.md), so anyone can see why it is built the way it is.
 
 ## Support SoundStorm
 
