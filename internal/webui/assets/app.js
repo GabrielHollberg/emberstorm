@@ -6222,6 +6222,8 @@ const ICONS = {
   send: '<path d="M4 12l16-8-6 16-2.5-6.5zM11.5 13.5L20 4"/>',
   // Four squares: every button showing (Now Playing's easy mode).
   tap: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
+  // A quarter turn: an arrow round.
+  rotate: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4.5h-4.5"/>',
   radio: '<path d="M12 12h.01M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8" stroke-width="2.2"/>',
 };
 
@@ -16694,7 +16696,7 @@ async function squarePicture(source) {
     sheet.className = 'crop-sheet';
     const hint = document.createElement('p');
     hint.className = 'crop-hint';
-    hint.textContent = touchScreen() ? 'Drag to move, pinch to zoom' : 'Drag to move, scroll to zoom';
+    hint.textContent = touchScreen() ? 'Drag to move, pinch to zoom, twist to turn' : 'Drag to move, scroll to zoom';
     const frame = document.createElement('div');
     frame.className = 'crop-frame';
     const canvas = document.createElement('canvas');
@@ -16707,6 +16709,17 @@ async function squarePicture(source) {
     zoom.step = '0.01';
     zoom.value = '1';
     zoom.setAttribute('aria-label', 'Zoom');
+    // Turning it: a quarter at a time with this, or freely by twisting two
+    // fingers (the owner's asking).
+    const rotate = document.createElement('button');
+    rotate.type = 'button';
+    rotate.className = 'ghost crop-rotate';
+    rotate.setAttribute('aria-label', 'Rotate');
+    rotate.title = 'Rotate';
+    rotate.append(icon('rotate'));
+    const tools = document.createElement('div');
+    tools.className = 'crop-tools';
+    tools.append(rotate, zoom);
     const buttons = document.createElement('div');
     buttons.className = 'crop-buttons';
     const cancel = document.createElement('button');
@@ -16718,24 +16731,63 @@ async function squarePicture(source) {
     use.className = 'primary';
     use.textContent = 'Use';
     buttons.append(cancel, use);
-    sheet.append(hint, frame, zoom, buttons);
+    sheet.append(hint, frame, tools, buttons);
     document.body.append(sheet);
 
     // The view: the frame's side V (CSS px), the picture's scale (CSS px per
     // picture px) as a multiple z of the scale that just covers the frame,
-    // and its centre's offset from the frame's centre.
+    // its centre's offset from the frame's centre, and how far it is turned
+    // (radians, about its centre). Turned, it must still cover the frame:
+    // the frame's corners stay inside the turned picture.
     let V = frame.clientWidth;
     let z = 1;
     let cx = 0;
     let cy = 0;
-    const cover = () => V / Math.min(bmp.width, bmp.height);
+    let turn = 0;
+    const spread = () => Math.abs(Math.cos(turn)) + Math.abs(Math.sin(turn));
+    const cover = () => (V * spread()) / Math.min(bmp.width, bmp.height);
     const clamp = () => {
       z = Math.max(1, Math.min(4, z));
       const sc = cover() * z;
-      const mx = Math.max(0, (bmp.width * sc - V) / 2);
-      const my = Math.max(0, (bmp.height * sc - V) / 2);
-      cx = Math.max(-mx, Math.min(mx, cx));
-      cy = Math.max(-my, Math.min(my, cy));
+      // In the picture's own (turned) directions, the offset may go as far as
+      // leaves the frame's corners inside it.
+      const co = Math.cos(turn);
+      const si = Math.sin(turn);
+      let u = cx * co + cy * si;
+      let v = -cx * si + cy * co;
+      const reach = (V / 2) * spread();
+      const mu = Math.max(0, (bmp.width * sc) / 2 - reach);
+      const mv = Math.max(0, (bmp.height * sc) / 2 - reach);
+      u = Math.max(-mu, Math.min(mu, u));
+      v = Math.max(-mv, Math.min(mv, v));
+      cx = u * co - v * si;
+      cy = u * si + v * co;
+    };
+    // The picture drawn into a square of side n as it shows in the frame.
+    const paint = (ctx, n) => {
+      const k = n / V;
+      const sc = cover() * z * k;
+      ctx.save();
+      ctx.translate(n / 2 + cx * k, n / 2 + cy * k);
+      ctx.rotate(turn);
+      ctx.drawImage(bmp, (-bmp.width * sc) / 2, (-bmp.height * sc) / 2, bmp.width * sc, bmp.height * sc);
+      ctx.restore();
+    };
+    // Turning about a point of the frame (offset from its middle): that point
+    // of the picture stays where it is.
+    const turnAbout = (d, ox, oy) => {
+      const co = Math.cos(d);
+      const si = Math.sin(d);
+      const dx = cx - ox;
+      const dy = cy - oy;
+      cx = ox + dx * co - dy * si;
+      cy = oy + dx * si + dy * co;
+      turn += d;
+    };
+    // Close to straight snaps straight, so a level picture is easy to keep.
+    const snap = (a) => {
+      const q = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
+      return Math.abs(a - q) < (4 * Math.PI) / 180 ? q : a;
     };
     const draw = () => {
       clamp();
@@ -16746,11 +16798,8 @@ async function squarePicture(source) {
         canvas.height = Math.round(V * dpr);
       }
       const ctx = canvas.getContext('2d');
-      const sc = cover() * z * dpr;
-      const w = bmp.width * sc;
-      const h = bmp.height * sc;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(bmp, (V * dpr - w) / 2 + cx * dpr, (V * dpr - h) / 2 + cy * dpr, w, h);
+      paint(ctx, canvas.width);
       zoom.value = String(z);
     };
     draw();
@@ -16776,7 +16825,7 @@ async function squarePicture(source) {
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()];
-        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z };
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z, a: Math.atan2(b.y - a.y, b.x - a.x), turn };
       }
     });
     frame.addEventListener('pointermove', (e) => {
@@ -16791,7 +16840,12 @@ async function squarePicture(source) {
       } else if (pinch && pointers.size === 2) {
         const [a, b] = [...pointers.values()];
         const r = frame.getBoundingClientRect();
-        zoomAt(pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d), (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+        const mx = (a.x + b.x) / 2 - r.left;
+        const my = (a.y + b.y) / 2 - r.top;
+        // The twist since the fingers came down, turning about between them.
+        const want = snap(pinch.turn + Math.atan2(b.y - a.y, b.x - a.x) - pinch.a);
+        turnAbout(want - turn, mx - V / 2, my - V / 2);
+        zoomAt(pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d), mx, my);
       }
     });
     const lift = (e) => {
@@ -16806,6 +16860,12 @@ async function squarePicture(source) {
       zoomAt(z * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
     }, { passive: false });
     zoom.addEventListener('input', () => zoomAt(Number(zoom.value), V / 2, V / 2));
+    rotate.addEventListener('click', () => {
+      // A quarter turn to the right, from the nearest straight angle.
+      const q = Math.round(turn / (Math.PI / 2)) * (Math.PI / 2);
+      turnAbout(q + Math.PI / 2 - turn, 0, 0);
+      draw();
+    });
 
     const finish = (blob) => {
       window.removeEventListener('resize', onResize);
@@ -16814,16 +16874,13 @@ async function squarePicture(source) {
     };
     cancel.addEventListener('click', () => finish(null));
     use.addEventListener('click', () => {
-      // The part of the picture inside the frame, in picture pixels.
-      const sc = cover() * z;
-      const side = V / sc;
-      const sx = bmp.width / 2 - cx / sc - side / 2;
-      const sy = bmp.height / 2 - cy / sc - side / 2;
-      const out = Math.max(1, Math.min(1000, Math.round(side)));
+      // What is inside the frame, turned as it shows, at about the picture's
+      // own pixels (1000 at most).
+      const out = Math.max(1, Math.min(1000, Math.round(V / (cover() * z))));
       const c = document.createElement('canvas');
       c.width = out;
       c.height = out;
-      c.getContext('2d').drawImage(bmp, sx, sy, side, side, 0, 0, out, out);
+      paint(c.getContext('2d'), out);
       c.toBlob((blob) => finish(blob), 'image/jpeg', 0.9);
     });
   });
