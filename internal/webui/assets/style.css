@@ -1272,6 +1272,12 @@ button.danger {
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 .menu-new input { padding: 8px 10px; font-size: 14px; border-radius: 8px; }
+/* Adding to several playlists: the ticked ones, those it is already in, and the one Add. */
+.menu-item.menu-picked { color: var(--accent); }
+.menu-item.menu-picked .icon { color: var(--accent); }
+.menu-item.menu-in { opacity: 0.55; }
+.menu-add-chosen { display: block; width: calc(100% - 16px); margin: 8px; padding: 11px; border: 0; border-radius: 10px; background: var(--accent); color: #08131f; font-weight: 700; }
+.menu-add-chosen:disabled { background: var(--surface-2); color: var(--muted); }
 .menu-create {
   flex: 0 0 auto;
   width: 38px;

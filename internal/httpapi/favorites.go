@@ -155,9 +155,23 @@ func (s *Server) handlePlaylists(w http.ResponseWriter, r *http.Request) {
 	sort.SliceStable(lists, func(i, j int) bool {
 		return strings.ToLower(lists[i].Name) < strings.ToLower(lists[j].Name)
 	})
+	// ?has=<source>/<id>: which playlists already hold that song, so adding
+	// it to several at once can say where it is already.
+	hasSource, hasID, asked := strings.Cut(r.URL.Query().Get("has"), "/")
 	out := make([]map[string]any, 0, len(lists))
 	for _, p := range lists {
-		out = append(out, playlistSummary(p))
+		sum := playlistSummary(p)
+		if asked && hasID != "" {
+			has := false
+			for _, e := range p.Items {
+				if e.Item.SourceID == hasSource && e.Item.ID == hasID {
+					has = true
+					break
+				}
+			}
+			sum["has"] = has
+		}
+		out = append(out, sum)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"playlists": out})
 }

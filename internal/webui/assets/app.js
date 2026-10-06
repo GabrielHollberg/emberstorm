@@ -5968,58 +5968,13 @@ function renderSelectMenu() {
 }
 
 function renderSelectPlaylists(items, lists) {
-  const box = $('item-menu');
-  const note = menuNote();
-  const add = async (id) => {
-    let failed = '';
-    let added = 0;
-    let there = 0;
-    for (const it of items) {
-      const { ok, status, body } = await api(`/api/playlists/${encodeURIComponent(id)}/items`, {
-        method: 'POST', body: JSON.stringify({ source: it.sourceId, id: it.id }),
-      });
-      // Already in it: a playlist holds each song once, so it is skipped.
-      if (status === 409) { there++; continue; }
-      if (!ok) { failed = (body && body.error) || 'Could not add them all.'; break; }
-      added++;
-    }
-    if (failed) {
-      note.textContent = failed;
-      show(note, true);
-      return;
-    }
+  renderPlaylistPicker($('item-menu'), selectMenuBack('Add to playlist'), items, lists, (added, there, chosen) => {
     setSelecting(false);
     const s = (n) => (n === 1 ? '' : 's');
-    showToast(there
-      ? (added ? `Added ${added} song${s(added)}; ${there} ${there === 1 ? 'was' : 'were'} already in it.` : 'Those are all in it already.')
-      : `Added ${added} song${s(added)} to the playlist.`);
-  };
-  const list = document.createElement('div');
-  list.className = 'menu-scroll';
-  list.append(...lists.map((pl) => menuItem('playlist', pl.name, () => add(pl.id), { detail: `${pl.count}` })));
-  const form = document.createElement('form');
-  form.className = 'menu-new';
-  const input = document.createElement('input');
-  input.placeholder = lists.length ? 'New playlist' : 'Name your first playlist';
-  input.maxLength = 100;
-  input.setAttribute('aria-label', 'New playlist name');
-  const create = document.createElement('button');
-  create.type = 'submit';
-  create.className = 'menu-create';
-  create.setAttribute('aria-label', 'Create playlist');
-  create.append(icon('plus'));
-  form.append(input, create);
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const { ok, body } = await api('/api/playlists', { method: 'POST', body: JSON.stringify({ name: input.value }) });
-    if (!ok || !body) {
-      note.textContent = (body && body.error) || 'Could not make it.';
-      show(note, true);
-      return;
-    }
-    await add(body.id);
+    const where = chosen.length === 1 ? chosen[0].name : `${chosen.length} playlists`;
+    if (!added) showToast('Those are all in there already.');
+    else showToast(`Added ${items.length} song${s(items.length)} to ${where}${there ? ` (${there} already there)` : ''}.`);
   });
-  box.replaceChildren(selectMenuBack('Add to playlist'), list, form, note);
 }
 
 // Delete: the server says exactly what would go, the owner confirms, and it
@@ -6365,7 +6320,7 @@ function renderMainMenu(item, opts = {}) {
   }
   if (item.kind === 'music') {
     entries.push(menuItem('playlist', 'Add to playlist', async () => {
-      const { ok, body } = await api('/api/playlists');
+      const { ok, body } = await api(`/api/playlists?has=${encodeURIComponent(`${item.sourceId}/${item.id}`)}`);
       renderPlaylistMenu(item, (ok && body && body.playlists) || []);
     }, { chevron: true }));
   }
@@ -7106,21 +7061,72 @@ function renderPlaylistMenu(item, lists) {
   backLabel.textContent = 'Add to playlist';
   back.append(backLabel);
   back.addEventListener('click', () => renderMainMenu(item, state.menuOpts));
+  const input = renderPlaylistPicker(menu, back, [item], lists, (added, there, chosen) => {
+    closeItemMenu();
+    if (!added) showToast(there ? 'It is already in those.' : 'Nothing was added.');
+    else if (chosen.length === 1) showToast(`Added to ${chosen[0].name}.`);
+    else showToast(`Added to ${chosen.length} playlists.`);
+  });
+  // A keyboard lands in the box; a phone does not pop its keyboard over the
+  // list somebody is about to tap.
+  if (!state.sheetMenus) setTimeout(() => input.focus(), 0);
+}
 
-  const add = async (id) => {
-    const { ok, body } = await api(`/api/playlists/${encodeURIComponent(id)}/items`, {
-      method: 'POST', body: JSON.stringify({ source: item.sourceId, id: item.id }),
-    });
-    if (!ok) say((body && body.error) || 'Could not add it.');
-    else {
-      closeItemMenu();
-      showToast(`Added to ${(lists.find((l) => l.id === id) || {}).name || 'the playlist'}.`);
-    }
+// Choosing playlists to add songs to - as many as wanted, each ticked as it
+// is tapped, then one Add (the owner's asking: a song into several playlists
+// at once). For one song, a playlist it is already in says so and is not
+// offered. A playlist made here is ticked. Answers through finish(how many
+// were added, how many were there already, the playlists chosen).
+function renderPlaylistPicker(box, back, items, lists, finish) {
+  const note = menuNote();
+  const say = (text) => { note.textContent = text; show(note, Boolean(text)); };
+  const chosen = new Set();
+  const list = document.createElement('div');
+  list.className = 'menu-scroll';
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'menu-add-chosen';
+  const draw = () => {
+    list.replaceChildren(...lists.map((pl) => {
+      const inIt = items.length === 1 && pl.has === true;
+      const picked = chosen.has(pl.id);
+      const row = menuItem(picked || inIt ? 'check' : 'playlist', pl.name, (event) => {
+        event.stopPropagation();
+        if (inIt) return;
+        if (picked) chosen.delete(pl.id); else chosen.add(pl.id);
+        draw();
+      }, { detail: inIt ? 'Already in it' : `${pl.count}` });
+      if (picked) row.classList.add('menu-picked');
+      if (inIt) row.classList.add('menu-in');
+      row.setAttribute('aria-checked', String(picked || inIt));
+      return row;
+    }));
+    const n = chosen.size;
+    go.textContent = n ? `Add to ${n} playlist${n === 1 ? '' : 's'}` : 'Tap the playlists to add to';
+    go.disabled = !n;
   };
-
-  const rows = lists.map((list) => menuItem('playlist', list.name, () => add(list.id),
-    { detail: `${list.count}` }));
-
+  go.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    go.disabled = true;
+    let added = 0;
+    let there = 0;
+    for (const id of chosen) {
+      for (const it of items) {
+        const { ok, status, body } = await api(`/api/playlists/${encodeURIComponent(id)}/items`, {
+          method: 'POST', body: JSON.stringify({ source: it.sourceId, id: it.id }),
+        });
+        // Already in it: a playlist holds each song once, so it is skipped.
+        if (status === 409) { there++; continue; }
+        if (!ok) {
+          say((body && body.error) || 'Could not add them all.');
+          go.disabled = false;
+          return;
+        }
+        added++;
+      }
+    }
+    finish(added, there, lists.filter((pl) => chosen.has(pl.id)));
+  });
   const form = document.createElement('form');
   form.className = 'menu-new';
   const input = document.createElement('input');
@@ -7135,23 +7141,21 @@ function renderPlaylistMenu(item, lists) {
   form.append(input, create);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const { ok, body } = await api('/api/playlists', {
-      method: 'POST', body: JSON.stringify({ name: input.value }),
-    });
+    const { ok, body } = await api('/api/playlists', { method: 'POST', body: JSON.stringify({ name: input.value }) });
     if (!ok || !body) {
       say((body && body.error) || 'Could not make it.');
       return;
     }
-    await add(body.id);
+    lists.push({ id: body.id, name: body.name || input.value, count: 0 });
+    lists.sort((x, y) => x.name.toLowerCase().localeCompare(y.name.toLowerCase()));
+    chosen.add(body.id);
+    input.value = '';
+    say('');
+    draw();
   });
-
-  const list = document.createElement('div');
-  list.className = 'menu-scroll';
-  list.append(...rows);
-  menu.replaceChildren(back, list, form, note);
-  // A keyboard lands in the box; a phone does not pop its keyboard over the
-  // list somebody is about to tap.
-  if (!state.sheetMenus) setTimeout(() => input.focus(), 0);
+  box.replaceChildren(back, list, go, form, note);
+  draw();
+  return input;
 }
 
 // On a touch screen the menu is a sheet from the bottom of the screen, where a
@@ -16035,7 +16039,7 @@ function holdIconList(item) {
       // A plain plus: Up next's list icon is too like the playlist one.
       { spot: 'c', icon: 'plus', label: 'Add to playlist',
         run: async () => {
-          const { ok, body } = await api('/api/playlists');
+          const { ok, body } = await api(`/api/playlists?has=${encodeURIComponent(`${item.sourceId}/${item.id}`)}`);
           menuAt(() => renderPlaylistMenu(item, (ok && body && body.playlists) || []));
         } },
       { spot: 'mr', icon: 'repeat', label: repeatNext, on: audio.repeat !== 'off', one: audio.repeat === 'one',
