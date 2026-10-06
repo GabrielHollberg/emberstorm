@@ -18003,185 +18003,29 @@ const viz = {
     this.clock = (this.clock || 0) + dt * (0.25 + 0.75 * lv) * (0.5 + 0.5 * e + 0.6 * loudness);
     const ck = this.clock;
 
+    // Every look is a scene, the Orb too: each draws itself from the music's
+    // moment and keeps its own state, fresh when chosen.
     const style = coverStyle();
-    if (style !== 'pulse') {
-      const scene = VIZ_SCENES[style];
-      const g = back.getContext('2d');
-      const f = front.getContext('2d');
-      const anyBeat = playing && beatNo !== this.sceneBeat;
-      if (anyBeat) this.sceneBeat = beatNo;
-      // Big moments only: a beat that stands out, or the first of a bar -
-      // not all four.
-      const newBeat = anyBeat && (novelty > 0.4 || downbeat);
-      if (this.sceneFor !== style) {
-        // A fresh start for each scene: nothing left over from the last.
-        this.sceneFor = style;
-        this.scene = {};
-        f.clearRect(0, 0, w, h);
-      }
-      scene(this.scene, {
-        g, f, w, h, cx, cy, size, dpr, pal, rgba, t, dt, ck, phase, beatNo, downbeat, newBeat, novelty, drop, firstDrop, dropPower, dropLoud, dropBass, dropEnv,
-        kick, snare, loud: loudness, lv, e, drive, bright, playing,
-      });
-      if (flowing) this.keepClearOfPlay(back, front);
-      if (playing || this.level > 0.01 || this.scrubAt !== undefined) this.raf = requestAnimationFrame((ts) => this.frame(ts));
-      return;
-    }
-    this.sceneFor = 'pulse';
-
-    // ---- the orb, redrawn whole
+    const scene = VIZ_SCENES[style] || VIZ_SCENES.pulse;
     const g = back.getContext('2d');
-    g.clearRect(0, 0, w, h);
-    g.globalCompositeOperation = 'lighter';
-    // A nebula behind it, in the cover's colours.
-    for (let i = 0; i < 3; i++) {
-      const ang = ck * 0.3 + i * 2.1;
-      const x = cx + Math.cos(ang) * R0 * 0.9;
-      const y = cy + Math.sin(ang * 1.2) * R0 * 0.9;
-      const r = R0 * (2.2 + 0.5 * kick * drive);
-      const grad = g.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, rgba(pal[i], 0.22 * (0.4 + 0.6 * lv) * bright));
-      grad.addColorStop(1, rgba(pal[i], 0));
-      g.fillStyle = grad;
-      g.fillRect(0, 0, w, h);
-    }
-    // Light rays turning slowly, brighter on the beat.
-    g.save();
-    g.translate(cx, cy);
-    g.rotate(ck * 0.12);
-    const rays = 18;
-    for (let i = 0; i < rays; i++) {
-      const a0 = (i / rays) * TAU;
-      const len = R0 * (2.4 + 0.8 * Math.sin(ck * 1.3 + i * 1.9) + 1.2 * kick * drive);
-      const grad = g.createLinearGradient(0, 0, Math.cos(a0) * len, Math.sin(a0) * len);
-      grad.addColorStop(0, rgba(pal[i % 3], 0.16 * (0.3 + kick)));
-      grad.addColorStop(1, rgba(pal[i % 3], 0));
-      g.fillStyle = grad;
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.arc(0, 0, len, a0 - 0.05, a0 + 0.05);
-      g.closePath();
-      g.fill();
-    }
-    g.restore();
-    // The orb: six layers, each a closed shape whose edge is a sum of waves
-    // travelling round it. Added together they glow white where they overlap.
-    // The beat swells them; the snare sharpens the edges into spikes.
-    const pts = 120;
-    ORB_LAYERS.forEach((layer, l) => {
-      const R = R0 * (0.72 + l * 0.085) * (1 + 0.22 * kick * drive);
-      const amp = 0.05 + 0.06 * e + 0.1 * kick * drive;
-      const spike = 0.07 * snare * drive;
-      g.beginPath();
-      for (let p = 0; p <= pts; p++) {
-        const th = (p / pts) * TAU;
-        let r = 1;
-        for (const wv of layer.waves) r += (amp / layer.waves.length) * 2 * Math.sin(wv.k * th + wv.speed * ck * 2 + wv.ph);
-        r += spike * Math.sin(13 * th + ck * 6 + l);
-        const a = th + layer.spin * ck * 2;
-        const x = cx + Math.cos(a) * R * r;
-        const y = cy + Math.sin(a) * R * r;
-        if (p) g.lineTo(x, y); else g.moveTo(x, y);
-      }
-      g.closePath();
-      const grad = g.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 1.25);
-      grad.addColorStop(0, rgba(pal[l % 3], 0.05 * bright));
-      grad.addColorStop(0.6, rgba(pal[l % 3], (0.2 + 0.1 * lv) * bright));
-      grad.addColorStop(1, rgba(pal[l % 3], 0.04 * bright));
-      g.fillStyle = grad;
-      g.fill();
-    });
-    // A bright core that flashes on the kick.
-    const core = g.createRadialGradient(cx, cy, 0, cx, cy, R0 * (0.9 + 0.5 * kick));
-    core.addColorStop(0, vizColor(VIZ_WHITE, 0.1 + 0.1 * bright + 0.4 * kick));
-    core.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    g.fillStyle = core;
-    g.fillRect(0, 0, w, h);
-    // Thin rings round it, rippling fast.
-    g.lineWidth = 1.4 * dpr;
-    for (let i = 0; i < 3; i++) {
-      const R = R0 * (1.35 + i * 0.16) * (1 + 0.12 * kick * drive);
-      g.strokeStyle = rgba(pal[(i + 1) % 3], (0.35 + 0.35 * lv) * bright);
-      g.beginPath();
-      for (let p = 0; p <= pts; p++) {
-        const th = (p / pts) * TAU;
-        const r = 1 + (0.015 + 0.05 * snare * drive) * Math.sin((9 + i * 3) * th - ck * (3 + i)) + 0.02 * Math.sin(4 * th + ck * 1.7 + i);
-        const x = cx + Math.cos(th) * R * r;
-        const y = cy + Math.sin(th) * R * r;
-        if (p) g.lineTo(x, y); else g.moveTo(x, y);
-      }
-      g.closePath();
-      g.stroke();
-    }
-    // A white shock ring and a flash, for a drop only.
-    if (dropEnv > 0 && lv > 0.05) {
-      const p = 1 - dropEnv;
-      g.lineWidth = (2 + 6 * dropEnv) * dpr;
-      g.strokeStyle = vizColor(VIZ_WHITE, dropEnv * 0.7 * lv);
-      g.beginPath();
-      g.arc(cx, cy, R0 * (1.2 + p * 2.6), 0, TAU);
-      g.stroke();
-      const flash = g.createRadialGradient(cx, cy, 0, cx, cy, R0 * 3);
-      flash.addColorStop(0, vizColor(VIZ_WHITE, dropEnv * dropEnv * 0.45));
-      flash.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      g.fillStyle = flash;
-      g.fillRect(0, 0, w, h);
-    }
-    g.globalCompositeOperation = 'source-over';
-
-    // ---- the vortex, on the canvas that fades rather than clears
     const f = front.getContext('2d');
-    f.globalCompositeOperation = 'destination-out';
-    f.fillStyle = `rgba(0, 0, 0, ${playing ? 0.2 : 0.35})`;
-    f.fillRect(0, 0, w, h);
-    f.globalCompositeOperation = 'lighter';
-    if (!this.dots.length) {
-      for (let i = 0; i < Math.round(240 * VIZ_DENSITY); i++) {
-        const home = 1.25 + Math.random() * 1.3;
-        this.dots.push({ a: Math.random() * TAU, r: home, home, v: 0, spin: 0.25 + Math.random() * 0.6,
-          size: 0.8 + Math.random() * 1.8, c: i % 3 });
-      }
+    const anyBeat = playing && beatNo !== this.sceneBeat;
+    if (anyBeat) this.sceneBeat = beatNo;
+    // Big moments only: a beat that stands out, or the first of a bar -
+    // not all four.
+    const newBeat = anyBeat && (novelty > 0.4 || downbeat);
+    if (this.sceneFor !== style) {
+      // A fresh start for each scene: nothing left over from the last.
+      this.sceneFor = style;
+      this.scene = {};
+      f.clearRect(0, 0, w, h);
     }
-    // Every beat throws them outward; a spring brings them back.
-    if (playing && beatNo !== this.lastBeat && (novelty > 0.4 || downbeat)) {
-      this.lastBeat = beatNo;
-      const push = (0.4 + 0.9 * e) * (0.6 + 1.4 * novelty) * (0.3 + 0.9 * (this.loudEnv === undefined ? 0.6 : this.loudEnv));
-      for (const d of this.dots) d.v += push * (0.4 + Math.random() * 0.8);
-    }
-    for (const d of this.dots) {
-      d.v += ((d.home - d.r) * 9 - d.v * 3.2) * dt;
-      d.r += d.v * dt;
-      d.a += (d.spin / d.r) * dt * (0.6 + 1.4 * lv) * (1 + kick);
-      const rr = R0 * d.r;
-      d.px = d.x === undefined ? cx + Math.cos(d.a) * rr : d.x;
-      d.py = d.y === undefined ? cy + Math.sin(d.a) * rr * 0.92 : d.y;
-      d.x = cx + Math.cos(d.a) * rr;
-      d.y = cy + Math.sin(d.a) * rr * 0.92;
-    }
-    // A streak from where each was, so the trails are smooth lines rather
-    // than a string of dots one frame apart - drawn in six batches (three
-    // colours, two weights), not a stroke per particle, which with a colour
-    // each was the other half of the garbage that made a phone skip.
-    const streak = (0.55 + 0.4 * lv) * (0.45 + 0.55 * bright);
-    f.lineCap = 'round';
-    for (let c = 0; c < 3; c++) {
-      for (let big = 0; big < 2; big++) {
-        f.beginPath();
-        for (const d of this.dots) {
-          if (d.c !== c || (d.size >= 1.7) !== (big === 1)) continue;
-          f.moveTo(d.px, d.py);
-          f.lineTo(d.x, d.y);
-        }
-        f.strokeStyle = rgba(pal[c], streak);
-        f.lineWidth = (big ? 2.2 : 1.2) * dpr * (1 + kick * 0.6);
-        f.stroke();
-      }
-    }
-    f.globalCompositeOperation = 'source-over';
-
-    // On until paused and settled.
+    scene(this.scene, {
+      g, f, w, h, cx, cy, size, dpr, pal, rgba, t, dt, ck, phase, beatNo, downbeat, newBeat, novelty, drop, firstDrop, dropPower, dropLoud, dropBass, dropEnv,
+      kick, snare, loud: loudness, lv, e, drive, bright, playing,
+    });
     if (flowing) this.keepClearOfPlay(back, front);
-    if (playing || this.level > 0.01) this.raf = requestAnimationFrame((ts) => this.frame(ts));
+    if (playing || this.level > 0.01 || this.scrubAt !== undefined) this.raf = requestAnimationFrame((ts) => this.frame(ts));
   },
 };
 $('audio-player').addEventListener('play', () => {
@@ -18419,8 +18263,108 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) play
 // the middle of the screen, trailing light; faster and more turbulent as it
 // gets louder, a pulse out from the middle on every beat and a shock wave
 // across the screen on the first beat of each bar.
+// ---- Shared by the looks: strikes sized as Storm's lightning, soft glows
+// and shooting stars. Every look answers a strike (m.drop - the moments
+// Storm's lightning falls on) with something of its own, in three sizes.
+// How big a strike is, 0 to 1, by Storm's own rule - how loud the song is at
+// that moment and whether a bass hit comes with it: under 0.3 small (Storm's
+// clouds lit alone, about half of them), to 0.7 middling (a bolt far off),
+// above that big (a close bolt, about one in eight).
+function strikeSize(m) {
+  const ld = m.dropLoud || 0;
+  const bass = m.dropBass || 0;
+  return ld >= 0.85 && bass >= 0.3 ? 0.7 + 0.3 * Math.min(1, bass)
+    : ld >= 0.82 ? 0.3 + 0.39 * Math.min(1, (ld - 0.82) / 0.18)
+      : 0.29 * Math.min(1, ld / 0.82);
+}
+// A soft round glow, a sprite drawn once per colour and stretched, rather
+// than a gradient made every frame (garbage a phone stops to collect).
+const vizSprites = new Map();
+function vizGlow(g, rgb, x, y, r, a) {
+  if (!(a > 0.004) || !(r > 0.5)) return;
+  const key = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+  let s = vizSprites.get(key);
+  if (!s) {
+    if (vizSprites.size > 64) vizSprites.clear();
+    s = stormSprite(rgb, 1, 0.38);
+    vizSprites.set(key, s);
+  }
+  g.globalAlpha = Math.min(1, a);
+  g.drawImage(s, x - r, y - r, r * 2, r * 2);
+  g.globalAlpha = 1;
+}
+// A soft glow stretched into an oval (a streak of light).
+function vizStreak(g, rgb, x, y, rx, ry, a) {
+  if (!(a > 0.004) || !(rx > 0.5) || !(ry > 0.2)) return;
+  vizGlow(g, rgb, 0, 0, 1, 0); // makes the sprite
+  const s = vizSprites.get((rgb[0] << 16) | (rgb[1] << 8) | rgb[2]);
+  if (!s) return;
+  g.globalAlpha = Math.min(1, a);
+  g.drawImage(s, x - rx, y - ry, rx * 2, ry * 2);
+  g.globalAlpha = 1;
+}
+// A colour part way to white.
+function vizWhiter(c, k) {
+  return [Math.round(c[0] + (255 - c[0]) * k), Math.round(c[1] + (255 - c[1]) * k), Math.round(c[2] + (255 - c[2]) * k)];
+}
+// Shooting stars across the top of a sky.
+function vizMeteor(w, h) {
+  const right = Math.random() < 0.5;
+  const a = (right ? 0.32 : Math.PI - 0.32) + (Math.random() - 0.5) * 0.3;
+  const v = Math.max(w, h) * (0.9 + Math.random() * 0.6);
+  return { x: Math.random() * w, y: Math.random() * h * 0.3, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1 };
+}
+function vizMeteors(g, list, dt, dpr, bright) {
+  for (let i = list.length - 1; i >= 0; i--) {
+    const mt = list[i];
+    mt.life -= dt * 1.4;
+    if (mt.life <= 0) { list.splice(i, 1); continue; }
+    mt.x += mt.vx * dt;
+    mt.y += mt.vy * dt;
+    const tx = mt.x - mt.vx * 0.14;
+    const ty = mt.y - mt.vy * 0.14;
+    const grad = g.createLinearGradient(tx, ty, mt.x, mt.y);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    grad.addColorStop(1, vizColor(VIZ_WHITE, Math.min(1, mt.life * 1.5) * (0.5 + 0.5 * bright)));
+    g.strokeStyle = grad;
+    g.lineWidth = 2 * dpr;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(tx, ty);
+    g.lineTo(mt.x, mt.y);
+    g.stroke();
+    vizGlow(g, VIZ_WHITE, mt.x, mt.y, 6 * dpr, mt.life * 0.8);
+  }
+}
+// A loop of plasma off a round edge, as a sun's prominences: a few strands
+// from one point of the rim out and back to another, each a little apart and
+// wavering, a wide faint glow under a fine bright line.
+function plasmaArc(g, cx, cy, R, a, span, height, rgb, alpha, dpr, seed, width) {
+  if (alpha <= 0.01 || height <= 0) return;
+  const segs = 22;
+  const hot = vizWhiter(rgb, 0.55);
+  for (let k = 0; k < 3; k++) {
+    const hk = height * (0.78 + 0.13 * k);
+    g.beginPath();
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const ang = a + span * (t - 0.5) * (1 + 0.06 * k);
+      const r = R + hk * Math.sin(Math.PI * t) * (1 + 0.12 * Math.sin(t * 9 + seed + k * 2.1));
+      const x = cx + Math.cos(ang) * r;
+      const y = cy + Math.sin(ang) * r;
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.strokeStyle = vizColor(rgb, alpha * 0.22);
+    g.lineWidth = width * 7 * dpr;
+    g.stroke();
+    g.strokeStyle = vizColor(hot, alpha * (0.85 - k * 0.2));
+    g.lineWidth = width * (1.6 - k * 0.35) * dpr;
+    g.stroke();
+  }
+}
+
 function flowScene(st, m) {
-  const { g, f, w, h, cx, cy, dpr, pal, rgba, dt, ck, kick, snare, loud, lv, e, newBeat, downbeat, bright, playing } = m;
+  const { g, f, w, h, cx, cy, dpr, pal, rgba, dt, ck, kick, snare, loud, lv, e, newBeat, bright, playing } = m;
   const S = Math.min(w, h);
   g.clearRect(0, 0, w, h);
   f.globalCompositeOperation = 'destination-out';
@@ -18431,11 +18375,29 @@ function flowScene(st, m) {
   const spawn = (anywhere) => {
     const c = Math.floor(Math.random() * 3);
     if (anywhere || Math.random() < 0.35) return { x: Math.random() * w, y: Math.random() * h, vx: 0, vy: 0, c, life: 0.4 + Math.random() };
-    const a = Math.random() * Math.PI * 2;
+    const a = Math.random() * TAU;
     const r = Math.random() * S * 0.12;
     return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, vx: 0, vy: 0, c, life: 0.6 + Math.random() };
   };
-  if (!st.p) { st.p = Array.from({ length: Math.round(520 * VIZ_DENSITY) }, () => spawn(true)); st.pulses = []; }
+  if (!st.p) {
+    st.p = Array.from({ length: Math.round(520 * VIZ_DENSITY) }, () => spawn(true));
+    st.pulses = [];
+    st.veins = [];
+    st.white = 0;
+  }
+  // The current: a swirl round the middle mixed with a field of waves that
+  // tightens as it gets louder. Into fx and fy, for a particle or a vein.
+  const k = ((1.1 + 1.4 * loud) / S) * Math.PI;
+  const sw = 0.45;
+  let fx = 0;
+  let fy = 0;
+  const field = (x, y) => {
+    const swirl = Math.atan2(y - cy, x - cx) + Math.PI / 2;
+    const n = Math.sin(x * k + ck * 0.7) + Math.cos(y * k * 1.3 - ck * 0.5) + Math.sin((x + y) * k * 0.7 + ck * 1.1);
+    const na = n * Math.PI * 0.4;
+    fx = Math.cos(na) * (1 - sw) + Math.cos(swirl) * sw;
+    fy = Math.sin(na) * (1 - sw) + Math.sin(swirl) * sw;
+  };
   if (newBeat || m.drop) {
     st.pulses.push({ r: S * 0.05, life: 1, big: m.drop });
     const push = S * (0.15 + 0.5 * loud) * (m.drop ? 2.4 : 1) * (0.6 + 0.6 * e);
@@ -18447,46 +18409,81 @@ function flowScene(st, m) {
       p.vy += (dy / d) * push * near;
     }
   }
+  // A strike: veins of light racing out along the current itself, more of
+  // them and longer the harder it hits, the particles flashing white.
+  if (m.drop) {
+    const s = strikeSize(m);
+    const n = 1 + Math.round(s * 4) + (m.firstDrop ? 2 : 0);
+    for (let v = 0; v < n; v++) {
+      const steps = Math.round(40 + 50 * s);
+      const pts = new Float32Array(steps * 2);
+      const a = Math.random() * TAU;
+      let x = cx + Math.cos(a) * S * (0.03 + Math.random() * 0.12);
+      let y = cy + Math.sin(a) * S * (0.03 + Math.random() * 0.12);
+      // Out from the middle, then wherever the current takes it.
+      for (let i = 0; i < steps; i++) {
+        pts[i * 2] = x;
+        pts[i * 2 + 1] = y;
+        field(x, y);
+        const out = Math.max(0, 1 - i / 12);
+        const len = Math.hypot(x - cx, y - cy) || 1;
+        x += (fx * (1 - out) + ((x - cx) / len) * out) * S * 0.011;
+        y += (fy * (1 - out) + ((y - cy) / len) * out) * S * 0.011;
+      }
+      st.veins.push({ pts, steps, life: 1, s, c: Math.floor(Math.random() * 3) });
+    }
+    if (st.veins.length > 10) st.veins.splice(0, st.veins.length - 10);
+    st.white = Math.max(st.white, 0.3 + 0.6 * s);
+  }
+  st.white = Math.max(0, st.white - dt * 1.6);
   // A glow in the middle, and the pulses going out from it.
   g.globalCompositeOperation = 'lighter';
-  const core = g.createRadialGradient(cx, cy, 0, cx, cy, S * (0.3 + 0.25 * kick));
-  core.addColorStop(0, rgba(pal[0], (0.1 + 0.3 * kick) * (0.4 + 0.6 * bright)));
-  core.addColorStop(1, rgba(pal[0], 0));
-  g.fillStyle = core;
-  g.fillRect(0, 0, w, h);
-  st.pulses = st.pulses.filter((pl) => {
+  vizGlow(g, pal[0], cx, cy, S * (0.32 + 0.25 * kick), (0.12 + 0.3 * kick + 0.3 * st.white) * (0.4 + 0.6 * bright));
+  for (let i = st.pulses.length - 1; i >= 0; i--) {
+    const pl = st.pulses[i];
     pl.r += dt * S * (0.8 + 0.7 * loud);
     pl.life -= dt * 0.7;
-    if (pl.life <= 0) return false;
-    g.strokeStyle = rgba(pl.big ? [255, 255, 255] : pal[1], pl.life * (pl.big ? 0.45 : 0.22) * (0.4 + 0.6 * bright));
+    if (pl.life <= 0) { st.pulses.splice(i, 1); continue; }
+    g.strokeStyle = rgba(pl.big ? VIZ_WHITE : pal[1], pl.life * (pl.big ? 0.45 : 0.22) * (0.4 + 0.6 * bright));
     g.lineWidth = (pl.big ? 4 : 2) * dpr;
     g.beginPath();
-    g.arc(cx, cy, pl.r, 0, Math.PI * 2);
+    g.arc(cx, cy, pl.r, 0, TAU);
     g.stroke();
-    return true;
-  });
+  }
+  // The veins: drawn out as they race, a wide glow under a white core,
+  // then fading.
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  for (let i = st.veins.length - 1; i >= 0; i--) {
+    const vn = st.veins[i];
+    vn.life -= dt * 1.05;
+    if (vn.life <= 0) { st.veins.splice(i, 1); continue; }
+    const shown = Math.max(2, Math.floor(vn.steps * Math.min(1, (1 - vn.life) * 4.5)));
+    g.beginPath();
+    g.moveTo(vn.pts[0], vn.pts[1]);
+    for (let j = 1; j < shown; j++) g.lineTo(vn.pts[j * 2], vn.pts[j * 2 + 1]);
+    g.strokeStyle = rgba(pal[vn.c], vn.life * 0.35 * bright);
+    g.lineWidth = (6 + 10 * vn.s) * dpr;
+    g.stroke();
+    g.strokeStyle = vizColor(VIZ_WHITE, vn.life * 0.9);
+    g.lineWidth = (1.2 + 1.2 * vn.s) * dpr;
+    g.stroke();
+    vizGlow(g, vizWhiter(pal[vn.c], 0.5), vn.pts[(shown - 1) * 2], vn.pts[(shown - 1) * 2 + 1], S * (0.04 + 0.04 * vn.s), vn.life);
+  }
   g.globalCompositeOperation = 'source-over';
-  // The current: a swirl round the middle mixed with a field of waves that
-  // tightens as it gets louder.
-  const speed = S * (0.04 + (0.1 + 0.35 * loud) * lv * (0.6 + 0.6 * e) + 0.25 * kick);
-  // A gentle current, so trails flow in curves rather than zigzags.
-  const k = ((1.1 + 1.4 * loud) / S) * Math.PI;
-  const sw = 0.45;
+  const speed = S * (0.04 + (0.1 + 0.35 * loud) * lv * (0.6 + 0.6 * e) + 0.25 * kick + 0.2 * st.white);
   f.globalCompositeOperation = 'lighter';
   f.lineCap = 'round';
   f.lineWidth = (0.9 + 1.2 * snare) * dpr;
-  for (const p of st.p) {
-    const dx = p.x - cx, dy = p.y - cy;
-    const swirl = Math.atan2(dy, dx) + Math.PI / 2;
-    const n = Math.sin(p.x * k + ck * 0.7) + Math.cos(p.y * k * 1.3 - ck * 0.5) + Math.sin((p.x + p.y) * k * 0.7 + ck * 1.1);
-    const na = n * Math.PI * 0.4;
-    const fx = Math.cos(na) * (1 - sw) + Math.cos(swirl) * sw;
-    const fy = Math.sin(na) * (1 - sw) + Math.sin(swirl) * sw;
+  const alpha = (0.35 + 0.45 * lv) * (0.4 + 0.6 * bright);
+  const whiteEvery = st.white > 0.05 ? Math.max(1, Math.round(1 / st.white)) : 0;
+  st.p.forEach((p, i) => {
+    field(p.x, p.y);
     p.vx *= 1 - dt * 2.2;
     p.vy *= 1 - dt * 2.2;
     const nx = p.x + (fx * speed + p.vx) * dt;
     const ny = p.y + (fy * speed + p.vy) * dt;
-    f.strokeStyle = rgba(pal[p.c], (0.35 + 0.45 * lv) * (0.4 + 0.6 * bright));
+    f.strokeStyle = rgba(whiteEvery && i % whiteEvery === 0 ? VIZ_WHITE : pal[p.c], alpha);
     f.beginPath();
     f.moveTo(p.x, p.y);
     f.lineTo(nx, ny);
@@ -18495,7 +18492,7 @@ function flowScene(st, m) {
     p.y = ny;
     p.life -= dt * 0.22;
     if (p.life <= 0 || p.x < -20 || p.y < -20 || p.x > w + 20 || p.y > h + 20) Object.assign(p, spawn(false));
-  }
+  });
   f.globalCompositeOperation = 'source-over';
 }
 
@@ -19164,8 +19161,12 @@ const FULL_SCENES = {
     g.globalCompositeOperation = 'source-over';
   },
 
-  // Synthwave: a neon grid racing towards you under a striped sunset sun that
-  // pulses on the kick, with mountains on the horizon.
+  // Synthwave: a neon grid racing towards you under a striped sunset sun
+  // that pulses on the kick, mountains on the horizon, the sun's light
+  // lying on the floor, and now and then a shooting star. A strike sends a
+  // pulse of light racing down the grid towards you; a middling one lights
+  // the whole grid and flares the sun; a big one sends two, flares the sun
+  // across the horizon and throws a shooting star.
   synthwave(st, m) {
     const { g, f, w, h, dpr, pal, rgba, dt, ck, kick, loud, lv, bright } = m;
     f.clearRect(0, 0, w, h);
@@ -19178,20 +19179,43 @@ const FULL_SCENES = {
       const ridge = (n, rough) => Array.from({ length: n + 1 }, (_, i) => (0.35 + 0.65 * Math.abs(Math.sin(i * 1.7 + rough)) * (0.5 + 0.5 * Math.sin(i * 0.6 + rough * 2))));
       st.far = ridge(18, 1.3);
       st.near = ridge(12, 4.1);
+      st.pulses = [];
+      st.meteors = [];
+      st.nextMeteor = 4;
+      st.flare = 0;
+      st.gridLit = 0;
     }
+    if (m.drop) {
+      const s = strikeSize(m);
+      st.pulses.push({ t: 0, s });
+      if (s >= 0.3) { st.gridLit = Math.max(st.gridLit, 0.4 + 0.6 * s); st.flare = Math.max(st.flare, s); }
+      if (s >= 0.7 || m.firstDrop) {
+        st.flare = 1;
+        st.pulses.push({ t: -0.14, s });
+        st.meteors.push(vizMeteor(w, hz));
+      }
+      if (st.pulses.length > 6) st.pulses.shift();
+    }
+    st.nextMeteor -= dt * lv;
+    if (st.nextMeteor <= 0) { st.meteors.push(vizMeteor(w, hz)); st.nextMeteor = 5 + Math.random() * 9; }
+    st.flare = Math.max(0, st.flare - dt * 1.1);
+    st.gridLit = Math.max(0, st.gridLit - dt * 1.4);
     for (const s of st.stars) {
       g.fillStyle = vizColor(VIZ_WHITE, (0.25 + 0.5 * s.b * (0.5 + 0.5 * Math.sin(ck * 2 + s.x * 40))) * bright);
       g.fillRect(s.x * w, s.y * h, 1.5 * dpr, 1.5 * dpr);
     }
+    g.globalCompositeOperation = 'lighter';
+    vizMeteors(g, st.meteors, dt, dpr, bright);
+    g.globalCompositeOperation = 'source-over';
     // The sun, striped across its lower half.
-    const r = S * 0.24 * (1 + 0.06 * kick);
+    const r = S * 0.24 * (1 + 0.06 * kick + 0.08 * st.flare);
     const sy = hz - r * 0.35;
     const sun = g.createLinearGradient(0, sy - r, 0, sy + r);
-    sun.addColorStop(0, rgba(pal[0], 0.95));
+    sun.addColorStop(0, rgba(st.flare > 0.05 ? vizWhiter(pal[0], st.flare * 0.5) : pal[0], 0.95));
     sun.addColorStop(1, rgba(pal[1], 0.95));
     g.save();
     g.beginPath();
-    g.arc(w / 2, sy, r, 0, Math.PI * 2);
+    g.arc(w / 2, sy, r, 0, TAU);
     g.clip();
     g.fillStyle = sun;
     g.fillRect(w / 2 - r, sy - r, r * 2, r * 2);
@@ -19202,11 +19226,9 @@ const FULL_SCENES = {
       g.fillRect(w / 2 - r, y, r * 2, r * 0.02 + r * 0.09 * t);
     }
     g.restore();
-    const glow = g.createRadialGradient(w / 2, sy, r * 0.8, w / 2, sy, r * 2.2);
-    glow.addColorStop(0, rgba(pal[0], (0.25 + 0.3 * kick) * bright));
-    glow.addColorStop(1, rgba(pal[0], 0));
-    g.fillStyle = glow;
-    g.fillRect(0, 0, w, hz);
+    g.globalCompositeOperation = 'lighter';
+    vizGlow(g, pal[0], w / 2, sy, r * (2.4 + 1.2 * st.flare), (0.3 + 0.35 * kick + 0.5 * st.flare) * bright);
+    g.globalCompositeOperation = 'source-over';
     // Mountains, far then near.
     for (const [ridge, height, alpha] of [[st.far, 0.13, 0.75], [st.near, 0.09, 0.92]]) {
       g.fillStyle = `rgba(12, 6, 24, ${alpha})`;
@@ -19217,11 +19239,20 @@ const FULL_SCENES = {
       g.closePath();
       g.fill();
     }
-    // The floor.
+    // The floor, and the sun's light lying on it.
     g.fillStyle = 'rgba(10, 4, 20, 0.85)';
     g.fillRect(0, hz, w, h - hz);
+    g.globalCompositeOperation = 'lighter';
+    // Soft streaks, wider and fainter towards you, shimmering.
+    for (let i = 0; i < 10; i++) {
+      const u = i / 10;
+      const y = hz + (h - hz) * (u + 0.04) ** 1.5;
+      const half = r * (0.5 + 0.5 * u) * (1 + 0.08 * Math.sin(ck * 3 + i * 1.7));
+      const thick = (h - hz) * (0.012 + 0.03 * u);
+      vizStreak(g, pal[i % 2], w / 2, y, half, thick, (0.38 + 0.3 * st.flare) * (1 - u * 0.75) * bright);
+    }
     st.scroll = (st.scroll + dt * (0.25 + 1.1 * loud * lv + 0.6 * kick)) % 1;
-    const line = rgba(pal[2], (0.55 + 0.35 * kick) * (0.5 + 0.5 * bright));
+    const line = rgba(st.gridLit > 0.05 ? vizWhiter(pal[2], st.gridLit * 0.5) : pal[2], Math.min(1, (0.55 + 0.35 * kick + 0.45 * st.gridLit) * (0.5 + 0.5 * bright)));
     g.strokeStyle = line;
     g.lineWidth = 1.5 * dpr;
     for (let i = -14; i <= 14; i++) {
@@ -19239,20 +19270,47 @@ const FULL_SCENES = {
       g.lineTo(w, y);
       g.stroke();
     }
-    // A glow along the horizon.
+    // The strike's pulses, racing down the grid towards you.
+    for (let k = st.pulses.length - 1; k >= 0; k--) {
+      const pl = st.pulses[k];
+      pl.t += dt * (0.8 + 0.4 * pl.s);
+      if (pl.t >= 1) { st.pulses.splice(k, 1); continue; }
+      if (pl.t <= 0) continue;
+      const y = hz + (h - hz) * pl.t * pl.t;
+      const band = (h - hz) * (0.01 + 0.05 * pl.t) * (0.6 + 0.6 * pl.s);
+      const a = (1 - pl.t) * (0.55 + 0.45 * pl.s) * bright;
+      g.fillStyle = rgba(pal[2], a * 0.5);
+      g.fillRect(0, y - band, w, band * 2);
+      g.fillStyle = vizColor(VIZ_WHITE, a);
+      g.fillRect(0, y - dpr, w, 2 * dpr * (1 + pl.t * 2));
+    }
+    // A glow along the horizon, and the flare's streak across it.
     const hg = g.createLinearGradient(0, hz - h * 0.03, 0, hz + h * 0.05);
     hg.addColorStop(0, rgba(pal[2], 0));
-    hg.addColorStop(0.5, rgba(pal[2], 0.5 * bright));
+    hg.addColorStop(0.5, rgba(pal[2], (0.5 + 0.4 * st.flare) * bright));
     hg.addColorStop(1, rgba(pal[2], 0));
     g.fillStyle = hg;
     g.fillRect(0, hz - h * 0.03, w, h * 0.08);
+    if (st.flare > 0.02) {
+      const streak = g.createLinearGradient(0, 0, w, 0);
+      streak.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      streak.addColorStop(0.5, vizColor(VIZ_WHITE, st.flare * 0.85));
+      streak.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      g.fillStyle = streak;
+      g.fillRect(0, sy - 1.5 * dpr * (1 + 2 * st.flare), w, 3 * dpr * (1 + 2 * st.flare));
+      vizGlow(g, VIZ_WHITE, w / 2, sy, r * 0.9, st.flare * 0.6);
+    }
+    g.globalCompositeOperation = 'source-over';
   },
 
-  // Galaxy: a spiral galaxy turning round the middle of the screen, inner stars
-  // faster than outer, arms winding tighter when loud, the core flashing on
-  // the kick and a ripple on each bar.
+  // Galaxy: a spiral galaxy turning round the middle of the screen, inner
+  // stars faster than outer, a haze along its arms, arms winding tighter when
+  // loud, the core flashing on the kick. A strike sets stars in its arms off
+  // as novae - a flare with a cross of light and a shell spreading from it,
+  // one for a small strike, a few for a middling one - and a big one fires
+  // jets from the core, out of the disc both ways, and a ripple across it.
   galaxy(st, m) {
-    const { g, f, w, h, cx, cy, dpr, pal, rgba, dt, ck, kick, loud, lv, newBeat, downbeat, bright } = m;
+    const { g, f, w, h, cx, cy, dpr, pal, rgba, dt, ck, kick, loud, lv, bright } = m;
     f.clearRect(0, 0, w, h);
     g.clearRect(0, 0, w, h);
     const S = Math.min(w, h);
@@ -19261,63 +19319,195 @@ const FULL_SCENES = {
       st.bg = Array.from({ length: 120 }, () => ({ x: Math.random(), y: Math.random(), b: Math.random() }));
       st.turn = 0;
       st.ripples = [];
+      st.novae = [];
+      st.jets = 0;
     }
     for (const s of st.bg) {
-      g.fillStyle = vizColor(VIZ_WHITE, 0.15 + 0.35 * s.b);
+      g.fillStyle = vizColor(VIZ_WHITE, (0.15 + 0.35 * s.b) * (0.7 + 0.3 * Math.sin(ck * 2 + s.b * 40)));
       g.fillRect(s.x * w, s.y * h, dpr, dpr);
     }
     st.turn += dt * (0.12 + 0.5 * loud * lv);
     const R = S * 0.46 * (1 + 0.06 * kick);
     const wind = 3.2 + 1.8 * loud;
+    // Where a star is this frame, into px and py (not a new array for each
+    // of hundreds of stars every frame: garbage a phone stops to collect).
+    let px = 0;
+    let py = 0;
+    const place = (arm, r, off) => {
+      const a = arm * (TAU / 3) + r * wind + st.turn / (0.25 + r) + off / (0.4 + r);
+      px = cx + Math.cos(a) * r * R;
+      py = cy + Math.sin(a) * r * R * 0.8;
+    };
+    if (m.drop) {
+      const s = strikeSize(m);
+      const n = s >= 0.7 ? 3 : s >= 0.3 ? 2 : 1;
+      for (let i = 0; i < n + (m.firstDrop ? 2 : 0); i++) {
+        let p = null;
+        for (let tries = 0; tries < 6 && !p; tries++) {
+          const q = st.pts[Math.floor(Math.random() * st.pts.length)];
+          if (q.r > 0.25) p = q;
+        }
+        if (p) st.novae.push({ p, life: 1, s });
+      }
+      if (st.novae.length > 8) st.novae.splice(0, st.novae.length - 8);
+      if (s >= 0.7 || m.firstDrop) { st.jets = 1; st.jetS = Math.max(0.7, s); st.ripples.push({ r: R * 0.2, life: 1 }); }
+      else st.ripples.push({ r: R * 0.2, life: 0.5 });
+    }
     g.globalCompositeOperation = 'lighter';
-    const core = g.createRadialGradient(cx, cy, 0, cx, cy, R * (0.35 + 0.2 * kick));
-    core.addColorStop(0, `rgba(255, 245, 235, ${(0.35 + 0.5 * kick) * (0.5 + 0.5 * bright)})`);
-    core.addColorStop(1, rgba(pal[0], 0));
-    g.fillStyle = core;
-    g.fillRect(0, 0, w, h);
+    // A haze along each arm.
+    for (let arm = 0; arm < 3; arm++) {
+      for (let k = 0; k < 9; k++) {
+        const pr = 0.12 + k * 0.1;
+        place(arm, pr, 0);
+        vizGlow(g, pal[arm], px, py, R * 0.2 * (1 - pr * 0.35), 0.09 * (1 - pr * 0.5) * (0.5 + 0.5 * bright) * (0.5 + 0.5 * lv));
+      }
+    }
+    vizGlow(g, [255, 245, 235], cx, cy, R * (0.4 + 0.2 * kick + 0.3 * st.jets), (0.4 + 0.5 * kick + 0.4 * st.jets) * (0.5 + 0.5 * bright));
     for (const p of st.pts) {
-      const a = p.arm * ((Math.PI * 2) / 3) + p.r * wind + st.turn / (0.25 + p.r) + p.off / (0.4 + p.r);
-      const x = cx + Math.cos(a) * p.r * R;
-      const y = cy + Math.sin(a) * p.r * R * 0.8;
+      place(p.arm, p.r, p.off);
       const sz = (0.8 + 1.6 * p.b) * dpr;
       g.fillStyle = rgba(pal[p.c], (0.35 + 0.55 * p.b) * (1 - p.r * 0.45) * (0.45 + 0.55 * bright));
-      g.fillRect(x, y, sz, sz);
+      g.fillRect(px, py, sz, sz);
     }
-    if (m.drop) st.ripples.push({ r: R * 0.2, life: 1 });
-    st.ripples = st.ripples.filter((rp) => {
+    // The jets, out of the disc both ways.
+    if (st.jets > 0) {
+      st.jets = Math.max(0, st.jets - dt * 0.8);
+      const grow = Math.min(1, (1 - st.jets) * 5);
+      const len = R * (0.5 + 1.1 * st.jetS) * grow;
+      const tilt = Math.sin(st.turn * 0.5) * 0.15;
+      for (const dir of [-1, 1]) {
+        const ex = cx + Math.sin(tilt) * len * dir;
+        const ey = cy - Math.cos(tilt) * len * dir;
+        const grad = g.createLinearGradient(cx, cy, ex, ey);
+        grad.addColorStop(0, vizColor(VIZ_WHITE, 0.9 * st.jets));
+        grad.addColorStop(0.4, rgba(pal[1], 0.6 * st.jets));
+        grad.addColorStop(1, rgba(pal[2], 0));
+        g.strokeStyle = grad;
+        g.lineCap = 'round';
+        g.lineWidth = R * 0.05 * (0.5 + 0.5 * st.jets);
+        g.beginPath();
+        g.moveTo(cx, cy);
+        g.lineTo(ex, ey);
+        g.stroke();
+        g.lineWidth = 2 * dpr;
+        g.stroke();
+        vizGlow(g, pal[1], ex, ey, R * 0.12, st.jets * 0.5);
+      }
+    }
+    // Novae: each turns with the galaxy as it burns out.
+    for (let k = st.novae.length - 1; k >= 0; k--) {
+      const nv = st.novae[k];
+      nv.life -= dt * 0.6;
+      if (nv.life <= 0) { st.novae.splice(k, 1); continue; }
+      place(nv.p.arm, nv.p.r, nv.p.off);
+      const x = px;
+      const y = py;
+      const kk = nv.life;
+      const pop = Math.min(1, (1 - nv.life) * 8);
+      vizGlow(g, pal[nv.p.c], x, y, S * (0.05 + 0.08 * nv.s) * pop, kk * 0.7 * bright);
+      vizGlow(g, VIZ_WHITE, x, y, S * (0.015 + 0.02 * nv.s) * pop, kk);
+      const spike = S * (0.04 + 0.09 * nv.s) * kk * pop;
+      g.strokeStyle = vizColor(VIZ_WHITE, kk * 0.8);
+      g.lineWidth = 1.2 * dpr;
+      g.beginPath();
+      g.moveTo(x - spike, y); g.lineTo(x + spike, y);
+      g.moveTo(x, y - spike); g.lineTo(x, y + spike);
+      g.stroke();
+      g.strokeStyle = rgba(pal[nv.p.c], kk * 0.5 * bright);
+      g.beginPath();
+      g.arc(x, y, S * (0.01 + (1 - kk) * 0.1 * (0.5 + nv.s)), 0, TAU);
+      g.stroke();
+    }
+    for (let k = st.ripples.length - 1; k >= 0; k--) {
+      const rp = st.ripples[k];
       rp.r += dt * S * 0.7;
       rp.life -= dt * 0.9;
-      if (rp.life <= 0) return false;
+      if (rp.life <= 0) { st.ripples.splice(k, 1); continue; }
       g.strokeStyle = rgba(pal[1], rp.life * 0.4 * bright);
       g.lineWidth = 2 * dpr;
       g.beginPath();
-      g.ellipse(cx, cy, rp.r, rp.r * 0.8, 0, 0, Math.PI * 2);
+      g.ellipse(cx, cy, rp.r, rp.r * 0.8, 0, 0, TAU);
       g.stroke();
-      return true;
-    });
+    }
     g.globalCompositeOperation = 'source-over';
   },
 
-  // Aurora: curtains of northern lights swaying across a starry sky, flaring
-  // on the beat and brighter when loud.
+  // Aurora: curtains of northern lights swaying over mountains under a
+  // starry sky, flaring on the beat and brighter when loud, a shooting star
+  // now and then. A strike sends a flare running along the curtains - their
+  // folds blaze and the curtain stretches down where it passes; a middling
+  // one sends two; a big one lights a corona, rays spreading from high
+  // overhead, the whole sky glowing.
   aurora(st, m) {
-    const { g, f, w, h, dpr, pal, rgba, ck, kick, snare, loud, lv, bright } = m;
+    const { g, f, w, h, dpr, pal, rgba, dt, ck, kick, snare, loud, lv, bright } = m;
     f.clearRect(0, 0, w, h);
     g.clearRect(0, 0, w, h);
-    if (!st.stars) st.stars = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random() * 0.8, b: Math.random(), t: Math.random() * 6 }));
+    if (!st.stars) {
+      st.stars = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random() * 0.8, b: Math.random(), t: Math.random() * 6 }));
+      st.flares = [];
+      st.meteors = [];
+      st.nextMeteor = 6;
+      st.corona = 0;
+      st.bump = new Float32Array(61);
+      st.ridge = Array.from({ length: 25 }, (_, i) => 0.5 + 0.5 * Math.abs(Math.sin(i * 1.3 + 0.7)) * (0.6 + 0.4 * Math.sin(i * 0.5 + 2)));
+    }
+    if (m.drop) {
+      const s = strikeSize(m);
+      st.flares.push({ u: Math.random(), dir: Math.random() < 0.5 ? -1 : 1, s, life: 1 });
+      if (s >= 0.3) st.flares.push({ u: Math.random(), dir: Math.random() < 0.5 ? -1 : 1, s, life: 1 });
+      if (s >= 0.7 || m.firstDrop) { st.corona = 1; st.meteors.push(vizMeteor(w, h)); }
+      if (st.flares.length > 6) st.flares.splice(0, st.flares.length - 6);
+    }
+    st.nextMeteor -= dt * lv;
+    if (st.nextMeteor <= 0) { st.meteors.push(vizMeteor(w, h)); st.nextMeteor = 7 + Math.random() * 10; }
+    st.corona = Math.max(0, st.corona - dt * 0.7);
+    for (let k = st.flares.length - 1; k >= 0; k--) {
+      const fl = st.flares[k];
+      fl.u += fl.dir * dt * (0.3 + 0.2 * fl.s);
+      fl.life -= dt * 0.45;
+      if (fl.life <= 0 || fl.u < -0.2 || fl.u > 1.2) st.flares.splice(k, 1);
+    }
+    const steps = 60;
+    for (let i = 0; i <= steps; i++) {
+      const u = i / steps;
+      let b = 0;
+      for (const fl of st.flares) {
+        const d = (u - fl.u) / 0.13;
+        b += (0.5 + 1.0 * fl.s) * Math.min(1, fl.life * 2) * Math.exp(-d * d);
+      }
+      st.bump[i] = b;
+    }
+    const bumpAt = (u) => st.bump[Math.max(0, Math.min(steps, Math.round(u * steps)))];
     for (const s of st.stars) {
       g.fillStyle = vizColor(VIZ_WHITE, (0.2 + 0.5 * s.b * (0.5 + 0.5 * Math.sin(ck * 1.5 + s.t))) * bright);
       g.fillRect(s.x * w, s.y * h, 1.4 * dpr, 1.4 * dpr);
     }
     g.globalCompositeOperation = 'lighter';
-    const steps = 60;
+    vizMeteors(g, st.meteors, dt, dpr, bright);
+    if (st.corona > 0) {
+      // The corona: the sky glowing, rays spreading from high overhead.
+      g.fillStyle = rgba(pal[0], st.corona * 0.12 * bright);
+      g.fillRect(0, 0, w, h);
+      const ox = w / 2;
+      const oy = -h * 0.15;
+      g.lineWidth = 3 * dpr;
+      for (let i = 0; i < 28; i++) {
+        const a = Math.PI / 2 + ((i / 27) - 0.5) * 2.2;
+        const len = h * (0.5 + 0.35 * Math.sin(i * 2.7 + ck));
+        g.strokeStyle = rgba(pal[i % 3], st.corona * 0.22 * bright);
+        g.beginPath();
+        g.moveTo(ox + Math.cos(a) * h * 0.2, oy + Math.sin(a) * h * 0.2);
+        g.lineTo(ox + Math.cos(a) * len, oy + Math.sin(a) * len);
+        g.stroke();
+      }
+    }
     for (let c = 0; c < 3; c++) {
       const base = h * (0.16 + c * 0.07);
       const depth = h * (0.22 + 0.22 * loud * lv + 0.08 * kick) * (1 - c * 0.15);
       const topAt = (u) => base + h * 0.05 * Math.sin(u * 6 + ck * (0.5 + c * 0.2) + c) + h * 0.03 * Math.sin(u * 13 - ck * 0.8 + c * 2);
       const color = pal[c];
-      const glow = (0.28 + 0.4 * kick + 0.12 * snare) * (0.35 + 0.65 * bright);
-      const grad = g.createLinearGradient(0, base - h * 0.08, 0, base + depth + h * 0.08);
+      const glow = (0.28 + 0.4 * kick + 0.12 * snare + 0.2 * st.corona) * (0.35 + 0.65 * bright);
+      const grad = g.createLinearGradient(0, base - h * 0.08, 0, base + depth * 1.4 + h * 0.08);
       grad.addColorStop(0, rgba(color, 0));
       grad.addColorStop(0.25, rgba(color, glow * 0.9));
       grad.addColorStop(0.7, rgba(color, glow * 0.35));
@@ -19332,70 +19522,139 @@ const FULL_SCENES = {
       }
       for (let i = steps; i >= 0; i--) {
         const u = i / steps;
-        g.lineTo(u * w, topAt(u) + depth * (0.75 + 0.25 * Math.sin(u * 9 + ck + c)));
+        g.lineTo(u * w, topAt(u) + depth * (0.75 + 0.25 * Math.sin(u * 9 + ck + c)) * (1 + 0.25 * st.bump[i]));
       }
       g.closePath();
       g.fill();
-      // The folds: faint rays hanging from the top edge.
+      // The folds: faint rays hanging from the top edge, blazing where a
+      // flare is passing.
       g.lineWidth = 2 * dpr;
+      const hot = vizWhiter(color, 0.6);
       for (let i = 0; i <= 50; i++) {
         const u = i / 50;
         const x = u * w;
         const y = topAt(u);
-        const a = glow * 0.35 * (0.5 + 0.5 * Math.sin(u * 40 + ck * 2 + c * 3));
-        g.strokeStyle = rgba(color, a);
+        const b = bumpAt(u);
+        const a = glow * 0.35 * (0.5 + 0.5 * Math.sin(u * 40 + ck * 2 + c * 3)) * (1 + 1.5 * b);
+        g.strokeStyle = rgba(b > 0.6 ? hot : color, Math.min(0.8, a));
         g.beginPath();
         g.moveTo(x, y);
-        g.lineTo(x, y + depth * 0.8);
+        g.lineTo(x, y + depth * (0.8 + 0.3 * b));
         g.stroke();
       }
     }
+    // Where each flare is, a glow on the curtain.
+    for (const fl of st.flares) {
+      if (fl.u < 0 || fl.u > 1) continue;
+      vizGlow(g, vizWhiter(pal[0], 0.5), fl.u * w, h * 0.3, h * (0.12 + 0.1 * fl.s), Math.min(1, fl.life * 2) * 0.45 * bright);
+    }
     g.globalCompositeOperation = 'source-over';
+    // Mountains along the foot, against the glow.
+    const top = h * 0.84;
+    g.fillStyle = 'rgba(3, 5, 12, 0.96)';
+    g.beginPath();
+    g.moveTo(0, h);
+    st.ridge.forEach((v, i) => g.lineTo((i / (st.ridge.length - 1)) * w, top + (1 - v) * h * 0.09));
+    g.lineTo(w, h);
+    g.closePath();
+    g.fill();
   },
 
-  // Lava: big soft glowing blobs rising and wobbling like a lava lamp,
-  // bouncing on the kick, with small bubbles popping on the snare.
+  // Lava: big soft glowing blobs rising and wobbling like a lava lamp over a
+  // hot glow at the foot, bouncing on the kick, small bubbles popping on the
+  // snare. A strike is an eruption: the heat flares, glowing drops are flung
+  // up from it and fall back, and the nearest blob shoots upward - more and
+  // higher the harder it hits; a big one also sends up a new blob.
   lava(st, m) {
     const { g, f, w, h, dpr, pal, rgba, dt, ck, kick, snare, loud, lv, bright } = m;
     f.clearRect(0, 0, w, h);
     g.clearRect(0, 0, w, h);
     const S = Math.min(w, h);
     if (!st.blobs) {
-      st.blobs = Array.from({ length: 9 }, (_, i) => ({ x: Math.random() * w, y: Math.random() * h, r: S * (0.12 + Math.random() * 0.14), v: 0.3 + Math.random() * 0.7, ph: Math.random() * 6, c: i % 3 }));
+      st.blobs = Array.from({ length: 9 }, (_, i) => ({ x: Math.random() * w, y: Math.random() * h, r: S * (0.12 + Math.random() * 0.14), v: 0.3 + Math.random() * 0.7, ph: Math.random() * 6, c: i % 3, boost: 0 }));
       st.bubbles = [];
+      st.drops = [];
       st.snare = 0;
+      st.heat = 0;
     }
+    if (m.drop) {
+      const s = strikeSize(m);
+      st.heat = Math.max(st.heat, 0.4 + 0.6 * s);
+      const n = Math.round(8 + 34 * s) + (m.firstDrop ? 20 : 0);
+      const at = w * (0.25 + 0.5 * Math.random());
+      for (let i = 0; i < n && st.drops.length < 220; i++) {
+        st.drops.push({ x: at + (Math.random() - 0.5) * S * 0.25, y: h + S * 0.02, vx: (Math.random() - 0.5) * S * 0.6, vy: -S * (0.6 + 0.9 * Math.random()) * (0.6 + 0.6 * s), r: S * (0.006 + 0.016 * Math.random()), life: 1, c: Math.floor(Math.random() * 3) });
+      }
+      let near = null;
+      for (const b of st.blobs) if (!near || Math.abs(b.x - at) + Math.abs(b.y - h) * 0.5 < Math.abs(near.x - at) + Math.abs(near.y - h) * 0.5) near = b;
+      if (near) near.boost = 1;
+      if ((s >= 0.7 || m.firstDrop) && st.blobs.length < 12) {
+        st.blobs.push({ x: at, y: h + S * 0.15, r: S * (0.1 + Math.random() * 0.1), v: 0.6 + Math.random() * 0.5, ph: Math.random() * 6, c: Math.floor(Math.random() * 3), boost: 1, fresh: true });
+      }
+    }
+    st.heat = Math.max(0, st.heat - dt * 1.1);
+    const cores = [0, 1, 2].map((c) => vizWhiter(pal[c], 0.55));
     g.globalCompositeOperation = 'lighter';
+    // The heat at the foot.
+    vizGlow(g, pal[0], w / 2, h * 1.08, S * (0.7 + 0.25 * loud + 0.6 * st.heat), (0.35 + 0.15 * kick + 0.5 * st.heat) * bright);
+    if (st.heat > 0.05) vizGlow(g, VIZ_WHITE, w / 2, h * 1.02, S * 0.45 * st.heat, st.heat * 0.35);
     const rise = h * (0.03 + 0.12 * loud * lv) * dt;
-    for (const b of st.blobs) {
-      b.y -= rise * b.v;
-      if (b.y < -b.r * 1.5) { b.y = h + b.r * 1.5; b.x = Math.random() * w; }
+    for (let i = st.blobs.length - 1; i >= 0; i--) {
+      const b = st.blobs[i];
+      b.boost = Math.max(0, b.boost - dt * 0.7);
+      b.y -= rise * b.v * (1 + 4 * b.boost) + h * 0.25 * b.boost * dt;
+      if (b.y < -b.r * 1.5) {
+        // A blob sent up by a strike goes once it is through; the rest
+        // come round again from the foot.
+        if (b.fresh) { st.blobs.splice(i, 1); continue; }
+        b.y = h + b.r * 1.5;
+        b.x = Math.random() * w;
+      }
       const x = b.x + Math.sin(ck * 0.4 * b.v + b.ph) * S * 0.08;
       const r = b.r * (1 + 0.08 * Math.sin(ck * 1.3 + b.ph) + 0.18 * kick);
-      const grad = g.createRadialGradient(x, b.y, 0, x, b.y, r);
+      // Stretched upright as it rises fast.
+      const stretch = 1 + 0.35 * b.boost;
+      g.save();
+      g.translate(x, b.y);
+      g.scale(1 / Math.sqrt(stretch), stretch);
+      const grad = g.createRadialGradient(0, 0, 0, 0, 0, r);
       grad.addColorStop(0, rgba(pal[b.c], 0.75 * (0.45 + 0.55 * bright)));
       grad.addColorStop(0.55, rgba(pal[b.c], 0.45 * (0.45 + 0.55 * bright)));
       grad.addColorStop(1, rgba(pal[b.c], 0));
       g.fillStyle = grad;
       g.beginPath();
-      g.arc(x, b.y, r, 0, Math.PI * 2);
+      g.arc(0, 0, r, 0, TAU);
       g.fill();
+      g.restore();
+      // A hotter heart.
+      vizGlow(g, cores[b.c], x - r * 0.15, b.y - r * 0.2, r * 0.5, (0.22 + 0.4 * b.boost) * bright);
     }
     if (snare - st.snare > 0.3 && lv > 0.3) {
       for (let i = 0; i < 6; i++) st.bubbles.push({ x: Math.random() * w, y: h * (0.6 + Math.random() * 0.4), r: (2 + Math.random() * 5) * dpr, life: 1, c: Math.floor(Math.random() * 3) });
     }
     st.snare = snare;
-    st.bubbles = st.bubbles.filter((bb) => {
+    for (let k = st.bubbles.length - 1; k >= 0; k--) {
+      const bb = st.bubbles[k];
       bb.life -= dt * 0.9;
       bb.y -= h * 0.25 * dt;
-      if (bb.life <= 0) return false;
+      if (bb.life <= 0) { st.bubbles.splice(k, 1); continue; }
       g.strokeStyle = rgba(pal[bb.c], bb.life * 0.8 * bright);
       g.lineWidth = 1.2 * dpr;
       g.beginPath();
-      g.arc(bb.x, bb.y, bb.r * (1 + (1 - bb.life) * 0.6), 0, Math.PI * 2);
+      g.arc(bb.x, bb.y, bb.r * (1 + (1 - bb.life) * 0.6), 0, TAU);
       g.stroke();
-      return true;
-    });
+    }
+    // The eruption's drops, flung up and falling back.
+    for (let k = st.drops.length - 1; k >= 0; k--) {
+      const d = st.drops[k];
+      d.life -= dt * 0.45;
+      d.vy += S * 1.25 * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      if (d.life <= 0 || (d.vy > 0 && d.y > h + S * 0.05)) { st.drops.splice(k, 1); continue; }
+      vizGlow(g, pal[d.c], d.x, d.y, d.r * 3.2, d.life * 0.7 * bright);
+      vizGlow(g, cores[d.c], d.x, d.y, d.r * 1.1, d.life);
+    }
     g.globalCompositeOperation = 'source-over';
   },
 };
@@ -20013,24 +20272,230 @@ const VIZ_SCENES = {
   flow: (st, m) => flowScene(st, m),
   analysis: (st, m) => analysisScene(st, m),
   ...FULL_SCENES,
+  // Orb: a nebula and turning rays behind an orb of six glowing layers whose
+  // edges are travelling waves, a flashing core, rippling rings, and a vortex
+  // of particles thrown out on the beats that stand out. Plasma crawls over
+  // its edge, and a strike throws prominences - loops arching off it as a
+  // sun's do, more and taller the harder it hits; the big ones fling a
+  // corona of streaks and the vortex with it.
+  pulse(st, m) {
+    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, ck, kick, snare, loud, lv, e, drive, bright, playing, beatNo, novelty, downbeat, dropEnv } = m;
+    const R0 = size * 0.3;
+    g.clearRect(0, 0, w, h);
+    g.globalCompositeOperation = 'lighter';
+    // A nebula behind it, in the cover's colours.
+    for (let i = 0; i < 3; i++) {
+      const ang = ck * 0.3 + i * 2.1;
+      vizGlow(g, pal[i], cx + Math.cos(ang) * R0 * 0.9, cy + Math.sin(ang * 1.2) * R0 * 0.9,
+        R0 * (2.2 + 0.5 * kick * drive), 0.26 * (0.4 + 0.6 * lv) * bright);
+    }
+    // Light rays turning slowly, brighter on the beat.
+    g.save();
+    g.translate(cx, cy);
+    g.rotate(ck * 0.12);
+    const rays = 18;
+    for (let i = 0; i < rays; i++) {
+      const a0 = (i / rays) * TAU;
+      const len = R0 * (2.4 + 0.8 * Math.sin(ck * 1.3 + i * 1.9) + 1.2 * kick * drive);
+      const grad = g.createLinearGradient(0, 0, Math.cos(a0) * len, Math.sin(a0) * len);
+      grad.addColorStop(0, rgba(pal[i % 3], 0.16 * (0.3 + kick)));
+      grad.addColorStop(1, rgba(pal[i % 3], 0));
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.arc(0, 0, len, a0 - 0.05, a0 + 0.05);
+      g.closePath();
+      g.fill();
+    }
+    g.restore();
+    // The orb: six layers, each a closed shape whose edge is a sum of waves
+    // travelling round it. Added together they glow white where they overlap.
+    const pts = 120;
+    ORB_LAYERS.forEach((layer, l) => {
+      const R = R0 * (0.72 + l * 0.085) * (1 + 0.22 * kick * drive);
+      const amp = 0.05 + 0.06 * e + 0.1 * kick * drive;
+      const spike = 0.07 * snare * drive;
+      g.beginPath();
+      for (let p = 0; p <= pts; p++) {
+        const th = (p / pts) * TAU;
+        let r = 1;
+        for (const wv of layer.waves) r += (amp / layer.waves.length) * 2 * Math.sin(wv.k * th + wv.speed * ck * 2 + wv.ph);
+        r += spike * Math.sin(13 * th + ck * 6 + l);
+        const a = th + layer.spin * ck * 2;
+        const x = cx + Math.cos(a) * R * r;
+        const y = cy + Math.sin(a) * R * r;
+        if (p) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.closePath();
+      const grad = g.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 1.25);
+      grad.addColorStop(0, rgba(pal[l % 3], 0.05 * bright));
+      grad.addColorStop(0.6, rgba(pal[l % 3], (0.2 + 0.1 * lv) * bright));
+      grad.addColorStop(1, rgba(pal[l % 3], 0.04 * bright));
+      g.fillStyle = grad;
+      g.fill();
+    });
+    // A bright core that flashes on the kick.
+    vizGlow(g, VIZ_WHITE, cx, cy, R0 * (0.9 + 0.5 * kick), 0.1 + 0.1 * bright + 0.4 * kick);
+    // Thin rings round it, rippling fast.
+    g.lineWidth = 1.4 * dpr;
+    for (let i = 0; i < 3; i++) {
+      const R = R0 * (1.35 + i * 0.16) * (1 + 0.12 * kick * drive);
+      g.strokeStyle = rgba(pal[(i + 1) % 3], (0.35 + 0.35 * lv) * bright);
+      g.beginPath();
+      for (let p = 0; p <= pts; p++) {
+        const th = (p / pts) * TAU;
+        const r = 1 + (0.015 + 0.05 * snare * drive) * Math.sin((9 + i * 3) * th - ck * (3 + i)) + 0.02 * Math.sin(4 * th + ck * 1.7 + i);
+        const x = cx + Math.cos(th) * R * r;
+        const y = cy + Math.sin(th) * R * r;
+        if (p) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.closePath();
+      g.stroke();
+    }
+    // Plasma crawling over its edge: a few low loops, taller when loud.
+    const rim = R0 * 0.98 * (1 + 0.22 * kick * drive);
+    if (!st.loops) {
+      st.loops = Array.from({ length: 5 }, (_, i) => ({ a: Math.random() * TAU, sp: (0.12 + Math.random() * 0.3) * (i % 2 ? -1 : 1),
+        span: 0.22 + Math.random() * 0.3, c: i % 3, seed: Math.random() * 9 }));
+      st.flares = [];
+      st.corona = 0;
+    }
+    for (const lp of st.loops) {
+      lp.a += lp.sp * dt * (0.4 + lv);
+      plasmaArc(g, cx, cy, rim, lp.a, lp.span, R0 * (0.06 + 0.16 * loud * lv + 0.1 * kick), pal[lp.c],
+        (0.25 + 0.4 * lv) * bright, dpr, ck * 2 + lp.seed, 0.6);
+    }
+    // A strike: prominences erupting off the edge, and for the big ones a
+    // corona and the vortex flung outward.
+    if (m.drop) {
+      const s = strikeSize(m);
+      const n = 1 + Math.round(s * 4) + (m.firstDrop ? 2 : 0);
+      for (let i = 0; i < n; i++) {
+        st.flares.push({ a: Math.random() * TAU, span: 0.35 + Math.random() * 0.45 + s * 0.4, hgt: R0 * (0.35 + 1.15 * s) * (0.6 + Math.random() * 0.6),
+          life: 1, rate: 0.8 + Math.random() * 0.5, c: Math.floor(Math.random() * 3), seed: Math.random() * 9 });
+      }
+      if (st.flares.length > 14) st.flares.splice(0, st.flares.length - 14);
+      if (s >= 0.7 || m.firstDrop) {
+        st.corona = 1;
+        st.coronaS = Math.max(s, 0.7);
+        for (const d of st.dots || []) d.v += 2.6 * st.coronaS * (0.6 + Math.random() * 0.8);
+      }
+    }
+    for (let i = st.flares.length - 1; i >= 0; i--) {
+      const fl = st.flares[i];
+      fl.life -= dt * fl.rate;
+      if (fl.life <= 0) { st.flares.splice(i, 1); continue; }
+      // It erupts fast, then sinks back as it fades.
+      const k = Math.min(1, (1 - fl.life) * 6) * fl.life ** 0.5;
+      plasmaArc(g, cx, cy, rim, fl.a, fl.span, fl.hgt * k, pal[fl.c], Math.min(1, fl.life * 1.8) * (0.5 + 0.5 * bright), dpr, ck * 5 + fl.seed, 1.2);
+      for (const side of [-0.5, 0.5]) {
+        const fa = fl.a + fl.span * side;
+        vizGlow(g, vizWhiter(pal[fl.c], 0.4), cx + Math.cos(fa) * rim, cy + Math.sin(fa) * rim, R0 * 0.2, 0.55 * fl.life * bright);
+      }
+    }
+    if (st.corona > 0) {
+      st.corona = Math.max(0, st.corona - dt * 1.5);
+      const c = st.corona;
+      const out = 1 - c;
+      g.beginPath();
+      for (let i = 0; i < 40; i++) {
+        const a = (i / 40) * TAU + ((i * 0.618) % 1) * 0.12;
+        const r1 = rim * (1.05 + out * 0.5);
+        const r2 = rim * (1.3 + out * (1.6 + 2 * st.coronaS)) * (0.6 + 0.4 * ((i * 0.37) % 1));
+        g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+        g.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+      }
+      g.strokeStyle = vizColor(VIZ_WHITE, c * 0.55 * lv);
+      g.lineWidth = (1 + 2 * c) * dpr;
+      g.stroke();
+      vizGlow(g, VIZ_WHITE, cx, cy, R0 * (2 + 2 * st.coronaS), c * c * 0.45);
+    }
+    // A white shock ring and a flash, for every strike.
+    if (dropEnv > 0 && lv > 0.05) {
+      const p = 1 - dropEnv;
+      g.lineWidth = (2 + 6 * dropEnv) * dpr;
+      g.strokeStyle = vizColor(VIZ_WHITE, dropEnv * 0.7 * lv);
+      g.beginPath();
+      g.arc(cx, cy, R0 * (1.2 + p * 2.6), 0, TAU);
+      g.stroke();
+      vizGlow(g, VIZ_WHITE, cx, cy, R0 * 3, dropEnv * dropEnv * 0.4);
+    }
+    g.globalCompositeOperation = 'source-over';
+
+    // ---- the vortex, on the canvas that fades rather than clears
+    f.globalCompositeOperation = 'destination-out';
+    f.fillStyle = `rgba(0, 0, 0, ${playing ? 0.2 : 0.35})`;
+    f.fillRect(0, 0, w, h);
+    f.globalCompositeOperation = 'lighter';
+    if (!st.dots) {
+      st.dots = [];
+      for (let i = 0; i < Math.round(240 * VIZ_DENSITY); i++) {
+        const home = 1.25 + Math.random() * 1.3;
+        st.dots.push({ a: Math.random() * TAU, r: home, home, v: 0, spin: 0.25 + Math.random() * 0.6, size: 0.8 + Math.random() * 1.8, c: i % 3 });
+      }
+    }
+    // Every beat that stands out throws them outward; a spring brings them back.
+    if (playing && beatNo !== st.lastBeat && (novelty > 0.4 || downbeat)) {
+      st.lastBeat = beatNo;
+      const push = (0.4 + 0.9 * e) * (0.6 + 1.4 * novelty) * (0.3 + 0.9 * loud);
+      for (const d of st.dots) d.v += push * (0.4 + Math.random() * 0.8);
+    }
+    for (const d of st.dots) {
+      d.v += ((d.home - d.r) * 9 - d.v * 3.2) * dt;
+      d.r += d.v * dt;
+      d.a += (d.spin / d.r) * dt * (0.6 + 1.4 * lv) * (1 + kick);
+      const rr = R0 * d.r;
+      d.px = d.x === undefined ? cx + Math.cos(d.a) * rr : d.x;
+      d.py = d.y === undefined ? cy + Math.sin(d.a) * rr * 0.92 : d.y;
+      d.x = cx + Math.cos(d.a) * rr;
+      d.y = cy + Math.sin(d.a) * rr * 0.92;
+    }
+    // Streaks from where each was, in six batches (three colours, two
+    // weights) - a stroke each was garbage enough to make a phone skip.
+    const streak = (0.55 + 0.4 * lv) * (0.45 + 0.55 * bright);
+    f.lineCap = 'round';
+    for (let c = 0; c < 3; c++) {
+      for (let big = 0; big < 2; big++) {
+        f.beginPath();
+        for (const d of st.dots) {
+          if (d.c !== c || (d.size >= 1.7) !== (big === 1)) continue;
+          f.moveTo(d.px, d.py);
+          f.lineTo(d.x, d.y);
+        }
+        f.strokeStyle = rgba(pal[c], streak);
+        f.lineWidth = (big ? 2.2 : 1.2) * dpr * (1 + kick * 0.6);
+        f.stroke();
+      }
+    }
+    f.globalCompositeOperation = 'source-over';
+  },
+
   // Spectrum: a mirrored equalizer across the screen, bass in the middle
   // jumping with the kick, highs at the edges snapping with the snare, peak
-  // caps falling slowly, and a reflection below.
+  // caps falling slowly, embers drifting off the tall bars, and a reflection
+  // below. A strike overloads it: bars fire beams up the screen and their
+  // caps fly off as sparks - one bar for a small strike, a handful for a
+  // middling one, and for a big one every bar, the whole flashing and a line
+  // of light sweeping out along the floor.
   bars(st, m) {
-    const { g, f, w, h, cx, cy, size, pal, rgba, dt, ck, kick, snare, loud, lv, drive, bright } = m;
+    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, ck, kick, snare, loud, lv, drive, bright } = m;
     f.clearRect(0, 0, w, h);
     g.clearRect(0, 0, w, h);
     const half = 24;
-    if (!st.v) { st.v = new Float32Array(half); st.peak = new Float32Array(half); }
+    if (!st.v) {
+      st.v = new Float32Array(half);
+      st.peak = new Float32Array(half);
+      st.lit = new Float32Array(half);
+      st.beams = [];
+      st.sparks = [];
+      st.embers = [];
+      st.sweeps = [];
+      st.flash = 0;
+    }
     const span = size * 0.56; // each side: the whole fits a phone's width
     const base = cy + size * 0.18;
     const bw = span / half;
-    // A glow under them, brighter when loud.
-    const glow = g.createRadialGradient(cx, base, 0, cx, base, size * 0.9);
-    glow.addColorStop(0, rgba(pal[0], 0.25 * bright * (0.4 + 0.6 * lv)));
-    glow.addColorStop(1, rgba(pal[0], 0));
-    g.fillStyle = glow;
-    g.fillRect(0, 0, w, h);
+    const H = size * 0.62;
     for (let i = 0; i < half; i++) {
       const fq = i / (half - 1);
       const low = Math.exp(-fq * 3.5);
@@ -20039,118 +20504,302 @@ const VIZ_SCENES = {
       const target = lv * (low * kick * 1.1 + high * snare * 0.9 + (0.15 + 0.55 * loud) * (0.35 + 0.65 * wander) * (1 - 0.4 * fq)) * drive;
       st.v[i] = target > st.v[i] ? st.v[i] + (target - st.v[i]) * 0.6 : Math.max(target, st.v[i] - dt * 1.6);
       st.peak[i] = Math.max(st.peak[i] - dt * 0.45, st.v[i]);
+      st.lit[i] = Math.max(0, st.lit[i] - dt * 2.2);
     }
+    const capY = (i) => base - st.peak[i] * H - size * 0.02;
+    // The cover's colours a little whiter, worked out once a frame.
+    const warm = [vizWhiter(pal[0], 0.4), vizWhiter(pal[1], 0.4), vizWhiter(pal[2], 0.4)];
+    const colX = (side, i) => cx + side * (i + 0.5) * bw;
+    if (m.drop) {
+      const s = strikeSize(m);
+      const all = s >= 0.7 || m.firstDrop;
+      const n = all ? half * 2 : s >= 0.3 ? 3 + Math.round(s * 5) : 1;
+      st.flash = Math.max(st.flash, all ? 1 : 0.25 + 0.5 * s);
+      for (let k = 0; k < n; k++) {
+        const i = all ? k >> 1 : Math.min(half - 1, Math.floor(Math.random() ** 0.7 * half));
+        const side = all ? (k % 2 ? 1 : -1) : (Math.random() < 0.5 ? -1 : 1);
+        st.v[i] = Math.min(all ? 1.05 : 1.3, st.v[i] + (all ? 0.25 : 0.35 + 0.5 * s));
+        st.peak[i] = Math.max(st.peak[i], st.v[i]);
+        st.lit[i] = 1;
+        // Every bar's beam at once is a softer, ragged row of them, not a
+        // wall of white.
+        st.beams.push({ i, side, life: all ? 0.75 + Math.random() * 0.25 : 1, s: all ? 0.25 : s, reach: all ? 0.35 + Math.random() * 0.65 : 1, c: i % 3, col: warm[i % 3] });
+        const x = colX(side, i);
+        const y = capY(i);
+        for (let j = 0; j < (all ? 3 : 6); j++) {
+          st.sparks.push({ x, y, px: x, py: y, vx: (Math.random() - 0.5) * size * 0.5, vy: -size * (0.35 + 0.9 * Math.random()) * (0.6 + 0.7 * s), life: 1, col: warm[i % 3] });
+        }
+      }
+      if (all) st.sweeps.push({ p: 0, life: 1 });
+      if (st.beams.length > 60) st.beams.splice(0, st.beams.length - 60);
+      if (st.sparks.length > 400) st.sparks.splice(0, st.sparks.length - 400);
+    }
+    st.flash = Math.max(0, st.flash - dt * 2.4);
     g.globalCompositeOperation = 'lighter';
+    // A glow under them, brighter when loud and on a strike.
+    vizGlow(g, pal[0], cx, base, size * 0.95, (0.32 * (0.4 + 0.6 * lv) + 0.35 * st.flash) * bright);
+    // The floor they stand on.
+    g.fillStyle = rgba(pal[1], (0.3 + 0.4 * st.flash) * bright);
+    g.fillRect(cx - span - bw, base + size * 0.006, (span + bw) * 2, 1.5 * dpr);
     for (const side of [-1, 1]) {
       for (let i = 0; i < half; i++) {
-        const x = cx + side * (i + 0.5) * bw - bw * 0.36;
-        const bh = Math.max(size * 0.012, st.v[i] * size * 0.62);
+        const x = colX(side, i) - bw * 0.36;
+        const bh = Math.max(size * 0.012, st.v[i] * H);
         const c = pal[i % 3];
+        const hot = st.lit[i] + st.flash * 0.6;
+        const top = hot > 0.05 ? vizWhiter(c, Math.min(0.8, hot)) : c;
         const grad = g.createLinearGradient(0, base - bh, 0, base);
-        grad.addColorStop(0, rgba(c, 0.95 * (0.5 + 0.5 * bright)));
+        grad.addColorStop(0, rgba(top, 0.95 * (0.5 + 0.5 * bright)));
         grad.addColorStop(1, rgba(pal[(i + 1) % 3], 0.55 * (0.5 + 0.5 * bright)));
         g.fillStyle = grad;
         g.fillRect(x, base - bh, bw * 0.72, bh);
         // The reflection, faint and squashed.
-        g.fillStyle = rgba(c, 0.16 * bright);
+        g.fillStyle = rgba(c, (0.16 + 0.2 * hot) * bright);
         g.fillRect(x, base + size * 0.02, bw * 0.72, bh * 0.35);
-        // The peak cap.
+        // The peak cap, and a small glow on it.
         g.fillStyle = vizColor(VIZ_WHITE, 0.5 + 0.4 * bright);
-        g.fillRect(x, base - st.peak[i] * size * 0.62 - size * 0.02, bw * 0.72, size * 0.01);
+        g.fillRect(x, capY(i), bw * 0.72, size * 0.01);
+        if (st.peak[i] > 0.35) vizGlow(g, c, x + bw * 0.36, capY(i), bw * 1.6, (st.peak[i] - 0.3) * 0.5 * bright);
+        // Embers drifting up off the tall ones.
+        if (st.v[i] > 0.5 && st.embers.length < 140 && Math.random() < dt * 5 * (st.v[i] - 0.45)) {
+          st.embers.push({ x: x + Math.random() * bw * 0.72, y: base - bh, vy: -size * (0.08 + 0.18 * Math.random()), dx: (Math.random() - 0.5) * size * 0.05, life: 1, col: warm[i % 3], ph: Math.random() * 9 });
+        }
       }
+    }
+    for (let k = st.embers.length - 1; k >= 0; k--) {
+      const em = st.embers[k];
+      em.life -= dt * 0.7;
+      if (em.life <= 0) { st.embers.splice(k, 1); continue; }
+      em.y += em.vy * dt;
+      em.x += (em.dx + Math.sin(ck * 3 + em.ph) * size * 0.02) * dt;
+      const a = em.life * (0.5 + 0.5 * Math.sin(ck * 9 + em.ph)) * bright;
+      g.fillStyle = rgba(em.col, a);
+      g.fillRect(em.x, em.y, 1.6 * dpr, 1.6 * dpr);
+    }
+    // The beams, up from the bars to the top of the screen.
+    for (let k = st.beams.length - 1; k >= 0; k--) {
+      const bm = st.beams[k];
+      bm.life -= dt * (1.4 + 0.6 * (1 - bm.s));
+      if (bm.life <= 0) { st.beams.splice(k, 1); continue; }
+      const x = colX(bm.side, bm.i);
+      const y = base - st.v[bm.i] * H;
+      const bwid = bw * (0.5 + 0.9 * bm.s) * (0.6 + 0.4 * bm.life);
+      const grad = g.createLinearGradient(0, y, 0, y * (1 - bm.reach));
+      grad.addColorStop(0, rgba(bm.col, bm.life * (0.55 + 0.4 * bm.s) * bright));
+      grad.addColorStop(1, rgba(pal[bm.c], 0));
+      g.fillStyle = grad;
+      const topY = y * (1 - bm.reach);
+      g.fillRect(x - bwid / 2, topY, bwid, y - topY);
+      g.fillStyle = vizColor(VIZ_WHITE, bm.life * 0.8 * (bm.reach < 1 ? 0.5 : 1));
+      g.fillRect(x - dpr * 0.75, topY + (y - topY) * (1 - bm.life) * 0.5, dpr * 1.5, (y - topY) * (0.5 + 0.5 * bm.life));
+      vizGlow(g, VIZ_WHITE, x, y, bw * 2.5, bm.life * 0.6);
+    }
+    // The caps that flew, falling back.
+    g.lineCap = 'round';
+    g.lineWidth = 1.8 * dpr;
+    for (let k = st.sparks.length - 1; k >= 0; k--) {
+      const p = st.sparks[k];
+      p.life -= dt * 0.9;
+      if (p.life <= 0) { st.sparks.splice(k, 1); continue; }
+      p.px = p.x; p.py = p.y;
+      p.vy += size * 1.1 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      g.strokeStyle = rgba(p.col, Math.min(1, p.life * 1.4) * bright);
+      g.beginPath();
+      g.moveTo(p.px, p.py);
+      g.lineTo(p.x, p.y);
+      g.stroke();
+    }
+    // A big strike's line of light along the floor, out to both edges.
+    for (let k = st.sweeps.length - 1; k >= 0; k--) {
+      const sw = st.sweeps[k];
+      sw.p += dt * 1.5;
+      sw.life -= dt * 1.2;
+      if (sw.life <= 0) { st.sweeps.splice(k, 1); continue; }
+      const reach = Math.min(1, sw.p) * (span + bw * 2);
+      g.fillStyle = vizColor(VIZ_WHITE, sw.life * 0.8);
+      g.fillRect(cx - reach, base, reach * 2, 2 * dpr);
+      for (const side of [-1, 1]) vizGlow(g, VIZ_WHITE, cx + side * reach, base, size * 0.12, sw.life);
     }
     g.globalCompositeOperation = 'source-over';
   },
 
   // Warp: a hyperspace tunnel - stars streaking past, faster as it gets
-  // louder and on every kick, and turning rings of a tunnel flashing on the
-  // first beat of a bar.
+  // louder and on every kick, glowing clouds of nebula rushing by, and
+  // turning rings of a tunnel. A strike is a jump: the stars stretch into
+  // long lines, a shock wave in the cover's colours rushes out from the
+  // middle, and on a big one the tunnel flashes white and the screen with it.
   warp(st, m) {
-    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, ck, kick, loud, lv, e, downbeat, phase, bright } = m;
+    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, ck, kick, loud, lv, e, bright } = m;
     f.clearRect(0, 0, w, h);
     g.clearRect(0, 0, w, h);
     if (!st.stars) {
       st.stars = Array.from({ length: Math.round(320 * VIZ_DENSITY) }, () => ({ x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random(), c: Math.floor(Math.random() * 3) }));
       st.rings = Array.from({ length: 9 }, (_, i) => i / 9);
+      st.clouds = Array.from({ length: 6 }, (_, i) => ({ x: (Math.random() * 2 - 1) * 1.3, y: (Math.random() * 2 - 1) * 1.3, z: (i + 1) / 6, c: i % 3 }));
+      st.shocks = [];
+      st.jump = 0;
+      st.white = 0;
     }
-    const speed = (0.08 + (0.35 + 1.4 * loud) * lv * (0.6 + 0.6 * e) + 1.2 * kick + 2 * m.dropEnv) * dt;
+    if (m.drop) {
+      const s = strikeSize(m);
+      st.jump = Math.max(st.jump, 0.3 + 0.7 * s);
+      st.shocks.push({ r: 0, life: 1, s });
+      if (s >= 0.7 || m.firstDrop) st.white = 1;
+      if (m.firstDrop) st.shocks.push({ r: -size * 0.25, life: 1, s });
+      if (st.shocks.length > 6) st.shocks.shift();
+    }
+    st.jump = Math.max(0, st.jump - dt * 1.1);
+    st.white = Math.max(0, st.white - dt * 2);
+    const speed = (0.08 + (0.35 + 1.4 * loud) * lv * (0.6 + 0.6 * e) + 1.2 * kick + 2 * m.dropEnv + 5 * st.jump) * dt;
     const focal = size * 0.32;
-    // A flash in the middle on the kick.
-    const core = g.createRadialGradient(cx, cy, 0, cx, cy, size * (0.35 + 0.3 * kick));
-    core.addColorStop(0, vizColor(VIZ_WHITE, 0.08 + 0.45 * kick));
-    core.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    g.fillStyle = core;
-    g.fillRect(0, 0, w, h);
+    const ringCol = st.white > 0.05 ? [0, 1, 2].map((c) => vizWhiter(pal[c], st.white)) : pal;
+    const starCol = st.jump > 0.3 ? [0, 1, 2].map((c) => vizWhiter(pal[c], st.jump * 0.6)) : pal;
     g.globalCompositeOperation = 'lighter';
-    // The tunnel: hexagons coming towards you, turning.
+    // A flash in the middle on the kick, and more on a jump.
+    vizGlow(g, VIZ_WHITE, cx, cy, size * (0.35 + 0.3 * kick + 0.4 * st.jump), 0.08 + 0.45 * kick + 0.5 * st.jump);
+    // Clouds of nebula coming towards you and past.
+    for (const cl of st.clouds) {
+      cl.z -= speed * 0.3;
+      if (cl.z <= 0.08) { cl.z = 1; cl.x = (Math.random() * 2 - 1) * 1.3; cl.y = (Math.random() * 2 - 1) * 1.3; }
+      const near = Math.min(1, (1 - cl.z) * 1.5) * Math.min(1, (cl.z - 0.08) * 5);
+      vizGlow(g, pal[cl.c], cx + (cl.x / cl.z) * focal, cy + (cl.y / cl.z) * focal, (focal * 0.55) / cl.z, near * 0.16 * (0.4 + 0.6 * lv) * bright);
+    }
+    // The tunnel: hexagons coming towards you, turning, each a glow under a
+    // fine line, white for a moment after a big jump.
     for (let i = 0; i < st.rings.length; i++) {
       st.rings[i] -= speed * 0.35;
       if (st.rings[i] <= 0.05) st.rings[i] += 1;
       const z = st.rings[i];
       const r = focal * 0.9 / z;
       const turn = ck * 0.5 + i * 0.35;
-      g.strokeStyle = rgba(pal[i % 3], Math.min(1, (1 - z) * 1.2) * (0.25 + 0.5 * bright));
-      g.lineWidth = (1 + 4 * m.dropEnv + 2 * (1 - z)) * dpr;
       g.beginPath();
       for (let k = 0; k <= 6; k++) {
-        const a = turn + (k / 6) * Math.PI * 2;
+        const a = turn + (k / 6) * TAU;
         const x = cx + Math.cos(a) * r;
         const y = cy + Math.sin(a) * r;
         if (k) g.lineTo(x, y); else g.moveTo(x, y);
       }
+      const a = Math.min(1, (1 - z) * 1.2) * (0.25 + 0.5 * bright);
+      const col = ringCol[i % 3];
+      g.strokeStyle = rgba(col, a * 0.3);
+      g.lineWidth = (6 + 10 * st.jump + 4 * m.dropEnv) * (1 - z * 0.5) * dpr;
+      g.stroke();
+      g.strokeStyle = rgba(col, a);
+      g.lineWidth = (1 + 4 * m.dropEnv + 2 * (1 - z)) * dpr;
       g.stroke();
     }
-    // The stars: each a streak from where it was a moment ago.
+    // The stars: each a streak from where it was a moment ago - far longer
+    // in a jump.
     g.lineCap = 'round';
     for (const s of st.stars) {
       const z0 = s.z;
       s.z -= speed;
       if (s.z <= 0.02) { s.x = Math.random() * 2 - 1; s.y = Math.random() * 2 - 1; s.z = 1; continue; }
-      const x0 = cx + (s.x / z0) * focal, y0 = cy + (s.y / z0) * focal;
+      const zt = Math.min(1, z0 + st.jump * 0.22 * (1 - s.z));
+      const x0 = cx + (s.x / zt) * focal, y0 = cy + (s.y / zt) * focal;
       const x1 = cx + (s.x / s.z) * focal, y1 = cy + (s.y / s.z) * focal;
-      g.strokeStyle = rgba(pal[s.c], Math.min(1, (1 - s.z) * 1.4) * (0.4 + 0.6 * bright));
+      const col = starCol[s.c];
+      g.strokeStyle = rgba(col, Math.min(1, (1 - s.z) * 1.4) * (0.4 + 0.6 * bright));
       g.lineWidth = (0.6 + 2.2 * (1 - s.z)) * dpr;
       g.beginPath();
       g.moveTo(x0, y0);
       g.lineTo(x1, y1);
       g.stroke();
     }
+    // The shock waves, the cover's three colours a little apart.
+    for (let k = st.shocks.length - 1; k >= 0; k--) {
+      const sh = st.shocks[k];
+      sh.r += dt * size * (1.3 + 1.6 * sh.s);
+      sh.life -= dt * 1.2;
+      if (sh.life <= 0) { st.shocks.splice(k, 1); continue; }
+      if (sh.r <= 0) continue;
+      for (let c = 0; c < 3; c++) {
+        g.strokeStyle = rgba(pal[c], sh.life * (0.35 + 0.4 * sh.s) * bright);
+        g.lineWidth = (1.5 + 5 * sh.s * sh.life) * dpr;
+        g.beginPath();
+        g.arc(cx, cy, sh.r * (0.97 + c * 0.03), 0, TAU);
+        g.stroke();
+      }
+    }
+    if (st.white > 0) {
+      g.fillStyle = vizColor(VIZ_WHITE, st.white * st.white * 0.35);
+      g.fillRect(0, 0, w, h);
+    }
     g.globalCompositeOperation = 'source-over';
   },
 
   // Waves: glowing ribbons across the screen, each the space between two
-  // travelling waves, so it twists. Loudness raises them, a kick bulges them,
-  // the snare ripples them.
+  // travelling waves, so it twists, with glints along their crests.
+  // Loudness raises them, a kick bulges them, the snare ripples them. A
+  // strike sends a surge rolling along them, throwing spray off its crest:
+  // from one side for a small one, from both sides to meet for a middling
+  // one, and out from the middle both ways, the whole lit, for a big one.
   waves(st, m) {
-    const { g, f, w, h, cx, cy, size, pal, rgba, ck, kick, snare, loud, lv, drive, bright } = m;
+    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, ck, kick, snare, loud, lv, drive, bright } = m;
     f.clearRect(0, 0, w, h);
     g.clearRect(0, 0, w, h);
     const x0 = cx - size * 0.9;
     const x1 = cx + size * 0.9;
     const steps = 90;
+    if (!st.top) {
+      st.top = new Float32Array(steps + 1);
+      st.bottom = new Float32Array(steps + 1);
+      st.bump = new Float32Array(steps + 1);
+      st.crest = new Float32Array(steps + 1);
+      st.surges = [];
+      st.spray = [];
+      st.flash = 0;
+    }
+    if (m.drop) {
+      const s = strikeSize(m);
+      if (s >= 0.7 || m.firstDrop) {
+        st.surges.push({ u: 0.5, dir: 1, s, life: 1 }, { u: 0.5, dir: -1, s, life: 1 });
+        st.flash = 1;
+      } else if (s >= 0.3) {
+        st.surges.push({ u: -0.05, dir: 1, s, life: 1 }, { u: 1.05, dir: -1, s, life: 1 });
+      } else {
+        const left = Math.random() < 0.5;
+        st.surges.push({ u: left ? -0.05 : 1.05, dir: left ? 1 : -1, s, life: 1 });
+      }
+      if (st.surges.length > 8) st.surges.splice(0, st.surges.length - 8);
+    }
+    st.flash = Math.max(0, st.flash - dt * 1.8);
+    for (let k = st.surges.length - 1; k >= 0; k--) {
+      const sg = st.surges[k];
+      sg.u += sg.dir * dt * (0.55 + 0.35 * sg.s);
+      sg.life -= dt * 0.55;
+      if (sg.life <= 0 || sg.u < -0.2 || sg.u > 1.2) st.surges.splice(k, 1);
+    }
+    for (let p = 0; p <= steps; p++) {
+      const u = p / steps;
+      let b = 0;
+      for (const sg of st.surges) {
+        const d = (u - sg.u) / 0.07;
+        b += (0.35 + 0.65 * sg.s) * Math.min(1, sg.life * 1.5) * Math.exp(-d * d);
+      }
+      st.bump[p] = b;
+    }
+    const xAt = (p) => x0 + (x1 - x0) * (p / steps);
     g.globalCompositeOperation = 'lighter';
+    if (st.flash > 0) vizGlow(g, pal[0], cx, cy, size * 1.2, st.flash * 0.35);
     for (let r = 0; r < 5; r++) {
       const amp = size * (0.05 + (0.1 + 0.22 * loud) * lv * drive * 0.8 + 0.16 * kick) * (1 - r * 0.11);
       const k = 2.2 + r * 0.7;
       const sp = (0.8 + r * 0.35) * (r % 2 ? -1 : 1);
       const ripple = 0.25 * snare;
-      const wave = (u, ph) => {
-        const env = Math.sin(Math.PI * u);
-        return cy + amp * env * (Math.sin(k * u * Math.PI * 2 + ck * sp * 2 + ph + r) + ripple * Math.sin(u * 40 + ck * 9 + r));
-      };
-      // The edges' heights go into buffers kept from frame to frame: arrays
-      // of points built fresh each frame were garbage enough to make a phone
-      // stop and collect it.
-      if (!st.top) { st.top = new Float32Array(steps + 1); st.bottom = new Float32Array(steps + 1); }
+      const lift = 0.9 + 0.3 * Math.sin(ck + r);
       const top = st.top;
       const bottom = st.bottom;
-      const lift = 0.9 + 0.3 * Math.sin(ck + r);
       for (let p = 0; p <= steps; p++) {
         const u = p / steps;
-        top[p] = wave(u, 0);
-        bottom[p] = wave(u, lift);
+        const env = Math.sin(Math.PI * u);
+        const rise = st.bump[p] * size * 0.36 * (1 - r * 0.12);
+        top[p] = cy - rise + amp * env * (Math.sin(k * u * TAU + ck * sp * 2 + r) + ripple * Math.sin(u * 40 + ck * 9 + r));
+        bottom[p] = cy - rise * 0.6 + amp * env * (Math.sin(k * u * TAU + ck * sp * 2 + lift + r) + ripple * Math.sin(u * 40 + ck * 9 + r));
       }
-      const xAt = (p) => x0 + (x1 - x0) * (p / steps);
+      if (r === 0) st.crest.set(top);
       const c = pal[r % 3];
       const grad = g.createLinearGradient(x0, 0, x1, 0);
       grad.addColorStop(0, rgba(c, 0));
@@ -20165,143 +20814,306 @@ const VIZ_SCENES = {
       g.fill();
       // A bright edge along the top.
       g.strokeStyle = rgba(c, 0.55 * (0.4 + 0.6 * bright));
-      g.lineWidth = 1.5 * m.dpr;
+      g.lineWidth = 1.5 * dpr;
       g.beginPath();
       g.moveTo(xAt(0), top[0]);
       for (let p = 1; p <= steps; p++) g.lineTo(xAt(p), top[p]);
       g.stroke();
+      // Glints along the crest, and white where a surge is passing.
+      for (let p = 2; p < steps - 1; p += 4) {
+        const env = Math.sin((Math.PI * p) / steps);
+        const a = (0.35 * (0.5 + 0.5 * Math.sin(p * 1.7 + ck * 5 + r * 2)) ** 3 * lv + st.bump[p] * 0.9) * env * bright;
+        if (a > 0.03) {
+          g.fillStyle = vizColor(VIZ_WHITE, a);
+          g.fillRect(xAt(p) - dpr, top[p] - dpr, 2 * dpr, 2 * dpr);
+        }
+      }
+    }
+    // The surges' crests, white, and the spray they throw up.
+    for (const sg of st.surges) {
+      const p = Math.round(sg.u * steps);
+      if (p < 1 || p >= steps) continue;
+      const a = Math.min(1, sg.life * 1.5) * (0.4 + 0.6 * sg.s);
+      g.strokeStyle = vizColor(VIZ_WHITE, a * 0.9);
+      g.lineWidth = 2.5 * dpr;
+      g.beginPath();
+      for (let q = Math.max(0, p - 7); q <= Math.min(steps, p + 7); q++) {
+        if (q === Math.max(0, p - 7)) g.moveTo(xAt(q), st.crest[q]); else g.lineTo(xAt(q), st.crest[q]);
+      }
+      g.stroke();
+      vizGlow(g, vizWhiter(pal[0], 0.5), xAt(p), st.crest[p], size * (0.18 + 0.2 * sg.s), a);
+      const n = Math.random() < dt * 60 * a ? 3 + Math.floor(sg.s * 5) : 0;
+      for (let j = 0; j < n && st.spray.length < 300; j++) {
+        st.spray.push({ x: xAt(p) + (Math.random() - 0.5) * size * 0.05, y: st.crest[p], vx: (Math.random() - 0.5 + sg.dir * 0.4) * size * 0.35, vy: -size * (0.3 + 0.6 * Math.random()) * (0.5 + sg.s), life: 1 });
+      }
+    }
+    for (let k = st.spray.length - 1; k >= 0; k--) {
+      const sp = st.spray[k];
+      sp.life -= dt * 1.1;
+      if (sp.life <= 0) { st.spray.splice(k, 1); continue; }
+      sp.vy += size * 1.3 * dt;
+      sp.x += sp.vx * dt;
+      sp.y += sp.vy * dt;
+      g.fillStyle = vizColor(VIZ_WHITE, sp.life * 0.8 * bright);
+      g.fillRect(sp.x, sp.y, 1.8 * dpr, 1.8 * dpr);
     }
     g.globalCompositeOperation = 'source-over';
   },
 
-  // Kaleidoscope: shapes in one wedge, mirrored ten ways. They swell on the
-  // kick, turn on the snare, and the whole thing snaps round on each bar and
-  // spins faster when it is loud.
+  // Kaleidoscope: shapes in one wedge, joined by a fine web, mirrored ten
+  // ways inside a ring of turning facets. They swell on the kick, turn on the
+  // snare, and the whole thing snaps round on each bar and spins faster when
+  // it is loud. A strike shatters it: shards fly out of every wedge and a
+  // ring of prism colours spreads; a big one spins it hard and flashes.
   kaleido(st, m) {
-    const { g, f, w, h, cx, cy, size, pal, rgba, dt, kick, snare, loud, lv, downbeat, phase, bright } = m;
+    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, kick, snare, loud, lv, downbeat, phase, bright } = m;
     f.clearRect(0, 0, w, h);
     g.clearRect(0, 0, w, h);
     if (!st.shapes) {
       st.shapes = Array.from({ length: 8 }, (_, i) => ({ r: 0.15 + (i / 8) * 0.75, a: Math.random(), s: 0.04 + Math.random() * 0.07, kind: i % 3, c: i % 3, sp: 0.3 + Math.random() }));
       st.spin = 0;
+      st.spinV = 0;
+      st.shards = [];
+      st.rings = [];
+      st.flash = 0;
+      st.sx = new Float32Array(8);
+      st.sy = new Float32Array(8);
     }
-    st.spin += dt * (0.1 + 0.9 * loud * lv) + (downbeat ? dt * 3 * (1 - phase) : 0);
-    const seg = (Math.PI * 2) / 10;
+    const seg = TAU / 10;
+    if (m.drop) {
+      const s = strikeSize(m);
+      const n = 3 + Math.round(s * 6) + (m.firstDrop ? 3 : 0);
+      for (let i = 0; i < n; i++) {
+        st.shards.push({ a: Math.random() * seg * 0.5, r: 0.05 + Math.random() * 0.2, v: 0.5 + Math.random() * 0.7 + 0.8 * s, rot: Math.random() * TAU,
+          vr: (Math.random() - 0.5) * 9, sz: (0.04 + 0.06 * Math.random()) * (0.8 + s), life: 1, col: vizWhiter(pal[Math.floor(Math.random() * 3)], 0.45) });
+      }
+      if (st.shards.length > 24) st.shards.splice(0, st.shards.length - 24);
+      st.rings.push({ r: 0.08, life: 1, s });
+      if (s >= 0.7 || m.firstDrop) { st.spinV += 1.2 + 2.5 * s; st.flash = 1; }
+    }
+    st.spin += dt * (0.1 + 0.9 * loud * lv) + (downbeat ? dt * 3 * (1 - phase) : 0) + st.spinV * dt;
+    st.spinV *= Math.exp(-dt * 2.2);
+    st.flash = Math.max(0, st.flash - dt * 2);
     const R = size * 0.62;
+    for (let i = st.shards.length - 1; i >= 0; i--) {
+      const sh = st.shards[i];
+      sh.r += sh.v * dt * 0.7;
+      sh.rot += sh.vr * dt;
+      sh.life -= dt * 0.85;
+      if (sh.life <= 0 || sh.r > 1.3) st.shards.splice(i, 1);
+    }
+    // Where each shape sits in the wedge this frame, the same in every copy.
+    st.shapes.forEach((sh, i) => {
+      const a = (0.5 + 0.5 * Math.sin(st.spin * sh.sp * 3 + sh.a * 6)) * seg * 0.5;
+      const r = R * (sh.r + 0.08 * Math.sin(st.spin * 2 + sh.a * 9) + 0.1 * kick);
+      st.sx[i] = Math.cos(a) * r;
+      st.sy[i] = Math.sin(a) * r;
+    });
     g.save();
     g.translate(cx, cy);
     g.globalCompositeOperation = 'lighter';
+    const web = rgba(pal[1], (0.12 + 0.12 * lv + 0.3 * st.flash) * bright);
+    const shapeCol = st.flash > 0.05 ? [0, 1, 2].map((c) => vizWhiter(pal[c], st.flash * 0.6)) : pal;
     for (let k = 0; k < 10; k++) {
       for (const mirror of [1, -1]) {
         g.save();
         g.rotate(k * seg + st.spin);
         g.scale(1, mirror);
-        for (const sh of st.shapes) {
-          const a = (0.5 + 0.5 * Math.sin(st.spin * sh.sp * 3 + sh.a * 6)) * seg * 0.5;
-          const r = R * (sh.r + 0.08 * Math.sin(st.spin * 2 + sh.a * 9) + 0.1 * kick);
-          const x = Math.cos(a) * r;
-          const y = Math.sin(a) * r;
+        // The web joining the shapes.
+        g.strokeStyle = web;
+        g.lineWidth = dpr;
+        g.beginPath();
+        g.moveTo(0, 0);
+        for (let i = 0; i < 8; i++) g.lineTo(st.sx[i], st.sy[i]);
+        g.stroke();
+        st.shapes.forEach((sh, i) => {
+          const x = st.sx[i];
+          const y = st.sy[i];
           const sz = R * sh.s * (1 + 1.2 * kick) * (0.6 + 0.6 * loud);
-          g.fillStyle = rgba(pal[sh.c], (0.35 + 0.3 * lv) * (0.4 + 0.6 * bright));
+          g.fillStyle = rgba(shapeCol[sh.c], (0.35 + 0.3 * lv) * (0.4 + 0.6 * bright));
           g.beginPath();
           if (sh.kind === 0) {
-            g.arc(x, y, sz, 0, Math.PI * 2);
+            g.arc(x, y, sz, 0, TAU);
           } else {
             const turn = st.spin * 2 + snare * 2;
             const n = sh.kind === 1 ? 3 : 4;
             for (let p = 0; p <= n; p++) {
-              const t = turn + (p / n) * Math.PI * 2;
+              const t = turn + (p / n) * TAU;
               if (p) g.lineTo(x + Math.cos(t) * sz, y + Math.sin(t) * sz);
               else g.moveTo(x + Math.cos(t) * sz, y + Math.sin(t) * sz);
             }
           }
           g.fill();
+        });
+        // The shards, flying out.
+        for (const sh of st.shards) {
+          const x = Math.cos(sh.a) * R * sh.r;
+          const y = Math.sin(sh.a) * R * sh.r;
+          const sz = R * sh.sz;
+          g.fillStyle = rgba(sh.col, sh.life * 0.75 * bright);
+          g.beginPath();
+          g.moveTo(x + Math.cos(sh.rot) * sz, y + Math.sin(sh.rot) * sz);
+          g.lineTo(x + Math.cos(sh.rot + 2.5) * sz * 0.5, y + Math.sin(sh.rot + 2.5) * sz * 0.5);
+          g.lineTo(x + Math.cos(sh.rot + 3.9) * sz * 0.7, y + Math.sin(sh.rot + 3.9) * sz * 0.7);
+          g.closePath();
+          g.fill();
         }
         g.restore();
       }
     }
-    // A star in the middle.
-    const core = g.createRadialGradient(0, 0, 0, 0, 0, R * (0.25 + 0.2 * kick));
-    core.addColorStop(0, vizColor(VIZ_WHITE, 0.25 + 0.5 * kick));
-    core.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    g.fillStyle = core;
+    // The ring of facets round it all, turning the other way.
+    g.rotate(-st.spin * 0.5);
+    g.strokeStyle = rgba(pal[2], (0.25 + 0.25 * lv + 0.4 * st.flash) * bright);
+    g.lineWidth = 1.5 * dpr;
     g.beginPath();
-    g.arc(0, 0, R * 0.5, 0, Math.PI * 2);
-    g.fill();
+    for (let i = 0; i <= 20; i++) {
+      const a = (i / 20) * TAU;
+      const rr = R * (1.02 + (i % 2 ? 0.05 : 0) + 0.04 * kick);
+      if (i) g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    g.stroke();
+    g.rotate(st.spin * 0.5);
+    // A star in the middle.
+    vizGlow(g, VIZ_WHITE, 0, 0, R * (0.3 + 0.2 * kick + 0.4 * st.flash), 0.25 + 0.5 * kick + 0.5 * st.flash);
+    // The prism rings, the three colours a little apart.
+    for (let i = st.rings.length - 1; i >= 0; i--) {
+      const rg = st.rings[i];
+      rg.r += dt * (0.9 + 0.8 * rg.s);
+      rg.life -= dt * 1.1;
+      if (rg.life <= 0) { st.rings.splice(i, 1); continue; }
+      for (let c = 0; c < 3; c++) {
+        g.strokeStyle = rgba(pal[c], rg.life * (0.35 + 0.35 * rg.s) * bright);
+        g.lineWidth = (1.5 + 4 * rg.s * rg.life) * dpr;
+        g.beginPath();
+        g.arc(0, 0, R * rg.r * (0.975 + c * 0.025), 0, TAU);
+        g.stroke();
+      }
+    }
     g.restore();
     g.globalCompositeOperation = 'source-over';
   },
 
-  // Fireworks: a burst on every beat, bigger on the first of a bar, crackle
-  // on the snare, falling with gravity and leaving trails.
+  // Fireworks: a burst on the beats that stand out, bigger on the first of a
+  // bar, crackle on the snare, sparks that twinkle, falling with gravity and
+  // leaving trails, and the smoke of each lit as it hangs. A strike is a
+  // shell of its own size: a crackle of glitter for a small one, a peony
+  // whose sparks split again for a middling one, and for a big one a great
+  // chrysanthemum with a ring, glitter and the sky lit; the first after a
+  // quiet spell is the finale.
   fireworks(st, m) {
-    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, newBeat, downbeat, snare, loud, lv, e, bright, playing } = m;
+    const { g, f, w, h, cx, cy, size, dpr, pal, rgba, dt, ck, newBeat, downbeat, snare, loud, lv, e, bright, playing } = m;
     g.clearRect(0, 0, w, h);
     f.globalCompositeOperation = 'destination-out';
     f.fillStyle = `rgba(0, 0, 0, ${playing ? 0.14 : 0.3})`;
     f.fillRect(0, 0, w, h);
-    if (!st.sparks) { st.sparks = []; st.flashes = []; st.snare = 0; }
-    const burst = (x, y, n, power, c) => {
+    if (!st.sparks) { st.sparks = []; st.flashes = []; st.smoke = []; st.snare = 0; st.sky = 0; }
+    const burst = (x, y, n, power, c, o = {}) => {
+      const col = o.white ? vizWhiter(pal[c], 0.7) : pal[c];
       for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const v = size * power * (0.35 + Math.random() * 0.75);
-        st.sparks.push({ x, y, px: x, py: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, fade: 0.55 + Math.random() * 0.45, c });
+        const a = o.ring ? (i / n) * TAU : Math.random() * TAU;
+        const v = size * power * (o.ring ? 0.95 + Math.random() * 0.1 : 0.35 + Math.random() * 0.75);
+        st.sparks.push({ x, y, px: x, py: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: o.life || 1, fade: (0.55 + Math.random() * 0.45) * (o.fast ? 2.2 : 1),
+          c, col, split: o.split && Math.random() < o.split, tw: o.glitter || Math.random() < 0.15, seed: Math.random() * 50 });
       }
       st.flashes.push({ x, y, life: 1, r: size * power * 0.6, c });
+      if (st.smoke.length < 24) st.smoke.push({ x, y, r: size * power * 0.5, life: 1, c });
     };
-    if (m.firstDrop) {
-      // The drop: a great burst in the middle, and two more beside it.
-      burst(cx, cy - size * 0.1, 180, 1.5, 0);
-      burst(cx - size * 0.45, cy, 70, 0.9, 1);
-      burst(cx + size * 0.45, cy, 70, 0.9, 2);
-    } else if (m.drop) {
-      // Each loud bar after it: one great burst.
-      burst(cx + (Math.random() - 0.5) * size * 0.5, cy - size * 0.15, 110, 1.2, Math.floor(Math.random() * 3));
+    const rc = () => Math.floor(Math.random() * 3);
+    if (m.drop) {
+      const s = strikeSize(m);
+      const x = cx + (Math.random() - 0.5) * size * 0.6;
+      const y = cy - size * (0.1 + Math.random() * 0.15);
+      if (m.firstDrop) {
+        // The finale: a great burst in the middle, two beside it, glitter.
+        burst(cx, cy - size * 0.1, 180, 1.5, 0, { split: 0.3 });
+        burst(cx, cy - size * 0.1, 60, 1.2, 1, { ring: true });
+        burst(cx - size * 0.45, cy, 70, 0.9, 1, { split: 0.2 });
+        burst(cx + size * 0.45, cy, 70, 0.9, 2, { split: 0.2 });
+        burst(cx, cy - size * 0.1, 70, 0.6, 0, { glitter: true, fast: true, white: true });
+        st.sky = 1;
+      } else if (s >= 0.7) {
+        burst(x, y, 150, 1.35, rc(), { split: 0.35 });
+        burst(x, y, 56, 1.1, rc(), { ring: true });
+        burst(x, y, 60, 0.55, 0, { glitter: true, fast: true, white: true });
+        st.sky = Math.max(st.sky, 0.8);
+      } else if (s >= 0.3) {
+        burst(x, y, 90, 0.95 + 0.3 * s, rc(), { split: 0.3 });
+        burst(x, y, 36, 0.8, rc(), { ring: true });
+      } else {
+        burst(x, y, 46, 0.4, rc(), { glitter: true, fast: true, white: true });
+      }
     } else if (newBeat) {
-      const a = Math.random() * Math.PI * 2;
+      const a = Math.random() * TAU;
       const d = Math.random() * size * 0.45;
       const n = Math.round((24 + 60 * loud) * (downbeat ? 1.8 : 1) * (0.6 + 0.6 * e));
-      burst(cx + Math.cos(a) * d, cy - size * 0.1 + Math.sin(a) * d * 0.7, n, (downbeat ? 1.1 : 0.75) * (0.6 + 0.6 * loud), Math.floor(Math.random() * 3));
+      burst(cx + Math.cos(a) * d, cy - size * 0.1 + Math.sin(a) * d * 0.7, n, (downbeat ? 1.1 : 0.75) * (0.6 + 0.6 * loud), rc());
     }
     if (snare - st.snare > 0.35 && lv > 0.3) {
-      const a = Math.random() * Math.PI * 2;
-      burst(cx + Math.cos(a) * size * 0.5, cy + Math.sin(a) * size * 0.4, 14, 0.35, Math.floor(Math.random() * 3));
+      const a = Math.random() * TAU;
+      burst(cx + Math.cos(a) * size * 0.5, cy + Math.sin(a) * size * 0.4, 14, 0.35, rc(), { glitter: true });
     }
     st.snare = snare;
-    if (st.sparks.length > 650) st.sparks.splice(0, st.sparks.length - 650);
-    // Glows where the bursts went off.
+    const cap = Math.round(900 * VIZ_DENSITY);
+    if (st.sparks.length > cap) st.sparks.splice(0, st.sparks.length - cap);
+    st.sky = Math.max(0, st.sky - dt * 1.6);
     g.globalCompositeOperation = 'lighter';
-    st.flashes = st.flashes.filter((fl) => {
+    if (st.sky > 0) vizGlow(g, vizWhiter(pal[0], 0.5), cx, cy - size * 0.2, size * 1.6, st.sky * st.sky * 0.4);
+    // The smoke of each burst, hanging and drifting, lit while it is fresh
+    // and by any flash after.
+    let litNow = 0;
+    for (const fl of st.flashes) litNow = Math.max(litNow, fl.life);
+    for (let k = st.smoke.length - 1; k >= 0; k--) {
+      const sm = st.smoke[k];
+      sm.life -= dt * 0.18;
+      if (sm.life <= 0) { st.smoke.splice(k, 1); continue; }
+      sm.r += dt * size * 0.06;
+      sm.y -= dt * size * 0.02;
+      sm.x += dt * size * 0.015;
+      vizGlow(g, pal[sm.c], sm.x, sm.y, sm.r, sm.life * (0.05 + 0.1 * litNow) * bright);
+    }
+    // Glows where the bursts went off.
+    for (let k = st.flashes.length - 1; k >= 0; k--) {
+      const fl = st.flashes[k];
       fl.life -= dt * 2.2;
-      if (fl.life <= 0) return false;
-      const grad = g.createRadialGradient(fl.x, fl.y, 0, fl.x, fl.y, fl.r);
-      grad.addColorStop(0, rgba(pal[fl.c], 0.45 * fl.life * bright));
-      grad.addColorStop(1, rgba(pal[fl.c], 0));
-      g.fillStyle = grad;
-      g.fillRect(fl.x - fl.r, fl.y - fl.r, fl.r * 2, fl.r * 2);
-      return true;
-    });
+      if (fl.life <= 0) { st.flashes.splice(k, 1); continue; }
+      vizGlow(g, pal[fl.c], fl.x, fl.y, fl.r, 0.5 * fl.life * bright);
+      vizGlow(g, VIZ_WHITE, fl.x, fl.y, fl.r * 0.3, 0.6 * fl.life * fl.life);
+    }
     g.globalCompositeOperation = 'source-over';
-    // The sparks, as streaks on the fading canvas.
+    // The sparks, as streaks on the fading canvas; some split again into a
+    // crackle of little ones, some twinkle as they fall.
     const gravity = size * 0.45;
     f.globalCompositeOperation = 'lighter';
     f.lineCap = 'round';
-    st.sparks = st.sparks.filter((p) => {
+    const born = [];
+    for (let k = st.sparks.length - 1; k >= 0; k--) {
+      const p = st.sparks[k];
       p.life -= dt * p.fade;
-      if (p.life <= 0) return false;
+      if (p.life <= 0) { st.sparks.splice(k, 1); continue; }
+      if (p.split && p.life < 0.55) {
+        p.split = false;
+        const col = vizWhiter(pal[p.c], 0.7);
+        for (let j = 0; j < 5; j++) {
+          const a = Math.random() * TAU;
+          const v = size * (0.08 + Math.random() * 0.12);
+          born.push({ x: p.x, y: p.y, px: p.x, py: p.y, vx: p.vx * 0.3 + Math.cos(a) * v, vy: p.vy * 0.3 + Math.sin(a) * v, life: 0.5, fade: 1.1, c: p.c, col, tw: true, seed: Math.random() * 50 });
+        }
+      }
       p.px = p.x; p.py = p.y;
       p.vx *= 1 - dt * 1.4;
       p.vy = p.vy * (1 - dt * 1.4) + gravity * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      f.strokeStyle = rgba(pal[p.c], Math.min(1, p.life * 1.3) * (0.5 + 0.5 * bright));
+      let a = Math.min(1, p.life * 1.3) * (0.5 + 0.5 * bright);
+      if (p.tw) a *= Math.sin(ck * 30 + p.seed) > 0 ? 1 : 0.15;
+      f.strokeStyle = rgba(p.col, a);
       f.lineWidth = (0.8 + 1.8 * p.life) * dpr;
       f.beginPath();
       f.moveTo(p.px, p.py);
       f.lineTo(p.x, p.y);
       f.stroke();
-      return true;
-    });
+    }
+    for (const b of born) st.sparks.push(b);
     f.globalCompositeOperation = 'source-over';
   },
 };
