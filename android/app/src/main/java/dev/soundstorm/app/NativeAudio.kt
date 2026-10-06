@@ -43,6 +43,18 @@ object NativeAudio {
     private var app: Context? = null
     private var seeking = false
 
+    /**
+     * Where the music was when Android closed the player. Paused, the service
+     * leaves the foreground, and about a minute later Android ends it to save
+     * the battery; the page still has its song and only sends "play", which a
+     * new, empty player could not answer - reported as music and audiobooks
+     * not playing again after a pause until they were closed and started
+     * again. So the song, the songs queued after it and the moment are kept,
+     * and "play" on an empty player picks up from there.
+     */
+    private data class Resume(val items: List<MediaItem>, val positionMs: Long)
+    private var resume: Resume? = null
+
     fun attachView(view: WebView) {
         webView = WeakReference(view)
     }
@@ -60,6 +72,13 @@ object NativeAudio {
     }
 
     fun detach() {
+        player?.let { p ->
+            if (p.mediaItemCount > 0) {
+                val from = p.currentMediaItemIndex.coerceAtLeast(0)
+                resume = Resume((from until p.mediaItemCount).map(p::getMediaItemAt), p.currentPosition.coerceAtLeast(0))
+                PlayerLog.add("kept to resume: ${PlayerLog.song(p.currentMediaItem?.localConfiguration?.uri?.toString())} at ${p.currentPosition}ms")
+            }
+        }
         player?.removeListener(listener)
         player = null
         main.removeCallbacks(tick)
@@ -110,6 +129,7 @@ object NativeAudio {
             "upcoming" -> PlayerLog.add("page: upcoming ${m.optJSONArray("items")?.length() ?: 0} songs")
             else -> PlayerLog.add("page: $cmd")
         }
+        if (cmd == "load" || cmd == "stop") resume = null
         when (cmd) {
             "load" -> {
                 val url = m.optString("url")
@@ -174,6 +194,14 @@ object NativeAudio {
                 if (index + 1 < p.mediaItemCount) p.removeMediaItems(index + 1, p.mediaItemCount)
             }
             "play" -> {
+                // A new player after Android closed the last one: back where
+                // the music was.
+                val r = resume
+                if (p.mediaItemCount == 0 && r != null) {
+                    resume = null
+                    p.setMediaItems(r.items, 0, r.positionMs)
+                    PlayerLog.add("resumed after the player was closed, at ${r.positionMs}ms")
+                }
                 if (p.playbackState == Player.STATE_IDLE) p.prepare()
                 // Played to its end: play from the start, as the page's own
                 // audio element does.
@@ -185,6 +213,12 @@ object NativeAudio {
             // the last one, to take the song over rather than show nothing.
             "state" -> report()
             "seek" -> {
+                val r = resume
+                if (p.mediaItemCount == 0 && r != null) {
+                    // Moved while the player was closed: picked up from there.
+                    resume = r.copy(positionMs = (m.optDouble("s", 0.0) * 1000).toLong().coerceAtLeast(0))
+                    return
+                }
                 seeking = true
                 p.seekTo((m.optDouble("s", 0.0) * 1000).toLong().coerceAtLeast(0))
             }
