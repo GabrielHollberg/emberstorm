@@ -702,33 +702,56 @@ function Callout([string]$Title, [string[]]$Lines, [ConsoleColor]$Color = 'Yello
 # whether the account is needed (it is not), or whether closing the window
 # breaks something (it does not). Shown once per run, whichever comes first of
 # installing Docker (which opens itself when it finishes) or starting it.
+#
+# Then most of it was answered for them (2026-10-07, the owner: "the most
+# annoying part of install"). Docker's own installer accepts its terms with
+# --accept-license (its documented switch for an unattended install, found in
+# "Docker Desktop Installer.exe"), and Docker skips its sign-in and survey
+# when its settings already say DisplayedOnboarding - the key it writes
+# itself once they are done (seen in this PC's settings-store.json, and in
+# Docker.Core.dll). So a Docker installed by this setup asks nothing.
+#
+# A Docker already on the PC but never opened has not had its terms accepted,
+# and that is the person's to do, not this script's: it is asked for in a
+# window that only closes with "I understand" - the one click left.
 $script:dockerGuideShown = $false
+$script:dockerInstalledNow = $false
 function Show-DockerGuide([switch]$FirstRun) {
     if ($script:dockerGuideShown) { return }
     $script:dockerGuideShown = $true
-    Callout 'Docker Desktop may open a window' @(
-        'SoundStorm runs inside a free program called Docker. The first time',
-        'it starts, Docker asks a few questions.',
-        '*You do NOT need a Docker account.',
+    # A Docker set up before: nothing to say.
+    if (-not $script:dockerInstalledNow -and -not $FirstRun) { return }
+    if ($script:dockerInstalledNow) {
+        Callout 'Docker Desktop' @(
+            'SoundStorm runs inside a free program called Docker Desktop.',
+            'Setup installs and starts it, and answers its first questions for',
+            'you - there is nothing to click in Docker, and no Docker account',
+            'is needed.',
+            '',
+            'Docker Desktop is free for personal use and small businesses.',
+            'Installing it accepts Docker''s terms:',
+            '  docker.com/legal/docker-subscription-service-agreement',
+            '',
+            'If a Docker window opens anyway: accept its terms and Skip anything',
+            'else, then come back here. Closing Docker''s window is fine - it',
+            'keeps running in the background.'
+        ) 'Cyan'
+        return
+    }
+    Callout 'Docker Desktop will ask one thing' @(
+        'Docker Desktop is already on this PC but has not been opened yet.',
+        'When it starts, it asks you to accept its terms:',
         '',
-        '*  1. Subscription Service Agreement   ->  click Accept',
-        '*  2. Sign in / create an account      ->  click Skip',
-        '*  3. Questions about you or your work ->  click Skip',
+        '*  Subscription Service Agreement  ->  click Accept',
         '',
-        'No Skip button? Choose "Continue without signing in" instead.',
-        '',
-        '*Setup waits until you do: nothing happens until you click Skip.',
-        '',
-        'Then come back to THIS window. You can minimize or close the Docker',
-        'window - Docker keeps running in the background, and this setup',
-        'carries on by itself as soon as Docker is ready.'
+        'Setup skips Docker''s sign-in and questions for you - no Docker',
+        'account is needed. Then come back to THIS window: setup carries on',
+        'by itself as soon as Docker is ready.'
     ) 'Cyan'
-    # Read, not just shown. A box in the setup window is easy to walk away
-    # from, and the setup then sits waiting on a Docker window nobody is
-    # there to click - so before Docker's first start, the steps are put in
-    # a window that only closes with "I understand". Never on the desktop
-    # icon's path (-Launch), which runs minimized at sign-in.
-    if ($FirstRun -and -not $Launch) { Confirm-DockerGuide }
+    # Read, not just shown: a box in the setup window is easy to walk away
+    # from, and the setup would then sit waiting on that one click. Never on
+    # the desktop icon's path (-Launch), which runs minimized at sign-in.
+    if (-not $Launch) { Confirm-DockerGuide }
 }
 
 # Test-DockerFirstRun is whether Docker Desktop has yet to show its first-run
@@ -748,23 +771,21 @@ function Test-DockerFirstRun {
 # "I understand". The window has no close button, so the only way on is to
 # have read it; the console fallback asks for Enter.
 function Confirm-DockerGuide {
-    $text = "SoundStorm runs inside a free program called Docker, which is installed and started next. The first time Docker starts, it opens a window of its own and asks three things:`r`n`r`n" +
-        "    1.  Subscription Service Agreement  ->  click Accept`r`n" +
-        "    2.  Sign in / create an account  ->  click Skip`r`n" +
-        "    3.  Questions about you or your work  ->  click Skip`r`n`r`n" +
-        "You do NOT need a Docker account. If there is no Skip button, choose ""Continue without signing in"".`r`n`r`n" +
-        "Setup cannot finish until you do this. Stay at the computer until Docker's window appears, click through it, then come back to this setup - it carries on by itself."
+    $text = "SoundStorm runs inside a free program called Docker Desktop. It is already on this PC but has not been opened yet, so when setup starts it, Docker opens a window asking you to accept its terms:`r`n`r`n" +
+        "    Subscription Service Agreement  ->  click Accept`r`n`r`n" +
+        "That is the only thing to click: setup skips Docker's sign-in and questions for you, and no Docker account is needed.`r`n`r`n" +
+        "Setup cannot finish until you click Accept. Stay at the computer until Docker's window appears, then come back to this setup - it carries on by itself."
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
     } catch {
         try {
-            [void](Read-Host '    Docker will open a window: Accept, then Skip, Skip. Press Enter once you have read this')
+            [void](Read-Host '    Docker will open a window asking you to accept its terms: click Accept. Press Enter once you have read this')
         } catch { }
         return
     }
     Note "A window has opened: read it, then click I understand."
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'SoundStorm - Docker will open a window'
+    $form.Text = 'SoundStorm - Docker will ask one thing'
     $form.FormBorderStyle = 'FixedDialog'
     $form.ControlBox = $false
     $form.StartPosition = 'CenterScreen'
@@ -1100,6 +1121,12 @@ function Hide-DockerDashboard {
         # only writes settings that differ from its defaults, so on a fresh
         # install it will be absent.
         $settings | Add-Member -NotePropertyName 'OpenUIOnStartupDisabled' `
+            -NotePropertyValue $true -Force
+        # Its sign-in and survey, marked done as Docker marks them itself
+        # (see Show-DockerGuide). Its terms are not: those are accepted by
+        # its installer's --accept-license when this setup installs it, or by
+        # the person.
+        $settings | Add-Member -NotePropertyName 'DisplayedOnboarding' `
             -NotePropertyValue $true -Force
 
         $json = $settings | ConvertTo-Json -Depth 20
@@ -1666,8 +1693,10 @@ function Install-Docker {
 
     Note "Docker Desktop is not installed. Getting it now."
     Note "This is a big download and takes a few minutes."
-    # Docker opens itself the moment its installer finishes, so this is the
-    # last chance to say what it is going to ask.
+    # Installed with its terms accepted and its questions answered, so its
+    # first start asks nothing (Show-DockerGuide says so, and what the terms
+    # are).
+    $script:dockerInstalledNow = $true
     Show-DockerGuide -FirstRun
 
     # Written before the install as well as after it. Docker Desktop launches
@@ -1677,13 +1706,46 @@ function Install-Docker {
     # the window ever appearing.
     Hide-DockerDashboard -Quiet
 
+    # --override hands Docker's installer exactly these: quiet, and its
+    # terms accepted (its own switch for an unattended install), which is
+    # what keeps its first start from asking.
     $wingetArgs = @(
         'install', '--exact', '--id', 'Docker.DockerDesktop',
-        '--accept-source-agreements', '--accept-package-agreements', '--silent'
+        '--accept-source-agreements', '--accept-package-agreements', '--silent',
+        '--override', 'install --quiet --accept-license'
     )
 
+    $code = Invoke-WingetDocker $wingetArgs
+    Refresh-Path
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        # Should Docker's installer ever refuse those switches, it is tried
+        # once more the ordinary way - and its first start will then ask for
+        # its terms, which the setup says before starting it.
+        Note "Trying the Docker install once more, the ordinary way."
+        $script:dockerInstalledNow = $false
+        $script:dockerGuideShown = $false
+        $code = Invoke-WingetDocker ($wingetArgs | Select-Object -First 7)
+        Refresh-Path
+    }
+
+    # Whether it worked is better answered by looking than by decoding an exit
+    # code. winget has a family of them - 0 is installed, 0x8A150061 is already
+    # installed, and a reboot-required result is a success that reads like a
+    # failure - so the question asked here is simply whether docker is there
+    # now.
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        Good "Docker Desktop installed."
+        Hide-DockerDashboard
+        return
+    }
+    Stop-ForDockerInstall $code
+}
+
+# Invoke-WingetDocker runs winget with these arguments, elevated when the setup
+# is not, and answers its exit code.
+function Invoke-WingetDocker([string[]]$wingetArgs) {
     if (Test-Administrator) {
-        $code = (Invoke-Native 'winget' $wingetArgs -Show).ExitCode
+        return (Invoke-Native 'winget' $wingetArgs -Show).ExitCode
     } else {
         Important "Windows will ask for permission to install it - click Yes."
         try {
@@ -1696,12 +1758,16 @@ function Install-Docker {
                 -not $winget.StartsWith($env:ProgramFiles, [StringComparison]::OrdinalIgnoreCase)) {
                 throw "winget is in an unexpected place: $winget"
             }
-            $process = Start-Process -FilePath $winget -ArgumentList $wingetArgs `
+            # Start-Process joins its arguments with spaces and quotes none,
+            # so the one with spaces in it (--override's) is quoted here; the
+            # call above quotes it itself.
+            $quoted = $wingetArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+            $process = Start-Process -FilePath $winget -ArgumentList $quoted `
                 -Verb RunAs -WindowStyle Hidden -PassThru -ErrorAction Stop
             # Waited on here rather than with -Wait, which would freeze the
             # setup window for the minutes Docker Desktop takes to install.
             $null = Wait-ProcessPumped $process
-            $code = $process.ExitCode
+            return $process.ExitCode
         } catch {
             Stop-With @"
   Installing Docker Desktop needs permission, and that was refused or
@@ -1714,20 +1780,9 @@ function Install-Docker {
 "@
         }
     }
+}
 
-    Refresh-Path
-
-    # Whether it worked is better answered by looking than by decoding an exit
-    # code. winget has a family of them - 0 is installed, 0x8A150061 is already
-    # installed, and a reboot-required result is a success that reads like a
-    # failure - so the question asked here is simply whether docker is there
-    # now.
-    if (Get-Command docker -ErrorAction SilentlyContinue) {
-        Good "Docker Desktop installed."
-        Hide-DockerDashboard
-        return
-    }
-
+function Stop-ForDockerInstall($code) {
     Stop-With @"
   Docker Desktop did not finish installing. (winget exit code: $code)
 
@@ -1823,7 +1878,12 @@ function Start-Docker {
 "@
     }
 
-    Show-DockerGuide -FirstRun:(Test-DockerFirstRun)
+    # Before a Docker's first start only (one installed some other way, never
+    # opened): its dashboard kept away and its sign-in and questions marked
+    # done. A Docker somebody has used keeps whatever they chose in it.
+    $firstRun = Test-DockerFirstRun
+    if ($firstRun) { Hide-DockerDashboard -Quiet }
+    Show-DockerGuide -FirstRun:$firstRun
     Note "Starting Docker Desktop. This takes a minute or two."
     Start-Process -FilePath $exe | Out-Null
 
@@ -1836,8 +1896,8 @@ function Start-Docker {
             # By a minute in, a window waiting on a click is the likeliest
             # reason, and the box that said what to click has scrolled away.
             if ($waited -eq 60) {
-                Important "If a Docker window is waiting on you, see the box above:"
-                Important "Accept the terms, and Skip the sign-in and the questions."
+                Important "If a Docker window is open, it may be waiting on you:"
+                Important "accept its terms, and Skip anything else."
             }
         }
         if ($waited -gt 420) {

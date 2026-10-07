@@ -83,14 +83,19 @@ temp folder.</p>
   installs and then asks the person to install WSL by hand, as administrator, with a restart. So the
   installer runs <code>wsl --install --no-distribution</code> first. <code>--no-distribution</code>
   skips Ubuntu, a gigabyte and a prompt for a Linux username nobody will use.</li>
-  <li><strong>Docker Desktop</strong>, through <code>winget</code>, elevated for that one step only.
-  Its dashboard is turned off in Docker's settings file <em>before</em> it is installed, because it
-  launches itself the moment its installer finishes.</li>
+  <li><strong>Docker Desktop</strong>, through <code>winget</code>, elevated for that one step only,
+  with its terms accepted by its installer's own <code>--accept-license</code> (the setup says so, and
+  links Docker's terms: it is free for personal use and small businesses). Its dashboard is turned off,
+  and its sign-in and survey marked done (<code>DisplayedOnboarding</code>), in Docker's settings file
+  <em>before</em> it is installed, because it launches itself the moment its installer finishes. So a
+  Docker the setup installs asks nothing: nothing to click, no Docker account.</li>
 </ol>
-<p>Before Docker's first start, a window explains its first-run screens - Accept, Skip, Skip, no
-account needed - with one button, <strong>I understand</strong>. A description alone was not enough:
-people walked away expecting everything to happen by itself, leaving setup waiting on a Docker window
-nobody clicked. Downloads then count up ("Downloaded 3 of 12: jellyfin"), and a registry rate limit is
+<p>A Docker already on the PC but never opened has not had its terms accepted, and that is the
+person's to do: before its first start a window says it will ask one thing - click
+<strong>Accept</strong> - with one button, <strong>I understand</strong> (a description alone was not
+enough: people walked away, leaving setup waiting on a click). Its sign-in and survey are skipped for
+them as for a new one. Should a Docker window ever appear anyway, the setup says to accept its terms
+and skip anything else. Downloads then count up ("Downloaded 3 of 12: jellyfin"), and a registry rate limit is
 retried after 30, 60 and 120 seconds rather than reported as a broken connection.</p>
 
 <h3 id="network">The home network</h3>
