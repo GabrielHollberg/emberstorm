@@ -665,6 +665,9 @@ type Prefs struct {
 	// WelcomeDone is whether the welcome after the first sign-in (add your
 	// media, away from home, family, TV) was closed.
 	WelcomeDone bool `json:"welcomeDone,omitempty"`
+	// AddressSeen is whether the owner said "Got it" to the welcome's
+	// address step (their SoundStorm address, to open and save elsewhere).
+	AddressSeen bool `json:"addressSeen,omitempty"`
 }
 
 // CoverStyles are the ways Now Playing can fill the screen under the title:
@@ -705,6 +708,7 @@ type PrefsChange struct {
 	CoverSpin   *bool               `json:"coverSpin"`
 	CoverStyle  *string             `json:"coverStyle"`
 	WelcomeDone *bool               `json:"welcomeDone"`
+	AddressSeen *bool               `json:"addressSeen"`
 }
 
 // ErrBadPrefs is a preference outside what is allowed.
@@ -780,6 +784,9 @@ func (s *Store) ChangePrefs(userID string, ch PrefsChange) (Prefs, error) {
 	}
 	if ch.WelcomeDone != nil {
 		p.WelcomeDone = *ch.WelcomeDone
+	}
+	if ch.AddressSeen != nil {
+		p.AddressSeen = *ch.AddressSeen
 	}
 	if err := s.save(userID, c); err != nil {
 		return Prefs{}, err

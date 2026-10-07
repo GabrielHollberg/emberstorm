@@ -153,8 +153,9 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	if _, err := home.ClaimName(ctx, other, "maria", "", "wrong"); !errors.As(err, &se) || se.Status != http.StatusConflict {
 		t.Errorf("maria with the wrong code: %v", err)
 	}
-	if _, err := home.ClaimName(ctx, other, "maria", "", "family-code-1"); err != nil {
-		t.Errorf("maria with its code: %v", err)
+	// Capitals, spaces and dashes do not count.
+	if _, err := home.ClaimName(ctx, other, "maria", "", " Family Code1 "); err != nil {
+		t.Errorf("maria with its code typed loosely: %v", err)
 	}
 
 	host := "thehollbergs.soundstorm.dev"

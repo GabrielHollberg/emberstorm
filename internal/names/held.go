@@ -68,14 +68,26 @@ func held(name string) bool {
 // reserved or taken alike.
 const notAvailable = "That name isn't available. Try another."
 
-// heldCodeFor is the code that lets somebody take a held name, if the owner
-// gave one for it (NAMES_HELD_CODES).
+// heldCodeOK says whether code is the one the owner gave out for a held name
+// (NAMES_HELD_CODES). Capitals, spaces and dashes do not count, as with the
+// setup code: a phone keyboard capitalising the first letter must not refuse it.
 func (s *Server) heldCodeOK(name, code string) bool {
 	want, ok := s.HeldCodes[name]
+	want, code = plainCode(want), plainCode(code)
 	if !ok || want == "" || code == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(code)), []byte(want)) == 1
+	return subtle.ConstantTimeCompare([]byte(code), []byte(want)) == 1
+}
+
+// plainCode is a code with its capitals, spaces and dashes set aside.
+func plainCode(code string) string {
+	return strings.Map(func(r rune) rune {
+		if r == ' ' || r == '-' || r == '\t' {
+			return -1
+		}
+		return r
+	}, strings.ToLower(code))
 }
 
 // ParseHeldCodes reads "name=code,name=code" (NAMES_HELD_CODES): the held

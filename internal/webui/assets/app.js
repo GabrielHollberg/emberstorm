@@ -11421,6 +11421,57 @@ async function renderWelcome() {
   const box = drives.ok && drives.body && drives.body.available;
   const remote = session.ok && session.body && session.body.remote;
   const steps = [];
+  // Their address, first: the page moved itself to it without a word, and it
+  // is what to open in a browser on any other device - a TV's and a phone's
+  // apps find the server by themselves. Their chosen web address when they
+  // have one. Done once another of their devices (not a TV) is open, or on
+  // Got it.
+  const shareURL = library.ok && library.body && library.body.shareURL;
+  const webName = session.ok && session.body && session.body.webName;
+  const address = webName ? `https://${webName}.soundstorm.dev` : shareURL;
+  if (address) {
+    const others = players.ok && players.body
+      && (players.body.players || []).some((p) => p.mine && !p.tv && p.id !== PLAYER.id);
+    const extra = document.createElement('div');
+    extra.className = 'welcome-address';
+    const row = document.createElement('div');
+    row.className = 'address-row';
+    const link = document.createElement('a');
+    link.className = 'address';
+    link.href = address;
+    link.textContent = address.replace(/\/$/, '');
+    row.append(link);
+    if (navigator.clipboard && window.isSecureContext) {
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'ghost small';
+      copy.textContent = 'Copy';
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(link.textContent); copy.textContent = 'Copied'; } catch { copy.textContent = 'Could not copy'; }
+        setTimeout(() => { copy.textContent = 'Copy'; }, 1800);
+      });
+      row.append(copy);
+    }
+    extra.append(row);
+    if (!webName && session.ok && session.body && session.body.webNames) {
+      const pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'ghost small';
+      pick.textContent = 'Pick an easier one, like yourname.soundstorm.dev';
+      pick.addEventListener('click', () => { selectTab('settings'); openSettingsCard($('web-name-block')); });
+      extra.append(pick);
+    }
+    const seen = Boolean(others || (state.prefs && state.prefs.addressSeen));
+    // Until then Use on your phone or TV opens unfolded in Settings too.
+    if (!seen) state.settingsOpen.add('devices');
+    steps.push({
+      done: seen,
+      what: 'Your SoundStorm address',
+      how: 'Open it in the browser on any phone, tablet or computer at home, sign in, and save it as a bookmark.',
+      extra,
+      label: 'Got it', act: async () => { await savePrefs({ addressSeen: true }); renderWelcome(); },
+    });
+  }
   steps.push({
     done: library.ok && library.body && !library.body.empty,
     what: 'Add your music, films, books and photos',
@@ -11465,6 +11516,7 @@ async function renderWelcome() {
     const how = document.createElement('span');
     how.textContent = st.how;
     what.append(b, how);
+    if (st.extra && !st.done) what.append(st.extra);
     li.append(tick, what);
     if (!st.done && st.act) {
       const go = document.createElement('button');
