@@ -139,7 +139,7 @@ final class PhotoBackup: NSObject {
             Task { @MainActor in PhotoBackup.shared.runInBackground(task) }
         }
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-            Task { @MainActor in PhotoBackup.shared.start() }
+            Task { @MainActor in PhotoBackup.shared.pageAsked() }
         }
         // The phone locking (or the app put away): iOS allows about half a
         // minute more, spent handing it as many files as fit; it sends those
@@ -147,7 +147,7 @@ final class PhotoBackup: NSObject {
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
             Task { @MainActor in PhotoBackup.shared.wentToBackground() }
         }
-        if enabled { start() }
+        if enabled { pageAsked() }
     }
 
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
@@ -176,17 +176,30 @@ final class PhotoBackup: NSObject {
     private var startWhenSent = false
     /// The server said it was busy (429): nothing new until then.
     private var busyUntil = Date.distantPast
-    /// When the last run went through every photo, and whether one has.
-    private var lastWholeRun: Date?
+    /// When the last run went through every photo, and whether one has -
+    /// kept across launches, so opening the app does not check every photo
+    /// with the server again minutes after the last time.
+    private var lastWholeRun: Date? {
+        get { UserDefaults.standard.object(forKey: "backupLastWholeRun") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "backupLastWholeRun") }
+    }
 
     /// The page sends a backup message every few seconds (its status), and
     /// each one used to start a run - a question to the server about every
     /// photo - which is most of what flooded the server on the first full
     /// backup. From the page now, a run starts only when the last did not
     /// get through (not signed in yet, the network, put away) or ten minutes
-    /// have passed; photos taken meanwhile start one of their own.
+    /// have passed; photos taken meanwhile start one of their own. So does
+    /// opening the app: every opening used to check every photo again.
     func pageAsked() {
-        if let last = lastWholeRun, Date().timeIntervalSince(last) < 600 { return }
+        if let last = lastWholeRun, Date().timeIntervalSince(last) < 600 {
+            // Still watching for new photos, which start a run of their own.
+            if enabled, permitted, !watching {
+                PHPhotoLibrary.shared().register(self)
+                watching = true
+            }
+            return
+        }
         start()
     }
 
@@ -263,17 +276,22 @@ final class PhotoBackup: NSObject {
     /// One file to send: a photo, a video, or a Live Photo's moving part -
     /// which is kept track of apart from its still (`<id>#live`), so a phone
     /// whose stills went up before clips were sent still sends the clips.
-    private struct Item {
+    nonisolated private struct Item: @unchecked Sendable {
         let key: String
         let assetID: String
         let resource: PHAssetResource
         let name: String
         let taken: Int64
         let video: Bool
+        /// As Photos records it (`size(of:)`), worked out with the rest.
+        let size: Int64
     }
 
-    private static func isLive(_ asset: PHAsset) -> Bool { asset.mediaSubtypes.contains(.photoLive) }
-    private static func liveKey(_ asset: PHAsset) -> String { asset.localIdentifier + "#live" }
+    /// Something of Photos' handed between threads; only read.
+    nonisolated private struct Handed<T>: @unchecked Sendable { let value: T }
+
+    nonisolated private static func isLive(_ asset: PHAsset) -> Bool { asset.mediaSubtypes.contains(.photoLive) }
+    nonisolated private static func liveKey(_ asset: PHAsset) -> String { asset.localIdentifier + "#live" }
 
 
     /// Files waiting with iOS at once, at most: enough to go on for hours
@@ -291,7 +309,12 @@ final class PhotoBackup: NSObject {
         let servers = candidates()
         guard var server = servers.first else { return }
         let list = sentList
-        let roll = cameraRoll()
+        // Photos' lookups (the roll, each photo's files and sizes) are run off
+        // the main thread: there, a batch of them held up the web view's
+        // frames, which pass through it - the looks skipped for as long as a
+        // run went on after opening the app (the owner's report, 2026-10-06).
+        let videos = self.videos
+        let roll = await Task.detached(priority: .utility) { Handed(value: Self.cameraRoll(videos: videos)) }.value.value
         // Only what this run has learnt: the server answers for the rest.
         known = []
         var sent = known
@@ -310,8 +333,9 @@ final class PhotoBackup: NSObject {
                 // shared to the phone but never downloaded): done, or it
                 // would count as waiting for ever.
                 var batch: [Item] = []
-                for asset in assets {
-                    let units = items(asset)
+                let handed = Handed(value: assets)
+                let found = await Task.detached(priority: .utility) { handed.value.map { Self.items($0) } }.value
+                for (asset, units) in zip(assets, found) {
                     if units.isEmpty {
                         markSent([asset.localIdentifier], list)
                         sent.insert(asset.localIdentifier)
@@ -443,7 +467,7 @@ final class PhotoBackup: NSObject {
     }
 
     /// Every photo, and video if asked for, newest first.
-    private func cameraRoll() -> [PHAsset] {
+    nonisolated private static func cameraRoll(videos: Bool) -> [PHAsset] {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.predicate = videos
@@ -460,7 +484,7 @@ final class PhotoBackup: NSObject {
     /// lands in the same month. The server's photo library joins the two by
     /// the identifier Apple writes inside both files, not by name. The clip
     /// goes even with videos left out: it is part of the photo.
-    private func items(_ asset: PHAsset) -> [Item] {
+    nonisolated private static func items(_ asset: PHAsset) -> [Item] {
         let resources = PHAssetResource.assetResources(for: asset)
         let video = asset.mediaType == .video
         let wanted: [PHAssetResourceType] = video ? [.video, .fullSizeVideo] : [.photo, .fullSizePhoto]
@@ -468,11 +492,11 @@ final class PhotoBackup: NSObject {
         let when = asset.creationDate ?? asset.modificationDate ?? Date()
         let taken = Int64(when.timeIntervalSince1970 * 1000)
         var out = [Item(key: asset.localIdentifier, assetID: asset.localIdentifier, resource: resource,
-                        name: resource.originalFilename, taken: taken, video: video)]
+                        name: resource.originalFilename, taken: taken, video: video, size: size(of: resource))]
         if Self.isLive(asset), let clip = resources.first(where: { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }) {
             let base = (resource.originalFilename as NSString).deletingPathExtension
             out.append(Item(key: Self.liveKey(asset), assetID: asset.localIdentifier, resource: clip,
-                            name: base + ".MOV", taken: taken, video: true))
+                            name: base + ".MOV", taken: taken, video: true, size: size(of: clip)))
         }
         return out
     }
@@ -481,7 +505,7 @@ final class PhotoBackup: NSObject {
     /// A resource's size as Photos records it, without reading the file (so
     /// a photo kept in iCloud is not downloaded to ask). Photos has no public
     /// call for it; the property is looked for first, and 0 if it is not there.
-    private static func size(of resource: PHAssetResource) -> Int64 {
+    nonisolated private static func size(of resource: PHAssetResource) -> Int64 {
         guard resource.responds(to: Selector(("fileSize"))),
               let n = resource.value(forKey: "fileSize") as? NSNumber else { return 0 }
         return max(0, n.int64Value)
@@ -497,7 +521,7 @@ final class PhotoBackup: NSObject {
         // picture of the same name and month (the camera's numbering starting
         // over, another device's file) is not taken for the one already
         // there. 0 where it does not: the server then matches name and month.
-        let list = items.map { ["name": $0.name, "taken": $0.taken, "size": Self.size(of: $0.resource)] as [String: Any] }
+        let list = items.map { ["name": $0.name, "taken": $0.taken, "size": $0.size] as [String: Any] }
         request.httpBody = try JSONSerialization.data(withJSONObject: ["items": list])
         let (data, response) = try await Self.plain.data(for: request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0

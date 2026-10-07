@@ -139,12 +139,22 @@ final class ConnectFlowTests: XCTestCase {
         if !settings.exists { signIn(web) }
         XCTAssertTrue(settings.waitForExistence(timeout: 15), "never got past signing in")
 
+        // Settings' cards fold to their titles: Your photos opened to see in.
+        let openPhotosCard = {
+            let card = web.buttons.containing(NSPredicate(format: "label BEGINSWITH %@", "Your photos")).firstMatch
+            for _ in 0..<16 where !card.isHittable { web.swipeUp() }
+            XCTAssertTrue(card.isHittable, "no Your photos card in Settings")
+            // Open already (a group of one card, or opened earlier): a tap would fold it.
+            if !web.descendants(matching: .any)["Back up this phone's photos and videos"].firstMatch.exists { card.tap() }
+        }
         let turnOn = web.buttons["Turn on"]
         if turnOn.waitForExistence(timeout: 8) {
             turnOn.tap()
             openSettings(web)
+            openPhotosCard()
         } else {
             openSettings(web)
+            openPhotosCard()
             let toggle = web.descendants(matching: .any)["Back up this phone's photos and videos"].firstMatch
             for _ in 0..<16 where !toggle.isHittable { web.swipeUp() }
             XCTAssertTrue(toggle.isHittable, "no backup switch in Settings")
