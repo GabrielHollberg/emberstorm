@@ -44,10 +44,14 @@ final class PhotoBackup: NSObject {
             // Not "expensive" (cellular, a phone's hotspot) or "constrained"
             // (Low Data Mode): what Wi-Fi only means to a person.
             let wifi = path.status == .satisfied && !path.isExpensive && !path.isConstrained
-            Task { @MainActor in PhotoBackup.shared.onWiFi = wifi }
+            Task { @MainActor in PhotoBackup.shared.wifiChanged(wifi) }
         }
         network.start(queue: DispatchQueue(label: "photo-backup-network"))
         UIDevice.current.isBatteryMonitoringEnabled = true
+        // Plugged in: a run waiting for it can go.
+        NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { PhotoBackup.shared.conditionsChanged() }
+        }
     }
 
     // MARK: Settings
@@ -192,6 +196,12 @@ final class PhotoBackup: NSObject {
     /// have passed; photos taken meanwhile start one of their own. So does
     /// opening the app: every opening used to check every photo again.
     func pageAsked() {
+        // A run that ended early (waiting for Wi-Fi or charging, not signed
+        // in, the server not answering) is not started again for every
+        // message the page sends: a report showed one starting every four
+        // seconds the whole time the app was open, each reading the photo
+        // library before giving up.
+        if let began = lastStarted, Date().timeIntervalSince(began) < 60 { return }
         if let last = lastWholeRun, Date().timeIntervalSince(last) < 600 {
             // Still watching for new photos, which start a run of their own.
             if enabled, permitted, !watching {
@@ -210,7 +220,21 @@ final class PhotoBackup: NSObject {
     /// minutes). It starts by itself once they are through.
     func start() {
         guard enabled, permitted, run == nil else { return }
+        // Waiting for Wi-Fi or the charger: no run until then (one starts by
+        // itself when they come, `conditionsChanged`).
+        guard mayRun else {
+            if !waitingForConditions { PlayerLog.add("photo backup: waiting for \(wifiOnly && !onWiFi ? "Wi-Fi" : "the charger")") }
+            waitingForConditions = true
+            if !watching {
+                PHPhotoLibrary.shared().register(self)
+                watching = true
+            }
+            return
+        }
+        waitingForConditions = false
+        lastStarted = Date()
         if Uploader.shared.pending.count > 0 || Date() < busyUntil {
+            if !startWhenSent { PlayerLog.add("photo backup: waiting for \(Uploader.shared.pending.count) files still with iOS") }
             startWhenSent = true
             if Date() < busyUntil {
                 let wait = busyUntil.timeIntervalSinceNow
@@ -263,6 +287,21 @@ final class PhotoBackup: NSObject {
     }
 
     /// Whether a file may go now: Wi-Fi and charging, if asked for.
+    /// When a run last began, and whether one is waiting for Wi-Fi or the
+    /// charger.
+    private var lastStarted: Date?
+    private var waitingForConditions = false
+
+    private func wifiChanged(_ wifi: Bool) {
+        let was = onWiFi
+        onWiFi = wifi
+        if wifi != was { conditionsChanged() }
+    }
+
+    private func conditionsChanged() {
+        if waitingForConditions, mayRun { start() }
+    }
+
     private var mayRun: Bool {
         if wifiOnly && !onWiFi { return false }
         if charging && ![.charging, .full].contains(UIDevice.current.batteryState) { return false }
