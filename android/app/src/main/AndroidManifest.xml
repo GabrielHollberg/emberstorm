@@ -95,6 +95,18 @@
                 <data android:host="*.net.soundstorm.dev" />
                 <data android:pathPrefix="/link/" />
             </intent-filter>
+            <!-- Open my SoundStorm on soundstorm.dev, on a phone:
+                 https://names.soundstorm.dev/open?to=<the server>, an App
+                 Link to the names service, which also serves its
+                 assetlinks.json; without the app it sends the browser on. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="names.soundstorm.dev" />
+                <data android:path="/open" />
+            </intent-filter>
         </activity>
 
         <!-- Songs from the server, played by Android's own media player

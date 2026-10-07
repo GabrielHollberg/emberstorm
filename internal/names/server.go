@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -171,6 +172,7 @@ func (s *Server) Handler() http.Handler {
 			"x-forwarded-for": r.Header.Get("X-Forwarded-For"),
 		})
 	})
+	mux.HandleFunc("GET /open", s.handleOpen)
 	mux.HandleFunc("GET /.well-known/assetlinks.json", s.handleAssetLinks)
 	mux.HandleFunc("GET /.well-known/apple-app-site-association", s.handleAppleLinks)
 	mux.HandleFunc("GET /apple-app-site-association", s.handleAppleLinks)
@@ -194,6 +196,29 @@ func (s *Server) Handler() http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+// handleOpen is "Open my SoundStorm" on a phone (2026-10-07, the owner's
+// asking): soundstorm.dev links here with ?to= the server it found, and the
+// phone's SoundStorm app, which claims this address (assetlinks.json and
+// apple-app-site-association), opens that server itself. Without the app
+// the browser arrives here, and is sent on to the server's web address. Only
+// ever an install's own name, on its home or away label: never anywhere else.
+func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
+	to, err := url.Parse(r.URL.Query().Get("to"))
+	ok := err == nil && to.Scheme == "https" && to.User == nil
+	if ok {
+		host := strings.ToLower(to.Hostname())
+		id, rest, _ := strings.Cut(host, ".")
+		ok = validID(id) && (rest == s.Label+"."+s.Zone || (s.PublicLabel != "" && rest == s.PublicLabel+"."+s.Zone))
+	}
+	if !ok {
+		writeError(w, http.StatusBadRequest, "not a SoundStorm address")
+		return
+	}
+	dest := url.URL{Scheme: "https", Host: strings.ToLower(to.Host), Path: "/"}
+	w.Header().Set("Cache-Control", "no-store")
+	http.Redirect(w, r, dest.String(), http.StatusFound)
 }
 
 // handleAssetLinks lets the Android app open links to installs' names. Only
@@ -233,7 +258,7 @@ func (s *Server) handleAppleLinks(w http.ResponseWriter, r *http.Request) {
 	}
 	details := []detail{}
 	if len(s.AppleApps) > 0 {
-		details = append(details, detail{AppIDs: s.AppleApps, Components: []component{{"/link/*"}, {"/invite/*"}}})
+		details = append(details, detail{AppIDs: s.AppleApps, Components: []component{{"/link/*"}, {"/invite/*"}, {"/open"}}})
 	}
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	writeJSON(w, http.StatusOK, map[string]any{"applinks": map[string]any{"details": details}})

@@ -53,8 +53,8 @@ func TestAppleLinksNameTheApp(t *testing.T) {
 			t.Fatalf("%s: %d %s %v", path, rec.Code, rec.Body, err)
 		}
 		d := got.Applinks.Details[0]
-		if d.AppIDs[0] != "TEAM.dev.soundstorm.app" || len(d.Components) != 2 ||
-			d.Components[0]["/"] != "/link/*" || d.Components[1]["/"] != "/invite/*" {
+		if d.AppIDs[0] != "TEAM.dev.soundstorm.app" || len(d.Components) != 3 ||
+			d.Components[0]["/"] != "/link/*" || d.Components[1]["/"] != "/invite/*" || d.Components[2]["/"] != "/open" {
 			t.Fatalf("%+v", d)
 		}
 		if ct := rec.Header().Get("Content-Type"); ct != "application/json" && ct != "application/json; charset=utf-8" {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -200,6 +201,29 @@ func TestNameRules(t *testing.T) {
 	} {
 		if got := NameStatus(name) == ""; got != ok {
 			t.Errorf("%q allowed = %v, want %v (%s)", name, got, ok, NameStatus(name))
+		}
+	}
+}
+
+// "Open my SoundStorm" on a phone: the app claims /open; without it the
+// browser is sent on to the install's own address, and nowhere else.
+func TestOpenSendsTheBrowserOnToTheServer(t *testing.T) {
+	_, _, base := newFindService(t)
+	for to, want := range map[string]string{
+		"https://k3xqm2p7qa.home.soundstorm.dev:8099/":         "https://k3xqm2p7qa.home.soundstorm.dev:8099/",
+		"https://K3XQM2P7QA.home.soundstorm.dev/x?y=1":         "https://k3xqm2p7qa.home.soundstorm.dev/",
+		"https://evil.example/":                                "",
+		"http://k3xqm2p7qa.home.soundstorm.dev/":               "",
+		"https://k3xqm2p7qa.home.soundstorm.dev.evil.example/": "",
+		"https://hollberg.soundstorm.dev/":                     "",
+	} {
+		r := get(t, base, "/open?to="+url.QueryEscape(to), "203.0.113.7", "")
+		got := ""
+		if r.StatusCode == http.StatusFound {
+			got = r.Header.Get("Location")
+		}
+		if got != want {
+			t.Errorf("%q: sent to %q (%d), want %q", to, got, r.StatusCode, want)
 		}
 	}
 }

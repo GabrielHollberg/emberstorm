@@ -172,8 +172,17 @@ class MainActivity : Activity() {
         // TV?" for it.
         val link = tvLink(intent)
         if (link != null) pendingLink = link.second
-        val start = link?.first ?: saved
-        if (start != null) showWeb(start) else showConnect(null)
+        // Opened from Open my SoundStorm on soundstorm.dev.
+        val opened = if (link == null) openLink(intent) else null
+        val start = link?.first ?: opened?.first?.takeIf { opened.second } ?: saved
+        when {
+            opened != null && !opened.second -> showConnect(opened.first)
+            start != null -> {
+                if (opened != null) ServerAddress.remember(this, start)
+                showWeb(start)
+            }
+            else -> showConnect(null)
+        }
         // Opened from the Share sheet: the files go to the page once it is up.
         // Not again when the activity is only made again (a rotation).
         if (savedInstanceState == null) takeShare(intent)
@@ -744,6 +753,14 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (takeShare(intent)) return
+        openLink(intent)?.let { (to, known) ->
+            if (!known) showConnect(to)
+            else if (server?.let(ServerAddress::origin) != ServerAddress.origin(to)) {
+                ServerAddress.remember(this, to)
+                showWeb(to)
+            }
+            return
+        }
         val link = tvLink(intent) ?: return
         val view = webView
         if (view != null && server?.let(ServerAddress::origin) == ServerAddress.origin(link.first)) {
@@ -796,6 +813,28 @@ class MainActivity : Activity() {
         }
         val server = match ?: ServerAddress.saved(this) ?: return null
         return server to code
+    }
+
+    /**
+     * https://names.soundstorm.dev/open?to=<server>, from Open my SoundStorm
+     * on soundstorm.dev. A server this app knows (by its address or the
+     * install's id, as tvLink matches) is opened - the saved address, which
+     * may be the away name the found home one is a twin of - and true comes
+     * with it. One it does not know is not opened: it is put in the Connect
+     * screen for the person to choose, as a link must never point the app
+     * somewhere new by itself.
+     */
+    private fun openLink(intent: Intent?): Pair<Uri, Boolean>? {
+        val data = intent?.data ?: return null
+        if (data.scheme != "https" || data.host?.lowercase() != "names.soundstorm.dev" || data.path != "/open") return null
+        val to = data.getQueryParameter("to")?.let(ServerAddress::parse) ?: return null
+        val host = to.host?.lowercase() ?: return null
+        if (to.scheme != "https" || !(host.endsWith(".home.soundstorm.dev") || host.endsWith(".net.soundstorm.dev"))) return null
+        val known = ServerAddress.all(this).map { it.url } + listOfNotNull(ServerAddress.saved(this))
+        val installId = { u: Uri -> u.host?.lowercase()?.takeIf { it.endsWith(".soundstorm.dev") }?.substringBefore('.') }
+        val match = known.firstOrNull { ServerAddress.origin(it) == ServerAddress.origin(to) }
+            ?: known.firstOrNull { installId(it) != null && installId(it) == installId(to) }
+        return if (match != null) match to true else to to false
     }
 
     private fun load() {

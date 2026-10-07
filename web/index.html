@@ -196,13 +196,22 @@
       const form = document.getElementById('open-type');
       const input = document.getElementById('open-input');
       const KEY = 'soundstorm-last-server';
-      const go = (url) => { try { localStorage.setItem(KEY, url); } catch {} location.href = url; };
+      // On a phone, a server's own address goes by way of the names service's
+      // /open, which the SoundStorm app claims: with the app, it opens there;
+      // without, the browser is sent on to the server. A phone opens an app
+      // only from a tap, so a server found is a button to tap, not a jump.
+      const phone = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+      const viaApp = (url) => phone && /^https:\/\/[a-z2-7]{10}\.(home|net)\.soundstorm\.dev(:\d+)?\/?$/i.test(url)
+        ? `https://names.soundstorm.dev/open?to=${encodeURIComponent(url)}` : url;
+      const remember = (url) => { try { localStorage.setItem(KEY, url); } catch {} };
+      const go = (url) => { remember(url); location.href = viaApp(url); };
       const button = (label, url) => {
         const a = document.createElement('a');
         a.className = 'button primary';
-        a.href = url;
+        a.href = viaApp(url);
         a.textContent = label;
-        a.addEventListener('click', (e) => { e.preventDefault(); go(url); });
+        // Left to the browser, so a phone hands it to the app.
+        a.addEventListener('click', () => remember(url));
         return a;
       };
       const typed = (raw) => {
@@ -237,7 +246,10 @@
           const r = await fetch('https://names.soundstorm.dev/v1/find', { cache: 'no-store' });
           if (r.ok) servers = (await r.json()).servers || [];
         } catch {}
-        if (servers.length === 1) {
+        if (servers.length === 1 && phone) {
+          status.textContent = 'Found it.';
+          list.append(button('Open SoundStorm', servers[0].url));
+        } else if (servers.length === 1) {
           status.textContent = 'Found it. Opening your SoundStorm...';
           go(servers[0].url);
         } else if (servers.length > 1) {
