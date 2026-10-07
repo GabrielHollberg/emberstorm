@@ -66,10 +66,14 @@ enum TVLink {
     /// true; one it does not is only offered on the connect screen - a link
     /// must never point the app somewhere new by itself. Only an install's
     /// own home or away name is taken.
+    /// With no server named (away from home, where there is nothing to
+    /// find), it is this app's own saved server, as Android 0.44.
     static func open(_ url: URL) -> (server: URL, known: Bool)? {
-        guard url.scheme == "https", url.host()?.lowercased() == "names.soundstorm.dev", url.path() == "/open",
-              let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "to" })?.value,
-              let to = ServerAddress.parse(raw), to.scheme == "https",
+        guard url.scheme == "https", url.host()?.lowercased() == "names.soundstorm.dev", url.path() == "/open" else { return nil }
+        guard let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "to" })?.value,
+              !raw.isEmpty
+        else { return ServerAddress.saved.map { ($0, true) } }
+        guard let to = ServerAddress.parse(raw), to.scheme == "https",
               let host = to.host()?.lowercased(), host.hasSuffix(".home.soundstorm.dev") || host.hasSuffix(".net.soundstorm.dev")
         else { return nil }
         if let saved = known(to) { return (saved, true) }
