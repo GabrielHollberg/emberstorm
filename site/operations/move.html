@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moving to a new computer - SoundStorm</title>
+<link rel="icon" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="operations/move" data-root="..">
+<main>
+<h1>Moving to a new computer</h1>
+<p class="lede">Moving SoundStorm to a new computer - in the same house or on another network - keeps
+everything: every account, playlist, favorite, the place you got to in every book and film, your
+settings, and your library if you bring it. It takes two steps: pack it up on the old computer, and
+install it from that folder on the new one.</p>
+
+<h2 id="before">Before you start</h2>
+<ul>
+  <li><strong>A drive to carry it on.</strong> An external drive or USB stick, or a shared folder both
+  computers can reach. Bringing your media means a drive at least as big as your library; leaving the
+  media out, a few gigabytes is plenty.</li>
+  <li><strong>The new computer needs the internet</strong> while it installs: it fetches the newest
+  installer and the media servers SoundStorm runs on. Only your own things come from the drive.</li>
+  <li><strong>Windows, Mac or Linux, either way round.</strong> A move from Windows to a Mac, or Linux to
+  Windows, works the same.</li>
+</ul>
+
+<h2 id="old">On the old computer</h2>
+<ol>
+  <li>Plug in the drive.</li>
+  <li><strong>Windows:</strong> open the Start menu and choose <strong>Move SoundStorm to another
+  computer</strong>.<br>
+  <strong>Mac or Linux:</strong> in a terminal, run<br>
+  <code>curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --export /path/to/the/drive</code><br>
+  (add <code>--no-library</code> to leave your media out).</li>
+  <li>Choose the drive, and whether to bring your media.</li>
+  <li>Wait while it copies. SoundStorm stops for the copy - so nothing is caught half-written - and
+  starts again by itself when it is done.</li>
+</ol>
+<p>The drive now has a folder called <strong>SoundStorm-move</strong>. Inside are your things and two
+installers: <strong>Install SoundStorm here.cmd</strong> for Windows and <strong>install-here.sh</strong>
+for a Mac or Linux.</p>
+<div class="note">Anything you change on the old computer after this - a new playlist, a song added -
+does not come along. Move when you are ready to switch.</div>
+
+<h2 id="new">On the new computer</h2>
+<ol>
+  <li>Plug in the drive, or copy the <strong>SoundStorm-move</strong> folder onto the computer.</li>
+  <li><strong>Windows:</strong> open the folder and double-click <strong>Install SoundStorm
+  here.cmd</strong>.<br>
+  <strong>Mac or Linux:</strong> in a terminal, run <code>sh install-here.sh</code> inside the folder.</li>
+  <li>The setup is the same as a fresh install - it installs Docker if the computer needs it, with the
+  same window and steps - except that SoundStorm starts with everything from the folder instead of
+  empty.</li>
+  <li>Open SoundStorm and sign in with your usual name and password. There is no new account to make.</li>
+</ol>
+
+<h2 id="after">Afterwards</h2>
+<ul>
+  <li><strong>Phones, TVs and tablets</strong> find it at its same name - your server keeps its address,
+  and tells it the new computer's place on the network by itself. If a device cannot connect, open the
+  app's server list and choose the server again, or sign in once more.</li>
+  <li><strong>Away from home:</strong> SoundStorm sets up the new router by itself where it can. If you
+  had forwarded a port by hand on the old router, do the same on the new one. Tailscale, if you used it,
+  needs setting up again on the new computer (Start menu, <strong>Set up Tailscale</strong>).</li>
+  <li><strong>Remove it from the old computer</strong> once the new one is working: Settings, Apps,
+  SoundStorm, Uninstall on Windows. Uninstalling never deletes your media.</li>
+</ul>
+
+<h2 id="problems">If something goes wrong</h2>
+<ul>
+  <li><strong>It says SoundStorm is already on this computer.</strong> The new computer already has
+  SoundStorm, and a move will not write over its accounts. Uninstall it there first if you mean to replace it.</li>
+  <li><strong>The drive is too small for your media.</strong> Move without the media, then copy your
+  library folder across yourself and point the new install at it.</li>
+  <li><strong>A file named <code>windows-name-problems.txt</code></strong> in the folder lists media
+  whose names Windows cannot hold (moving from a Mac or Linux to Windows). Rename those files and move
+  again, or copy them across by hand.</li>
+  <li><strong>The installer could not download.</strong> The new computer needs the internet during the
+  install; check the connection and run the installer in the folder again.</li>
+</ul>
+<p>How the move works underneath - what is packed, and why - is in
+<a href="maintain.html#move">Updating, moving, removing</a>.</p>
+</main>
+<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<script src="../assets/nav.js"></script>
+</body>
+</html>

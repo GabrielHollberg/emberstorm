@@ -67,6 +67,7 @@ const SITE = [
     pages: [
       { id: 'operations/install', title: 'Installing', href: 'operations/install.html' },
       { id: 'operations/maintain', title: 'Updating, moving, removing', href: 'operations/maintain.html' },
+      { id: 'operations/move', title: 'Moving to a new computer', href: 'operations/move.html' },
       { id: 'operations/remote', title: 'Away from home', href: 'operations/remote.html' },
       { id: 'operations/troubleshooting', title: 'Troubleshooting', href: 'operations/troubleshooting.html' },
     ],

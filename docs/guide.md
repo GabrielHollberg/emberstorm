@@ -548,6 +548,8 @@ On the new computer, open the `SoundStorm-move` folder and run
 **Install SoundStorm here.cmd** (Windows) or `sh install-here.sh` (Mac, Linux).
 Then uninstall it from the old computer. File names Windows can't hold are
 listed in `windows-name-problems.txt` so they can be renamed first.
+The whole of it, step by step, is on the website: Running it, **Moving to a new
+computer** (`site/operations/move.html`).
 
 ## Uninstalling
 
