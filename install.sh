@@ -341,6 +341,169 @@ gateway_address() {
 	fi
 }
 
+# machine_addresses lists every IPv4 address this machine has, one a line.
+machine_addresses() {
+	if command -v ip >/dev/null 2>&1; then
+		ip -o -4 addr show 2>/dev/null | awk '{split($4, a, "/"); print a[1]}'
+		return
+	fi
+	if command -v ifconfig >/dev/null 2>&1; then
+		ifconfig 2>/dev/null | awk '$1 == "inet" {print $2}' | sed 's/^addr://'
+		return
+	fi
+	hostname -I 2>/dev/null | tr ' ' '\n'
+}
+
+# refresh_lan_address points the recorded LAN address at where this machine is
+# now, when it has moved - another network, or a router that handed out a new
+# address (a power cut, a new router). Written once and never looked at again,
+# the secure name every phone saved kept pointing at an address this machine no
+# longer had. Only the first entry, and only when it is on none of this
+# machine's interfaces: an address still here was chosen, not left behind (the
+# Windows installer's Update-LanAddress, the same rule). True when it changed.
+refresh_lan_address() {
+	hosts=$(get_env SOUNDSTORM_TLS_HOSTS)
+	[ -n "$hosts" ] || return 1
+	first=${hosts%%,*}
+	rest=
+	case "$hosts" in *,*) rest=",${hosts#*,}" ;; esac
+	case "$first" in '' | *[!0-9.]*) return 1 ;; esac
+	now=$(lan_address)
+	[ -n "$now" ] && [ "$now" != "$first" ] || return 1
+	if machine_addresses | grep -qxF "$first"; then return 1; fi
+	set_env SOUNDSTORM_TLS_HOSTS "$now$rest"
+	return 0
+}
+
+# refresh_gateway does the same for the router: a machine on another network
+# kept asking the old house's router to open its port. A new router also means
+# its UPnP address is looked for again. True when it changed.
+refresh_gateway() {
+	was=$(get_env SOUNDSTORM_GATEWAY)
+	[ -n "$was" ] || return 1
+	now=$(gateway_address)
+	[ -n "$now" ] && [ "$now" != "$was" ] || return 1
+	set_env SOUNDSTORM_GATEWAY "$now"
+	set_env SOUNDSTORM_UPNP_URL ""
+	return 0
+}
+
+# A check this machine runs by itself - when it starts, and every ten minutes
+# - so a changed address is picked up with nobody running the installer: the
+# secure name follows the new address, and the router the machine is behind
+# now is the one asked to open the port. Through the user's crontab, which
+# needs no administrator; uninstalling takes it out again. (On Windows the
+# start-up shortcut does the same; the SoundStorm box does it on every start.)
+ADDRESS_TAG='# soundstorm-address'
+install_address_watch() {
+	command -v crontab >/dev/null 2>&1 || return 0
+	watch="$DIR/soundstorm-address.sh"
+	docker_dir=$(dirname "$(command -v docker 2>/dev/null || echo /usr/local/bin/docker)")
+	{
+		printf '#!/bin/sh\n'
+		printf '# Points SoundStorm at this machine'"'"'s current network address when it has moved.\n'
+		printf '# Run by cron (installed by install.sh); safe to run by hand.\n'
+		printf 'PATH="%s:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"\n' "$docker_dir"
+		printf 'cd "%s" || exit 0\n' "$DIR"
+		printf '[ -f .env ] && [ -f docker-compose.yml ] || exit 0\n'
+		printf 'COMPOSE="%s"\n' "$COMPOSE"
+		# Its own copies of the installer's helpers: the installer usually
+		# arrives through a pipe (curl | sh), with no file to copy them from.
+		cat <<'WATCH'
+get_env() {
+	sed -n "s/^[[:space:]]*$1=//p" .env | head -n 1
+}
+set_env() {
+	case "$2" in *"
+"* | *"$(printf '\r')"*) return ;; esac
+	( umask 077; grep -v "^[[:space:]]*$1=" .env > .env.new ) || true
+	mv .env.new .env
+	printf '%s=%s\n' "$1" "$2" >> .env
+}
+lan_address() {
+	if command -v ip >/dev/null 2>&1; then
+		ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}'
+		return
+	fi
+	if command -v ipconfig >/dev/null 2>&1; then
+		for interface in en0 en1 eth0; do
+			addr=$(ipconfig getifaddr "$interface" 2>/dev/null) || true
+			if [ -n "$addr" ]; then printf '%s' "$addr"; return; fi
+		done
+	fi
+	if command -v hostname >/dev/null 2>&1; then hostname -I 2>/dev/null | awk '{print $1}'; fi
+}
+gateway_address() {
+	if command -v ip >/dev/null 2>&1; then
+		ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="via") {print $(i+1); exit}}'
+		return
+	fi
+	if command -v route >/dev/null 2>&1; then
+		route -n get default 2>/dev/null | awk '/gateway:/{print $2; exit}'
+		return
+	fi
+	if command -v netstat >/dev/null 2>&1; then
+		netstat -rn 2>/dev/null | awk '$1=="default" || $1=="0.0.0.0" {print $2; exit}'
+	fi
+}
+machine_addresses() {
+	if command -v ip >/dev/null 2>&1; then
+		ip -o -4 addr show 2>/dev/null | awk '{split($4, a, "/"); print a[1]}'
+		return
+	fi
+	if command -v ifconfig >/dev/null 2>&1; then
+		ifconfig 2>/dev/null | awk '$1 == "inet" {print $2}' | sed 's/^addr://'
+		return
+	fi
+	hostname -I 2>/dev/null | tr ' ' '\n'
+}
+refresh_lan_address() {
+	hosts=$(get_env SOUNDSTORM_TLS_HOSTS)
+	[ -n "$hosts" ] || return 1
+	first=${hosts%%,*}
+	rest=
+	case "$hosts" in *,*) rest=",${hosts#*,}" ;; esac
+	case "$first" in '' | *[!0-9.]*) return 1 ;; esac
+	now=$(lan_address)
+	[ -n "$now" ] && [ "$now" != "$first" ] || return 1
+	if machine_addresses | grep -qxF "$first"; then return 1; fi
+	set_env SOUNDSTORM_TLS_HOSTS "$now$rest"
+	return 0
+}
+refresh_gateway() {
+	was=$(get_env SOUNDSTORM_GATEWAY)
+	[ -n "$was" ] || return 1
+	now=$(gateway_address)
+	[ -n "$now" ] && [ "$now" != "$was" ] || return 1
+	set_env SOUNDSTORM_GATEWAY "$now"
+	set_env SOUNDSTORM_UPNP_URL ""
+	return 0
+}
+changed=
+refresh_lan_address && changed=1
+refresh_gateway && changed=1
+# Compose sees the changed .env and starts SoundStorm again on it.
+[ -n "$changed" ] && $COMPOSE up -d >/dev/null 2>&1
+exit 0
+WATCH
+	} > "$watch.new" || return 0
+	chmod 755 "$watch.new"
+	mv "$watch.new" "$watch"
+	{
+		crontab -l 2>/dev/null | grep -vF "$ADDRESS_TAG"
+		printf '@reboot sleep 90; sh "%s" >/dev/null 2>&1 %s\n' "$watch" "$ADDRESS_TAG"
+		printf '*/10 * * * * sh "%s" >/dev/null 2>&1 %s\n' "$watch" "$ADDRESS_TAG"
+	} | crontab - 2>/dev/null || true
+}
+
+remove_address_watch() {
+	rm -f "$DIR/soundstorm-address.sh"
+	command -v crontab >/dev/null 2>&1 || return 0
+	if crontab -l 2>/dev/null | grep -qF "$ADDRESS_TAG"; then
+		crontab -l 2>/dev/null | grep -vF "$ADDRESS_TAG" | crontab - 2>/dev/null || true
+	fi
+}
+
 # upnp_url discovers the router's UPnP device-description URL over SSDP, the
 # fallback for opening the port on routers that speak UPnP but not NAT-PMP/PCP.
 # Done on the host because SSDP multicast does not cross the Docker bridge; the
@@ -478,6 +641,7 @@ uninstall() {
 		step "Cleaning up"
 		# soundstorm-backup.json is deliberately not in this list.
 		rm -f "$DIR/docker-compose.yml" "$DIR/.env"
+		remove_address_watch
 	else
 		note "nothing installed in $DIR"
 	fi
@@ -510,7 +674,7 @@ MOVE_VOLUMES="soundstorm-state navidrome-data jellyfin-config abs-config abs-met
 
 # Settings that describe this computer and its network rather than the
 # install. They are worked out again on the new one.
-MOVE_LOCAL='^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL)='
+MOVE_LOCAL='^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME)='
 
 # windows_name_problems lists files under $1 that cannot exist on Windows:
 # names with a character Windows refuses, names ending in a dot or a space,
@@ -945,6 +1109,12 @@ if [ -n "$IMPORT" ]; then
 	import_settings "$IMPORT"
 fi
 
+# This computer on another network than when it was installed - or given a new
+# address by its router: the secure name follows it.
+if [ "$UPGRADE" = "1" ] && refresh_lan_address; then
+	note "this computer's network address has changed; SoundStorm will use the new one"
+fi
+
 # After the port, so that on a fresh install this amends the file just written
 # rather than being overwritten by it.
 #
@@ -1010,7 +1180,9 @@ fi
 # The router address, for opening the port automatically when remote access is
 # on (NAT-PMP/PCP). Written whether or not remote access is on yet, for the same
 # reason as the LAN address: by the time somebody turns it on from inside the
-# app, nothing on the host is running to work it out. An existing value stands.
+# app, nothing on the host is running to work it out. An existing value stands,
+# unless it is no longer this machine's router (refresh_gateway).
+refresh_gateway || true
 if [ -z "$(get_env SOUNDSTORM_GATEWAY)" ]; then
 	gw=$(gateway_address)
 	if [ -n "$gw" ]; then
@@ -1036,6 +1208,8 @@ if [ -z "$(get_env SOUNDSTORM_UPNP_URL)" ]; then
 		set_env SOUNDSTORM_UPNP_URL "$upnp"
 	fi
 fi
+
+install_address_watch
 
 # Where the library lives: beside the install unless --library says otherwise,
 # which is how it goes on an external drive. Compose mounts every shelf from

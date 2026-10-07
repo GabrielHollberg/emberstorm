@@ -1424,6 +1424,27 @@ function Update-LanAddress {
     return $true
 }
 
+# Confirm-LanOnLaunch asks the setup's question again when SoundStorm starts
+# on a network Windows treats as public - every new Wi-Fi network is, unless
+# somebody said otherwise - where phones and TVs cannot reach it and nothing
+# said why: a laptop taken to another house, or a new router. Yes makes it
+# private and opens the port, as the setup does (Windows asks for permission);
+# No is remembered for that network's name, so it is asked once per network.
+# A work network is left alone, as at setup.
+function Confirm-LanOnLaunch {
+    $lan = Get-LanAddress
+    if (-not $lan) { return }
+    $network = Get-LanProfile $lan
+    if (-not $network -or $network.Category -ne 'Public' -or -not $network.Name) { return }
+    $declined = @((Get-EnvSetting 'SOUNDSTORM_NOT_HOME') -split '\|' | Where-Object { $_ })
+    if ($declined -contains $network.Name) { return }
+    $result = Set-LanAccess $lan ([int](Get-InstalledPort))
+    if ($result -eq 'public') {
+        $names = @($declined) + @($network.Name -replace '[|\r\n]', ' ')
+        Set-EnvSetting 'SOUNDSTORM_NOT_HOME' ((@($names) | Select-Object -Last 20) -join '|')
+    }
+}
+
 # Update-RouterSettings keeps the router's address and UPnP URL in .env
 # current. They used to be written only when missing, so a laptop that moved
 # kept asking the old house's router to open its port, and a replaced router
@@ -2779,7 +2800,7 @@ $MoveVolumes = @('soundstorm-state', 'navidrome-data', 'jellyfin-config', 'abs-c
     'immich-data', 'immich-db', 'storyteller-data', 'audiomuse-db')
 # Settings that describe this computer and its network, worked out again on
 # the new one.
-$MoveLocal = '^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL)='
+$MoveLocal = '^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME)='
 $MoveImage = 'alpine:3'
 # The compose project, whose name prefixes every data volume. Always
 # soundstorm; overridable only so a move can be rehearsed on a throwaway
@@ -3057,6 +3078,8 @@ if ($Launch) {
     $port = Get-InstalledPort
     $url = "$(Get-InstalledScheme)://localhost:$port"
     Wait-ForSoundStorm $url
+    # On a network Windows treats as public, other devices are kept out: ask.
+    Confirm-LanOnLaunch
     # At startup there is nobody watching yet, so the browser stays shut; the
     # desktop icon is what opens it.
     if (-not $NoBrowser) {
