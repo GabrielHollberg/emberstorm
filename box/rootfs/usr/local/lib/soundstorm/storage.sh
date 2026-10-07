@@ -94,6 +94,23 @@ done
 sed -n 's|.*device: \(/srv/soundstorm/[a-z]*/[a-z0-9-]*\).*|\1|p' /opt/soundstorm/compose.box.yml |
 	while read -r dir; do mkdir -p "$dir"; done
 
+# The models built into the box (box/models.sh), each laid into its cache
+# folder when that is empty: on first boot, and after Start over empties the
+# caches - so photo search, Make an ebook and read-along syncing work with no
+# internet. The archives stay, for next time.
+for tar in /var/lib/soundstorm-models/*.tar; do
+	[ -f "$tar" ] || continue
+	dest="$MNT/cache/$(basename "$tar" .tar)"
+	mkdir -p "$dest"
+	if [ -z "$(ls -A "$dest" 2>/dev/null)" ]; then
+		if tar --numeric-owner -xf "$tar" -C "$dest"; then
+			log "models: $(basename "$tar" .tar) laid in"
+		else
+			log "models: could not lay in $(basename "$tar" .tar)"
+		fi
+	fi
+done
+
 # SoundStorm runs as uid 10001 and must own its state; the backends' own
 # images fix their folders' ownership themselves when they start.
 state="$MNT/volumes/soundstorm-state"

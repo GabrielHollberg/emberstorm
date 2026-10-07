@@ -132,6 +132,20 @@ if [ "${NO_IMAGES:-}" = 1 ]; then
 fi
 du -sh "$images" 2>/dev/null || true
 
+say "Models"
+# The models the backends download on first use, so a box set up with no
+# internet has photo search, Make an ebook and read-along syncing from its
+# first start. box/models.sh makes them from a working install (this build
+# runs no Docker); storage.sh lays each into its empty cache folder on the
+# data drive at first boot, and they stay here for Start over.
+if ls "$out/models/"*.tar >/dev/null 2>&1; then
+	mkdir -p "$stage/var/lib/soundstorm-models"
+	cp "$out/models/"*.tar "$stage/var/lib/soundstorm-models/"
+	du -sh "$stage/var/lib/soundstorm-models"
+else
+	echo "  none in $out/models - run box/models.sh first, or the box downloads them on first use"
+fi
+
 find "$stage" -type f ! -name '*.tar' ! -name soundstorm-caretaker -exec sed -i 's/\r$//' {} +
 # Each top folder is copied in whole; copying merges into what is there.
 copy_args=""

@@ -4,13 +4,19 @@ What turns a small computer into a SoundStorm box: a system disk made from
 Debian 13 with Docker, and the services that prepare the data drive and start
 SoundStorm on it. See "Selling it on a box" in `CLAUDE.md` for why.
 
+    box/models.sh       copies the backends' models out of a working install
     box/build.sh        builds out/soundstorm-box.qcow2
     box/run-vm.sh       boots it as a pretend box (UEFI, eMMC + NVMe drive)
     box/release.sh      makes a signed release (manifest) for boxes to update to
     box/compose.box.yml the box's additions to docker-compose.yml
     box/rootfs/         files copied into the system disk
 
-On the Windows PC both run in the Debian WSL distro, which has KVM (Docker
+On the Windows PC, first the models (with Docker, from the live install -
+models only, nothing of anybody's media), into the folder the build reads:
+
+    OUT=//wsl.localhost/Debian/root/box-out sh box/models.sh
+
+then the build and the VM in the Debian WSL distro, which has KVM (Docker
 Desktop's own does not, and Hyper-V is off):
 
     wsl -d Debian -u root -- sh -c 'cd /mnt/h/dev/soundstorm && OUT=/root/box-out DEV_SSH=1 sh box/build.sh'
@@ -28,7 +34,10 @@ through `/mnt`.
    disk is ever formatted**, and never a USB one. It holds three subvolumes:
    `library`, `volumes` (every container volume that holds data) and `cache`.
    With no data drive the box runs on the system disk and leaves
-   `/run/soundstorm/no-data-drive`.
+   `/run/soundstorm/no-data-drive`. Each model built in
+   (`/var/lib/soundstorm-models/*.tar`, from `box/models.sh`) is laid into its
+   cache folder when that is empty - photo search, Make an ebook and read-along
+   syncing then work with no internet, and again after Start over.
 3. `soundstorm-images` loads the container images built into the disk
    (`/var/lib/soundstorm-images`, deleted once loaded), so a box starts with
    no downloads; `compose.images.yml` points each service at its built-in

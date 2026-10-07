@@ -90,3 +90,11 @@ services:
         read_only: true
         bind:
           propagation: rslave
+
+  # Whisper's model alone, so the one built into the box (box/models.sh) can be
+  # laid into it: mounted over the whole of its cache, a folder already
+  # holding the model would keep Docker from copying in the program's own
+  # virtualenv, which lives there too, and it would not start.
+  whisper:
+    volumes: !override
+      - whisper-models:/root/.cache/whisper
