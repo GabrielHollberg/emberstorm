@@ -147,16 +147,61 @@ install_docker_linux() {
 	log=$(mktemp)
 	note "Installing... (a few minutes)"
 	if ! as_root sh "$tmp" >"$log" 2>&1; then
-		tail -n 15 "$log" >&2
-		rm -f "$tmp" "$log"
-		die "Docker's installer did not finish (it does not know every Linux).
+		# Docker's installer knows the common systems by name only, and
+		# refuses the rest - Arch, openSUSE, Alpine, and some made from
+		# Ubuntu (Linux Mint, Pop!_OS). Then the system's own Docker, from
+		# its own package manager.
+		if ! install_docker_distro >>"$log" 2>&1; then
+			tail -n 15 "$log" >&2
+			rm -f "$tmp" "$log"
+			die "Docker could not be installed on this system automatically.
 Install Docker from here, then run this again:
 
   https://docs.docker.com/engine/install/"
+		fi
 	fi
 	rm -f "$tmp" "$log"
-	command -v systemctl >/dev/null 2>&1 && as_root systemctl enable --now docker >/dev/null 2>&1
+	enable_docker_service
 	note "Docker is installed."
+}
+
+# install_docker_distro installs the system's own Docker and Compose with
+# whatever package manager it has. Compose has a different name almost
+# everywhere, so each name is tried in turn.
+install_docker_distro() {
+	if command -v apt-get >/dev/null 2>&1; then
+		# A half-made Docker repository from Docker's own installer would stop
+		# apt from updating at all.
+		as_root rm -f /etc/apt/sources.list.d/docker.list
+		as_root apt-get update -q &&
+			as_root env DEBIAN_FRONTEND=noninteractive apt-get install -yq docker.io || return 1
+		for c in docker-compose-v2 docker-compose-plugin docker-compose; do
+			as_root env DEBIAN_FRONTEND=noninteractive apt-get install -yq "$c" && return 0
+		done
+		return 1
+	elif command -v dnf >/dev/null 2>&1; then
+		as_root dnf install -y docker || as_root dnf install -y moby-engine || return 1
+		as_root dnf install -y docker-compose || as_root dnf install -y docker-compose-plugin
+	elif command -v pacman >/dev/null 2>&1; then
+		as_root pacman -Sy --noconfirm --needed docker docker-compose
+	elif command -v zypper >/dev/null 2>&1; then
+		as_root zypper --non-interactive install docker docker-compose
+	elif command -v apk >/dev/null 2>&1; then
+		as_root apk add docker docker-cli-compose
+	else
+		return 1
+	fi
+}
+
+# enable_docker_service starts Docker now and at every boot: systemd almost
+# everywhere, OpenRC on Alpine.
+enable_docker_service() {
+	if command -v systemctl >/dev/null 2>&1; then
+		as_root systemctl enable --now docker >/dev/null 2>&1
+	elif command -v rc-update >/dev/null 2>&1; then
+		as_root rc-update add docker default >/dev/null 2>&1
+		as_root rc-service docker start >/dev/null 2>&1
+	fi
 }
 
 start_docker_linux() {
@@ -177,9 +222,9 @@ start_docker_linux() {
 		fi
 		docker_reachable && return
 	fi
-	if command -v systemctl >/dev/null 2>&1; then
+	if command -v systemctl >/dev/null 2>&1 || command -v rc-service >/dev/null 2>&1; then
 		note "Starting Docker."
-		as_root systemctl enable --now docker >/dev/null 2>&1
+		enable_docker_service
 		i=0
 		while [ $i -lt 30 ] && ! docker_reachable; do sleep 2; i=$((i + 1)); done
 		docker_reachable && return
