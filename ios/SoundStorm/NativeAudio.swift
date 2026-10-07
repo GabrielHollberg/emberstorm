@@ -99,6 +99,9 @@ final class NativeAudio: NSObject {
         case "upcoming": PlayerLog.add("page: upcoming, \((m["items"] as? [Any])?.count ?? 0) songs")
         case "seek": PlayerLog.add("page: seek to \((m["s"] as? NSNumber)?.doubleValue ?? 0)")
         case "play", "pause", "stop", "unqueue": PlayerLog.add("page: \(cmd)")
+        case "sleep":
+            let at = (m["at"] as? NSNumber)?.doubleValue ?? 0
+            PlayerLog.add("page: sleep timer \(at > 0 ? "in \(Int(at / 1000 - Date().timeIntervalSince1970))s" : "off")")
         default: break
         }
         switch cmd {
@@ -140,6 +143,8 @@ final class NativeAudio: NSObject {
             }
         case "unqueue":
             dropAfterCurrent()
+        case "sleep":
+            setSleep((m["at"] as? NSNumber)?.doubleValue ?? 0)
         case "play":
             play()
         case "pause":
@@ -216,6 +221,47 @@ final class NativeAudio: NSObject {
         return all.filter { c in
             let domain = c.domain.lowercased()
             return domain.hasPrefix(".") ? (host == String(domain.dropFirst()) || host.hasSuffix(domain)) : host == domain
+        }
+    }
+
+    /// The sleep timer (2026-10-07, the owner's report: a half-hour timer ran
+    /// on for hours with the screen off - the page's timer sleeps with the
+    /// page). Kept here, it runs while background audio keeps the app awake:
+    /// at the moment the page gave (ms since 1970; 0 cancels), the music fades
+    /// over eight seconds and pauses, as Android's does.
+    private var sleepTimer: Timer?
+    private var sleepFade: Timer?
+
+    private func setSleep(_ at: Double) {
+        sleepTimer?.invalidate()
+        sleepTimer = nil
+        sleepFade?.invalidate()
+        sleepFade = nil
+        guard at > 0 else { return }
+        let wait = max(0, at / 1000 - Date().timeIntervalSince1970)
+        sleepTimer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { _ in
+            MainActor.assumeIsolated { NativeAudio.shared.sleepNow() }
+        }
+    }
+
+    private func sleepNow() {
+        sleepTimer = nil
+        guard player.timeControlStatus != .paused else { return }
+        PlayerLog.add("sleep timer: fading out")
+        let start = player.volume
+        let began = Date()
+        sleepFade = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let me = NativeAudio.shared
+                let t = Float(min(1, Date().timeIntervalSince(began) / 8))
+                me.player.volume = start * (1 - t)
+                if t < 1, me.player.timeControlStatus != .paused { return }
+                me.sleepFade?.invalidate()
+                me.sleepFade = nil
+                me.player.pause()
+                me.player.volume = start
+                me.report()
+            }
         }
     }
 

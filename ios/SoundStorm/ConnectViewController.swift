@@ -8,6 +8,9 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
 
     /// The server in use, marked in the list.
     private let prefill: URL?
+    /// A server a link offered (Open my SoundStorm) that this app does not
+    /// know yet: written in the address box for the person to choose.
+    private let offered: URL?
     private let field = UITextField()
     private let serversTitle = UILabel()
     private let servers = UIStackView()
@@ -27,8 +30,9 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
     private static let surface = UIColor(red: 0x17 / 255, green: 0x1b / 255, blue: 0x22 / 255, alpha: 1)
     private static let accent = UIColor(red: 0x6a / 255, green: 0xa8 / 255, blue: 0xff / 255, alpha: 1)
 
-    init(prefill: URL?) {
+    init(prefill: URL?, offered: URL? = nil) {
         self.prefill = prefill
+        self.offered = offered
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -66,6 +70,7 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
         field.placeholder = "abc123.home.soundstorm.dev"
         field.keyboardType = .URL
         field.textContentType = .URL
+        if let offered { field.text = offered.absoluteString }
         field.autocapitalizationType = .none
         field.autocorrectionType = .no
         field.spellCheckingType = .no

@@ -206,6 +206,9 @@ final class WebViewController: UIViewController {
           window.soundstormApp.nativeAudio = true;
           window.soundstormApp.queueNext = (url) => post({ type: 'audio', cmd: url ? 'queue' : 'unqueue', url: url || '' });
           window.soundstormApp.queueUpcoming = (items) => post({ type: 'audio', cmd: 'upcoming', items: items || [] });
+          // The sleep timer, kept by the app's player: a page whose screen is
+          // off is asleep, timers and all, while the music plays on.
+          window.soundstormApp.sleepAt = (at) => post({ type: 'audio', cmd: 'sleep', at: at || 0 });
 
           // The page's media session, passed to the app for the lock screen
           // (the page's own audio no longer plays a song from the server, so

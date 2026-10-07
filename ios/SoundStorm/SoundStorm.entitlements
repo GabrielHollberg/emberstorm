@@ -9,6 +9,8 @@
 	<array>
 		<string>applinks:*.home.soundstorm.dev</string>
 		<string>applinks:*.net.soundstorm.dev</string>
+		<!-- Open my SoundStorm on soundstorm.dev: names.soundstorm.dev/open?to= -->
+		<string>applinks:names.soundstorm.dev</string>
 	</array>
 </dict>
 </plist>
