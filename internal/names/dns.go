@@ -180,6 +180,19 @@ func (p *Porkbun) Set(ctx context.Context, name, typ, value string) (bool, error
 	return err == nil, err
 }
 
+// Get is what a name holds of a type: nothing, or its values.
+func (p *Porkbun) Get(ctx context.Context, name, typ string) ([]string, error) {
+	got, err := p.call(ctx, "/dns/retrieveByNameType/"+p.Domain+"/"+typ+"/"+name, nil)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(got.Records))
+	for _, r := range got.Records {
+		out = append(out, r.Content)
+	}
+	return out, nil
+}
+
 // Delete removes every record of a type at a name.
 func (p *Porkbun) Delete(ctx context.Context, name, typ string) error {
 	_, err := p.call(ctx, "/dns/deleteByNameType/"+p.Domain+"/"+typ+"/"+name, nil)

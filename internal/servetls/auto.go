@@ -92,7 +92,10 @@ type autoCert struct {
 	// on. A function, not a flag, so the owner can toggle it at runtime and the
 	// next step picks the change up. Nil means off.
 	remoteEnabled func() bool
-	port          int
+	// findable says whether soundstorm.dev may find the install from its own
+	// connection; sent with every announcement. Nil is off.
+	findable func() bool
+	port     int
 
 	// kick nudges run to take a step at once, so a toggle takes effect now
 	// rather than at the next scheduled check. Buffered so a send never blocks.
@@ -126,6 +129,14 @@ type autoCert struct {
 	// no forward on this router can work, and the account panel says so
 	// instead of asking for one.
 	upstream portmap.Upstream
+}
+
+// registration is the install's name-service registration, or a zero one
+// before it has registered.
+func (a *autoCert) registration() names.Registration {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.reg
 }
 
 // remoteOn reports whether remote access is currently enabled.
@@ -340,7 +351,8 @@ func (a *autoCert) step(ctx context.Context) error {
 	// Announced every time rather than only when it changes: it is one cheap
 	// call, and it is how a record somebody deleted, or a service that lost
 	// track, heals without anybody noticing.
-	if err := a.names.SetAddress(ctx, reg, a.announce); err != nil {
+	findable := a.findable != nil && a.findable()
+	if err := a.names.Announce(ctx, reg, a.announce, a.port, findable); err != nil {
 		var se *names.StatusError
 		if errors.As(err, &se) && se.Status == 401 {
 			// The service no longer recognizes this registration - its secret

@@ -64,6 +64,9 @@ func run(log *slog.Logger) error {
 			"C3:3E:B7:FA:E1:A6:6C:74:79:FC:D6:9C:5D:3D:79:BF:29:02:06:82:9D:C2:66:42:E8:62:86:71:23:75:27:FF"), ","),
 		// The iPhone app (team LZA2K5LLDS); NAMES_APPLE_APPS replaces.
 		AppleApps: strings.Split(env("NAMES_APPLE_APPS", "LZA2K5LLDS.dev.soundstorm.app"), ","),
+		// The website, the only page that may ask which installs are on a
+		// visitor's connection ("Open my SoundStorm").
+		SiteOrigins: strings.Split(env("NAMES_SITE_ORIGINS", "https://soundstorm.dev,https://www.soundstorm.dev"), ","),
 	}
 
 	if test := os.Getenv("NAMES_CHALLTESTSRV"); test != "" {

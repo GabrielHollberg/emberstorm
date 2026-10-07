@@ -4546,6 +4546,9 @@ html, body { overscroll-behavior-y: none; }
 .crop-frame { width: min(88vw, 62vh, 520px); aspect-ratio: 1; border-radius: 16px; overflow: hidden; touch-action: none; cursor: grab; background: #111; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85); }
 .crop-frame:active { cursor: grabbing; }
 .crop-frame canvas { width: 100%; height: 100%; display: block; }
+.web-name-row { flex-wrap: nowrap; align-items: center; }
+.web-name-row input { min-width: 0; flex: 1; }
+.web-name-suffix { color: var(--muted); white-space: nowrap; }
 .crop-tools { display: flex; align-items: center; gap: 12px; width: min(88vw, 520px); }
 .crop-zoom { flex: 1; min-width: 0; accent-color: var(--accent); }
 .crop-rotate { flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 50%; }

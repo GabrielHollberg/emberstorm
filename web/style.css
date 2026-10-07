@@ -111,3 +111,18 @@ footer p { margin: 6px 0; }
   .grid, .grid.two { grid-template-columns: 1fr; }
   .screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Open my SoundStorm: the button in the top bar and its small window. */
+.open-btn { padding: 8px 14px; font-size: 14px; white-space: nowrap; }
+.open-dialog { width: min(440px, calc(100vw - 32px)); padding: 26px 24px 22px; border: 1px solid #2a3039; border-radius: 18px; background: #0d1015; color: var(--text); }
+.open-dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
+.open-dialog h2 { margin: 0 0 8px; font-size: 21px; }
+.open-close { position: absolute; top: 10px; right: 12px; margin: 0; }
+.open-close button { background: none; border: 0; color: var(--muted); font-size: 26px; cursor: pointer; line-height: 1; }
+.open-status { color: var(--muted); margin: 0 0 16px; }
+.open-list { display: grid; gap: 10px; margin-bottom: 12px; }
+.open-list .button { text-align: center; }
+.open-type label { display: block; font-weight: 600; margin-bottom: 8px; }
+.open-row { display: flex; gap: 8px; }
+.open-row input { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid #2a3039; background: #000; color: var(--text); font: inherit; }
+@media (max-width: 640px) { .top nav { display: none; } }

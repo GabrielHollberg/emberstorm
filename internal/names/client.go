@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -34,6 +35,31 @@ func (c *Client) Register(ctx context.Context) (Registration, error) {
 // SetAddress points the registration's name at ip.
 func (c *Client) SetAddress(ctx context.Context, reg Registration, ip string) error {
 	return c.do(ctx, http.MethodPut, "/v1/address", reg.Credential(), map[string]string{"ip": ip}, nil)
+}
+
+// Announce points the registration's name at ip, and says which port the
+// install serves and whether soundstorm.dev may find it from its own internet
+// connection ("Open my SoundStorm"; see find.go).
+func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port int, findable bool) error {
+	return c.do(ctx, http.MethodPut, "/v1/address", reg.Credential(),
+		map[string]any{"ip": ip, "port": port, "find": findable}, nil)
+}
+
+// ClaimName gives the install a chosen name (hollberg.soundstorm.dev),
+// letting previous go if it held one. Returns the address it is reached at.
+// A name somebody else holds is a *StatusError with status 409.
+func (c *Client) ClaimName(ctx context.Context, reg Registration, name, previous string) (string, error) {
+	var out struct {
+		URL string `json:"url"`
+	}
+	err := c.do(ctx, http.MethodPut, "/v1/name", reg.Credential(),
+		map[string]string{"name": name, "previous": previous}, &out)
+	return out.URL, err
+}
+
+// ReleaseName lets a chosen name go.
+func (c *Client) ReleaseName(ctx context.Context, reg Registration, name string) error {
+	return c.do(ctx, http.MethodDelete, "/v1/name?name="+url.QueryEscape(name), reg.Credential(), nil, nil)
 }
 
 // SetPublic points the registration's remote-access name at the install's

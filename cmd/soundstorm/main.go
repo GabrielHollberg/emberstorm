@@ -244,8 +244,10 @@ func run(log *slog.Logger) error {
 		// Remote access: reach this install from outside the house. Opt-in,
 		// and only meaningful in auto mode (it needs the name service).
 		RemoteEnabled: remoteEnabled,
-		Port:          publicPort,
-		Gateway:       gateway,
+		// "Open my SoundStorm" on soundstorm.dev, unless the owner turned it off.
+		Findable: store.Findable,
+		Port:     publicPort,
+		Gateway:  gateway,
 		// UPnP fallback: the installer discovers the router's device-description
 		// URL on the host and passes it here, since SSDP cannot cross the Docker
 		// bridge from in here. Empty just means UPnP is tried by SSDP or skipped.
@@ -396,6 +398,9 @@ func run(log *slog.Logger) error {
 			tlsServer.Refresh() // act on the change now, not at the next check
 			return nil
 		},
+		ClaimWebName:     tlsServer.ClaimWebName,
+		ReleaseWebName:   tlsServer.ReleaseWebName,
+		Reannounce:       tlsServer.Refresh,
 		SetupCode:        setupCode,
 		SetupCodeFromEnv: setupFromEnv,
 		Lyrics:           lyricsFinder,

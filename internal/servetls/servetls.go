@@ -44,6 +44,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -123,6 +124,11 @@ type Config struct {
 	// owner can turn remote access on and off at runtime. It overrides Remote.
 	// Call Server.Refresh after it changes to have the change taken up at once.
 	RemoteEnabled func() bool
+
+	// Findable, when set, says whether soundstorm.dev may find this install
+	// from the home's own internet connection: announced with the address, so
+	// a change takes effect at the next announcement (Refresh). Nil is off.
+	Findable func() bool
 
 	// Port is the port the install is reached on, published to the name
 	// service so it can confirm the address is reachable there. Only used with
@@ -222,6 +228,36 @@ func (s *Server) RemoteName() string {
 	}
 	return s.auto.remoteNameNow()
 }
+
+// ClaimWebName gives this install a chosen address (hollberg.soundstorm.dev)
+// at the name service, letting previous go. Returns the address. Only in auto
+// mode, once registered with the name service.
+func (s *Server) ClaimWebName(ctx context.Context, name, previous string) (string, error) {
+	if s == nil || s.auto == nil {
+		return "", errNoNames
+	}
+	reg := s.auto.registration()
+	if reg.ID == "" {
+		return "", errNoNames
+	}
+	return s.auto.names.ClaimName(ctx, reg, name, previous)
+}
+
+// ReleaseWebName lets a chosen address go.
+func (s *Server) ReleaseWebName(ctx context.Context, name string) error {
+	if s == nil || s.auto == nil {
+		return errNoNames
+	}
+	reg := s.auto.registration()
+	if reg.ID == "" {
+		return errNoNames
+	}
+	return s.auto.names.ReleaseName(ctx, reg, name)
+}
+
+// errNoNames is a chosen address asked for where there is no name service to
+// hold it: outside auto mode, or before the install has registered.
+var errNoNames = errors.New("this server has no web address yet; it needs automatic HTTPS and a moment after starting")
 
 // RemotePort is the port the world reaches this install on - the one to forward
 // by hand when the automatic methods cannot. Zero outside auto mode.
@@ -359,6 +395,7 @@ func loadAuto(cfg Config) (*Server, error) {
 		announce:      announce,
 		directory:     directory,
 		remoteEnabled: remoteEnabled,
+		findable:      cfg.Findable,
 		port:          cfg.Port,
 		kick:          make(chan struct{}, 1),
 		names:         &names.Client{Base: namesURL},

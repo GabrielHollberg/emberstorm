@@ -1101,6 +1101,7 @@ function renderAccount() {
     show($('readalong-block'), false);
   }
   show($('server-name-block'), Boolean(me.owner));
+  if (!me.owner) show($('web-name-block'), false);
   api('/api/session').then(({ ok, body }) => show($('box-reset-block'), Boolean(ok && body && body.boxReset)));
 }
 
@@ -1223,6 +1224,57 @@ $('server-name-form').addEventListener('submit', async (event) => {
   }
 });
 
+// Your web address (hollberg.soundstorm.dev) and Open my SoundStorm on
+// soundstorm.dev: the owner's, and only with the name service (auto HTTPS).
+function showWebName(session) {
+  const has = Boolean(session && session.webNames);
+  show($('web-name-block'), has);
+  if (!has) return;
+  const name = session.webName || '';
+  $('web-name-input').value = name;
+  paintWebName(name);
+  $('findable-toggle').checked = session.findable !== false;
+}
+function paintWebName(name) {
+  const now = $('web-name-now');
+  now.replaceChildren();
+  if (!name) { show(now, false); return; }
+  const url = `https://${name}.soundstorm.dev`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = `${name}.soundstorm.dev`;
+  now.append('Open it at ', a);
+  if (navigator.clipboard && window.isSecureContext) {
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'ghost small';
+    copy.textContent = 'Copy';
+    copy.addEventListener('click', () => navigator.clipboard.writeText(url).then(() => { copy.textContent = 'Copied'; }));
+    now.append(' ', copy);
+  }
+  show(now, true);
+}
+$('web-name-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = $('web-name-input').value.trim().toLowerCase().replace(/\.soundstorm\.dev$/, '');
+  note($('web-name-note'), name ? 'Checking that name...' : 'Removing it...');
+  const { ok, body } = await api('/api/settings/web-name', { method: 'PUT', body: JSON.stringify({ name }) });
+  if (ok) {
+    $('web-name-input').value = body.name;
+    paintWebName(body.name);
+    note($('web-name-note'), body.name ? 'Saved. It works on any computer in a minute or two.' : 'Removed. The name is free for somebody else now.');
+  } else {
+    note($('web-name-note'), (body && body.error) || 'Could not save it.', true);
+  }
+});
+$('findable-toggle').addEventListener('change', async () => {
+  const enabled = $('findable-toggle').checked;
+  const { ok } = await api('/api/settings/findable', { method: 'PUT', body: JSON.stringify({ enabled }) });
+  if (!ok) $('findable-toggle').checked = !enabled;
+});
+
 // The lyrics setting is on the owner's session only, and only when the server
 // can look lyrics up at all.
 async function refreshLyricsSetting() {
@@ -1231,6 +1283,7 @@ async function refreshLyricsSetting() {
   show($('lyrics-block'), has);
   if (has) $('lyrics-toggle').checked = body.onlineLyrics;
   if (ok && body && typeof body.serverName === 'string') $('server-name-input').value = body.serverName;
+  showWebName(ok && body);
   if (ok && body && typeof body.approveNewDevices === 'boolean') {
     state.approveNewDevices = body.approveNewDevices;
     $('new-devices-toggle').checked = body.approveNewDevices;

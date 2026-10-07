@@ -76,10 +76,17 @@ type Server struct {
 	// client can send any header it likes.
 	ClientIPHeader string
 
+	// SiteOrigins are the website's own origins (https://soundstorm.dev),
+	// the only pages allowed to read which installs are on a visitor's
+	// connection (GET /v1/find).
+	SiteOrigins []string
+
 	Log *slog.Logger
 
 	once   sync.Once
 	limits *limits
+	find   *findIndex
+	claims claimCache
 }
 
 // Rates. Each is a count per window, and none of them is anywhere near what
@@ -128,6 +135,7 @@ const challengeWait = 4 * time.Minute
 func (s *Server) init() {
 	s.once.Do(func() {
 		s.limits = newLimits()
+		s.find = newFindIndex()
 		if s.Log == nil {
 			s.Log = slog.Default()
 		}
@@ -168,7 +176,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /v1/public", s.authed(s.handleClearPublic))
 	mux.HandleFunc("PUT /v1/challenge", s.authed(s.handleSetChallenge))
 	mux.HandleFunc("DELETE /v1/challenge", s.authed(s.handleClearChallenge))
-	return mux
+	mux.HandleFunc("GET /v1/find", s.handleFind)
+	mux.HandleFunc("OPTIONS /v1/find", s.handleFind)
+	mux.HandleFunc("PUT /v1/name", s.authed(s.handleClaim))
+	mux.HandleFunc("DELETE /v1/name", s.authed(s.handleRelease))
+	// A chosen name (hollberg.soundstorm.dev) points here too: its page sends
+	// the visitor on to the install. Anything at the service's own names goes
+	// to the API as before.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if name := s.chosenHost(r); name != "" {
+			s.handleChosen(w, r, name)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 // handleAssetLinks lets the Android app open links to installs' names. Only
@@ -251,6 +272,11 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
 		IP string `json:"ip"`
+		// Port and Find: the port it serves, and whether soundstorm.dev may
+		// find it from its own connection (see find.go). An install from
+		// before sends neither, and is not findable.
+		Port int   `json:"port"`
+		Find *bool `json:"find"`
 	}
 	if !readJSON(w, r, &body) {
 		return
@@ -286,6 +312,7 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 			s.Log.Warn("clear other family", "id", id, "err", err)
 		}
 	}
+	s.noteFind(r, id, body.Find != nil && *body.Find, body.Port, addr.String())
 	s.Log.Info("address set", "id", id)
 	writeJSON(w, http.StatusOK, map[string]string{"name": s.NameFor(id), "ip": addr.String()})
 }
@@ -355,6 +382,7 @@ func (s *Server) handlePublic(w http.ResponseWriter, r *http.Request, id string)
 		writeError(w, http.StatusBadGateway, "the DNS provider refused the change")
 		return
 	}
+	s.find.setPublic(id, true)
 	s.Log.Info("public address set", "id", id, "type", typ)
 	writeJSON(w, http.StatusOK, map[string]string{"name": s.PublicNameFor(id), "ip": addr.String()})
 }
@@ -373,6 +401,7 @@ func (s *Server) handleClearPublic(w http.ResponseWriter, r *http.Request, id st
 			s.Log.Warn("clear public address", "id", id, "type", typ, "err", err)
 		}
 	}
+	s.find.setPublic(id, false)
 	s.Log.Info("public address cleared", "id", id)
 	w.WriteHeader(http.StatusNoContent)
 }

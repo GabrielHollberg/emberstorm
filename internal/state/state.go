@@ -431,6 +431,16 @@ type data struct {
 	// same reason User.Libraries is careful about nil. Once the owner toggles
 	// it in the app, their choice is what stands.
 	RemoteAccess *bool `json:"remoteAccess,omitempty"`
+
+	// NotFindable is the owner turning off "Open my SoundStorm": the server
+	// stops telling the name service which port it serves, and soundstorm.dev
+	// no longer finds it from the home's internet connection. Absent is on.
+	NotFindable bool `json:"notFindable,omitempty"`
+
+	// WebName is the address the owner chose, as "hollberg" for
+	// hollberg.soundstorm.dev, or "" for none. Held by the name service; kept
+	// here to show, and to let go when it changes.
+	WebName string `json:"webName,omitempty"`
 	// OnlineLyrics is whether the owner lets SoundStorm look up missing
 	// lyrics on LRCLIB. Off unless turned on: it sends a song's artist and
 	// title to an outside service, which nothing else here does.
@@ -1170,6 +1180,43 @@ func (s *Store) RemoteAccess() (on, chosen bool) {
 		return false, false
 	}
 	return *s.d.RemoteAccess, true
+}
+
+// Findable reports whether soundstorm.dev may find this server from the
+// home's own internet connection ("Open my SoundStorm"). On unless turned off.
+func (s *Store) Findable() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return !s.d.NotFindable
+}
+
+// SetFindable turns that on or off.
+func (s *Store) SetFindable(on bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.d.NotFindable == !on {
+		return nil
+	}
+	s.d.NotFindable = !on
+	return s.save()
+}
+
+// WebName is the address the owner chose ("hollberg"), or "".
+func (s *Store) WebName() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.d.WebName
+}
+
+// SetWebName records it; "" for none.
+func (s *Store) SetWebName(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.d.WebName == name {
+		return nil
+	}
+	s.d.WebName = name
+	return s.save()
 }
 
 // SetRemoteAccess records the owner's choice.

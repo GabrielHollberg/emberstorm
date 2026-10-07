@@ -27,7 +27,26 @@
       <a href="docs/">Docs</a>
       <a href="https://github.com/GabrielHollberg/soundstorm">GitHub</a>
     </nav>
+    <button class="button open-btn" id="open-mine" type="button">Open my SoundStorm</button>
   </header>
+
+  <!-- Open my SoundStorm: the server on this internet connection, found by
+       SoundStorm's name service, or an address or code typed. -->
+  <dialog id="open-dialog" class="open-dialog">
+    <form method="dialog" class="open-close"><button aria-label="Close">&times;</button></form>
+    <h2>Open my SoundStorm</h2>
+    <p id="open-status" class="open-status">Looking for your SoundStorm...</p>
+    <div id="open-list" class="open-list"></div>
+    <form id="open-type" class="open-type" hidden>
+      <label for="open-input">Your web address or server code</label>
+      <div class="open-row">
+        <input id="open-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="yourname.soundstorm.dev">
+        <button class="button primary" type="submit">Open</button>
+      </div>
+      <p class="small">Your web address is chosen in SoundStorm's Settings, under Devices. The code is the
+        first part of its address, like k3xqm2p7qa.</p>
+    </form>
+  </dialog>
 
   <main>
     <!-- The first screen: what it is, in plain words, and the two ways in. -->
@@ -167,6 +186,70 @@
   </footer>
 
   <script>
+    // Open my SoundStorm. SoundStorm's name service knows which servers on this
+    // internet connection allow it; one is opened straight away, several are
+    // listed, and with none (away from home) an address or code is typed.
+    (() => {
+      const dialog = document.getElementById('open-dialog');
+      const status = document.getElementById('open-status');
+      const list = document.getElementById('open-list');
+      const form = document.getElementById('open-type');
+      const input = document.getElementById('open-input');
+      const KEY = 'soundstorm-last-server';
+      const go = (url) => { try { localStorage.setItem(KEY, url); } catch {} location.href = url; };
+      const button = (label, url) => {
+        const a = document.createElement('a');
+        a.className = 'button primary';
+        a.href = url;
+        a.textContent = label;
+        a.addEventListener('click', (e) => { e.preventDefault(); go(url); });
+        return a;
+      };
+      const typed = (raw) => {
+        let v = raw.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        if (!v) return '';
+        if (v.includes('.')) return `https://${v}/`;
+        // A server's code is ten letters and digits (a, b, ... 2 to 7); a
+        // chosen name never looks like one.
+        if (/^[a-z2-7]{10}$/.test(v)) return `https://${v}.home.soundstorm.dev:8099/`;
+        return `https://${v}.soundstorm.dev/`;
+      };
+      const askToType = (text) => {
+        status.textContent = text;
+        form.hidden = false;
+        let last = '';
+        try { last = localStorage.getItem(KEY) || ''; } catch {}
+        if (last) list.append(button('Open the one you used last', last));
+        input.focus();
+      };
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const url = typed(input.value);
+        if (url) go(url);
+      });
+      document.getElementById('open-mine').addEventListener('click', async () => {
+        list.replaceChildren();
+        form.hidden = true;
+        status.textContent = 'Looking for your SoundStorm...';
+        dialog.showModal();
+        let servers = [];
+        try {
+          const r = await fetch('https://names.soundstorm.dev/v1/find', { cache: 'no-store' });
+          if (r.ok) servers = (await r.json()).servers || [];
+        } catch {}
+        if (servers.length === 1) {
+          status.textContent = 'Found it. Opening your SoundStorm...';
+          go(servers[0].url);
+        } else if (servers.length > 1) {
+          status.textContent = 'There is more than one SoundStorm on this internet connection. Which is yours?';
+          servers.forEach((s) => list.append(button(s.lan ? `SoundStorm at ${s.lan}` : 'SoundStorm', s.url)));
+          form.hidden = false;
+        } else {
+          askToType('No SoundStorm found on this internet connection. Away from home, type its address or code.');
+        }
+      });
+    })();
+
     // The install tabs, starting on the visitor's own system, and the copy button.
     const tabs = document.querySelectorAll('.tab');
     const choose = (os) => {

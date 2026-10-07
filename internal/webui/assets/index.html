@@ -638,6 +638,29 @@
         <p id="server-name-note" class="muted hidden" role="status"></p>
       </div>
 
+      <!-- An easy address for this server, and finding it from soundstorm.dev
+           (owner only; needs automatic HTTPS, the name service). -->
+      <div id="web-name-block" class="account-section card hidden" data-hint="An easy address, and opening it from soundstorm.dev" data-cat="devices" data-words="web address name url soundstorm.dev find open bookmark link easy remember">
+        <h2>Your web address</h2>
+        <p class="muted">An easy address to open SoundStorm from any computer:
+          <strong>yourname.soundstorm.dev</strong>. At home it opens straight
+          away; away from home it needs Reach it from anywhere turned on.</p>
+        <form id="web-name-form" class="address-row web-name-row">
+          <input id="web-name-input" type="text" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Web address" placeholder="yourname">
+          <span class="web-name-suffix">.soundstorm.dev</span>
+          <button class="ghost small" type="submit">Save</button>
+        </form>
+        <p id="web-name-now" class="muted hidden"></p>
+        <p id="web-name-note" class="muted hidden" role="status"></p>
+        <label class="remote-switch">
+          <input id="findable-toggle" type="checkbox">
+          <span>Open from soundstorm.dev at home</span>
+        </label>
+        <p class="muted small-print">On soundstorm.dev, Open my SoundStorm sends anyone
+          on your home internet straight here, with nothing to type. SoundStorm
+          tells its name service the port it uses; nothing about what is on it.</p>
+      </div>
+
       <div id="people-block" class="account-section card hidden" data-hint="Accounts, invitations and who sees what" data-cat="people" data-words="people users accounts family members add remove libraries photos limit space storage backup">
         <h2>People</h2>
         <p class="muted">Everyone gets their own login and their own place in

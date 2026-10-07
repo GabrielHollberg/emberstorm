@@ -157,6 +157,9 @@ type Server struct {
 	remoteReach      func(nonce string) (string, bool)
 	remoteStatus     func() RemoteState
 	setRemoteAccess  func(bool) error
+	claimWebName     func(ctx context.Context, name, previous string) (string, error)
+	releaseWebName   func(ctx context.Context, name string) error
+	reannounce       func()
 	lyrics           *lyrics.Finder
 	discover         *discover.Finder
 	scrobble         *scrobble.Client
@@ -232,6 +235,14 @@ type Config struct {
 	// SetRemoteAccess turns remote access on or off: it persists the choice and
 	// nudges the certificate loop to act on it. Owner-only at the handler.
 	SetRemoteAccess func(enabled bool) error
+
+	// ClaimWebName and ReleaseWebName hold a chosen address at the name
+	// service (hollberg.soundstorm.dev); Reannounce sends the address again,
+	// so a change to whether soundstorm.dev may find the server takes effect
+	// now. Nil outside auto mode.
+	ClaimWebName   func(ctx context.Context, name, previous string) (string, error)
+	ReleaseWebName func(ctx context.Context, name string) error
+	Reannounce     func()
 
 	// SetupCode is what the first sign-up must present. See handleSignup.
 	SetupCode string
@@ -328,6 +339,9 @@ func New(cfg Config) *Server {
 		remoteReach:      cfg.RemoteReachability,
 		remoteStatus:     cfg.RemoteStatus,
 		setRemoteAccess:  cfg.SetRemoteAccess,
+		claimWebName:     cfg.ClaimWebName,
+		releaseWebName:   cfg.ReleaseWebName,
+		reannounce:       cfg.Reannounce,
 		setupCode:        NormalizeSetupCode(cfg.SetupCode),
 		approvalCode:     map[bool]string{true: NormalizeSetupCode(cfg.SetupCode)}[cfg.SetupCodeFromEnv],
 		collections:      cfg.Collections,
@@ -592,6 +606,8 @@ func (s *Server) Routes() http.Handler {
 	owner.HandleFunc("PUT /api/settings/readalong", s.handleSetAutoReadAlong)
 	owner.HandleFunc("PUT /api/settings/new-devices", s.handleSetApproveDevices)
 	owner.HandleFunc("PUT /api/settings/server-name", s.handleSetServerName)
+	owner.HandleFunc("PUT /api/settings/findable", s.handleSetFindable)
+	owner.HandleFunc("PUT /api/settings/web-name", s.limited(&s.listWrites, 10, time.Minute, s.handleSetWebName))
 	// USB drives plugged into the box (drives.go).
 	owner.HandleFunc("GET /api/invites", s.handleInvites)
 	owner.HandleFunc("POST /api/invites", s.handleNewInvite)
@@ -623,6 +639,8 @@ func (s *Server) Routes() http.Handler {
 	guarded.Handle("/api/settings/readalong", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/settings/new-devices", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/settings/server-name", s.auth.RequireOwner(owner))
+	guarded.Handle("/api/settings/findable", s.auth.RequireOwner(owner))
+	guarded.Handle("/api/settings/web-name", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/invites", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/invites/", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/reset", s.auth.RequireOwner(owner))
@@ -761,6 +779,17 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		// something an anonymous visitor needs.
 		if s.remoteStatus != nil {
 			answer["remote"] = remoteJSON(s.remoteStatus())
+		}
+		// Finding the server from soundstorm.dev: the chosen address (anyone
+		// signed in may be told it), and for the owner whether finding is on.
+		if s.webNamesAvailable() {
+			if name := s.store.WebName(); name != "" {
+				answer["webName"] = name
+			}
+			if user.IsOwner() {
+				answer["findable"] = s.store.Findable()
+				answer["webNames"] = true
+			}
 		}
 		if user.IsOwner() && s.lyrics != nil {
 			answer["onlineLyrics"] = s.store.OnlineLyrics()
