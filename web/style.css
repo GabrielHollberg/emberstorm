@@ -118,6 +118,7 @@ footer p { margin: 6px 0; }
 
 /* Open my SoundStorm: the button in the top bar and its small window. */
 .open-btn { padding: 8px 14px; font-size: 14px; white-space: nowrap; }
+.open-btn:hover { text-decoration: none; }
 .open-dialog { width: min(440px, calc(100vw - 32px)); padding: 26px 24px 22px; border: 1px solid #2a3039; border-radius: 18px; background: #0d1015; color: var(--text); }
 .open-dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
 .open-dialog h2 { margin: 0 0 8px; font-size: 21px; }

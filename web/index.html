@@ -27,7 +27,7 @@
       <a href="docs/">Docs</a>
       <a href="https://github.com/GabrielHollberg/soundstorm">GitHub</a>
     </nav>
-    <button class="button open-btn" id="open-mine" type="button">Open my SoundStorm</button>
+    <a class="button open-btn" id="open-mine" href="#open">Open my SoundStorm</a>
   </header>
 
   <!-- Open my SoundStorm: the server on this internet connection, found by
@@ -202,7 +202,10 @@
       // without, the browser is sent on to the server. A phone opens an app
       // only from a tap, so a server found is a button to tap, not a jump.
       const phone = /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
-      const viaApp = (url) => phone && /^https:\/\/[a-z2-7]{10}\.(home|net)\.soundstorm\.dev(:\d+)?\/?$/i.test(url)
+      // Back from the names service without the app having taken the link:
+      // there is no app on this phone, so nothing goes by way of it.
+      let noApp = false;
+      const viaApp = (url) => phone && !noApp && /^https:\/\/[a-z2-7]{10}\.(home|net)\.soundstorm\.dev(:\d+)?\/?$/i.test(url)
         ? `https://names.soundstorm.dev/open?to=${encodeURIComponent(url)}` : url;
       const remember = (url) => { try { localStorage.setItem(KEY, url); } catch {} };
       const go = (url) => { remember(url); location.href = viaApp(url); };
@@ -270,7 +273,7 @@
         store.textContent = /iPhone|iPad|iPod/.test(navigator.userAgent)
           ? 'Coming soon to the App Store' : 'Coming soon to Google Play';
         list.append(store);
-        dialog.showModal();
+        if (!dialog.open) dialog.showModal();
         offerTyping();
       };
       form.addEventListener('submit', (e) => {
@@ -289,7 +292,7 @@
           const r = await fetch('https://names.soundstorm.dev/v1/find', { cache: 'no-store' });
           if (r.ok) servers = (await r.json()).servers || [];
         } catch {}
-        if (servers.length === 1 && phone) {
+        if (servers.length === 1 && phone && !noApp) {
           status.textContent = 'Found it.';
           list.append(button('Open SoundStorm', servers[0].url));
         } else if (servers.length === 1) {
@@ -299,15 +302,28 @@
           status.textContent = 'There is more than one SoundStorm on this internet connection. Which is yours?';
           servers.forEach((s) => list.append(button(s.lan ? `SoundStorm at ${s.lan}` : 'SoundStorm', s.url)));
           offerTyping();
+        } else if (noApp) {
+          getTheApp();
         } else {
           askToType('No SoundStorm found on this internet connection. Away from home, type its address or code.');
         }
       };
-      document.getElementById('open-mine').addEventListener('click', () => openMine());
-      // Back from "Open the SoundStorm app" on a phone without the app.
+      // On a phone the button is the app's own link: one tap, and a phone with
+      // the SoundStorm app opens it on its server. Without the app the names
+      // service sends the browser back here (#getapp), and then SoundStorm is
+      // looked for: found at home it opens in the browser, away it says where
+      // to get the app. On a computer it looks for the server at once.
+      const mine = document.getElementById('open-mine');
+      if (phone) mine.href = 'https://names.soundstorm.dev/open';
+      mine.addEventListener('click', (e) => {
+        if (phone && !noApp) return; // left to the phone, to hand to the app
+        e.preventDefault();
+        openMine();
+      });
       if (location.hash === '#getapp' || location.hash === '#open') {
         history.replaceState(null, '', location.pathname);
-        getTheApp();
+        noApp = phone;
+        openMine();
       }
     })();
 
