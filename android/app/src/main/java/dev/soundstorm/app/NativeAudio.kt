@@ -55,6 +55,46 @@ object NativeAudio {
     private data class Resume(val items: List<MediaItem>, val positionMs: Long)
     private var resume: Resume? = null
 
+    // The sleep timer, kept here rather than in the page: Android sleeps a
+    // page whose screen is off - its timers too - while this player plays on,
+    // and a half-hour timer ran for hours until the phone was woken (the
+    // owner's report, 2026-10-07). At the moment the page set, the music
+    // fades over eight seconds, as the page's own fade does, and pauses.
+    private var sleepFade: Runnable? = null
+    private val sleepRun = Runnable { sleepNow() }
+
+    private fun setSleep(at: Long) {
+        main.removeCallbacks(sleepRun)
+        sleepFade?.let { main.removeCallbacks(it) }
+        sleepFade = null
+        if (at > 0) main.postDelayed(sleepRun, maxOf(0L, at - System.currentTimeMillis()))
+    }
+
+    private fun sleepNow() {
+        val p = player ?: return
+        if (!p.isPlaying) return
+        PlayerLog.add("sleep timer: fading out")
+        val start = p.volume
+        val began = android.os.SystemClock.uptimeMillis()
+        val step = object : Runnable {
+            override fun run() {
+                val q = player ?: return
+                val t = ((android.os.SystemClock.uptimeMillis() - began) / 8000f).coerceIn(0f, 1f)
+                q.volume = start * (1 - t)
+                if (t < 1f && q.isPlaying) {
+                    main.postDelayed(this, 100)
+                    return
+                }
+                q.pause()
+                q.volume = start
+                sleepFade = null
+                report()
+            }
+        }
+        sleepFade = step
+        main.post(step)
+    }
+
     fun attachView(view: WebView) {
         webView = WeakReference(view)
     }
@@ -127,6 +167,7 @@ object NativeAudio {
             "load", "queue" -> PlayerLog.add("page: $cmd ${PlayerLog.song(m.optString("url"))}")
             "seek" -> PlayerLog.add("page: seek ${m.optDouble("s", 0.0)}s")
             "upcoming" -> PlayerLog.add("page: upcoming ${m.optJSONArray("items")?.length() ?: 0} songs")
+            "sleep" -> PlayerLog.add("page: sleep timer ${if (m.optLong("at", 0) > 0) "in ${(m.optLong("at") - System.currentTimeMillis()) / 1000}s" else "off"}")
             else -> PlayerLog.add("page: $cmd")
         }
         if (cmd == "load" || cmd == "stop") resume = null
@@ -209,6 +250,7 @@ object NativeAudio {
                 p.play()
             }
             "pause" -> p.pause()
+            "sleep" -> setSleep(m.optLong("at", 0))
             // What is playing, asked by a page made again after Android ended
             // the last one, to take the song over rather than show nothing.
             "state" -> report()

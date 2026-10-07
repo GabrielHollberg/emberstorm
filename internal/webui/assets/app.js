@@ -11089,6 +11089,13 @@ function setSleep(choice) {
     sleep.until = Date.now() + Number(choice) * 60000;
     sleep.tick = setInterval(sleepTick, 1000);
   }
+  // The phone app's own player keeps the moment too: with the screen off the
+  // phone sleeps this page, timers and all, while the music plays on - a
+  // half-hour timer ran for hours until the phone was woken (the owner's
+  // report, 2026-10-07). The page's own timer still runs while it is awake.
+  try {
+    if (NATIVE_AUDIO && window.soundstormApp.sleepAt) window.soundstormApp.sleepAt(sleep.until || 0);
+  } catch { /* an app without it */ }
   // Turned off before the song ended: the next songs are handed over again.
   if (NATIVE_AUDIO && wasAtSongEnd && !sleep.atSongEnd) {
     audio.nativeQueued = '';

@@ -32,6 +32,10 @@ object PageScript {
   // The songs after it too, each with its title and cover, so the player
   // carries on if Android ends the page in the background.
   window.soundstormApp.queueUpcoming = (items) => post({ type: 'audio', cmd: 'upcoming', items: items || [] });
+  // The sleep timer's moment (milliseconds since 1970, 0 for none), kept by
+  // the player itself: with the screen off Android sleeps the page, timers
+  // and all, and the music played on for hours (NativeAudio "sleep").
+  window.soundstormApp.sleepAt = (at) => post({ type: 'audio', cmd: 'sleep', at: at || 0 });
   // Phone photo backup (PhotoBackup), on a phone only: Settings turns it on
   // and shows how it is going, answered through window.__soundstormBackup.
   window.soundstormApp.photoBackup = !/SoundStormTV/.test(navigator.userAgent);
