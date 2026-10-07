@@ -535,9 +535,15 @@ async function probeLink() {
 // at full quality again, and the slow note is forgotten. A short dip in the
 // Wi-Fi should not cost the rest of the evening. Nothing stalls to find out,
 // and a song already playing is never changed.
+// Also at once when the phone changes network (onto the Wi-Fi, most often)
+// or the app is looked at again, at most once a minute: somebody walking in
+// the door should not wait a quarter of an hour for full quality.
 const RECHECK_MS = 15 * 60 * 1000;
-setInterval(async () => {
+let recheckedAt = 0;
+async function recheckLink(soon) {
   if (!slowLink || document.hidden || state.offline) return;
+  if (soon && Date.now() - recheckedAt < 60000) return;
+  recheckedAt = Date.now();
   try {
     const t0 = performance.now();
     const resp = await fetch('/api/probe?b=131072', { cache: 'no-store' });
@@ -548,7 +554,27 @@ setInterval(async () => {
       try { localStorage.removeItem(SLOW_KEY); } catch { /* not kept */ }
     }
   } catch { /* offline: nothing to learn */ }
-}, RECHECK_MS);
+}
+setInterval(() => recheckLink(false), RECHECK_MS);
+// A new network takes a moment to carry anything: look a few seconds after.
+const recheckSoon = () => setTimeout(() => recheckLink(true), 4000);
+addEventListener('online', recheckSoon);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) recheckSoon(); });
+try { navigator.connection && navigator.connection.addEventListener('change', recheckSoon); } catch { /* none */ }
+
+// What the last song streamed at, so a change is said once, as the next song
+// starts at it (the owner's asking: to know it is full quality again once on
+// the Wi-Fi, and why it sounds worse when the signal is bad). Only a change
+// the connection made - a quality chosen in Settings is never announced.
+let streamedLow = false;
+function noteStreamQuality(item, full) {
+  if (item.kind !== 'music') return;
+  const low = !full && slowLink && streamingKbps() !== 0;
+  if (low !== streamedLow) {
+    showToast(low ? 'Weak connection - playing at a lower quality for now.' : 'Good connection - back to full quality.');
+  }
+  streamedLow = low;
+}
 
 function streamingKbps() {
   // "smart", the default, is original unless the link is found slow;
@@ -3723,6 +3749,9 @@ function playAudio(item, fromQueue) {
     audio.nativeQueued = '';
     if (NATIVE_AUDIO && item.kind === 'music') setTimeout(() => { if (audio.item === item) preloadNext(); }, 4000);
     if (!handoff && !preloaded) stopPreloading();
+    // A song fetched ahead is full quality: nothing is fetched ahead on a
+    // slow link (preloadNext).
+    if (!handoff && !isDownloaded(item)) noteStreamQuality(item, Boolean(preloaded));
     if (handoff) {
       startAt(handoff.url, handoff.at);
     } else if (preloaded) {
@@ -3760,7 +3789,7 @@ function startStream(item) {
     if (audio.item !== item || slowLink || player.paused) return;
     if (player.readyState >= 2) return; // it has started, or can
     rememberSlowLink();
-    showToast('Slow connection - streaming at a lower quality for now.');
+    noteStreamQuality(item);
     // From where it is, not the top: a jump made while it was starting
     // was thrown away.
     startAt(playPath(item), player.currentTime || 0);
@@ -9395,6 +9424,21 @@ const audioRecover = (() => {
   player.addEventListener('waiting', () => { if (!waitingSince) waitingSince = Date.now(); });
   for (const ev of ['playing', 'pause', 'emptied']) player.addEventListener(ev, () => { waitingSince = 0; });
   setInterval(() => {
+    // A song at full quality stuck for eight seconds mid-way - the signal
+    // gone bad - carries on at the lower quality from where it was, as a
+    // song unable to start does (startStream), rather than waiting out the
+    // twenty seconds below on a link that cannot keep up.
+    const item = audio.item;
+    if (waitingSince && !player.paused && Date.now() - waitingSince > 8000 && playable() && item
+        && item.kind === 'music' && !slowLink && streamingKbps() === 0
+        && (localStorage.getItem(QUALITY_KEY) || 'smart') === 'smart'
+        && audio.currentURL === playPath(item) && !isDownloaded(item)) {
+      waitingSince = 0;
+      rememberSlowLink();
+      noteStreamQuality(item);
+      startAt(playPath(item), lastT);
+      return;
+    }
     if (waitingSince && !player.paused && Date.now() - waitingSince > 20000) {
       waitingSince = 0;
       schedule();
