@@ -95,8 +95,8 @@ final class RootViewController: UIViewController {
         }
     }
 
-    private func showConnect(prefill: URL?) {
-        let connect = ConnectViewController(prefill: prefill)
+    private func showConnect(prefill: URL?, offered: URL? = nil) {
+        let connect = ConnectViewController(prefill: prefill, offered: offered)
         connect.onConnected = { [weak self] url in
             ServerAddress.remember(url)
             self?.showWeb(url)
@@ -108,6 +108,16 @@ final class RootViewController: UIViewController {
     /// (known) server opened with the code - the app's own if the link named
     /// one it does not know.
     private func open(_ url: URL) {
+        // Open my SoundStorm: a known server opened, an unknown one offered.
+        if let link = TVLink.open(url) {
+            if !link.known {
+                showConnect(prefill: (current as? WebViewController)?.serverURL, offered: link.server)
+            } else if (current as? WebViewController)?.serverURL != link.server {
+                ServerAddress.remember(link.server)
+                showWeb(link.server)
+            }
+            return
+        }
         // An invitation: that server's page, making the account.
         if let invite = TVLink.invite(url) {
             ServerAddress.remember(invite.server)
