@@ -466,8 +466,10 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 		return
 	}
 	if id == "" {
-		chosenPage(w, http.StatusNotFound, "No SoundStorm by that name",
-			"Nobody has chosen "+name+"."+s.Zone+". Check the spelling - or, at home, open soundstorm.dev and choose Open my SoundStorm.",
+		// The same words whether nobody has the name or it is held back: a
+		// visitor is never told a name is free, or that it is kept (held.go).
+		chosenPage(w, http.StatusNotFound, "This SoundStorm is unavailable",
+			"Check the address and try again - or, at home, open soundstorm.dev and choose Open my SoundStorm.",
 			[]link{{"Go to soundstorm.dev", "https://" + s.Zone + "/"}})
 		return
 	}
