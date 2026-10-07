@@ -66,6 +66,19 @@ final class NativeAudio: NSObject {
                                                name: .AVPlayerItemDidPlayToEndTime, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(interrupted(_:)),
                                                name: AVAudioSession.interruptionNotification, object: nil)
+        // For a playback report: what went wrong on the way.
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: nil, queue: .main) { note in
+            let error = (note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError).map { "\($0.domain) \($0.code) \($0.localizedDescription)" } ?? "?"
+            MainActor.assumeIsolated { PlayerLog.add("player: failed to play to the end: \(error)") }
+        }
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemPlaybackStalled, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { PlayerLog.add("player: stalled (ran out of song)") }
+        }
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemNewErrorLogEntry, object: nil, queue: .main) { note in
+            let e = (note.object as? AVPlayerItem)?.errorLog()?.events.last
+            let line = e.map { "\($0.errorDomain) \($0.errorStatusCode) \($0.errorComment ?? "")" } ?? "?"
+            MainActor.assumeIsolated { PlayerLog.add("player: network error: \(line)") }
+        }
         commands()
     }
 
@@ -80,7 +93,15 @@ final class NativeAudio: NSObject {
     }
 
     private func run(_ m: [String: Any]) async {
-        switch m["cmd"] as? String ?? "" {
+        let cmd = m["cmd"] as? String ?? ""
+        switch cmd {
+        case "load", "queue": PlayerLog.add("page: \(cmd) \(PlayerLog.song(m["url"] as? String))")
+        case "upcoming": PlayerLog.add("page: upcoming, \((m["items"] as? [Any])?.count ?? 0) songs")
+        case "seek": PlayerLog.add("page: seek to \((m["s"] as? NSNumber)?.doubleValue ?? 0)")
+        case "play", "pause", "stop", "unqueue": PlayerLog.add("page: \(cmd)")
+        default: break
+        }
+        switch cmd {
         case "load":
             guard let url = allowed(m["url"]) else { return }
             if let current = player.currentItem, urls[ObjectIdentifier(current)] == url.absoluteString {
@@ -181,6 +202,7 @@ final class NativeAudio: NSObject {
         observations.append(item.observe(\.status) { [weak self] item, _ in
             DispatchQueue.main.async {
                 guard let self, item.status == .failed, item === self.player.currentItem else { return }
+                PlayerLog.add("player: song failed: \(item.error.map { ($0 as NSError).domain + " \(($0 as NSError).code) " + $0.localizedDescription } ?? "?")")
                 self.failed = true
                 self.report()
             }
@@ -229,6 +251,7 @@ final class NativeAudio: NSObject {
         // Moved into the queued song by itself: the page hears the last one
         // end, and sets this one, which it finds already playing.
         if let item, let next = urls[ObjectIdentifier(item)] {
+            PlayerLog.add("player: moved on by itself to \(PlayerLog.song(next))")
             if let upcoming = upcomingMeta[next] { meta = upcoming; nowPlaying() }
             send(["ev": "ended", "next": next])
         }
@@ -238,11 +261,14 @@ final class NativeAudio: NSObject {
         // The last song in the queue: the player stops on it.
         guard let item = note.object as? AVPlayerItem, item === player.currentItem,
               player.items().count <= 1 else { return }
+        PlayerLog.add("player: reached the end of the queue")
         ended = true
         report()
     }
 
     @objc private func interrupted(_ note: Notification) {
+        let kind = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init) == .began ? "began" : "ended"
+        PlayerLog.add("audio interruption \(kind)")
         // A call or an alarm over: play on if iOS says so.
         guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
               AVAudioSession.InterruptionType(rawValue: raw) == .ended,
@@ -252,7 +278,19 @@ final class NativeAudio: NSObject {
         play()
     }
 
+    private var loggedStatus = ""
+
     private func changed() {
+        let status: String
+        switch player.timeControlStatus {
+        case .playing: status = "playing"
+        case .paused: status = "paused"
+        default: status = "waiting: " + PlayerLog.waiting(player.reasonForWaitingToPlay)
+        }
+        if status != loggedStatus {
+            loggedStatus = status
+            PlayerLog.add("player: \(status) at \(Int(player.currentTime().seconds.isFinite ? player.currentTime().seconds : 0))s of \(PlayerLog.song(player.currentItem.flatMap { urls[ObjectIdentifier($0)] }))")
+        }
         report()
         nowPlaying()
     }

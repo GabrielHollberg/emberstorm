@@ -306,6 +306,9 @@ final class PhotoBackup: NSObject {
     private var known: Set<String> = []
 
     private func backUp() async {
+        let began = Date()
+        PlayerLog.add("photo backup: run started")
+        defer { PlayerLog.add("photo backup: run ended after \(Int(Date().timeIntervalSince(began)))s") }
         let servers = candidates()
         guard var server = servers.first else { return }
         let list = sentList

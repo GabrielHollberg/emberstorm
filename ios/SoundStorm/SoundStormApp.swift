@@ -38,6 +38,7 @@ struct SoundStormApp: App {
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        PlayerLog.watchApp()
         PhotoBackup.shared.launched()
         // Files added that were still waiting carry on.
         FileUploads.shared.resume()
