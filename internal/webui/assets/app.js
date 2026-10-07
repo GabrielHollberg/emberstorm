@@ -1260,14 +1260,22 @@ $('web-name-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const name = $('web-name-input').value.trim().toLowerCase().replace(/\.soundstorm\.dev$/, '');
   note($('web-name-note'), name ? 'Checking that name...' : 'Removing it...');
-  const { ok, body } = await api('/api/settings/web-name', { method: 'PUT', body: JSON.stringify({ name }) });
+  const code = $('web-name-code').value.trim();
+  const { ok, body } = await api('/api/settings/web-name', { method: 'PUT', body: JSON.stringify({ name, code }) });
   if (ok) {
+    $('web-name-code').value = '';
     $('web-name-input').value = body.name;
     paintWebName(body.name);
     note($('web-name-note'), body.name ? 'Saved. It works on any computer in a minute or two.' : 'Removed. The name is free for somebody else now.');
   } else {
     note($('web-name-note'), (body && body.error) || 'Could not save it.', true);
   }
+});
+// A code from whoever gave out a name nobody else can choose.
+$('web-name-code-open').addEventListener('click', () => {
+  show($('web-name-code-open'), false);
+  show($('web-name-code'), true);
+  $('web-name-code').focus();
 });
 $('findable-toggle').addEventListener('change', async () => {
   const enabled = $('findable-toggle').checked;

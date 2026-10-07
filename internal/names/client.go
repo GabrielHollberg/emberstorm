@@ -48,12 +48,12 @@ func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port
 // ClaimName gives the install a chosen name (hollberg.soundstorm.dev),
 // letting previous go if it held one. Returns the address it is reached at.
 // A name somebody else holds is a *StatusError with status 409.
-func (c *Client) ClaimName(ctx context.Context, reg Registration, name, previous string) (string, error) {
+func (c *Client) ClaimName(ctx context.Context, reg Registration, name, previous, code string) (string, error) {
 	var out struct {
 		URL string `json:"url"`
 	}
 	err := c.do(ctx, http.MethodPut, "/v1/name", reg.Credential(),
-		map[string]string{"name": name, "previous": previous}, &out)
+		map[string]string{"name": name, "previous": previous, "code": code}, &out)
 	return out.URL, err
 }
 

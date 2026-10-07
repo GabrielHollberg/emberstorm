@@ -232,7 +232,7 @@ func (s *Server) RemoteName() string {
 // ClaimWebName gives this install a chosen address (hollberg.soundstorm.dev)
 // at the name service, letting previous go. Returns the address. Only in auto
 // mode, once registered with the name service.
-func (s *Server) ClaimWebName(ctx context.Context, name, previous string) (string, error) {
+func (s *Server) ClaimWebName(ctx context.Context, name, previous, code string) (string, error) {
 	if s == nil || s.auto == nil {
 		return "", errNoNames
 	}
@@ -240,7 +240,7 @@ func (s *Server) ClaimWebName(ctx context.Context, name, previous string) (strin
 	if reg.ID == "" {
 		return "", errNoNames
 	}
-	return s.auto.names.ClaimName(ctx, reg, name, previous)
+	return s.auto.names.ClaimName(ctx, reg, name, previous, code)
 }
 
 // ReleaseWebName lets a chosen address go.

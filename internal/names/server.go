@@ -81,6 +81,10 @@ type Server struct {
 	// connection (GET /v1/find).
 	SiteOrigins []string
 
+	// HeldCodes are the held names the owner gives out to family and friends,
+	// each with the code that unlocks it (held.go).
+	HeldCodes map[string]string
+
 	Log *slog.Logger
 
 	once   sync.Once

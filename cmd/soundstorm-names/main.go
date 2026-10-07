@@ -67,6 +67,9 @@ func run(log *slog.Logger) error {
 		// The website, the only page that may ask which installs are on a
 		// visitor's connection ("Open my SoundStorm").
 		SiteOrigins: strings.Split(env("NAMES_SITE_ORIGINS", "https://soundstorm.dev,https://www.soundstorm.dev"), ","),
+		// Held names given out to family and friends, "name=code,name=code".
+		// Secret: set on the host, never in the repository.
+		HeldCodes: names.ParseHeldCodes(os.Getenv("NAMES_HELD_CODES")),
 	}
 
 	if test := os.Getenv("NAMES_CHALLTESTSRV"); test != "" {

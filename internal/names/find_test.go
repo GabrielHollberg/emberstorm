@@ -130,22 +130,34 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	other, _ := home.Register(ctx)
 	_ = home.Announce(ctx, mine, "192.168.0.50", 8099, true)
 
-	url, err := home.ClaimName(ctx, mine, "Hollberg", "")
-	if err != nil || url != "https://hollberg.soundstorm.dev/" {
+	url, err := home.ClaimName(ctx, mine, "TheHollbergs", "", "")
+	if err != nil || url != "https://thehollbergs.soundstorm.dev/" {
 		t.Fatalf("claim: %q, %v", url, err)
 	}
-	if dns.get("hollberg.claim TXT") != mine.ID {
-		t.Errorf("claim record = %q", dns.get("hollberg.claim TXT"))
+	if dns.get("thehollbergs.claim TXT") != mine.ID {
+		t.Errorf("claim record = %q", dns.get("thehollbergs.claim TXT"))
 	}
 	var se *StatusError
-	if _, err := home.ClaimName(ctx, other, "hollberg", ""); !errors.As(err, &se) || se.Status != http.StatusConflict {
-		t.Errorf("a second install claiming it: %v, want 409", err)
+	if _, err := home.ClaimName(ctx, other, "thehollbergs", "", ""); !errors.As(err, &se) || se.Status != http.StatusConflict || se.Message != notAvailable {
+		t.Errorf("a second install claiming it: %v, want 409 saying only it is not available", err)
 	}
-	if _, err := home.ClaimName(ctx, other, "www", ""); !errors.As(err, &se) || se.Status != http.StatusUnprocessableEntity {
-		t.Errorf("a reserved name: %v, want 422", err)
+	// Held: single first and last names, the domain's own words, the product's
+	// name, a server's code - all refused with the same words as a taken name.
+	for _, name := range []string{"www", "smith", "maria", "hollberg", "sphere", "my-soundstorm", "abcdefghij"} {
+		if _, err := home.ClaimName(ctx, other, name, "", ""); !errors.As(err, &se) || se.Status != http.StatusConflict || se.Message != notAvailable {
+			t.Errorf("held %q: %v, want 409 saying only it is not available", name, err)
+		}
+	}
+	// A held name the owner gave out: taken with its code, and only with it.
+	s.HeldCodes = ParseHeldCodes(" Maria = family-code-1 , bad, =x")
+	if _, err := home.ClaimName(ctx, other, "maria", "", "wrong"); !errors.As(err, &se) || se.Status != http.StatusConflict {
+		t.Errorf("maria with the wrong code: %v", err)
+	}
+	if _, err := home.ClaimName(ctx, other, "maria", "", "family-code-1"); err != nil {
+		t.Errorf("maria with its code: %v", err)
 	}
 
-	host := "hollberg.soundstorm.dev"
+	host := "thehollbergs.soundstorm.dev"
 	if r := get(t, base, "/", "203.0.113.7", host); r.StatusCode != http.StatusFound || r.Header.Get("Location") != "https://"+mine.ID+".home.soundstorm.dev:8099/" {
 		t.Errorf("from home: %d to %q", r.StatusCode, r.Header.Get("Location"))
 	}
@@ -165,25 +177,25 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	}
 
 	// Moving to another name lets the first go, for anybody to take.
-	if _, err := home.ClaimName(ctx, mine, "gabe", "hollberg"); err != nil {
+	if _, err := home.ClaimName(ctx, mine, "gabe-and-co", "thehollbergs", ""); err != nil {
 		t.Fatal(err)
 	}
-	if dns.get("hollberg.claim TXT") != "" {
+	if dns.get("thehollbergs.claim TXT") != "" {
 		t.Error("the old name was kept")
 	}
-	if _, err := home.ClaimName(ctx, other, "hollberg", ""); err != nil {
+	if _, err := home.ClaimName(ctx, other, "thehollbergs", "maria", ""); err != nil {
 		t.Errorf("the freed name could not be taken: %v", err)
 	}
-	if err := home.ReleaseName(ctx, mine, "hollberg"); err != nil || dns.get("hollberg.claim TXT") != other.ID {
-		t.Errorf("one install let go of another's name: %v, record %q", err, dns.get("hollberg.claim TXT"))
+	if err := home.ReleaseName(ctx, mine, "thehollbergs"); err != nil || dns.get("thehollbergs.claim TXT") != other.ID {
+		t.Errorf("one install let go of another's name: %v, record %q", err, dns.get("thehollbergs.claim TXT"))
 	}
 }
 
 func TestNameRules(t *testing.T) {
 	for name, ok := range map[string]bool{
 		"hollberg": true, "the-hollbergs": true, "a1b": true,
-		"ab": false, "-x-y": false, "x--y": false, "www": false, "UPPER": false,
-		strings.Repeat("a", 31): false, "abcdefghij": false, // shaped like a server's code
+		"ab": false, "-x-y": false, "x--y": false, "UPPER": false,
+		strings.Repeat("a", 31): false,
 	} {
 		if got := NameStatus(name) == ""; got != ok {
 			t.Errorf("%q allowed = %v, want %v (%s)", name, got, ok, NameStatus(name))

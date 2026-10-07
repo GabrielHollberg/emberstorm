@@ -157,7 +157,7 @@ type Server struct {
 	remoteReach      func(nonce string) (string, bool)
 	remoteStatus     func() RemoteState
 	setRemoteAccess  func(bool) error
-	claimWebName     func(ctx context.Context, name, previous string) (string, error)
+	claimWebName     func(ctx context.Context, name, previous, code string) (string, error)
 	releaseWebName   func(ctx context.Context, name string) error
 	reannounce       func()
 	lyrics           *lyrics.Finder
@@ -240,7 +240,7 @@ type Config struct {
 	// service (hollberg.soundstorm.dev); Reannounce sends the address again,
 	// so a change to whether soundstorm.dev may find the server takes effect
 	// now. Nil outside auto mode.
-	ClaimWebName   func(ctx context.Context, name, previous string) (string, error)
+	ClaimWebName   func(ctx context.Context, name, previous, code string) (string, error)
 	ReleaseWebName func(ctx context.Context, name string) error
 	Reannounce     func()
 

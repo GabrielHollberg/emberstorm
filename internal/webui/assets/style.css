@@ -4549,6 +4549,9 @@ html, body { overscroll-behavior-y: none; }
 .web-name-row { flex-wrap: nowrap; align-items: center; }
 .web-name-row input { min-width: 0; flex: 1; }
 .web-name-suffix { color: var(--muted); white-space: nowrap; }
+#web-name-code { display: block; width: 100%; max-width: 260px; margin-top: 8px; }
+#web-name-code.hidden { display: none; }
+#web-name-code-open { margin-top: 8px; }
 .crop-tools { display: flex; align-items: center; gap: 12px; width: min(88vw, 520px); }
 .crop-zoom { flex: 1; min-width: 0; accent-color: var(--accent); }
 .crop-rotate { flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 50%; }

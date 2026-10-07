@@ -51,6 +51,8 @@ func (s *Server) handleSetWebName(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Name string `json:"name"`
+		// Code: one the owner of soundstorm.dev gave out for a held name.
+		Code string `json:"code"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512)).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "expected a JSON body with name")
@@ -78,7 +80,7 @@ func (s *Server) handleSetWebName(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, why)
 		return
 	}
-	url, err := s.claimWebName(ctx, name, previous)
+	url, err := s.claimWebName(ctx, name, previous, strings.TrimSpace(body.Code))
 	if err != nil {
 		var se *names.StatusError
 		if errors.As(err, &se) && se.Status < 500 {

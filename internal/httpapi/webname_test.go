@@ -19,9 +19,9 @@ func TestTheOwnerChoosesAWebAddress(t *testing.T) {
 	claimed := map[string]string{} // name -> who
 	var released []string
 	announced := 0
-	h.api.claimWebName = func(_ context.Context, name, previous string) (string, error) {
+	h.api.claimWebName = func(_ context.Context, name, previous, code string) (string, error) {
 		if claimed[name] == "someone else" {
-			return "", &names.StatusError{Status: http.StatusConflict, Message: "Somebody already has that name. Try another."}
+			return "", &names.StatusError{Status: http.StatusConflict, Message: "That name isn't available. Try another."}
 		}
 		if previous != "" {
 			delete(claimed, previous)
@@ -54,11 +54,11 @@ func TestTheOwnerChoosesAWebAddress(t *testing.T) {
 	if s := session(); s["webName"] != "hollberg" {
 		t.Errorf("kept as %v", s["webName"])
 	}
-	if resp, body := h.do(t, http.MethodPut, "/api/settings/web-name", `{"name":"taken"}`); resp.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), "already has that name") {
+	if resp, body := h.do(t, http.MethodPut, "/api/settings/web-name", `{"name":"taken"}`); resp.StatusCode != http.StatusBadRequest || !strings.Contains(string(body), "isn't available") {
 		t.Errorf("a taken name: %d %s", resp.StatusCode, body)
 	}
-	if resp, _ := h.do(t, http.MethodPut, "/api/settings/web-name", `{"name":"www"}`); resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("a reserved name: %d", resp.StatusCode)
+	if resp, _ := h.do(t, http.MethodPut, "/api/settings/web-name", `{"name":"no spaces"}`); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("a name written wrong: %d", resp.StatusCode)
 	}
 	if s := session(); s["webName"] != "hollberg" {
 		t.Errorf("a refused claim changed the address to %v", s["webName"])

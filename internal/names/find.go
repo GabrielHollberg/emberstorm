@@ -272,10 +272,6 @@ func NameStatus(name string) string {
 		return "Use 3 to 30 letters, numbers and dashes, starting and ending with a letter or number."
 	case strings.Contains(name, "--"):
 		return "No two dashes in a row."
-	case reservedNames[name]:
-		return "That name is kept for SoundStorm itself. Try another."
-	case validID(name):
-		return "That looks like a server's code. Try another."
 	}
 	return ""
 }
@@ -356,6 +352,8 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 	var body struct {
 		Name     string `json:"name"`
 		Previous string `json:"previous"`
+		// Code: the owner's code for a held name they are giving out.
+		Code string `json:"code"`
 	}
 	if !readJSON(w, r, &body) {
 		return
@@ -363,6 +361,10 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 	name := strings.ToLower(strings.TrimSpace(body.Name))
 	if why := NameStatus(name); why != "" {
 		writeError(w, http.StatusUnprocessableEntity, why)
+		return
+	}
+	if held(name) && !s.heldCodeOK(name, body.Code) {
+		writeError(w, http.StatusConflict, notAvailable)
 		return
 	}
 	if _, ok := s.DNS.(Getter); !ok {
@@ -376,7 +378,7 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 		return
 	}
 	if owner != "" && owner != id {
-		writeError(w, http.StatusConflict, "Somebody already has that name. Try another.")
+		writeError(w, http.StatusConflict, notAvailable)
 		return
 	}
 	if owner == "" {
