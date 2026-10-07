@@ -98,3 +98,31 @@ func TestAFilmInPartsIsOneFilm(t *testing.T) {
 		t.Errorf("files %v, %v", files, err)
 	}
 }
+
+// The owner's own picture as a poster goes to Jellyfin base64-encoded, its
+// own shape for an uploaded image.
+func TestTheOwnersPictureBecomesThePoster(t *testing.T) {
+	var got []byte
+	var ct string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/Items":
+			w.Header().Set("Content-Type", "application/json")
+			io.WriteString(w, `{"Items":[{"Id":"film-1"}]}`)
+		case "/Items/film-1/Images/Primary":
+			got, _ = io.ReadAll(r.Body)
+			ct = r.Header.Get("Content-Type")
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s, _ := New(Config{ID: "jellyfin", BaseURL: srv.URL, Token: "t", UserID: "u"})
+	if err := s.SetPoster(context.Background(), "film-1", []byte("\xff\xd8\xffpicture"), "image/jpeg"); err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "/9j/cGljdHVyZQ==" || ct != "image/jpeg" {
+		t.Errorf("sent %q as %q", got, ct)
+	}
+}

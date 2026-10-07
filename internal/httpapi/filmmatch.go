@@ -187,7 +187,7 @@ var posterClient = &http.Client{
 
 // GET /api/films/poster?u= - a search answer's poster, through the server, as
 // the page's own policy loads pictures from nowhere else.
-func (s *Server) handleFilmPoster(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleFilmPosterProxy(w http.ResponseWriter, r *http.Request) {
 	addr := posterAllowed(r.URL.Query().Get("u"))
 	if addr == "" {
 		writeError(w, http.StatusBadRequest, "not a film poster")
@@ -213,4 +213,34 @@ func (s *Server) handleFilmPoster(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, max-age=86400")
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
+}
+
+// PUT /api/films/{source}/{id}/poster - the owner's own picture as the film's
+// poster, for everyone (Find the right film's last choice). The body is the
+// picture, squared and shrunk on the device as any cover of one's own is.
+func (s *Server) handleFilmPoster(w http.ResponseWriter, r *http.Request) {
+	src, ok := s.reg.ByID(r.Context(), r.PathValue("source"))
+	ps, can := src.(source.PosterSetter)
+	if !ok || !can {
+		writeError(w, http.StatusNotFound, "that library cannot take a picture")
+		return
+	}
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4<<20+1))
+	if err != nil || len(data) == 0 || len(data) > 4<<20 {
+		writeError(w, http.StatusRequestEntityTooLarge, "that picture is too big")
+		return
+	}
+	ct := http.DetectContentType(data)
+	if ct != "image/jpeg" && ct != "image/png" && ct != "image/webp" {
+		writeError(w, http.StatusBadRequest, "that is not a picture")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if err := ps.SetPoster(ctx, r.PathValue("id"), data, ct); err != nil {
+		s.log.Warn("film poster", "err", err)
+		writeError(w, http.StatusBadGateway, "could not change it just now; try again")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"set": true})
 }

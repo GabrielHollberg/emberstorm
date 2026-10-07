@@ -913,3 +913,9 @@ type FilmMatcher interface {
 	FindMatches(ctx context.Context, itemID, name string, year int) ([]FilmMatch, error)
 	ApplyMatch(ctx context.Context, itemID string, m FilmMatch) error
 }
+
+// PosterSetter is an optional interface for a video source whose backend
+// takes a picture of the owner's choosing as an item's poster, for everyone.
+type PosterSetter interface {
+	SetPoster(ctx context.Context, itemID string, image []byte, contentType string) error
+}

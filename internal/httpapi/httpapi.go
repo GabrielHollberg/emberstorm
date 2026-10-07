@@ -631,7 +631,8 @@ func (s *Server) Routes() http.Handler {
 	owner.HandleFunc("POST /api/move", s.handleMove)
 	owner.HandleFunc("GET /api/films/{source}/{id}/matches", s.limited(&s.listWrites, 60, time.Second, s.handleFilmMatches))
 	owner.HandleFunc("POST /api/films/{source}/{id}/match", s.limited(&s.listWrites, 60, time.Second, s.handleFilmMatch))
-	owner.HandleFunc("GET /api/films/poster", s.handleFilmPoster)
+	owner.HandleFunc("GET /api/films/poster", s.handleFilmPosterProxy)
+	owner.HandleFunc("PUT /api/films/{source}/{id}/poster", s.limited(&s.listWrites, 60, time.Second, s.handleFilmPoster))
 	guarded.Handle("/api/users", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/users/", s.auth.RequireOwner(owner))
 	// Turning remote access on or off is an owner decision too - it exposes the

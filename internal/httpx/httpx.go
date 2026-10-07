@@ -173,6 +173,10 @@ type Request struct {
 	Body    any               // marshaled as JSON when non-nil
 	Form    url.Values        // form-encoded body; mutually exclusive with Body
 	Headers map[string]string // merged over the client's headers
+	// Raw is a body sent as it is, with RawType as its Content-Type; for
+	// what is neither JSON nor a form (a picture for Jellyfin).
+	Raw     []byte
+	RawType string
 }
 
 // Response is a buffered upstream response.
@@ -283,6 +287,8 @@ func (c *Client) request(ctx context.Context, r Request) (*http.Request, error) 
 		body = bytes.NewReader(encoded)
 	case r.Form != nil:
 		body = strings.NewReader(r.Form.Encode())
+	case r.Raw != nil:
+		body = bytes.NewReader(r.Raw)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.URL(r.Path, r.Params), body)
@@ -300,6 +306,8 @@ func (c *Client) request(ctx context.Context, r Request) (*http.Request, error) 
 		req.Header.Set("Content-Type", "application/json")
 	case r.Form != nil:
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	case r.Raw != nil:
+		req.Header.Set("Content-Type", r.RawType)
 	}
 	return req, nil
 }

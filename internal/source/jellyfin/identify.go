@@ -2,6 +2,7 @@ package jellyfin
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -105,4 +106,29 @@ func (s *Source) searchType() string {
 		return "Series"
 	}
 	return "Movie"
+}
+
+// SetPoster makes a picture the item's poster: POST
+// /Items/{id}/Images/Primary with the picture base64-encoded as the body -
+// Jellyfin's own shape for an uploaded image, not multipart.
+func (s *Source) SetPoster(ctx context.Context, itemID string, image []byte, contentType string) error {
+	if err := s.owns(ctx, itemID); err != nil {
+		return err
+	}
+	enc := make([]byte, base64.StdEncoding.EncodedLen(len(image)))
+	base64.StdEncoding.Encode(enc, image)
+	resp, err := s.http.Do(ctx, httpx.Request{
+		Method:  http.MethodPost,
+		Path:    "/Items/" + url.PathEscape(itemID) + "/Images/Primary",
+		Raw:     enc,
+		RawType: contentType,
+	})
+	if err != nil {
+		return fmt.Errorf("jellyfin %q: set a poster: %w", s.id, err)
+	}
+	if err := resp.Err(); err != nil {
+		return fmt.Errorf("jellyfin %q: set a poster: %w", s.id, err)
+	}
+	s.shelf.Clear()
+	return nil
 }

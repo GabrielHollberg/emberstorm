@@ -13970,7 +13970,28 @@ function renderFilmMatch(item) {
   search.value = start;
   const list = document.createElement('div');
   list.className = 'menu-results film-matches';
-  menu.replaceChildren(back, search, list, note);
+  // Or a picture of the owner's own as its cover, for everyone - for a film
+  // no database has, or a poster they like better.
+  const ownPicture = menuItem('image', 'Choose a picture instead', async (event) => {
+    event.stopPropagation();
+    const blob = await pickCoverImage();
+    if (!blob) return;
+    closeItemMenu();
+    let res;
+    try {
+      res = await fetch(`/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/poster`, {
+        method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' },
+      });
+    } catch {
+      showToast('Could not change the cover.');
+      return;
+    }
+    const body = await res.json().catch(() => null);
+    if (!res.ok) { showToast((body && body.error) || 'Could not change the cover.'); return; }
+    showToast('Cover changed, for everyone.');
+    setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch(); }, 1500);
+  }, { detail: 'Shown to everyone here' });
+  menu.replaceChildren(back, search, list, ownPicture, note);
   if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
 
   const say = (text) => {
