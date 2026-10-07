@@ -21,6 +21,7 @@ package stream
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -284,16 +285,48 @@ func (p *Proxy) pipe(w http.ResponseWriter, r *http.Request, target source.Targe
 		return
 	}
 	var copyErr error
+	var sent int64
 	if burst, rate := paceFor(r, resp.Header.Get("Content-Type"), 0); rate > 0 && awayFromHome(r) {
 		// Audio to a device away from home: paced, so a slow link never has
 		// megabytes queued ahead of the next request (pace.go).
-		_, copyErr = pacedCopy(r.Context(), w, resp.Body, burst, rate)
+		sent, copyErr = pacedCopy(r.Context(), w, resp.Body, burst, rate)
 	} else {
-		_, copyErr = io.Copy(w, resp.Body)
+		sent, copyErr = io.Copy(w, resp.Body)
+	}
+	if errors.Is(copyErr, io.ErrUnexpectedEOF) && r.Context().Err() == nil &&
+		source.MaxBitRate(r.Context()) > 0 && padConverted(w, resp.ContentLength, sent) {
+		return
 	}
 	if copyErr != nil && r.Context().Err() == nil {
 		p.log.Debug("stream copy ended early", "what", what, "err", copyErr)
 	}
+}
+
+// padConverted finishes a converted song that came up short of the length
+// it was announced with. Navidrome announces a conversion it has not made
+// before by an estimate (estimateContentLength) - measured 553,451 bytes
+// promised and 540,552 sent - and only a second asking, from its cache, gets
+// the true length. A player told the larger number waits for bytes that
+// never come: on the iPhone, a song stopped near its end until the page's
+// own recovery started it again 20 seconds later (the owner's report,
+// 2026-10-06). So the rest is sent as zeros, which an MP3 decoder passes
+// over looking for the next frame, and the song simply ends. Only a small
+// shortfall: anything bigger is a real failure, left for the player to
+// retry.
+func padConverted(w io.Writer, want, sent int64) bool {
+	short := want - sent
+	if want <= 0 || short <= 0 || short > want/5 {
+		return false
+	}
+	zeros := make([]byte, 32<<10)
+	for short > 0 {
+		n := min(short, int64(len(zeros)))
+		if _, err := w.Write(zeros[:n]); err != nil {
+			return true
+		}
+		short -= n
+	}
+	return true
 }
 
 // GuardActiveContent sandboxes a response the browser would run as a page.
