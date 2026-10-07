@@ -18786,7 +18786,6 @@ function flowScene(st, m) {
     fy = Math.sin(na) * (1 - sw) + Math.sin(swirl) * sw;
   };
   if (newBeat || m.drop) {
-    st.pulses.push({ r: S * 0.05, life: 1, big: m.drop });
     const push = S * (0.15 + 0.5 * loud) * (m.drop ? 2.4 : 1) * (0.6 + 0.6 * e);
     for (const p of st.p) {
       const dx = p.x - cx, dy = p.y - cy;
@@ -18823,20 +18822,10 @@ function flowScene(st, m) {
     st.white = Math.max(st.white, 0.3 + 0.6 * s);
   }
   st.white = Math.max(0, st.white - dt * 1.6);
-  // A glow in the middle, and the pulses going out from it.
+  // A glow in the middle. (Circles going out from it on each beat were
+  // taken out of every look at the owner's asking, 2026-10-07.)
   g.globalCompositeOperation = 'lighter';
   vizGlow(g, pal[0], cx, cy, S * (0.32 + 0.25 * kick), (0.12 + 0.3 * kick + 0.3 * st.white) * (0.4 + 0.6 * bright));
-  for (let i = st.pulses.length - 1; i >= 0; i--) {
-    const pl = st.pulses[i];
-    pl.r += dt * S * (0.8 + 0.7 * loud);
-    pl.life -= dt * 0.7;
-    if (pl.life <= 0) { st.pulses.splice(i, 1); continue; }
-    g.strokeStyle = rgba(pl.big ? VIZ_WHITE : pal[1], pl.life * (pl.big ? 0.45 : 0.22) * (0.4 + 0.6 * bright));
-    g.lineWidth = (pl.big ? 4 : 2) * dpr;
-    g.beginPath();
-    g.arc(cx, cy, pl.r, 0, TAU);
-    g.stroke();
-  }
   // The veins: drawn out as they race, a wide glow under a white core,
   // then fading.
   g.lineCap = 'round';
@@ -19737,8 +19726,7 @@ const FULL_SCENES = {
         if (p) st.novae.push({ p, life: 1, s });
       }
       if (st.novae.length > 8) st.novae.splice(0, st.novae.length - 8);
-      if (s >= 0.7 || m.firstDrop) { st.jets = 1; st.jetS = Math.max(0.7, s); st.ripples.push({ r: R * 0.2, life: 1 }); }
-      else st.ripples.push({ r: R * 0.2, life: 0.5 });
+      if (s >= 0.7 || m.firstDrop) { st.jets = 1; st.jetS = Math.max(0.7, s); }
     }
     g.globalCompositeOperation = 'lighter';
     // A haze along each arm.
@@ -19803,17 +19791,6 @@ const FULL_SCENES = {
       g.strokeStyle = rgba(pal[nv.p.c], kk * 0.5 * bright);
       g.beginPath();
       g.arc(x, y, S * (0.01 + (1 - kk) * 0.1 * (0.5 + nv.s)), 0, TAU);
-      g.stroke();
-    }
-    for (let k = st.ripples.length - 1; k >= 0; k--) {
-      const rp = st.ripples[k];
-      rp.r += dt * S * 0.7;
-      rp.life -= dt * 0.9;
-      if (rp.life <= 0) { st.ripples.splice(k, 1); continue; }
-      g.strokeStyle = rgba(pal[1], rp.life * 0.4 * bright);
-      g.lineWidth = 2 * dpr;
-      g.beginPath();
-      g.ellipse(cx, cy, rp.r, rp.r * 0.8, 0, 0, TAU);
       g.stroke();
     }
     g.globalCompositeOperation = 'source-over';
@@ -20797,16 +20774,9 @@ const VIZ_SCENES = {
       g.stroke();
       vizGlow(g, VIZ_WHITE, cx, cy, R0 * (2 + 2 * st.coronaS), c * c * 0.45);
     }
-    // A white shock ring and a flash, for every strike.
-    if (dropEnv > 0 && lv > 0.05) {
-      const p = 1 - dropEnv;
-      g.lineWidth = (2 + 6 * dropEnv) * dpr;
-      g.strokeStyle = vizColor(VIZ_WHITE, dropEnv * 0.7 * lv);
-      g.beginPath();
-      g.arc(cx, cy, R0 * (1.2 + p * 2.6), 0, TAU);
-      g.stroke();
-      vizGlow(g, VIZ_WHITE, cx, cy, R0 * 3, dropEnv * dropEnv * 0.4);
-    }
+    // A flash, for every strike (its shock ring going out went, at the
+    // owner's asking).
+    if (dropEnv > 0 && lv > 0.05) vizGlow(g, VIZ_WHITE, cx, cy, R0 * 3, dropEnv * dropEnv * 0.4);
     g.globalCompositeOperation = 'source-over';
 
     // ---- the vortex, on the canvas that fades rather than clears
@@ -21032,10 +21002,7 @@ const VIZ_SCENES = {
     if (m.drop) {
       const s = strikeSize(m);
       st.jump = Math.max(st.jump, 0.3 + 0.7 * s);
-      st.shocks.push({ r: 0, life: 1, s });
       if (s >= 0.7 || m.firstDrop) st.white = 1;
-      if (m.firstDrop) st.shocks.push({ r: -size * 0.25, life: 1, s });
-      if (st.shocks.length > 6) st.shocks.shift();
     }
     st.jump = Math.max(0, st.jump - dt * 1.1);
     st.white = Math.max(0, st.white - dt * 2);
@@ -21094,21 +21061,6 @@ const VIZ_SCENES = {
       g.moveTo(x0, y0);
       g.lineTo(x1, y1);
       g.stroke();
-    }
-    // The shock waves, the cover's three colours a little apart.
-    for (let k = st.shocks.length - 1; k >= 0; k--) {
-      const sh = st.shocks[k];
-      sh.r += dt * size * (1.3 + 1.6 * sh.s);
-      sh.life -= dt * 1.2;
-      if (sh.life <= 0) { st.shocks.splice(k, 1); continue; }
-      if (sh.r <= 0) continue;
-      for (let c = 0; c < 3; c++) {
-        g.strokeStyle = rgba(pal[c], sh.life * (0.35 + 0.4 * sh.s) * bright);
-        g.lineWidth = (1.5 + 5 * sh.s * sh.life) * dpr;
-        g.beginPath();
-        g.arc(cx, cy, sh.r * (0.97 + c * 0.03), 0, TAU);
-        g.stroke();
-      }
     }
     if (st.white > 0) {
       g.fillStyle = vizColor(VIZ_WHITE, st.white * st.white * 0.35);
@@ -21275,7 +21227,6 @@ const VIZ_SCENES = {
           vr: (Math.random() - 0.5) * 9, sz: (0.04 + 0.06 * Math.random()) * (0.8 + s), life: 1, col: vizWhiter(pal[Math.floor(Math.random() * 3)], 0.45) });
       }
       if (st.shards.length > 24) st.shards.splice(0, st.shards.length - 24);
-      st.rings.push({ r: 0.08, life: 1, s });
       if (s >= 0.7 || m.firstDrop) { st.spinV += 1.2 + 2.5 * s; st.flash = 1; }
     }
     st.spin += dt * (0.1 + 0.9 * loud * lv) + (downbeat ? dt * 3 * (1 - phase) : 0) + st.spinV * dt;
@@ -21348,34 +21299,8 @@ const VIZ_SCENES = {
         g.restore();
       }
     }
-    // The ring of facets round it all, turning the other way.
-    g.rotate(-st.spin * 0.5);
-    g.strokeStyle = rgba(pal[2], (0.25 + 0.25 * lv + 0.4 * st.flash) * bright);
-    g.lineWidth = 1.5 * dpr;
-    g.beginPath();
-    for (let i = 0; i <= 20; i++) {
-      const a = (i / 20) * TAU;
-      const rr = R * (1.02 + (i % 2 ? 0.05 : 0) + 0.04 * kick);
-      if (i) g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
-    }
-    g.stroke();
-    g.rotate(st.spin * 0.5);
     // A star in the middle.
     vizGlow(g, VIZ_WHITE, 0, 0, R * (0.3 + 0.2 * kick + 0.4 * st.flash), 0.25 + 0.5 * kick + 0.5 * st.flash);
-    // The prism rings, the three colours a little apart.
-    for (let i = st.rings.length - 1; i >= 0; i--) {
-      const rg = st.rings[i];
-      rg.r += dt * (0.9 + 0.8 * rg.s);
-      rg.life -= dt * 1.1;
-      if (rg.life <= 0) { st.rings.splice(i, 1); continue; }
-      for (let c = 0; c < 3; c++) {
-        g.strokeStyle = rgba(pal[c], rg.life * (0.35 + 0.35 * rg.s) * bright);
-        g.lineWidth = (1.5 + 4 * rg.s * rg.life) * dpr;
-        g.beginPath();
-        g.arc(0, 0, R * rg.r * (0.975 + c * 0.025), 0, TAU);
-        g.stroke();
-      }
-    }
     g.restore();
     g.globalCompositeOperation = 'source-over';
   },
