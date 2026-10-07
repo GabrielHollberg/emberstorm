@@ -102,6 +102,7 @@ final class NativeAudio: NSObject {
                 failed = false
                 player.insert(item, after: nil)
             }
+            tookOver()
             report()
         case "queue":
             guard let url = allowed(m["url"]), player.currentItem != nil else { return }
@@ -140,6 +141,7 @@ final class NativeAudio: NSObject {
             player.pause()
             player.removeAllItems()
             urls.removeAll()
+            lastItem = nil
             ended = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             report()
@@ -207,11 +209,23 @@ final class NativeAudio: NSObject {
 
     // MARK: What the player did
 
+    /// The page changed the song itself (a song chosen, a skip, the same song
+    /// started again after a lost connection): not the song ending. Taken for
+    /// one, the page was told the song had ended and moved on to the next in
+    /// its queue - reported as music stopping mid-song, and play then starting
+    /// a different one.
+    private func tookOver() {
+        let item = player.currentItem
+        if let last = lastItem, last !== item { urls[ObjectIdentifier(last)] = nil }
+        lastItem = item
+    }
+
     private func itemChanged() {
         let item = player.currentItem
         defer { lastItem = item }
         guard let last = lastItem, last !== item else { return }
         urls[ObjectIdentifier(last)] = nil
+        failed = false
         // Moved into the queued song by itself: the page hears the last one
         // end, and sets this one, which it finds already playing.
         if let item, let next = urls[ObjectIdentifier(item)] {
