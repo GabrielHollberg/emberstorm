@@ -448,7 +448,10 @@ const touchScreen = () => !TV && matchMedia('(pointer: coarse)').matches;
 const artPath = (item) => {
   const songKey = item.kind === 'music' ? `song:${item.sourceId}/${item.id}` : '';
   const orig = item.artId ? `/api/art/${encodeURIComponent(item.sourceId)}/${escapeId(item.artId)}` : '';
-  return withOverride(orig, songKey, item.artId ? artKeyFor(item.sourceId, item.artId) : '');
+  // A film or show is keyed by itself, cover or none: a film with only a
+  // frame of video, or no picture at all, can have one of somebody's own.
+  const own = (item.kind === 'video' || item.kind === 'tv') && item.id ? `art:${item.sourceId}/${item.id}` : '';
+  return withOverride(orig, songKey, item.artId ? artKeyFor(item.sourceId, item.artId) : own);
 };
 // Covers come card-sized from the server (400px) unless asked for more, so
 // opening the app does not download every album's full picture ahead of the
@@ -6497,6 +6500,15 @@ function renderMainMenu(item, opts = {}) {
     entries.push(menuItem('image', 'Change cover', (event) => {
       event.stopPropagation();
       renderCoverMenu({ song: item }, () => renderMainMenu(item, opts));
+    }, { chevron: true }));
+  }
+  // A film's or a show's cover of one's own, for anybody, as for music
+  // (Find the right film, which changes it for everyone, is the owner's).
+  if ((item.kind === 'video' || item.kind === 'tv') && !state.offline
+      && !(item.extra && item.extra.type === 'Episode')) {
+    entries.push(menuItem('image', 'Change cover', (event) => {
+      event.stopPropagation();
+      renderFilmCoverMenu(item, () => renderMainMenu(item, opts));
     }, { chevron: true }));
   }
   if (item.kind === 'picture' && !state.offline) {
@@ -16931,7 +16943,8 @@ async function loadMyArt() {
 // al-<id>_<hash>), which changes when the file does; the person's choice
 // should not.
 function artKeyFor(sourceId, artId) {
-  return `art:${sourceId}/${String(artId).replace(/^((?:al|mf|ar|pl)-[^_]+)_.*$/, '$1')}`;
+  // Jellyfin's film and show covers too: <id>_<picture's version>.
+  return `art:${sourceId}/${String(artId).replace(/^((?:al|mf|ar|pl)-[^_]+)_.*$/, '$1').replace(/^([0-9a-f]{32})_[0-9a-f]+$/, '$1')}`;
 }
 
 // withOverride is the person's picture when they have one, carrying the
@@ -17457,6 +17470,59 @@ function renderCoverMenu(target, backTo) {
       if (songKey) keys.push(songKey);
       if (await removeCovers(keys)) {
         repaintCovers();
+        showToast('The original cover is back.');
+      }
+    }));
+  }
+  menu.replaceChildren(back, note, ...rows);
+  placeMenu(menu, state.menuAnchor);
+}
+
+// A film's or show's cover of one's own: choose a picture, or the original
+// back. Keyed by the film itself (artPath), so a poster found later does not
+// undo the choice.
+function renderFilmCoverMenu(item, backTo) {
+  const menu = $('item-menu');
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'menu-back';
+  back.append(icon('back'));
+  const label = document.createElement('span');
+  label.textContent = 'Change cover';
+  back.append(label);
+  back.addEventListener('click', (event) => {
+    event.stopPropagation();
+    backTo();
+  });
+  const note = document.createElement('p');
+  note.className = 'menu-note';
+  note.textContent = 'Pick a picture. Only you will see it.';
+  const key = `art:${item.sourceId}/${item.id}`;
+  const rows = [menuItem('image', 'Choose a picture', async () => {
+    const blob = await pickCoverImage();
+    if (!blob) return;
+    closeItemMenu();
+    let res;
+    try {
+      res = await fetch(`/api/myart?key=${encodeURIComponent(key)}`, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+    } catch {
+      showToast('Could not save the cover.');
+      return;
+    }
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !body) { showToast((body && body.error) || 'Could not save the cover.'); return; }
+    state.myArt = body.art || {};
+    repaintCovers();
+    // A film with no picture before has nothing on screen to repaint.
+    if (!item.artId) runSearch();
+    showToast('Cover changed. Only you see it.');
+  })];
+  if (state.myArt && state.myArt[key]) {
+    rows.push(menuItem('close', 'Use the original cover', async () => {
+      closeItemMenu();
+      if (await removeCovers([key])) {
+        repaintCovers();
+        if (!item.artId) runSearch();
         showToast('The original cover is back.');
       }
     }));
