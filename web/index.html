@@ -226,17 +226,26 @@
       const askToType = (text) => {
         status.textContent = text;
         form.hidden = false;
+        // A phone with the SoundStorm app needs nothing found: the app knows
+        // its server. Without the app this comes back here (#open).
+        if (phone) {
+          const app = document.createElement('a');
+          app.className = 'button primary';
+          app.href = 'https://names.soundstorm.dev/open';
+          app.textContent = 'Open the SoundStorm app';
+          list.append(app);
+        }
         let last = '';
         try { last = localStorage.getItem(KEY) || ''; } catch {}
         if (last) list.append(button('Open the one you used last', last));
-        input.focus();
+        if (!phone) input.focus();
       };
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         const url = typed(input.value);
         if (url) go(url);
       });
-      document.getElementById('open-mine').addEventListener('click', async () => {
+      const openMine = async (findFirst) => {
         list.replaceChildren();
         form.hidden = true;
         status.textContent = 'Looking for your SoundStorm...';
@@ -259,7 +268,13 @@
         } else {
           askToType('No SoundStorm found on this internet connection. Away from home, type its address or code.');
         }
-      });
+      };
+      document.getElementById('open-mine').addEventListener('click', () => openMine());
+      // Back from "Open the SoundStorm app" on a phone without the app.
+      if (location.hash === '#open') {
+        history.replaceState(null, '', location.pathname);
+        openMine();
+      }
     })();
 
     // The install tabs, starting on the visitor's own system, and the copy button.

@@ -216,6 +216,7 @@ func TestOpenSendsTheBrowserOnToTheServer(t *testing.T) {
 		"http://k3xqm2p7qa.home.soundstorm.dev/":               "",
 		"https://k3xqm2p7qa.home.soundstorm.dev.evil.example/": "",
 		"https://hollberg.soundstorm.dev/":                     "",
+		"":                                                     "https://soundstorm.dev/#open",
 	} {
 		r := get(t, base, "/open?to="+url.QueryEscape(to), "203.0.113.7", "")
 		got := ""
@@ -225,5 +226,30 @@ func TestOpenSendsTheBrowserOnToTheServer(t *testing.T) {
 		if got != want {
 			t.Errorf("%q: sent to %q (%d), want %q", to, got, r.StatusCode, want)
 		}
+	}
+}
+
+// A restart of the service forgets who may be found (it is kept in memory);
+// an install's quarter-hourly "still here" puts it back, with no DNS change.
+func TestStillHereRefillsTheFinding(t *testing.T) {
+	_, dns, base := newFindService(t)
+	ctx := context.Background()
+	home := from(base, "203.0.113.7")
+	mine, _ := home.Register(ctx)
+	before := len(dns.records)
+	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 0 {
+		t.Fatalf("found %v before it said anything", got)
+	}
+	if err := home.Here(ctx, mine, "192.168.0.50", 8099, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 1 || got[0] != "https://"+mine.ID+".home.soundstorm.dev:8099/" {
+		t.Errorf("after still here, found %v", got)
+	}
+	if len(dns.records) != before {
+		t.Error("still here changed a DNS record")
+	}
+	if err := home.Here(ctx, mine, "8.8.8.8", 8099, true, false); err == nil {
+		t.Error("a public address was taken")
 	}
 }

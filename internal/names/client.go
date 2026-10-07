@@ -45,6 +45,14 @@ func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port
 		map[string]any{"ip": ip, "port": port, "find": findable}, nil)
 }
 
+// Here tells the service the install is still here, for Open my SoundStorm
+// (the service keeps that in memory only, so a restart of it forgets until
+// told again). No DNS record changes.
+func (c *Client) Here(ctx context.Context, reg Registration, ip string, port int, findable, public bool) error {
+	return c.do(ctx, http.MethodPut, "/v1/here", reg.Credential(),
+		map[string]any{"ip": ip, "port": port, "find": findable, "public": public}, nil)
+}
+
 // ClaimName gives the install a chosen name (hollberg.soundstorm.dev),
 // letting previous go if it held one. Returns the address it is reached at.
 // A name somebody else holds is a *StatusError with status 409.

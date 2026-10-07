@@ -113,6 +113,7 @@ var (
 	// limit table) in a few days.
 	globalRegisterRate  = rate{300, 24 * time.Hour}
 	addressRate         = rate{20, time.Hour}      // per install
+	hereRate            = rate{12, time.Hour}      // per install: every 15 minutes, with room
 	challengeRate       = rate{10, 24 * time.Hour} // per install
 	challengeNetRate    = rate{20, 24 * time.Hour} // per client network
 	challengeWideRate   = rate{40, 24 * time.Hour} // per IPv4 /24 (or IPv6 /48)
@@ -178,6 +179,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /apple-app-site-association", s.handleAppleLinks)
 	mux.HandleFunc("POST /v1/register", s.handleRegister)
 	mux.HandleFunc("PUT /v1/address", s.authed(s.handleAddress))
+	mux.HandleFunc("PUT /v1/here", s.authed(s.handleHere))
 	mux.HandleFunc("PUT /v1/public", s.authed(s.handlePublic))
 	mux.HandleFunc("DELETE /v1/public", s.authed(s.handleClearPublic))
 	mux.HandleFunc("PUT /v1/challenge", s.authed(s.handleSetChallenge))
@@ -205,6 +207,18 @@ func (s *Server) Handler() http.Handler {
 // the browser arrives here, and is sent on to the server's web address. Only
 // ever an install's own name, on its home or away label: never anywhere else.
 func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
+	// No server named: "Open the SoundStorm app", from away from home, where
+	// nothing could be found - the app opens its own server. Without the app
+	// the browser goes back to soundstorm.dev to type its address.
+	if r.URL.Query().Get("to") == "" {
+		site := "https://" + s.Zone + "/"
+		if len(s.SiteOrigins) > 0 {
+			site = strings.TrimRight(s.SiteOrigins[0], "/") + "/"
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		http.Redirect(w, r, site+"#open", http.StatusFound)
+		return
+	}
 	to, err := url.Parse(r.URL.Query().Get("to"))
 	ok := err == nil && to.Scheme == "https" && to.User == nil
 	if ok {
@@ -344,6 +358,38 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 	s.noteFind(r, id, body.Find != nil && *body.Find, body.Port, addr.String())
 	s.Log.Info("address set", "id", id)
 	writeJSON(w, http.StatusOK, map[string]string{"name": s.NameFor(id), "ip": addr.String()})
+}
+
+// handleHere is an install saying it is still here, every quarter hour, for
+// Open my SoundStorm alone: who may be found from which connection is kept
+// only in memory (find.go), and every restart of this service - each push
+// redeploys it - forgot every install until its next address announcement,
+// half a day later. It touches no DNS record, so it costs the provider
+// nothing. The LAN address is the install's word, as in handleAddress, and
+// only shown back to its own connection; public says remote access is on,
+// which sends a chosen name's visitors from away to the remote name.
+func (s *Server) handleHere(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		IP     string `json:"ip"`
+		Port   int    `json:"port"`
+		Find   bool   `json:"find"`
+		Public bool   `json:"public"`
+	}
+	if !readJSON(w, r, &body) {
+		return
+	}
+	addr, err := checkAddress(body.IP)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if !s.limits.allow("here:"+id, hereRate) {
+		writeError(w, http.StatusTooManyRequests, "too often; try again later")
+		return
+	}
+	s.noteFind(r, id, body.Find, body.Port, addr.String())
+	s.find.setPublic(id, body.Public)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handlePublic points an install's remote-access name at its public address,

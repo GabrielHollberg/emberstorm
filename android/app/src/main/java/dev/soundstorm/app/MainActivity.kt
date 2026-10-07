@@ -827,6 +827,9 @@ class MainActivity : Activity() {
     private fun openLink(intent: Intent?): Pair<Uri, Boolean>? {
         val data = intent?.data ?: return null
         if (data.scheme != "https" || data.host?.lowercase() != "names.soundstorm.dev" || data.path != "/open") return null
+        // No server named (away from home, where nothing was found): the
+        // app's own server.
+        if (data.getQueryParameter("to").isNullOrEmpty()) return ServerAddress.saved(this)?.let { it to true }
         val to = data.getQueryParameter("to")?.let(ServerAddress::parse) ?: return null
         val host = to.host?.lowercase() ?: return null
         if (to.scheme != "https" || !(host.endsWith(".home.soundstorm.dev") || host.endsWith(".net.soundstorm.dev"))) return null

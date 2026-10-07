@@ -198,6 +198,7 @@ type Server struct {
 func (s *Server) Start(ctx context.Context) {
 	if s != nil && s.auto != nil {
 		go s.auto.run(ctx)
+		go s.auto.keepFindable(ctx)
 		if s.auto.portMapper != nil {
 			// Its own loop, on its own cadence: a router lease is measured in
 			// hours, far shorter than the 12-hour certificate check, so the

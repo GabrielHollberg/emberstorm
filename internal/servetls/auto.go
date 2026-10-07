@@ -306,6 +306,41 @@ func (a *autoCert) run(ctx context.Context) {
 	}
 }
 
+// keepFindable tells the name service every quarter hour that the install is
+// still here (names.Client.Here), so soundstorm.dev's Open my SoundStorm
+// finds it again within minutes of the service restarting - it keeps that in
+// memory, and the address announcement comes only twice a day. Quiet about
+// failures: the next one tries again, and the announcement still comes.
+func (a *autoCert) keepFindable(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			a.log.Error("still-here loop panicked; stopped", "panic", r)
+		}
+	}()
+	wait := time.Minute
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		wait = 15 * time.Minute
+		reg := a.registration()
+		if reg.ID == "" || a.announce == "" {
+			continue
+		}
+		a.mu.RLock()
+		public := a.publicName != "" && a.remoteOn()
+		a.mu.RUnlock()
+		findable := a.findable != nil && a.findable()
+		callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		if err := a.names.Here(callCtx, reg, a.announce, a.port, findable, public); err != nil {
+			a.log.Debug("still here: the name service did not answer", "err", err)
+		}
+		cancel()
+	}
+}
+
 // stepRecovered calls step with a panic turned into an ordinary error.
 //
 // run is started with go (see Start) and answers to no request, so nothing
