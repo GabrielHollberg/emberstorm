@@ -134,6 +134,17 @@ type Playback struct {
 	// AudioTracks are a video's audio streams, when it has more than one to
 	// choose between - a film in two languages, say.
 	AudioTracks []AudioTrack `json:"audio,omitempty"`
+
+	// Parts are a film's files when it is in more than one ("- part1",
+	// "- part2"), the film's own first, each playable by its id: one film
+	// to whoever watches, played one part after the other.
+	Parts []VideoPart `json:"parts,omitempty"`
+}
+
+// VideoPart is one file of a film in parts.
+type VideoPart struct {
+	ID      string  `json:"id"`
+	Seconds float64 `json:"seconds"`
 }
 
 // AudioTrack is one audio stream of a video.
@@ -880,4 +891,25 @@ type PhotoTimeline interface {
 // runs - a rescan does not (checked against 3.2.2).
 type SidecarFinder interface {
 	FindSidecars(ctx context.Context) error
+}
+
+// FilmMatch is one answer to "which film is this?": a title in an online film
+// database, as the backend found it.
+type FilmMatch struct {
+	Name     string `json:"name"`
+	Year     int    `json:"year,omitempty"`
+	Overview string `json:"overview,omitempty"`
+	Poster   string `json:"poster,omitempty"` // the database's own picture address
+	// Raw is the answer exactly as the backend gave it, which is what it
+	// takes back to apply it. Never sent to a browser.
+	Raw []byte `json:"-"`
+}
+
+// FilmMatcher is an optional interface for a video source whose backend
+// identifies films online, for a film it got wrong or could not place: its
+// file name said too little. Nothing about the file changes - only what the
+// backend knows it as, and so its poster and details.
+type FilmMatcher interface {
+	FindMatches(ctx context.Context, itemID, name string, year int) ([]FilmMatch, error)
+	ApplyMatch(ctx context.Context, itemID string, m FilmMatch) error
 }

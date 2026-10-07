@@ -1,0 +1,100 @@
+package jellyfin
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+// "Find the right film": the search is Jellyfin's, the same film from two
+// providers is offered once, and choosing sends back exactly what was found.
+func TestAFilmIsMatchedByHand(t *testing.T) {
+	var applied []byte
+	var replace string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/Items":
+			_ = json.NewEncoder(w).Encode(map[string]any{"Items": []any{map[string]any{"Id": r.URL.Query().Get("Ids")}}})
+		case "/Items/RemoteSearch/Movie":
+			io.WriteString(w, `[
+				{"Name":"The Quiet Meridian","ProductionYear":2002,"ImageUrl":"https://image.tmdb.org/t/p/original/a.jpg","ProviderIds":{"Tmdb":"2501"}},
+				{"Name":"The Glass Harbor","ProductionYear":2004,"ImageUrl":"http://insecure.example/b.jpg"},
+				{"Name":"The Quiet Meridian","ProductionYear":2002,"ProviderIds":{"Imdb":"tt0258463"}}]`)
+		case "/Items/RemoteSearch/Apply/film-1":
+			applied, _ = io.ReadAll(r.Body)
+			replace = r.URL.Query().Get("ReplaceAllImages")
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s, err := New(Config{ID: "jellyfin", BaseURL: srv.URL, Token: "t", UserID: "u"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	found, err := s.FindMatches(ctx, "film-1", "The Quiet Meridian", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 2 || found[0].Year != 2002 || found[0].Poster == "" || found[1].Poster != "" {
+		t.Fatalf("found %+v", found)
+	}
+	if err := s.ApplyMatch(ctx, "film-1", found[0]); err != nil {
+		t.Fatal(err)
+	}
+	var back map[string]any
+	if json.Unmarshal(applied, &back) != nil || back["ProviderIds"].(map[string]any)["Tmdb"] != "2501" || replace != "true" {
+		t.Errorf("applied %s (replace %q)", applied, replace)
+	}
+}
+
+// A film in two files plays as one: Playback lists both parts, the second is
+// playable though Jellyfin's lookups never return it, and its files are both.
+func TestAFilmInPartsIsOneFilm(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/Items" && r.URL.Query().Get("Ids") == "film-1":
+			io.WriteString(w, `{"Items":[{"Id":"film-1"}]}`)
+		case r.URL.Path == "/Items":
+			io.WriteString(w, `{"Items":[]}`) // a part: hidden from lookups
+		case r.URL.Path == "/Videos/film-1/AdditionalParts":
+			io.WriteString(w, `{"Items":[{"Id":"part-2","RunTimeTicks":72000000000,"Path":"/media/movies/Dune (2021)/Dune (2021) - part2.mkv"}]}`)
+		case r.URL.Path == "/Users/u/Items/film-1":
+			io.WriteString(w, `{"Path":"/media/movies/Dune (2021)/Dune (2021) - part1.mkv"}`)
+		case r.URL.Path == "/Items/film-1/PlaybackInfo" || r.URL.Path == "/Items/part-2/PlaybackInfo":
+			io.WriteString(w, `{"MediaSources":[{"Id":"ms","Container":"mp4","SupportsDirectPlay":true,"RunTimeTicks":60000000000}]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s, err := New(Config{ID: "jellyfin", BaseURL: srv.URL, Token: "t", UserID: "u", MediaRoot: "/media/movies"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	pb, err := s.Playback(ctx, "film-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pb.Parts) != 2 || pb.Parts[0].Seconds != 6000 || pb.Parts[1].ID != "part-2" || pb.Parts[1].Seconds != 7200 {
+		t.Fatalf("parts %+v", pb.Parts)
+	}
+	if _, err := s.Playback(ctx, "part-2"); err != nil {
+		t.Errorf("the second part could not be played: %v", err)
+	}
+	if _, err := s.Playback(ctx, "someone-else"); err == nil {
+		t.Error("an item that is no part of a film was played")
+	}
+	files, err := s.ItemFiles(ctx, "film-1")
+	if err != nil || len(files) != 2 {
+		t.Errorf("files %v, %v", files, err)
+	}
+}

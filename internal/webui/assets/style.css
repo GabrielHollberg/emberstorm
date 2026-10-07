@@ -4255,6 +4255,11 @@ html.tv .tv-me-tab.hidden { display: none; }
 .welcome-steps li.done .tick { background: var(--accent); border-color: var(--accent); color: #000; }
 .welcome-steps li.done .what b { text-decoration: line-through; opacity: 0.6; }
 .welcome-steps .what span { display: block; color: var(--muted); font-size: 13px; }
+.film-matches { max-height: min(60vh, 520px); overflow-y: auto; }
+.film-match { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; height: auto; padding: 8px 10px; }
+.film-match img { width: 54px; height: 80px; object-fit: cover; border-radius: 6px; background: var(--surface); }
+.film-match-words b { display: block; }
+.film-match-words span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--muted); font-size: 13px; line-height: 1.35; }
 .welcome-address { margin-top: 8px; display: grid; gap: 6px; justify-items: start; }
 .welcome-address .address-row { flex-wrap: wrap; }
 .welcome-address .address { font-size: 16px; font-weight: 600; word-break: break-all; }

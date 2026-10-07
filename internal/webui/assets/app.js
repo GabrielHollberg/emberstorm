@@ -3433,7 +3433,17 @@ async function playVideo(item, options = {}) {
   // applied to the film going out, and the new one started at 0:00.
   player.removeAttribute('src');
   player.load();
-  startWatching(item);
+  // A film in two parts (two files, "- part1" and "- part2"): one film to
+  // whoever watches, its place counted across both. options.part is the part
+  // to play, options.parts what the server said they are.
+  const parts = options.parts || null;
+  const partIndex = options.part || 0;
+  const offset = parts ? parts.slice(0, partIndex).reduce((n, p) => n + (p.seconds || 0), 0) : 0;
+  state.videoParts = parts;
+  state.videoPart = partIndex;
+  startWatching(item, parts ? {
+    offset, total: parts.reduce((n, p) => n + (p.seconds || 0), 0), at: options.at,
+  } : {});
 
   $('video-caption').textContent = [item.title, subtitleFor(item)]
     .filter(Boolean)
@@ -3454,11 +3464,29 @@ async function playVideo(item, options = {}) {
   state.videoAudio = options.audio;
   attachQualityChoice(item, vq);
   const audioQuery = `?vq=${vq}` + (options.audio !== undefined ? `&audio=${options.audio}` : '');
+  const playing = parts && parts[partIndex] ? { ...item, id: parts[partIndex].id } : item;
   const { ok, body } = await api(
-    `/api/playback/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}${audioQuery}`);
+    `/api/playback/${encodeURIComponent(item.sourceId)}/${escapeId(playing.id)}${audioQuery}`);
   if (!current()) return;
+  // The first time, the server says whether the film is in parts; where
+  // somebody stopped may be in the second.
+  if (!parts && ok && body && Array.isArray(body.parts) && body.parts.length > 1) {
+    const all = body.parts;
+    const place = await api(`/api/book/progress?${watchParams(item)}`);
+    if (!current()) return;
+    const m = place.ok && place.body && place.body.found && /^t=([0-9.]+)$/.exec(place.body.location || '');
+    let at = m ? Number(m[1]) : 0;
+    let k = 0;
+    while (k < all.length - 1 && at >= (all[k].seconds || Infinity)) { at -= all[k].seconds; k++; }
+    const total = all.reduce((n, p) => n + (p.seconds || 0), 0);
+    const from = m ? Number(m[1]) : 0;
+    // Not from the very start, nor into the credits, as for any film.
+    if (!(from > 10 && from < total * 0.93)) { k = 0; at = 0; }
+    playVideo(item, { ...options, parts: all, part: k, at });
+    return;
+  }
   const mode = ok && body ? body.mode : 'direct';
-  const url = ok && body && body.url ? body.url : streamPath(item);
+  const url = ok && body && body.url ? body.url : streamPath(playing);
 
   attachSubtitles(player, (ok && body && body.subtitles) || []);
   attachAudioChoice(item, (ok && body && body.audio) || [], options.audio);
@@ -3592,9 +3620,19 @@ function watchParams(item) {
 
 // startWatching remembers what is playing and, once the player knows how long
 // it is, jumps to where this person stopped last time.
-async function startWatching(item) {
-  const watching = { item, lastSave: 0 };
+async function startWatching(item, place = {}) {
+  // offset and total: for a film in parts, where this part starts in the
+  // film and how long the whole film is. at: where in this part to start,
+  // already worked out from the saved place.
+  const watching = { item, lastSave: 0, offset: place.offset || 0, total: place.total || 0 };
   state.watching = watching;
+  if (place.at !== undefined) {
+    const player = $('video-player');
+    const jump = () => { if (state.watching === watching && place.at > 0) player.currentTime = place.at; };
+    if (player.readyState >= 1) jump();
+    else player.addEventListener('loadedmetadata', jump, { once: true });
+    return;
+  }
   const { ok, body } = await api(`/api/book/progress?${watchParams(item)}`);
   if (state.watching !== watching || !ok || !body || !body.found) return;
   const match = /^t=([0-9.]+)$/.exec(body.location || '');
@@ -3620,11 +3658,12 @@ async function saveWatchPosition(force) {
   if (!watching || !player.src && !hls) return;
   const now = Date.now();
   if (!force && now - watching.lastSave < WATCH_SAVE_EVERY) return;
-  const seconds = player.currentTime;
+  const seconds = (watching.offset || 0) + player.currentTime;
   // A progressive transcode reports no length until it has finished, so the
-  // backend's own runtime stands in for it.
-  const length = Number.isFinite(player.duration) && player.duration > 0
-    ? player.duration : (watching.item.durationSeconds || 0);
+  // backend's own runtime stands in for it. A film in parts: the whole.
+  const length = watching.total > 0 ? watching.total
+    : Number.isFinite(player.duration) && player.duration > 0
+      ? player.duration : (watching.item.durationSeconds || 0);
   if (!(seconds > 5) || !(length > 0)) return;
   watching.lastSave = now;
   await api(`/api/book/progress?${watchParams(watching.item)}`, {
@@ -3640,6 +3679,12 @@ async function saveWatchPosition(force) {
 $('video-player').addEventListener('timeupdate', () => saveWatchPosition(false));
 $('video-player').addEventListener('ended', () => {
   const watching = state.watching;
+  // A film in parts carries straight on into the next.
+  const parts = state.videoParts;
+  if (watching && parts && state.videoPart < parts.length - 1) {
+    playVideo(watching.item, { parts, part: state.videoPart + 1, at: 0, audio: state.videoAudio });
+    return;
+  }
   if (watching && watching.item.kind === 'tv') offerNextEpisode(watching.item);
 });
 $('video-player').addEventListener('pause', () => saveWatchPosition(true));
@@ -6507,6 +6552,15 @@ function renderMainMenu(item, opts = {}) {
     entries.push(menuItem('book', 'Make an ebook', (event) => {
       event.stopPropagation();
       renderMakeEbook(item);
+    }, { chevron: true }));
+  }
+  // Find the right film: for one the film server did not recognise from its
+  // file name (a frame of the video for its cover), or got wrong.
+  if (item.kind === 'video' && state.me && state.me.owner && !state.offline
+      && !(item.extra && item.extra.type === 'Episode')) {
+    entries.push(menuItem('search', 'Find the right film', (event) => {
+      event.stopPropagation();
+      renderFilmMatch(item);
     }, { chevron: true }));
   }
   if (state.me && state.me.owner && !state.offline && item.sourceId !== 'storyteller') {
@@ -13858,6 +13912,114 @@ function renderPairPicker(item) {
   search.addEventListener('input', () => {
     clearTimeout(timer);
     timer = setTimeout(find, 250);
+  });
+  search.addEventListener('click', (event) => event.stopPropagation());
+  find();
+}
+
+/* ----------------------------------------------------- find the right film */
+
+// renderFilmMatch searches the film databases the film server uses, starting
+// at the film's own name with a ripper's leftovers taken out, and choosing one
+// tells the server which film this is (filmmatch.go). The file is not touched;
+// the poster and details arrive a moment later.
+function renderFilmMatch(item) {
+  const menu = $('item-menu');
+  const note = menuNote();
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'menu-back';
+  back.append(icon('back'));
+  const label = document.createElement('span');
+  label.textContent = 'Find the right film';
+  back.append(label);
+  back.addEventListener('click', (event) => {
+    event.stopPropagation();
+    renderMainMenu(item, state.menuOpts);
+  });
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'menu-search';
+  search.placeholder = 'The film’s name, and its year if you know it';
+  let start = item.title
+    .replace(/_t\d{2,3}$/i, '')
+    .replace(/[ _.-]*\b(?:pt|part|cd|dis[ck])[ _.]*\d{1,2}$/i, '')
+    .replace(/\((?:ext|extended)[^)]*\)/ig, '')
+    .replace(/(\S)- /g, '$1: ')
+    .replace(/\s{2,}/g, ' ').trim();
+  if (item.year && item.year < new Date().getFullYear() && !/\b(19|20)\d\d\b/.test(start)) start += ` ${item.year}`;
+  search.value = start;
+  const list = document.createElement('div');
+  list.className = 'menu-results film-matches';
+  menu.replaceChildren(back, search, list, note);
+  if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
+
+  const say = (text) => {
+    const p = document.createElement('p');
+    p.className = 'menu-confirm';
+    p.textContent = text;
+    list.replaceChildren(p);
+  };
+  let seq = 0;
+  const find = async () => {
+    const mine = ++seq;
+    let q = search.value.trim();
+    if (!q) { say('Type the film’s name.'); return; }
+    // A year typed at the end narrows it down.
+    let year = '';
+    const y = q.match(/[\s(]((?:19|20)\d\d)\)?$/);
+    if (y) { year = y[1]; q = q.slice(0, y.index).trim(); }
+    say('Looking…');
+    const params = new URLSearchParams({ q });
+    if (year) params.set('year', year);
+    const { ok, body } = await api(`/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/matches?${params}`);
+    if (mine !== seq || state.menuFor !== item) return;
+    if (!ok) { say((body && body.error) || 'Could not look that up.'); return; }
+    const found = (body && body.matches) || [];
+    if (!found.length) { say('Nothing matches that. Try fewer words, or the year.'); return; }
+    list.replaceChildren(...found.map((m) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'menu-item film-match';
+      const pic = document.createElement('img');
+      pic.alt = '';
+      pic.loading = 'lazy';
+      if (m.poster) pic.src = m.poster; else pic.src = '/static/no-cover.svg';
+      const words = document.createElement('span');
+      words.className = 'film-match-words';
+      const name = document.createElement('b');
+      name.textContent = m.year ? `${m.name} (${m.year})` : m.name;
+      const about = document.createElement('span');
+      about.textContent = m.overview || '';
+      words.append(name, about);
+      row.append(pic, words);
+      row.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        row.disabled = true;
+        const res = await api(`/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/match`, {
+          method: 'POST', body: JSON.stringify({ index: m.index, q, year }),
+        });
+        if (!res.ok) {
+          row.disabled = false;
+          note.textContent = (res.body && res.body.error) || 'Could not change it.';
+          show(note, true);
+          return;
+        }
+        closeItemMenu();
+        showToast(`Now it’s ${name.textContent}. The poster and details arrive in a moment.`);
+        // The film server fetches them itself: look again as they land.
+        for (const wait of [4000, 12000]) setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video') runSearch(); }, wait);
+      });
+      return row;
+    }));
+  };
+  let timer = 0;
+  search.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(find, 700);
+  });
+  search.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); clearTimeout(timer); find(); }
   });
   search.addEventListener('click', (event) => event.stopPropagation());
   find();

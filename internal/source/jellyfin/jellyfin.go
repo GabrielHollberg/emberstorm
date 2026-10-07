@@ -66,6 +66,7 @@ type Source struct {
 	http      *httpx.Client
 	owned     ownedCache
 	shelf     media.ShelfCache
+	parts     partsOf
 }
 
 // New builds a Jellyfin source.
@@ -243,7 +244,10 @@ func (s *Source) toItem(it jfItem) media.Item {
 		item.Extra["rating"] = strconv.FormatFloat(it.CommunityRating, 'f', 1, 64)
 	}
 	if tag, ok := it.ImageTags["Primary"]; ok && tag != "" {
-		item.ArtID = it.ID
+		// The picture's version rides in its address, as Navidrome's does:
+		// covers are kept a week, and a film matched by hand must show its
+		// poster, not the frame of video cached before it.
+		item.ArtID = it.ID + "_" + tag
 	}
 	// "S01E04" is how people refer to an episode, and without it an episode
 	// row is just a filename. Jellyfin only fills these in for episodes.
@@ -373,6 +377,7 @@ type playbackInfoResponse struct {
 		SupportsTranscoding  bool          `json:"SupportsTranscoding"`
 		MediaStreams         []mediaStream `json:"MediaStreams"`
 		DefaultAudioIndex    *int          `json:"DefaultAudioStreamIndex"`
+		RunTimeTicks         int64         `json:"RunTimeTicks"`
 	} `json:"MediaSources"`
 	PlaySessionID string `json:"PlaySessionId"`
 }
@@ -561,6 +566,7 @@ func (s *Source) Playback(ctx context.Context, itemID string) (source.Playback, 
 		return source.Playback{}, fmt.Errorf("jellyfin %q: item %q has no media sources", s.id, itemID)
 	}
 	ms := info.MediaSources[0]
+	parts := s.filmParts(ctx, itemID, ms.RunTimeTicks)
 
 	// Offered in both modes: a direct-played file can have a sidecar, and a
 	// transcode can carry embedded tracks.
@@ -575,7 +581,7 @@ func (s *Source) Playback(ctx context.Context, itemID string) (source.Playback, 
 		picked = false
 	}
 	if !picked && (ms.SupportsDirectPlay || ms.SupportsDirectStream) && s.browserCanPlay(ms.Container) {
-		return source.Playback{Mode: source.PlaybackModeDirect, Subtitles: subtitles, AudioTracks: audio}, nil
+		return source.Playback{Mode: source.PlaybackModeDirect, Subtitles: subtitles, AudioTracks: audio, Parts: parts}, nil
 	}
 
 	query := s.hlsParams(itemID, ms.ID, q)
@@ -601,6 +607,7 @@ func (s *Source) Playback(ctx context.Context, itemID string) (source.Playback, 
 		Query:       query,
 		Subtitles:   subtitles,
 		AudioTracks: audio,
+		Parts:       parts,
 	}, nil
 }
 
@@ -774,6 +781,9 @@ func (s *Source) stopTranscode(playSessionID string) {
 
 // ArtTarget builds an authenticated upstream target for a poster.
 func (s *Source) ArtTarget(ctx context.Context, artID string) (source.Target, error) {
+	if i := strings.IndexByte(artID, '_'); i > 0 {
+		artID = artID[:i] // the version (toItem), not part of the id
+	}
 	if artID == "" {
 		return source.Target{}, fmt.Errorf("jellyfin %q: empty art id", s.id)
 	}
@@ -858,6 +868,11 @@ type ownedCache struct {
 var errNotOwned = errors.New("no such item")
 
 func (s *Source) owns(ctx context.Context, itemID string) error {
+	// A film's later part is hidden from every lookup Jellyfin offers; it is
+	// this source's when its film is (filmParts).
+	if film, ok := s.parts.filmOf(itemID); ok {
+		return s.owns(ctx, film)
+	}
 	s.owned.mu.Lock()
 	at, ok := s.owned.at[itemID]
 	s.owned.mu.Unlock()
@@ -916,7 +931,29 @@ func (s *Source) ItemFiles(ctx context.Context, itemID string) ([]string, error)
 	if err != nil {
 		return nil, fmt.Errorf("jellyfin %q: %w", s.id, err)
 	}
-	return []string{rel}, nil
+	files := []string{rel}
+	// A film in parts is all of them: deleting or moving it takes both halves.
+	if s.searchType() == "Movie" {
+		var more itemsResponsePaths
+		params := url.Values{"Fields": {"Path"}}
+		if s.cfg.UserID != "" {
+			params.Set("userId", s.cfg.UserID)
+		}
+		if err := s.http.JSON(ctx, "/Videos/"+url.PathEscape(itemID)+"/AdditionalParts", params, &more); err == nil {
+			for _, p := range more.Items {
+				if r, err := source.RelativeTo(s.cfg.MediaRoot, p.Path); err == nil && r != rel {
+					files = append(files, r)
+				}
+			}
+		}
+	}
+	return files, nil
+}
+
+type itemsResponsePaths struct {
+	Items []struct {
+		Path string `json:"Path"`
+	} `json:"Items"`
 }
 
 // HasItem reports whether an id is one of this source's items - a film for the

@@ -47,7 +47,7 @@ func TestFilesGoToTheShelfTheirNameImplies(t *testing.T) {
 		// Music and audiobooks are filed under artist and album even when the
 		// drop names neither: the shelf is never a flat pile of tracks.
 		{"Myrrhman.flac", "music/Unknown Artist/Unknown Album/Myrrhman.flac"},
-		{"Arrival (2016).mkv", "movies/Arrival (2016).mkv"},
+		{"Arrival (2016).mkv", "movies/Arrival (2016)/Arrival (2016).mkv"},
 		{"A Wizard of Earthsea.epub", "ebooks/Unknown Author/A Wizard of Earthsea/A Wizard of Earthsea.epub"},
 		{"book.m4b", "audiobooks/Unknown Author/Unknown Title/book.m4b"},
 		// Television, in both of the forms people actually name it.

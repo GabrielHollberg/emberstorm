@@ -1202,6 +1202,11 @@ var structuredDepth = map[media.Kind]int{
 // the PDF orphaned from the thing it explains. The client sends taggable files
 // first so the group's folder exists by the time a companion arrives.
 func shelveUnder(kind media.Kind, rel, staged, shelf string) string {
+	if kind == media.KindVideo {
+		// The plan's tidy name again (filmnames.go): the same either way,
+		// whether the upload names the dropped path or the planned one.
+		return tidyFilm(rel)
+	}
 	if _, ok := structuredDepth[kind]; !ok {
 		return rel
 	}
@@ -1424,6 +1429,9 @@ func groupFolder(kind media.Kind, rel, shelf string) (string, bool) {
 // track's artist - or a compilation without an album-artist tag would be
 // scattered across a folder per guest.
 func shelvePath(kind media.Kind, rel string, t tags.Tags) string {
+	if kind == media.KindVideo {
+		return tidyFilm(rel)
+	}
 	if _, ok := structuredDepth[kind]; !ok {
 		return rel
 	}

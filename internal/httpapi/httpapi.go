@@ -109,6 +109,8 @@ type Server struct {
 	// writes of somebody's favorites, playlists, covers and prefs: their
 	// file is rewritten whole under the lock every person's lists share.
 	listWrites allowance
+	// Answers to "Find the right film", kept for the choosing (filmmatch.go).
+	filmMatches filmMatchCache
 	// other writes worth a ceiling: listening positions sent on to the
 	// audiobook server, the scrobbling token checked online, the read-along
 	// queue reordered.
@@ -627,6 +629,9 @@ func (s *Server) Routes() http.Handler {
 	owner.HandleFunc("POST /api/delete", s.handleDelete)
 	owner.HandleFunc("POST /api/delete/undo", s.handleDeleteUndo)
 	owner.HandleFunc("POST /api/move", s.handleMove)
+	owner.HandleFunc("GET /api/films/{source}/{id}/matches", s.limited(&s.listWrites, 60, time.Second, s.handleFilmMatches))
+	owner.HandleFunc("POST /api/films/{source}/{id}/match", s.limited(&s.listWrites, 60, time.Second, s.handleFilmMatch))
+	owner.HandleFunc("GET /api/films/poster", s.handleFilmPoster)
 	guarded.Handle("/api/users", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/users/", s.auth.RequireOwner(owner))
 	// Turning remote access on or off is an owner decision too - it exposes the
@@ -655,6 +660,7 @@ func (s *Server) Routes() http.Handler {
 	guarded.Handle("/api/delete", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/delete/", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/move", s.auth.RequireOwner(owner))
+	guarded.Handle("/api/films/", s.auth.RequireOwner(owner))
 
 	mux.Handle("/api/", s.auth.Require(s.withUserContext(guarded)))
 
@@ -2096,6 +2102,10 @@ func (s *Server) handlePlayback(w http.ResponseWriter, r *http.Request) {
 			}
 			if len(play.AudioTracks) > 0 {
 				answer["audio"] = play.AudioTracks
+			}
+			// A film in two files: both, for the player to play in turn.
+			if len(play.Parts) > 1 {
+				answer["parts"] = play.Parts
 			}
 		}
 	}

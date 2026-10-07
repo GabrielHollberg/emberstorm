@@ -129,12 +129,12 @@ func TestALooseAudiobookPartIsFiledByAuthorAndTitle(t *testing.T) {
 	}
 }
 
-// Films and television are not restructured: Jellyfin matches on the name,
-// not the depth, and a folder dropped there is already the right shape.
+// Films are not restructured beyond their names (filmnames.go): a loose one
+// goes in a folder of its own, as Jellyfin asks, and keeps its name.
 func TestVideoIsNotRestructured(t *testing.T) {
 	l := newLibrary(t)
 	dest := saved(t, l, media.KindVideo, "Arrival (2016).mkv", []byte("not really a film"))
-	if dest != "movies/Arrival (2016).mkv" {
+	if dest != "movies/Arrival (2016)/Arrival (2016).mkv" {
 		t.Errorf("a film was moved to %q", dest)
 	}
 }
