@@ -216,7 +216,7 @@ func TestOpenSendsTheBrowserOnToTheServer(t *testing.T) {
 		"http://k3xqm2p7qa.home.soundstorm.dev/":               "",
 		"https://k3xqm2p7qa.home.soundstorm.dev.evil.example/": "",
 		"https://hollberg.soundstorm.dev/":                     "",
-		"":                                                     "https://soundstorm.dev/#open",
+		"":                                                     "https://soundstorm.dev/#getapp",
 	} {
 		r := get(t, base, "/open?to="+url.QueryEscape(to), "203.0.113.7", "")
 		got := ""

@@ -37,6 +37,7 @@
     <h2>Open my SoundStorm</h2>
     <p id="open-status" class="open-status">Looking for your SoundStorm...</p>
     <div id="open-list" class="open-list"></div>
+    <button id="open-type-show" class="link-button" type="button" hidden>Or use it in your browser: type its address</button>
     <form id="open-type" class="open-type" hidden>
       <label for="open-input">Your web address or server code</label>
       <div class="open-row">
@@ -223,12 +224,29 @@
         if (/^[a-z2-7]{10}$/.test(v)) return `https://${v}.home.soundstorm.dev:8099/`;
         return `https://${v}.soundstorm.dev/`;
       };
+      const typeShow = document.getElementById('open-type-show');
+      // Typing the address, behind a small link on a phone, where the app is
+      // the way in; at once on a computer.
+      const offerTyping = () => {
+        if (phone) {
+          typeShow.hidden = false;
+        } else {
+          form.hidden = false;
+          input.focus();
+        }
+      };
+      typeShow.addEventListener('click', () => {
+        typeShow.hidden = true;
+        form.hidden = false;
+        input.focus();
+      });
       const askToType = (text) => {
         status.textContent = text;
-        form.hidden = false;
         // A phone with the SoundStorm app needs nothing found: the app knows
-        // its server. Without the app this comes back here (#open).
+        // its server. Without the app the names service sends the browser
+        // back here (#getapp), to get it.
         if (phone) {
+          status.textContent = 'Your SoundStorm is not on this internet connection, but the app knows it.';
           const app = document.createElement('a');
           app.className = 'button primary';
           app.href = 'https://names.soundstorm.dev/open';
@@ -238,16 +256,32 @@
         let last = '';
         try { last = localStorage.getItem(KEY) || ''; } catch {}
         if (last) list.append(button('Open the one you used last', last));
-        if (!phone) input.focus();
+        offerTyping();
+      };
+      // Back from "Open the SoundStorm app": it is not on this phone. Where to
+      // get it - both stores are still to come - and the browser meanwhile.
+      const getTheApp = () => {
+        list.replaceChildren();
+        form.hidden = true;
+        typeShow.hidden = true;
+        status.textContent = 'The SoundStorm app is not on this phone yet.';
+        const store = document.createElement('span');
+        store.className = 'button soon';
+        store.textContent = /iPhone|iPad|iPod/.test(navigator.userAgent)
+          ? 'Coming soon to the App Store' : 'Coming soon to Google Play';
+        list.append(store);
+        dialog.showModal();
+        offerTyping();
       };
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         const url = typed(input.value);
         if (url) go(url);
       });
-      const openMine = async (findFirst) => {
+      const openMine = async () => {
         list.replaceChildren();
         form.hidden = true;
+        typeShow.hidden = true;
         status.textContent = 'Looking for your SoundStorm...';
         dialog.showModal();
         let servers = [];
@@ -264,16 +298,16 @@
         } else if (servers.length > 1) {
           status.textContent = 'There is more than one SoundStorm on this internet connection. Which is yours?';
           servers.forEach((s) => list.append(button(s.lan ? `SoundStorm at ${s.lan}` : 'SoundStorm', s.url)));
-          form.hidden = false;
+          offerTyping();
         } else {
           askToType('No SoundStorm found on this internet connection. Away from home, type its address or code.');
         }
       };
       document.getElementById('open-mine').addEventListener('click', () => openMine());
       // Back from "Open the SoundStorm app" on a phone without the app.
-      if (location.hash === '#open') {
+      if (location.hash === '#getapp' || location.hash === '#open') {
         history.replaceState(null, '', location.pathname);
-        openMine();
+        getTheApp();
       }
     })();
 

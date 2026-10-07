@@ -209,14 +209,14 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
 	// No server named: "Open the SoundStorm app", from away from home, where
 	// nothing could be found - the app opens its own server. Without the app
-	// the browser goes back to soundstorm.dev to type its address.
+	// the browser goes back to soundstorm.dev, to say where to get it.
 	if r.URL.Query().Get("to") == "" {
 		site := "https://" + s.Zone + "/"
 		if len(s.SiteOrigins) > 0 {
 			site = strings.TrimRight(s.SiteOrigins[0], "/") + "/"
 		}
 		w.Header().Set("Cache-Control", "no-store")
-		http.Redirect(w, r, site+"#open", http.StatusFound)
+		http.Redirect(w, r, site+"#getapp", http.StatusFound)
 		return
 	}
 	to, err := url.Parse(r.URL.Query().Get("to"))

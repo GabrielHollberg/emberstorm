@@ -126,6 +126,9 @@ footer p { margin: 6px 0; }
 .open-status { color: var(--muted); margin: 0 0 16px; }
 .open-list { display: grid; gap: 10px; margin-bottom: 12px; }
 .open-list .button { text-align: center; }
+.open-list .soon { opacity: 0.6; cursor: default; }
+.link-button[hidden] { display: none; }
+.link-button { display: block; margin: 0 0 12px; padding: 0; border: 0; background: none; color: var(--accent, #6aa8ff); font: inherit; cursor: pointer; text-align: left; }
 .open-type label { display: block; font-weight: 600; margin-bottom: 8px; }
 .open-row { display: flex; gap: 8px; }
 .open-row input { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid #2a3039; background: #000; color: var(--text); font: inherit; }
