@@ -195,6 +195,9 @@ final class WebViewController: UIViewController {
           window.webkit.messageHandlers.soundstorm.postMessage({ type: 'remoteVolume', on: Boolean(on) });
         window.soundstormApp.backup = (cmd, options) =>
           window.webkit.messageHandlers.soundstorm.postMessage({ type: 'backup', cmd, options: options || {} });
+        // A playback report (PlayerLog.swift), as the Android app's.
+        window.soundstormApp.playerLog = () =>
+          window.webkit.messageHandlers.soundstorm.postMessage({ type: 'playerLog' });
         // Songs played by the app's own player (NativeAudio.swift), as the
         // Android app's: paused on the lock screen, the page's own player
         // could not be started again there, as iOS had put the app to sleep.
@@ -490,10 +493,36 @@ final class WebViewController: UIViewController {
         })();
         (() => {
           let open = false;
+          // How smoothly the page draws while Now Playing is open, for a
+          // playback report: every five seconds, frames counted, how many came
+          // late (over 25ms and over 50ms) and the worst gap.
+          let raf = 0, last = 0, n = 0, late = 0, veryLate = 0, worst = 0, since = 0;
+          const frame = (t) => {
+            if (last) {
+              const gap = t - last;
+              n++;
+              if (gap > 25) late++;
+              if (gap > 50) veryLate++;
+              if (gap > worst) worst = gap;
+            }
+            last = t;
+            if (t - since > 5000) {
+              if (n) window.webkit.messageHandlers.soundstorm.postMessage({ type: 'frames', n, late, veryLate, worst: Math.round(worst) });
+              n = late = veryLate = worst = 0;
+              since = t;
+            }
+            raf = requestAnimationFrame(frame);
+          };
+          const timeFrames = (on) => {
+            cancelAnimationFrame(raf);
+            raf = 0; last = 0; n = late = veryLate = worst = 0; since = performance.now();
+            if (on) raf = requestAnimationFrame(frame);
+          };
           const report = () => {
             const now = document.body.classList.contains('np-open');
             if (now === open) return;
             open = now;
+            timeFrames(open);
             window.webkit.messageHandlers.soundstorm.postMessage({ type: 'nowPlaying', open });
           };
           const watch = () => {
@@ -565,6 +594,18 @@ final class WebViewController: UIViewController {
             onChangeServer?()
         case "nowPlaying":
             AppChrome.shared.statusBarHidden = body["open"] as? Bool ?? false
+            PlayerLog.add("now playing \((body["open"] as? Bool ?? false) ? "opened" : "closed")")
+        case "frames":
+            let n = (body["n"] as? NSNumber)?.intValue ?? 0
+            let late = (body["late"] as? NSNumber)?.intValue ?? 0
+            let veryLate = (body["veryLate"] as? NSNumber)?.intValue ?? 0
+            let worst = (body["worst"] as? NSNumber)?.intValue ?? 0
+            PlayerLog.add("frames \(n), late \(late), over 50ms \(veryLate), worst \(worst)ms")
+        case "playerLog":
+            if let data = try? JSONSerialization.data(withJSONObject: [PlayerLog.text]),
+               let json = String(data: data, encoding: .utf8) {
+                webView.evaluateJavaScript("window.__soundstormPlayerLog && window.__soundstormPlayerLog(\(json)[0])")
+            }
         case "audio":
             NativeAudio.shared.handle(body)
         case "media":
