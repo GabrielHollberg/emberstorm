@@ -434,8 +434,19 @@ final class WebViewController: UIViewController {
             const wasPlaying = st.playing;
             const hadDuration = Number.isFinite(st.duration);
             st.state = m.state;
+            if (typeof m.position === 'number') {
+              // A report is a little old by the time it arrives, so taking it
+              // as it is set the clock back a few hundredths of a second twice
+              // a second, and every animation reading the clock stuttered. While
+              // the song plays on, a report only slightly off eases the clock
+              // towards it; a real jump (a seek, a stall) is taken at once.
+              const now = performance.now();
+              const ours = time();
+              const off = m.position - ours;
+              st.position = (wasPlaying && m.playing && Math.abs(off) < 0.35) ? ours + off * 0.15 : m.position;
+              st.at = now;
+            }
             st.playing = !!m.playing;
-            if (typeof m.position === 'number') { st.position = m.position; st.at = performance.now(); }
             if (typeof m.duration === 'number') st.duration = m.duration;
             if (typeof m.buffered === 'number') st.buffered = m.buffered;
             // The player's volume is the page's to set: should the two ever differ
