@@ -88,28 +88,181 @@ die() {
 
 need_docker() {
 	if ! command -v docker >/dev/null 2>&1; then
-		die "Docker is not installed.
+		case "$(uname -s)" in
+		Linux) install_docker_linux ;;
+		Darwin) install_docker_mac ;;
+		*) die "Docker is not installed.
 
-Docker runs the media servers SoundStorm sits on top of, so it is the one thing
-you have to install yourself. It is free for personal use.
+Docker runs the media servers SoundStorm sits on top of. Install it from here,
+then run this again:
 
-  macOS and Windows   https://www.docker.com/products/docker-desktop/
-  Linux               https://docs.docker.com/engine/install/
-
-Install it, then run this again."
+  https://docs.docker.com/engine/install/" ;;
+		esac
 	fi
+	docker_reachable && return
+	case "$(uname -s)" in
+	Darwin) start_docker_mac ;;
+	*) start_docker_linux ;;
+	esac
+}
 
-	# Installed is not running, and this is the single most common failure:
-	# somebody installs Docker Desktop, never opens it, and gets a wall of
-	# socket errors that say nothing about which application to launch.
-	if ! docker info >/dev/null 2>&1; then
-		die "Docker is installed but not running.
+# Docker is set up as part of the install (2026-10-07, the owner's asking:
+# nobody should have to install it first). On Linux it is plain Docker, as on
+# the box - a background service, no windows, no account, started at boot.
+# On a Mac it is Docker Desktop, made quiet as the Windows setup makes it: its
+# installer's own --accept-license, its sign-in and survey marked done before
+# it first starts, its dashboard kept away. Each asks for the computer's
+# password once - installing system software always does - which sudo reads
+# from the terminal even though this script arrives through a pipe.
 
-  macOS and Windows   open Docker Desktop and wait for it to say Running
-  Linux               sudo systemctl start docker
+# docker_reachable is whether docker answers - the one test that matters.
+docker_reachable() { docker info >/dev/null 2>&1; }
+
+# as_root runs a command as root: as it is when this is root, else by sudo.
+as_root() {
+	if [ "$(id -u)" = 0 ]; then
+		"$@"
+	elif command -v sudo >/dev/null 2>&1; then
+		sudo "$@"
+	else
+		die "Setting up Docker needs administrator rights, and this computer has no
+sudo to ask for them. Run this again as root, or install Docker from here:
+
+  https://docs.docker.com/engine/install/"
+	fi
+}
+
+install_docker_linux() {
+	step "Installing Docker"
+	note "SoundStorm runs on Docker, which is set up now (free and open source)."
+	important "Your computer may ask for your password - type it and press Enter."
+	tmp=$(mktemp)
+	fetch https://get.docker.com "$tmp"
+	# Docker's own installer: it knows Debian, Ubuntu, Fedora, Raspberry Pi
+	# OS and the rest, and adds Docker's repository so updates come with the
+	# system's.
+	# Its own output is a wall of version tables and advice meant for
+	# administrators, a WARNING among them: kept in a log, shown only if it
+	# fails. sudo still asks for the password on the terminal.
+	log=$(mktemp)
+	note "Installing... (a few minutes)"
+	if ! as_root sh "$tmp" >"$log" 2>&1; then
+		tail -n 15 "$log" >&2
+		rm -f "$tmp" "$log"
+		die "Docker's installer did not finish (it does not know every Linux).
+Install Docker from here, then run this again:
+
+  https://docs.docker.com/engine/install/"
+	fi
+	rm -f "$tmp" "$log"
+	command -v systemctl >/dev/null 2>&1 && as_root systemctl enable --now docker >/dev/null 2>&1
+	note "Docker is installed."
+}
+
+start_docker_linux() {
+	# Running, but this account may not use it yet: a new install adds it to
+	# the docker group, which only a new login brings - and the old message,
+	# "not running", sent people to start what was already running.
+	if docker info 2>&1 | grep -qi 'permission denied'; then
+		if [ "$(id -u)" != 0 ] && ! id -nG | tr ' ' '\n' | grep -qx docker; then
+			note "Letting this account use Docker."
+			as_root usermod -aG docker "$(id -un)" || die "Could not let this account use Docker. Run this again with sudo."
+		fi
+		# For the rest of this run, through the group just joined (sg reads it
+		# afresh, no new login needed); from the next login, as it is.
+		if command -v sg >/dev/null 2>&1; then
+			docker() { sg docker -c "docker $(shell_quote "$@")"; }
+		else
+			docker() { as_root docker "$@"; }
+		fi
+		docker_reachable && return
+	fi
+	if command -v systemctl >/dev/null 2>&1; then
+		note "Starting Docker."
+		as_root systemctl enable --now docker >/dev/null 2>&1
+		i=0
+		while [ $i -lt 30 ] && ! docker_reachable; do sleep 2; i=$((i + 1)); done
+		docker_reachable && return
+	fi
+	die "Docker is installed but would not start.
+
+  sudo systemctl start docker
 
 Then run this again."
+}
+
+# shell_quote quotes each argument for sh -c.
+shell_quote() {
+	for a in "$@"; do
+		printf "'%s' " "$(printf '%s' "$a" | sed "s/'/'\\\\''/g")"
+	done
+}
+
+install_docker_mac() {
+	step "Installing Docker Desktop"
+	note "SoundStorm runs inside Docker Desktop, which is set up now. There is"
+	note "nothing to click in it and no Docker account is needed."
+	note "Docker Desktop is free for personal use and small businesses; installing"
+	note "it accepts Docker's terms: docker.com/legal/docker-subscription-service-agreement"
+	important "Your Mac will ask for your password - type it and press Enter."
+	case "$(uname -m)" in
+	arm64) arch=arm64 ;;
+	*) arch=amd64 ;;
+	esac
+	tmp=$(mktemp -d)
+	note "Downloading Docker Desktop (about 600 MB)..."
+	fetch "https://desktop.docker.com/mac/main/$arch/Docker.dmg" "$tmp/Docker.dmg"
+	hdiutil attach -nobrowse -quiet -mountpoint "$tmp/mnt" "$tmp/Docker.dmg" ||
+		die "Could not open the Docker Desktop download. Run this again."
+	# Docker's own command-line install: its terms accepted, and set up for
+	# this user so its first start needs no password of its own.
+	if ! as_root "$tmp/mnt/Docker.app/Contents/MacOS/install" --accept-license --user="$(id -un)"; then
+		hdiutil detach -quiet "$tmp/mnt"
+		rm -rf "$tmp"
+		die "Docker Desktop did not finish installing. Install it from here, then
+run this again:
+
+  https://www.docker.com/products/docker-desktop/"
 	fi
+	hdiutil detach -quiet "$tmp/mnt"
+	rm -rf "$tmp"
+	quiet_docker_mac
+	# Where its command lives, should the installer not have linked it into
+	# a folder on PATH yet.
+	PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"
+	note "Docker Desktop is installed."
+}
+
+# quiet_docker_mac: before Docker Desktop's first start, its sign-in and
+# survey marked done and its dashboard kept away - the keys Docker writes
+# itself (see install.ps1's Hide-DockerDashboard). Only when it has no
+# settings yet: a Docker somebody has used keeps what they chose.
+quiet_docker_mac() {
+	dir="$HOME/Library/Group Containers/group.com.docker"
+	[ -e "$dir/settings-store.json" ] || [ -e "$dir/settings.json" ] && return
+	mkdir -p "$dir" 2>/dev/null &&
+		printf '{"OpenUIOnStartupDisabled": true, "DisplayedOnboarding": true}\n' >"$dir/settings-store.json"
+}
+
+start_docker_mac() {
+	[ -d /Applications/Docker.app ] || die "Docker is installed but Docker Desktop is not in Applications.
+Open Docker Desktop, wait until it says Running, then run this again."
+	quiet_docker_mac
+	note "Starting Docker Desktop. This takes a minute or two."
+	note "(If a Docker window asks you to accept its terms, click Accept.)"
+	open -g -a Docker
+	PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"
+	i=0
+	while [ $i -lt 150 ] && ! docker_reachable; do
+		sleep 2
+		i=$((i + 1))
+		[ $((i % 15)) -eq 0 ] && note "Docker is still starting... ($((i * 2)) seconds). This is normal."
+	done
+	docker_reachable && return
+	die "Docker Desktop was started but never came up.
+
+Open Docker Desktop: it may be waiting on you (accepting its terms, or a
+permission). Once it says Running, run this again."
 }
 
 # compose_cmd sets COMPOSE to whichever form of compose exists. v2 is a docker

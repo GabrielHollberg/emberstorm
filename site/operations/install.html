@@ -129,8 +129,17 @@ working folder and refuse, naming the other folder.</p>
 <code>/bin/sh</code> is dash - and the cheap home server it is aimed at is exactly where a bash-only
 script would fail. It downloads the compose file into a <code>soundstorm</code> folder, picks a free
 port, writes <code>.env</code> with owner-only permissions (it holds the setup code and any Tailscale
-key), starts the stack and waits until it answers. Every failure says what to do next; "Docker is
-installed but not running" has a branch of its own because it is the most common by far.</p>
+key), starts the stack and waits until it answers. Every failure says what to do next.</p>
+<p><strong>Docker is set up as part of the install</strong>, the computer's password asked for once
+(sudo reads it from the terminal though the script arrives through a pipe). On Linux it is plain
+Docker, as on the box: Docker's own installer (<code>get.docker.com</code>, which knows Debian, Ubuntu,
+Fedora, Raspberry Pi OS and the rest), its output kept in a log unless it fails, the service started
+at boot, and the account added to the <code>docker</code> group - used at once through
+<code>sg docker</code>, since a group only takes effect at the next login (before this, that state
+read as "Docker is not running"). On a Mac it is Docker Desktop, made quiet as on Windows: its own
+command-line install with <code>--accept-license --user</code>, and <code>DisplayedOnboarding</code>
+and <code>OpenUIOnStartupDisabled</code> written before its first start, then started in the
+background and waited for. A Docker already installed but stopped is started rather than reported.</p>
 <table>
   <tr><th>Option</th><th>What it does</th></tr>
   <tr><td><code>--library PATH</code></td><td>Keep the media library somewhere else, such as an external drive</td></tr>

@@ -616,6 +616,11 @@ docker compose down                 # stop (nothing is lost)
 docker compose up -d                # start
 ```
 
-Windows specifics: the setup installs Docker Desktop with `winget`, starts it
+Mac and Linux specifics: the setup installs Docker if it is missing (plain
+Docker on Linux, Docker Desktop on a Mac, asking for the computer's password
+once) and starts it when it is stopped.
+
+Windows specifics: the setup installs Docker Desktop with `winget`, with its
+first questions answered (nothing to click in Docker, no account), starts it
 when needed, picks the next free port if 8099 is taken, and adds desktop, Start
 menu and start-up shortcuts. It keeps a log at `%TEMP%\SoundStorm-setup.log`.

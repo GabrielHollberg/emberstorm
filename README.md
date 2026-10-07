@@ -137,10 +137,10 @@ A setup window walks you through the rest. Expect **10 to 30 minutes**, mostly
 downloading, and keep the window open until it says it's finished. Along the way:
 
 - **Windows asks for permission** to install Docker (the engine SoundStorm runs
-  on) and sometimes Windows Subsystem for Linux. Click **Yes**.
-- **Docker Desktop opens a window of its own.** You **don't** need a Docker
-  account: click **Accept**, then **Skip** on the sign-in and the questions.
-  You can close that window afterwards.
+  on) and sometimes Windows Subsystem for Linux. Click **Yes**. The setup
+  answers Docker's own first questions for you, so there is nothing to click in
+  Docker and no Docker account. (If you already had Docker installed but never
+  opened it, it asks you to accept its terms once: click **Accept**.)
 - **You choose where to keep your library.** Keep the suggested folder, or pick
   one on another drive.
 - **"Windows Security Alert"** for Docker Desktop Backend: click **Allow access**.
@@ -172,14 +172,16 @@ powershell -ExecutionPolicy Bypass -File "$env:TEMP\soundstorm.ps1"
 
 ### Mac and Linux
 
-Install [Docker](https://docs.docker.com/get-docker/) first (on a Mac, Docker
-Desktop), then run this in a terminal:
+Run this in a terminal:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh
 ```
 
-It downloads everything, sets it all up and prints the address to open.
+It sets up Docker if the computer does not have it (the engine SoundStorm runs
+on: plain Docker on Linux, Docker Desktop on a Mac, with nothing to click in it
+and no Docker account), downloads everything, sets it all up and prints the
+address to open. Your computer asks for your password once, to install Docker.
 
 <details>
 <summary>Already use Docker Compose? Install by hand</summary>
