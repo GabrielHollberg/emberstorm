@@ -82,9 +82,9 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="soundstorm" android:host="link" />
             </intent-filter>
-            <!-- The TV's QR code itself, https://<id>.home.emberstorm.dev/link/<code>:
+            <!-- The TV's QR code itself, https://<id>.home.emberstorm.app/link/<code>:
                  an App Link, so the camera opens it here, not in the browser.
-                 Android checks home.emberstorm.dev and net.emberstorm.dev's
+                 Android checks home.emberstorm.app and net.emberstorm.app's
                  /.well-known/assetlinks.json, which the names service serves.
                  The soundstorm.dev names are from before the rename. -->
             <intent-filter android:autoVerify="true">
@@ -92,14 +92,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" />
-                <data android:host="*.home.emberstorm.dev" />
-                <data android:host="*.net.emberstorm.dev" />
+                <data android:host="*.home.emberstorm.app" />
+                <data android:host="*.net.emberstorm.app" />
                 <data android:host="*.home.soundstorm.dev" />
                 <data android:host="*.net.soundstorm.dev" />
                 <data android:pathPrefix="/link/" />
             </intent-filter>
             <!-- Open my EmberStorm on emberstorm.app, on a phone:
-                 https://names.emberstorm.dev/open?to=<the server>, an App
+                 https://names.emberstorm.app/open?to=<the server>, an App
                  Link to the names service, which also serves its
                  assetlinks.json; without the app it sends the browser on. -->
             <intent-filter android:autoVerify="true">
@@ -107,7 +107,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" />
-                <data android:host="names.emberstorm.dev" />
+                <data android:host="names.emberstorm.app" />
                 <data android:host="names.soundstorm.dev" />
                 <data android:path="/open" />
             </intent-filter>

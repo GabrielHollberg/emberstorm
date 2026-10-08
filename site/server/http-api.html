@@ -86,7 +86,7 @@ through. A week heals itself, and every visit while the certificate works pushes
 
 <h3>Same origin</h3>
 <p>The session cookie is <code>SameSite=Lax</code>, which is normally enough against cross-site
-writes. Here it is not: every install's real name is under <code>emberstorm.dev</code>, which is
+writes. Here it is not: every install's real name is under <code>emberstorm.app</code>, which is
 not yet on the Public Suffix List, so to a browser another install - including one an attacker
 set up - is the same <em>site</em>. So <code>sameOrigin</code> refuses any request other than
 GET, HEAD or OPTIONS whose <code>Sec-Fetch-Site</code> is anything but

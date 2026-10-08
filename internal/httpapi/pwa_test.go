@@ -156,13 +156,13 @@ func TestServiceWorkerAnswersAPageLoadOnlyOnTheRealNames(t *testing.T) {
 		t.Error("sw.js no longer refuses navigations, so a changed certificate can hide behind the cache again")
 	}
 	// One exception, for opening the app offline to play downloads: allowed only
-	// on the real *.emberstorm.dev names, where the certificate is trusted and
+	// on the real *.emberstorm.app names, where the certificate is trusted and
 	// renews itself, so the trap above cannot happen. The saved page may be
 	// served from nowhere else: not from the general precache, and not
 	// outside the hostname check.
 	guard := strings.Index(src, "function offlineStartAllowed")
-	if guard < 0 || !strings.Contains(src[guard:], `/\.(?:ember|sound)storm\.dev$/.test(url.hostname)`) {
-		t.Error("sw.js serves a page offline without limiting it to the real *.emberstorm.dev names")
+	if guard < 0 || !strings.Contains(src[guard:], `/\.(?:emberstorm\.app|soundstorm\.dev)$/.test(url.hostname)`) {
+		t.Error("sw.js serves a page offline without limiting it to the real *.emberstorm.app names")
 	}
 	for _, served := range []string{"caches.match('/')", "cache.match('/')"} {
 		for at := strings.Index(src, served); at >= 0; {

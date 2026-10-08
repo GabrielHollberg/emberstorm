@@ -41,7 +41,7 @@
     <form id="open-type" class="open-type" hidden>
       <label for="open-input">Your web address or server code</label>
       <div class="open-row">
-        <input id="open-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="yourname.emberstorm.dev">
+        <input id="open-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="yourname.emberstorm.app">
         <button class="button primary" type="submit">Open</button>
       </div>
       <p class="small">Your web address is chosen in EmberStorm's Settings, under Devices. The code is the
@@ -204,8 +204,8 @@
       // Back from the names service without the app having taken the link:
       // there is no app on this phone, so nothing goes by way of it.
       let noApp = false;
-      const viaApp = (url) => phone && !noApp && /^https:\/\/[a-z2-7]{10}\.(home|net)\.(?:sound|ember)storm\.dev(:\d+)?\/?$/i.test(url)
-        ? `https://names.emberstorm.dev/open?to=${encodeURIComponent(url)}` : url;
+      const viaApp = (url) => phone && !noApp && /^https:\/\/[a-z2-7]{10}\.(home|net)\.(?:emberstorm\.app|soundstorm\.dev)(:\d+)?\/?$/i.test(url)
+        ? `https://names.emberstorm.app/open?to=${encodeURIComponent(url)}` : url;
       const remember = (url) => { try { localStorage.setItem(KEY, url); } catch {} };
       const go = (url) => { remember(url); location.href = viaApp(url); };
       const button = (label, url) => {
@@ -223,8 +223,8 @@
         if (v.includes('.')) return `https://${v}/`;
         // A server's code is ten letters and digits (a, b, ... 2 to 7); a
         // chosen name never looks like one.
-        if (/^[a-z2-7]{10}$/.test(v)) return `https://${v}.home.emberstorm.dev:8099/`;
-        return `https://${v}.emberstorm.dev/`;
+        if (/^[a-z2-7]{10}$/.test(v)) return `https://${v}.home.emberstorm.app:8099/`;
+        return `https://${v}.emberstorm.app/`;
       };
       const typeShow = document.getElementById('open-type-show');
       // Typing the address, behind a small link on a phone, where the app is
@@ -251,7 +251,7 @@
           status.textContent = 'Your EmberStorm is not on this internet connection, but the app knows it.';
           const app = document.createElement('a');
           app.className = 'button primary';
-          app.href = 'https://names.emberstorm.dev/open';
+          app.href = 'https://names.emberstorm.app/open';
           app.textContent = 'Open the EmberStorm app';
           list.append(app);
         }
@@ -288,7 +288,7 @@
         dialog.showModal();
         let servers = [];
         try {
-          const r = await fetch('https://names.emberstorm.dev/v1/find', { cache: 'no-store' });
+          const r = await fetch('https://names.emberstorm.app/v1/find', { cache: 'no-store' });
           if (r.ok) servers = (await r.json()).servers || [];
         } catch {}
         if (servers.length === 1 && phone && !noApp) {
@@ -313,7 +313,7 @@
       // looked for: found at home it opens in the browser, away it says where
       // to get the app. On a computer it looks for the server at once.
       const mine = document.getElementById('open-mine');
-      if (phone) mine.href = 'https://names.emberstorm.dev/open';
+      if (phone) mine.href = 'https://names.emberstorm.app/open';
       mine.addEventListener('click', (e) => {
         if (phone && !noApp) return; // left to the phone, to hand to the app
         e.preventDefault();

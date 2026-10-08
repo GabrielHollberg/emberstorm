@@ -87,7 +87,7 @@ transcoding. Video never will be.
 
 ```
 cmd/soundstorm/        main, env config, subcommands (backup, restore, reset-password, train-looks)
-cmd/soundstorm-names/  the name service behind *.emberstorm.dev
+cmd/soundstorm-names/  the name service behind *.emberstorm.app
 internal/media/        Item, Query, Kind - the shared vocabulary
 internal/source/       the Source interface, optional interfaces, Registry
 internal/source/*/     one package per backend (subsonic, jellyfin, audiobookshelf,

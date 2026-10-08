@@ -360,7 +360,7 @@ class MainActivity : Activity() {
         }, fill(top = if (servers.isEmpty()) 0 else 16, bottom = 28))
         val known = prefill != null && servers.any { ServerAddress.origin(it.url) == ServerAddress.origin(prefill) }
         val field = EditText(this).apply {
-            hint = "abc123.home.emberstorm.dev"
+            hint = "abc123.home.emberstorm.app"
             // Without the scheme for https (the default when none is typed),
             // with it for plain http, which would otherwise be read as https.
             // A server already in the list is not typed out again.
@@ -816,7 +816,7 @@ class MainActivity : Activity() {
     }
 
     /**
-     * https://names.emberstorm.dev/open?to=<server> (or names.soundstorm.dev,
+     * https://names.emberstorm.app/open?to=<server> (or names.soundstorm.dev,
      * from before the rename), from Open my EmberStorm on emberstorm.app. A server this app knows (by its address or the
      * install's id, as tvLink matches) is opened - the saved address, which
      * may be the away name the found home one is a twin of - and true comes
@@ -976,7 +976,7 @@ class MainActivity : Activity() {
     /**
      * https on one of this install's own names, on the port in use now. When
      * the server is known by one of its names, only its twin (the same id,
-     * home and away) - any install can get a name under emberstorm.dev, and a
+     * home and away) - any install can get a name under emberstorm.app, and a
      * security review found a page could send the app to another's. From a
      * plain address (a LAN IP) the name cannot be checked, so the move is only
      * followed, never saved (see shouldOverrideUrlLoading).
@@ -1119,7 +1119,7 @@ class MainActivity : Activity() {
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (!request.isForMainFrame) return
-            // A home name (<id>.home.emberstorm.dev) cannot be reached away
+            // A home name (<id>.home.emberstorm.app) cannot be reached away
             // from home; its away twin (<id>.net...) can, when remote access
             // is on. Tried once, without being saved.
             val s = server

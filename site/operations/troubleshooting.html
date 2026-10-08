@@ -43,7 +43,7 @@ publicly.</div>
 
 <h2 id="certs">Certificate warnings</h2>
 <p><strong>In the default (auto) mode there should be none.</strong> The secure
-<code>https://&lt;id&gt;.home.emberstorm.dev:8099</code> name carries a real Let's Encrypt certificate.
+<code>https://&lt;id&gt;.home.emberstorm.app:8099</code> name carries a real Let's Encrypt certificate.
 If you see a warning:</p>
 <ul>
   <li><strong>You typed <code>https://</code> with an IP address.</strong> A trusted certificate is for the
@@ -51,7 +51,7 @@ If you see a warning:</p>
   itself once it has checked it can reach it.</li>
   <li><strong>The page never moves to the secure name.</strong> Some routers refuse to resolve a public
   name that points at a private address (DNS rebinding protection). EmberStorm then stays on plain http
-  rather than redirect into a failure. Allowing <code>emberstorm.dev</code> in the router's rebinding
+  rather than redirect into a failure. Allowing <code>emberstorm.app</code> in the router's rebinding
   settings, or using a different DNS server, fixes it.</li>
   <li><strong>Self-signed mode</strong> (<code>SOUNDSTORM_TLS=self-signed</code>) warns on every device
   until <code>https://&lt;server&gt;:8099/ca.crt</code> is installed on it. That is expected.</li>
@@ -65,7 +65,7 @@ version of the worker can be stuck until its site data is cleared.</p>
 <h2 id="install-app">Android will not offer "Install app"</h2>
 <p>Chrome only installs a web app from an origin with a trusted certificate - not from a LAN IP address,
 and not from a self-signed certificate even after clicking through the warning. Open the secure
-<code>.home.emberstorm.dev</code> address and install from there, or use the Android app.</p>
+<code>.home.emberstorm.app</code> address and install from there, or use the Android app.</p>
 
 <h2 id="getting-ready">A shelf stuck on "Getting ready"</h2>
 <p>EmberStorm sets up each media server itself in the background, retrying with backoff, and the setup

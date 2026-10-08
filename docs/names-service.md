@@ -10,7 +10,7 @@ container (Railway here), and about fifteen minutes.
 
 ## 1. Porkbun
 
-1. **Domain Management**, find `emberstorm.dev`, open **Details**, and switch
+1. **Domain Management**, find `emberstorm.app`, open **Details**, and switch
    on **API Access**. Leave it off for every other domain: Porkbun keys are
    account-wide, and this switch is the only thing limiting one to a single
    domain.
@@ -19,8 +19,8 @@ container (Railway here), and about fifteen minutes.
    or a commit.
 
 Nothing else changes at Porkbun. The domain keeps its nameservers, and any
-website or mail on it is untouched: installs live under `home.emberstorm.dev`,
-and, with remote access on, `net.emberstorm.dev` (see `docs/remote-access.md`).
+website or mail on it is untouched: installs live under `home.emberstorm.app`,
+and, with remote access on, `net.emberstorm.app` (see `docs/remote-access.md`).
 
 ## 2. Railway
 
@@ -39,13 +39,13 @@ and, with remote access on, `net.emberstorm.dev` (see `docs/remote-access.md`).
 
 3. **Settings → Deploy → Healthcheck path:** `/healthz`, if the setting is
    there. Optional; it lets Railway tell a working deploy from a broken one.
-4. **Settings → Networking → Custom domain:** `names.emberstorm.dev`. Railway
+4. **Settings → Networking → Custom domain:** `names.emberstorm.app`. Railway
    shows a CNAME target; add that record at Porkbun (**DNS** for
-   `emberstorm.dev`, type CNAME, host `names`). Railway issues the
+   `emberstorm.app`, type CNAME, host `names`). Railway issues the
    certificate for it by itself.
 
-Check it: `https://names.emberstorm.dev/healthz` answers `{"status":"ok"}`,
-and `https://names.emberstorm.dev/v1/whoami` answers with *your* public
+Check it: `https://names.emberstorm.app/healthz` answers `{"status":"ok"}`,
+and `https://names.emberstorm.app/v1/whoami` answers with *your* public
 address as `clientIP`. If it shows some other address, every install is
 sharing one registration limit - see the next section.
 
@@ -100,14 +100,14 @@ If it fails, the log line says why. The common ones:
 
 Remove the `SOUNDSTORM_ACME_DIRECTORY` line and restart. The certificate is
 then real: open `http://localhost:8099` and the page should move itself to
-`https://<id>.home.emberstorm.dev:8099` with no warning. If it stays on http,
+`https://<id>.home.emberstorm.app:8099` with no warning. If it stays on http,
 the router is refusing to resolve a public name that points at a home address
 (DNS rebinding protection); that is a fallback working, not a failure.
 
 ## Limits worth knowing before there are many installs
 
 - **Let's Encrypt allows about fifty new certificates a week per registered
-  domain,** and every install is under `emberstorm.dev`. Renewals do not
+  domain,** and every install is under `emberstorm.app`. Renewals do not
   count. The fix is the Public Suffix List (publicsuffix.org), which makes each
   install its own domain to Let's Encrypt; apply well before it matters, as
   review takes weeks.
@@ -151,7 +151,7 @@ valid for ever, so its first announce recreates the record under **the same
 name**, and a certificate that expired meanwhile renews within a minute.
 
 It only ever touches names shaped exactly like an install's under
-`home.emberstorm.dev` and `net.emberstorm.dev` - never the apex, a website, `names`, or anything else -
+`home.emberstorm.app` and `net.emberstorm.app` - never the apex, a website, `names`, or anything else -
 and skips any record without a date, such as one written before dates
 existed; that install's next announce dates it. It **refuses to run** if it
 would delete more than a quarter of all installs at once (or twenty, for a

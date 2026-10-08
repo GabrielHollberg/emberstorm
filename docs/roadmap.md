@@ -50,7 +50,7 @@ virtual machine; a test unit is next. See [`box/README.md`](../box/README.md).
 
 ## 3. Growing beyond a handful of installs
 
-Every install shares the `emberstorm.dev` name service. It is cheap and holds
+Every install shares the `emberstorm.app` name service. It is cheap and holds
 no state, and it has limits to plan for:
 
 - **Let's Encrypt's rate limits.** Renewals now say what they replace (ACME

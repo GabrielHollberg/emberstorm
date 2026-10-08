@@ -25,7 +25,7 @@
 //      the browser, the same failure is a warning people know how to get past.
 //
 // The exception to rule 3 is opening the app with no connection, for
-// downloads. It applies only on the real *.emberstorm.dev names (and
+// downloads. It applies only on the real *.emberstorm.app names (and
 // *.soundstorm.dev, from before the rename), whose
 // certificates are trusted and renew themselves: the trap rule 3 exists for -
 // a clicked-through self-signed certificate changing underneath a cached page -
@@ -99,7 +99,7 @@ const OFFLINE_SHELL = 'soundstorm-offline-shell-v1';
 function offlineStartAllowed(request, url) {
   return request.mode === 'navigate'
     && url.origin === self.location.origin
-    && /\.(?:ember|sound)storm\.dev$/.test(url.hostname);
+    && /\.(?:emberstorm\.app|soundstorm\.dev)$/.test(url.hostname);
 }
 
 self.addEventListener('fetch', event => {

@@ -38,7 +38,7 @@ package or function that does it, so the rest of the site can be read against th
 
 <h3>1. The phone already knows it is away</h3>
 <p>The app is pointed at the install's away-from-home name
-(<code>&lt;id&gt;.net.emberstorm.dev</code>, or a Tailscale <code>ts.net</code> name). On opening,
+(<code>&lt;id&gt;.net.emberstorm.app</code>, or a Tailscale <code>ts.net</code> name). On opening,
 the page times 128&nbsp;KB from <code>/api/probe</code> once a session; under 1.2&nbsp;Mbps it
 starts songs at 128&nbsp;kbps from the first one, and remembers a slow address for six hours.
 Otherwise it asks for the original.</p>
@@ -62,7 +62,7 @@ service</a>, or the local authority's as a fallback.</p>
 <h3>3. The outer middleware</h3>
 <p>Every route, signed in or not, passes through the same chain built at the end of
 <code>Routes()</code>: logging, security headers, <code>sameOrigin</code> (cross-site writes refused
-on origin, not merely site, because every install shares <code>emberstorm.dev</code>) and
+on origin, not merely site, because every install shares <code>emberstorm.app</code>) and
 <code>bodyDeadline</code>. There is deliberately no global read or write timeout: a deadline that
 expired mid-response would cancel the request's context, and a film would stop with it.</p>
 

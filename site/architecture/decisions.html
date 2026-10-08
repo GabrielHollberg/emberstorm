@@ -136,7 +136,7 @@ line for anybody who would rather not be on the internet.</p>
 <h2 id="names">The names service: the one central piece</h2>
 <p>A browser trusts only a certificate that somebody on the internet vouches for, and that needs a
 name on the internet. <code>cmd/soundstorm-names</code> is a small service that gives each install
-<code>&lt;id&gt;.home.emberstorm.dev</code>, points it at the install's LAN address, and publishes
+<code>&lt;id&gt;.home.emberstorm.app</code>, points it at the install's LAN address, and publishes
 the DNS-01 challenge so Let's Encrypt can issue a certificate for a server nothing on the internet
 can reach. It is what Plex does with <code>plex.direct</code>, without the account.</p>
 <p>It is the first central infrastructure the project has, a real change made deliberately. Its

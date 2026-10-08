@@ -507,7 +507,7 @@ const FR = { on: false, target: null, item: null, timer: 0, heldUntil: 0, held: 
 // (measured: 20 seconds at 0.3 Mbps).
 const SLOW_KEY = 'soundstorm.slowlink';
 const SLOW_FOR_MS = 6 * 3600 * 1000;
-const awayHost = /\.net\.(?:ember|sound)storm\.dev$|\.ts\.net$/i.test(location.hostname);
+const awayHost = /\.net\.(?:emberstorm\.app|soundstorm\.dev)$|\.ts\.net$/i.test(location.hostname);
 try {
   const kept = JSON.parse(localStorage.getItem(SLOW_KEY) || 'null');
   if (kept && kept.host === location.host && kept.until > Date.now()) slowLink = true;
@@ -1088,7 +1088,7 @@ async function showApp(me) {
   await Promise.all([loadPrefs(), loadMyArt()]);
   renderWelcome();
   setTimeout(prepareDownloads, 20000);
-  if (/\.(?:ember|sound)storm\.dev$/.test(location.hostname)) keepShell();
+  if (/\.(?:emberstorm\.app|soundstorm\.dev)$/.test(location.hostname)) keepShell();
   refreshPairs();
   maybeShowHoldTip();
   askLinkFromAddress();
@@ -1253,7 +1253,7 @@ $('server-name-form').addEventListener('submit', async (event) => {
   }
 });
 
-// Your web address (hollberg.emberstorm.dev) and Open my EmberStorm on
+// Your web address (hollberg.emberstorm.app) and Open my EmberStorm on
 // emberstorm.app: the owner's, and only with the name service (auto HTTPS).
 function showWebName(session) {
   const has = Boolean(session && session.webNames);
@@ -1268,12 +1268,12 @@ function paintWebName(name) {
   const now = $('web-name-now');
   now.replaceChildren();
   if (!name) { show(now, false); return; }
-  const url = `https://${name}.emberstorm.dev`;
+  const url = `https://${name}.emberstorm.app`;
   const a = document.createElement('a');
   a.href = url;
   a.target = '_blank';
   a.rel = 'noopener';
-  a.textContent = `${name}.emberstorm.dev`;
+  a.textContent = `${name}.emberstorm.app`;
   now.append('Open it at ', a);
   if (navigator.clipboard && window.isSecureContext) {
     const copy = document.createElement('button');
@@ -1287,7 +1287,7 @@ function paintWebName(name) {
 }
 $('web-name-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const name = $('web-name-input').value.trim().toLowerCase().replace(/\.(?:ember|sound)storm\.dev$/, '');
+  const name = $('web-name-input').value.trim().toLowerCase().replace(/\.(?:emberstorm\.app|soundstorm\.dev)$/, '');
   note($('web-name-note'), name ? 'Checking that name...' : 'Removing it...');
   const code = $('web-name-code').value.trim();
   const { ok, body } = await api('/api/settings/web-name', { method: 'PUT', body: JSON.stringify({ name, code }) });
@@ -11545,7 +11545,7 @@ async function renderWelcome() {
   // Got it.
   const shareURL = library.ok && library.body && library.body.shareURL;
   const webName = session.ok && session.body && session.body.webName;
-  const address = webName ? `https://${webName}.emberstorm.dev` : shareURL;
+  const address = webName ? `https://${webName}.emberstorm.app` : shareURL;
   if (address) {
     const others = players.ok && players.body
       && (players.body.players || []).some((p) => p.mine && !p.tv && p.id !== PLAYER.id);
@@ -11574,7 +11574,7 @@ async function renderWelcome() {
       const pick = document.createElement('button');
       pick.type = 'button';
       pick.className = 'ghost small';
-      pick.textContent = 'Pick an easier one, like yourname.emberstorm.dev';
+      pick.textContent = 'Pick an easier one, like yourname.emberstorm.app';
       pick.addEventListener('click', () => { selectTab('settings'); openSettingsCard($('web-name-block')); });
       extra.append(pick);
     }

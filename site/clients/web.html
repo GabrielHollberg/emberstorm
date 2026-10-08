@@ -157,7 +157,7 @@ of a media server is worse than the problem it solves. It has three rules:</p>
   warning people know how to handle.</li>
 </ol>
 <p>The one exception to rule 3 is opening the app offline for downloads, and it applies only on
-the real <code>*.emberstorm.dev</code> names, only when the network actually failed. Those names
+the real <code>*.emberstorm.app</code> names, only when the network actually failed. Those names
 carry trusted certificates that renew themselves, so the trap rule 3 exists for cannot happen
 there. On an IP address, localhost or a self-signed certificate, the rule holds exactly.</p>
 <p>What the worker does answer - the app's own <code>/static/</code> files - is network-first.
@@ -174,7 +174,7 @@ The manifest is likewise served by hand, because Go's MIME table has no
 <p>On an iPhone, Share &rarr; Add to Home Screen works from any address. On Android, Chrome's
 <strong>Install app</strong> only appears where a service worker can register - and Chrome refuses
 to register one on an origin with a certificate error, even after the warning was clicked
-through. So the app installs only from the secure <code>https://&lt;id&gt;.home.emberstorm.dev:8099</code>
+through. So the app installs only from the secure <code>https://&lt;id&gt;.home.emberstorm.app:8099</code>
 name, which has a real Let's Encrypt certificate (see
 <a href="../server/tls.html">Certificates and names</a>).</p>
 <div class="warn">For a long time every installability test ran against <code>localhost</code> or

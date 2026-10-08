@@ -18,7 +18,7 @@ folder and every server package, each in a line, so you know where to look.</p>
 <table>
   <tr><th>Path</th><th>What it is</th></tr>
   <tr><td><code>cmd/soundstorm/</code></td><td>The server's <code>main</code>, plus its subcommands: <code>backup</code>, <code>restore</code>, <code>reset-password</code>, <code>train-looks</code>. Any argument it does not know is an error, never a second server.</td></tr>
-  <tr><td><code>cmd/soundstorm-names/</code></td><td>The names service: gives each install a name under <code>emberstorm.dev</code> and publishes ACME challenges. Deployed separately, with its own Dockerfile.</td></tr>
+  <tr><td><code>cmd/soundstorm-names/</code></td><td>The names service: gives each install a name under <code>emberstorm.app</code> and publishes ACME challenges. Deployed separately, with its own Dockerfile.</td></tr>
   <tr><td><code>internal/</code></td><td>Every server package (below).</td></tr>
   <tr><td><code>android/</code></td><td>The Android app (Kotlin): phones, Google TV, Android TV and Fire TV.</td></tr>
   <tr><td><code>ios/</code></td><td>The Xcode project: the iPhone app, the Apple TV app (<code>SoundStormTV/</code>), shared code and UI tests.</td></tr>

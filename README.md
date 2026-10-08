@@ -236,7 +236,7 @@ which also backs up the phone's photos, or add the web app to your home screen
 (on an iPhone, for now, this is the way):
 - **iPhone:** Share → **Add to Home Screen**.
 - **Android:** Chrome menu → **Install app**. Use the secure address, the one
-  ending in `.home.emberstorm.dev`.
+  ending in `.home.emberstorm.app`.
 
 **4. Add your family.** **Settings → People**: give each person a name and a
 password, tick which shelves they may see, and set their photo space if you
@@ -304,7 +304,7 @@ virtualization switched on in your computer's BIOS/UEFI settings, usually called
 - Give the computer a fixed address in your router (a "DHCP reservation"), so
   the address never changes.
 
-**The secure `.home.emberstorm.dev` address doesn't load.** Some routers block
+**The secure `.home.emberstorm.app` address doesn't load.** Some routers block
 it on purpose. EmberStorm then stays on the plain address, and everything still
 works.
 
@@ -322,7 +322,7 @@ Your media, searches and passwords stay on your computer. EmberStorm contacts
 the internet only for:
 
 - **Its secure address.** A small name service gives your server its
-  `….emberstorm.dev` name and certificate. It only knows your server's *home
+  `….emberstorm.app` name and certificate. It only knows your server's *home
   network* address.
 - **Updates**, when you run them.
 - **Things you switch on**, all off by default: finding missing lyrics online

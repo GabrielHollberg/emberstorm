@@ -6,7 +6,7 @@
 // where it was first deployed. Configuration is the environment:
 //
 //	NAMES_SECRET             at least 32 random bytes; keys every install's token
-//	NAMES_ZONE               the domain at the provider (default soundstorm.dev; set emberstorm.dev on Railway for the move)
+//	NAMES_ZONE               the domain at the provider (default soundstorm.dev; set emberstorm.app on Railway for the move)
 //	NAMES_LABEL              the level installs sit beneath (default home)
 //	PORKBUN_API_KEY          Porkbun credentials, with API access switched on
 //	PORKBUN_SECRET_API_KEY   for NAMES_ZONE only

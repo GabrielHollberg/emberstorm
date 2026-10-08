@@ -397,7 +397,7 @@ func (a *autoCert) step(ctx context.Context) error {
 		}
 		return fmt.Errorf("point %s at %s: %w", reg.Name, a.announce, err)
 	}
-	// The service moved to another zone (soundstorm.dev to emberstorm.dev,
+	// The service moved to another zone (soundstorm.dev to emberstorm.app,
 	// 2026-10-07): the same id under the new zone becomes this install's name,
 	// kept, and the certificate below is made again for it.
 	if given != "" && !strings.EqualFold(given, reg.Name) && strings.HasPrefix(strings.ToLower(given), reg.ID+".") {

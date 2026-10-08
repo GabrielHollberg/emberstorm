@@ -62,7 +62,7 @@ func awayFromHome(r *http.Request) bool {
 		host = h
 	}
 	host = strings.ToLower(strings.TrimSuffix(host, "."))
-	return strings.HasSuffix(host, ".net.emberstorm.dev") || strings.HasSuffix(host, ".net.soundstorm.dev") ||
+	return strings.HasSuffix(host, ".net.emberstorm.app") || strings.HasSuffix(host, ".net.soundstorm.dev") ||
 		strings.HasSuffix(host, ".ts.net")
 }
 

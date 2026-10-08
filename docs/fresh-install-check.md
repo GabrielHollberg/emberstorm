@@ -79,7 +79,7 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
 
 11. On the phone, open the address from **Settings → Use on your phone or TV**.
     Did it load, with no certificate warning, and did it move to the
-    `.home.emberstorm.dev` name?
+    `.home.emberstorm.app` name?
 12. Install the Android app from the newest `android-` release on GitHub.
     - What did Android say about installing an app from outside the Play
       Store, and how many taps did it take?

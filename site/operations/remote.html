@@ -20,8 +20,8 @@ what it sends to a phone away from home.</p>
 <table>
   <tr><th>Address</th><th>Where it works</th><th>Certificate</th></tr>
   <tr><td><code>http://192.168.1.50:8099</code></td><td>The home network</td><td>None (plain http)</td></tr>
-  <tr><td><code>https://&lt;id&gt;.home.emberstorm.dev:8099</code></td><td>The home network</td><td>Let's Encrypt, trusted everywhere</td></tr>
-  <tr><td><code>https://&lt;id&gt;.net.emberstorm.dev:8099</code></td><td>Anywhere, once remote access is on</td><td>The same certificate, carrying both names</td></tr>
+  <tr><td><code>https://&lt;id&gt;.home.emberstorm.app:8099</code></td><td>The home network</td><td>Let's Encrypt, trusted everywhere</td></tr>
+  <tr><td><code>https://&lt;id&gt;.net.emberstorm.app:8099</code></td><td>Anywhere, once remote access is on</td><td>The same certificate, carrying both names</td></tr>
 </table>
 <p>The id is random and per install. All three are served on the same port: EmberStorm's listener tells
 a TLS connection from a plain HTTP request by its first byte (<code>servetls.Listener</code>), so the
@@ -30,7 +30,7 @@ address people already have keeps working while the secure one is added.</p>
 <h2 id="home-name">The home name and its certificate</h2>
 <p>A trusted certificate needs a name on the internet, and a home server has neither a domain nor a
 route an ACME challenge can reach. So EmberStorm runs one small central service, the names service,
-which gives each install <code>&lt;id&gt;.home.emberstorm.dev</code>, points it at the install's
+which gives each install <code>&lt;id&gt;.home.emberstorm.app</code>, points it at the install's
 <em>private</em> LAN address, and publishes the DNS-01 challenge that lets Let's Encrypt issue a
 certificate for a server nothing on the internet can reach. It is the same idea as Plex's
 <code>plex.direct</code>, without the account.</p>
@@ -138,7 +138,7 @@ Mbps. Several causes were found, one after another:</p>
   <li><strong>The pipe was full.</strong> The server handed each song to the network in full the moment it
   was asked, and over a slow link those megabytes queue in the connection, so the next song, a skip and the
   covers all wait behind bytes nobody plays. Audio to a device that came in by an away-from-home name
-  (<code>*.net.emberstorm.dev</code> or <code>*.ts.net</code>) is now <strong>paced</strong>
+  (<code>*.net.emberstorm.app</code> or <code>*.ts.net</code>) is now <strong>paced</strong>
   (<code>internal/stream/pace.go</code>): the header plus eight seconds at once, then 1.5 times the song's
   own bitrate. At home nothing is paced, and neither are films, whose pieces are asked for one at a
   time.</li>

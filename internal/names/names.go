@@ -54,10 +54,10 @@ const idLength = 10
 // uppercase id would come back from a resolver in whatever case it liked.
 var idAlphabet = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)
 
-// Zones are the domains install names have lived under: emberstorm.dev now,
+// Zones are the domains install names have lived under: emberstorm.app now,
 // soundstorm.dev before the product was renamed (2026-10-07), which old
 // installs and saved addresses may still use.
-var Zones = []string{"emberstorm.dev", "soundstorm.dev"}
+var Zones = []string{"emberstorm.app", "soundstorm.dev"}
 
 // IsAwayName reports whether host is an install's away-from-home name,
 // <id>.net.<zone>, under any of the Zones.

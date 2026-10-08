@@ -93,7 +93,7 @@ and every request after them waits behind bytes nobody plays: the fallback copy,
 after a skip, the covers. A report from a phone showed a first byte arriving 67 seconds after
 play while the server sat idle.</p>
 <p>So audio sent to a device that reached the server by an away-from-home name
-(<code>*.net.emberstorm.dev</code> or a Tailscale <code>*.ts.net</code>) is paced
+(<code>*.net.emberstorm.app</code> or a Tailscale <code>*.ts.net</code>) is paced
 (<code>internal/stream/pace.go</code>):</p>
 <ul>
   <li>a burst first - eight seconds of music when the song's bitrate is known, else 1MB, enough

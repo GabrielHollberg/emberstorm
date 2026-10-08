@@ -310,7 +310,7 @@ whole shelf, and manages what's on the device. Downloaded things always play
 from the device, and show a small green tick.
 
 Without a connection, EmberStorm keeps working and shows only what's downloaded.
-On the secure `….emberstorm.dev` address it even opens with no connection at
+On the secure `….emberstorm.app` address it even opens with no connection at
 all. Signing out removes downloads from that device.
 
 ## Deleting things
@@ -385,7 +385,7 @@ Use the computer's address with port 8099, for example
 a Copy button.
 
 Within a minute of starting, EmberStorm also gets a secure address like
-`https://k3x9m2p7qa.home.emberstorm.dev:8099`, which it moves to by itself.
+`https://k3x9m2p7qa.home.emberstorm.app:8099`, which it moves to by itself.
 
 **The apps:**
 - **Android** (phones, and Google TV, Android TV and Fire TV): the newest
@@ -417,14 +417,14 @@ Worth doing:
 
 ## Away from home
 
-The secure `….home.emberstorm.dev` address only works on your own Wi-Fi, on
+The secure `….home.emberstorm.app` address only works on your own Wi-Fi, on
 purpose. For everywhere else there are two ways.
 
 ### Remote access
 
 Turn it on under **Settings → Reach it from anywhere** (or install with
 `-Remote` on Windows, `--remote` on Mac and Linux). Your server gets a second
-address, `https://….net.emberstorm.dev:8099`, with a trusted certificate. Share
+address, `https://….net.emberstorm.app:8099`, with a trusted certificate. Share
 the link and people reach your sign-in page, with no app to install.
 
 - **EmberStorm opens the port on your router itself** where the router allows
@@ -566,7 +566,7 @@ stays installed.
 ## Security and HTTPS
 
 **HTTPS is on by default, with nothing to do.** Each install gets its own
-`….home.emberstorm.dev` name and a certificate from Let's Encrypt, which every
+`….home.emberstorm.app` name and a certificate from Let's Encrypt, which every
 browser trusts. The name service only knows your server's home network address.
 Your media, searches and passwords never go near it. If it's ever down,
 EmberStorm carries on with the certificate it has.
