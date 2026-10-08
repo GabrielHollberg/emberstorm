@@ -498,6 +498,13 @@ func (s *Source) Clips(ctx context.Context, uuid string) ([]Clip, error) {
 	return readClips(&zr.Reader)
 }
 
+// maxOverlayBytes and maxClips bound what one synced book's timing may
+// take: a 50-hour book's overlays are a few megabytes and some 30,000 clips.
+const (
+	maxOverlayBytes = 128 << 20
+	maxClips        = 2_000_000
+)
+
 func readClips(zr *zip.Reader) ([]Clip, error) {
 	entries := map[string]*zip.File{}
 	for _, f := range zr.File {
@@ -555,17 +562,28 @@ func readClips(zr *zip.Reader) ([]Clip, error) {
 		}
 	}
 
+	// Each overlay is read once, however often the spine names it, and the
+	// whole is capped: a book whose spine named one large overlay thousands
+	// of times was read, and its clips kept, thousands of times over (the
+	// twelfth security pass).
 	var clips []Clip
+	seen := map[string]bool{}
+	var readBytes int
 	for _, ref := range opf.Spine {
 		smilID, ok := overlay[ref.IDRef]
 		if !ok {
 			continue
 		}
 		smilPath, ok := byID[smilID]
-		if !ok {
+		if !ok || seen[smilPath] {
 			continue
 		}
+		seen[smilPath] = true
 		raw, err := read(smilPath)
+		readBytes += len(raw)
+		if readBytes > maxOverlayBytes || len(clips) > maxClips {
+			return nil, fmt.Errorf("storyteller: the synced book's timing is too large")
+		}
 		if err != nil {
 			return nil, err
 		}

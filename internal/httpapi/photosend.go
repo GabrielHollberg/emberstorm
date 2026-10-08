@@ -168,14 +168,18 @@ func mayHavePhotos(u state.User) bool {
 }
 
 // holdFile puts a file in the holding folder: a hard link (no second copy),
-// else a copy.
-func holdFile(from, to string) error {
-	st, err := os.Stat(from)
+// else a copy - only while the disk keeps its reserve, since a copy is a
+// whole second file nobody's photo space counts (the twelfth security pass).
+func (s *Server) holdFile(from, to string) error {
+	st, err := os.Lstat(from)
 	if err != nil || !st.Mode().IsRegular() {
 		return errors.New("not a file")
 	}
 	if os.Link(from, to) == nil {
 		return nil
+	}
+	if !s.library.Room(st.Size()) {
+		return errLibraryFull
 	}
 	in, err := os.Open(from)
 	if err != nil {
@@ -471,7 +475,7 @@ func (s *Server) holdPhotos(ctx context.Context, dir string, refs []struct{ Sour
 		}
 		name := path.Base(rels[0])
 		held := fmt.Sprintf("%03d-%s", i, name)
-		if err := holdFile(abs, filepath.Join(dir, held)); err != nil {
+		if err := s.holdFile(abs, filepath.Join(dir, held)); err != nil {
 			skipped++
 			continue
 		}
@@ -482,13 +486,13 @@ func (s *Server) holdPhotos(ctx context.Context, dir string, refs []struct{ Sour
 			}
 		}
 		// Its date file travels with it: where the sender's date came from.
-		_ = holdFile(abs+".xmp", filepath.Join(dir, held+".xmp"))
+		_ = s.holdFile(abs+".xmp", filepath.Join(dir, held+".xmp"))
 		// A Live Photo's moving part goes with its still.
 		if lf, ok := src.(liveFiler); ok {
 			if rel, err := lf.LiveFile(ctx, it.ID); err == nil && rel != "" {
 				if labs, err := inside(pictures, rel); err == nil {
 					extra := fmt.Sprintf("%03d-live-%s", i, path.Base(rel))
-					if holdFile(labs, filepath.Join(dir, extra)) == nil {
+					if s.holdFile(labs, filepath.Join(dir, extra)) == nil {
 						item.Extras = append(item.Extras, extra)
 					}
 				}

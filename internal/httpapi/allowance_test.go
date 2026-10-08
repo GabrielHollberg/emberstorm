@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
 // An allowance forgets those it has nothing against, so a table keyed by
@@ -46,5 +49,38 @@ func TestTheBioLinkIsWikipediasOnly(t *testing.T) {
 		if got := wikipediaPage(raw) != ""; got != want {
 			t.Errorf("%s: %v", raw, got)
 		}
+	}
+}
+
+// Uploads at once are held against the photo limit as they start, so 64 of
+// them cannot all pass on the same figure.
+func TestUploadsAtOnceStayWithinThePhotoLimit(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t)
+	member, err := h.api.store.AddUser(state.User{ID: "m1", Name: "alice"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := 1
+	if err := h.api.store.SetPhotoLimitGB(member.ID, &one); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	passed := 0
+	var wg sync.WaitGroup
+	for range 64 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := h.api.holdPhotoRoom(member, 100<<20); err == nil {
+				mu.Lock()
+				passed++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if passed != 10 {
+		t.Fatalf("%d uploads of 100MB held against 1GB", passed)
 	}
 }

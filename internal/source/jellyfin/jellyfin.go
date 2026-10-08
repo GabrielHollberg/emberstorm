@@ -694,9 +694,11 @@ func (s *Source) HLSTarget(ctx context.Context, path string, query url.Values) (
 	// tiles, so it is always off.
 	query = withTrickplayOff(query)
 	// And the device is always EmberStorm's: the client's choice of device
-	// could reach another person's conversion.
+	// could reach another person's conversion. A live stream's id likewise
+	// names something opened for somebody else, and a file never has one
+	// (the twelfth security pass).
 	for k := range query {
-		if strings.EqualFold(k, "deviceId") {
+		if strings.EqualFold(k, "deviceId") || strings.EqualFold(k, "liveStreamId") {
 			query.Del(k)
 		}
 	}

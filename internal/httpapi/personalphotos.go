@@ -43,6 +43,13 @@ const usageFresh = time.Minute
 type photoUsage struct {
 	mu    sync.Mutex
 	sizes map[string]usageEntry
+	// held is what uploads still arriving will add, per person: the folder's
+	// figure counts a file only once it is saved, and a phone sends up to
+	// 64 at once, each checked against the same figure - together past the
+	// limit (the twelfth security pass).
+	held map[string]int64
+	// holding makes check-and-hold one step.
+	holding sync.Mutex
 }
 
 type usageEntry struct {
@@ -104,28 +111,67 @@ func (s *Server) photoRoom(u state.User, size int64) error {
 		// upload with no length filled the disk (a security review).
 		return fmt.Errorf("%w: the size of the file was not given", errPhotoLimit)
 	}
-	if s.photoBytes(u)+size > limit {
+	used := s.photoBytes(u)
+	s.photoUsage.mu.Lock()
+	used += s.photoUsage.held[u.ID]
+	s.photoUsage.mu.Unlock()
+	if used+size > limit {
 		return fmt.Errorf("%w: your photos have used their %d GB", errPhotoLimit, limit>>30)
 	}
 	return nil
 }
 
+// holdPhotoRoom is photoRoom for a file about to arrive, its size held
+// against the limit until release - once it is saved and counted, or not.
+// The check and the hold are one step, so uploads at once cannot all pass
+// on the same figure.
+func (s *Server) holdPhotoRoom(u state.User, size int64) (release func(), err error) {
+	if s.photoLimitBytes(u) < 0 {
+		return func() {}, nil
+	}
+	s.photoBytes(u) // walked first, outside the lock
+	c := &s.photoUsage
+	c.holding.Lock()
+	defer c.holding.Unlock()
+	if err := s.photoRoom(u, size); err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	if c.held == nil {
+		c.held = map[string]int64{}
+	}
+	c.held[u.ID] += size
+	c.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			c.mu.Lock()
+			if c.held[u.ID] -= size; c.held[u.ID] <= 0 {
+				delete(c.held, u.ID)
+			}
+			c.mu.Unlock()
+		})
+	}, nil
+}
+
 // personalUpload checks an upload to the picture shelf against the person's
 // folder and limit (the owner's photos have none). Where in the folder it
 // goes is decided once it has arrived: by when it was taken (datedPhoto).
-func (s *Server) personalUpload(u state.User, kind media.Kind, rel string, size int64) (string, error) {
+func (s *Server) personalUpload(u state.User, kind media.Kind, rel string, size int64) (string, func(), error) {
 	if kind != media.KindPicture {
-		return rel, nil
+		return rel, func() {}, nil
 	}
 	if _, err := s.library.EnsurePersonalFolder(u.Name); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if !u.IsOwner() {
-		if err := s.photoRoom(u, size); err != nil {
-			return "", err
+		release, err := s.holdPhotoRoom(u, size)
+		if err != nil {
+			return "", nil, err
 		}
+		return rel, release, nil
 	}
-	return rel, nil
+	return rel, func() {}, nil
 }
 
 // personalPlan shows where pictures will go: the person's own folder, sorted
@@ -507,10 +553,12 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !u.IsOwner() {
-		if err := s.photoRoom(u, it.Size); err != nil {
+		release, err := s.holdPhotoRoom(u, it.Size)
+		if err != nil {
 			writeError(w, http.StatusInsufficientStorage, err.Error())
 			return
 		}
+		defer release()
 	}
 	// Another, different file of the same name taken the same month (a
 	// different phone, a camera that restarted its numbering) is kept beside

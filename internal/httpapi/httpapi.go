@@ -118,6 +118,8 @@ type Server struct {
 	// audiobook server, the scrobbling token checked online, the read-along
 	// queue reordered.
 	otherWrites allowance
+	// photos sent to somebody: each holds up to 500 photos for them
+	sendAsks allowance
 	// playback reports sent from the app (diagnostics.go)
 	reports allowance
 	// "keep me on this device" (profiles): each rewrites state.json
@@ -555,7 +557,7 @@ func (s *Server) Routes() http.Handler {
 	guarded.HandleFunc("POST /api/photos/shares/{id}/decline", s.limited(&s.listWrites, 60, time.Second, s.handleDeclineShare))
 	guarded.HandleFunc("POST /api/photos/save", s.limited(&s.listWrites, 60, time.Second, s.handleSavePhotos))
 	guarded.HandleFunc("GET /api/photos/send-to", s.handleSendTo)
-	guarded.HandleFunc("POST /api/photos/send", s.handleSendPhotos)
+	guarded.HandleFunc("POST /api/photos/send", s.limited(&s.sendAsks, 10, 30*time.Second, s.handleSendPhotos))
 	guarded.HandleFunc("GET /api/photos/inbox", s.handlePhotoInbox)
 	guarded.HandleFunc("GET /api/photos/inbox/{id}/{n}/thumb", s.handlePhotoInboxThumb)
 	guarded.HandleFunc("POST /api/photos/inbox/{id}/accept", s.handlePhotoInboxAccept)
@@ -1763,10 +1765,11 @@ func (s *Server) addFile(a addRequest, body io.Reader) (string, error) {
 		return "", errLibraryFull
 	}
 	// A member's pictures go to their own folder, within their limit.
-	path, err := s.personalUpload(a.User, kind, path, a.Size)
+	path, release, err := s.personalUpload(a.User, kind, path, a.Size)
 	if err != nil {
 		return "", err
 	}
+	defer release()
 	// A taken name: keep both or replace, as the person chose (uploadcheck.go).
 	opts, err := s.saveOptions(a.User, kind, a.Conflict, a.As)
 	if err != nil {

@@ -1,8 +1,10 @@
 package voices
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,40 +72,54 @@ func mp4Pieces(b *mp4hls.Book, f func(float64, []byte, string) error) error {
 // mp3Pieces walks an MP3's frames and sends them in runs; the ID3 tag in
 // front is left out, so every piece starts on a frame.
 func mp3Pieces(path string, f func(float64, []byte, string) error) error {
-	data, err := os.ReadFile(path)
+	// Read as it goes, a piece at a time: a long book's MP3 is hundreds of
+	// megabytes, and it used to be read whole (the twelfth security pass).
+	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	pos := 0
-	if len(data) >= 10 && string(data[:3]) == "ID3" {
-		size := int(data[6]&0x7f)<<21 | int(data[7]&0x7f)<<14 | int(data[8]&0x7f)<<7 | int(data[9]&0x7f)
-		pos = 10 + size
-		if data[5]&0x10 != 0 {
-			pos += 10
+	defer file.Close()
+	br := bufio.NewReaderSize(file, 64<<10)
+	if h, err := br.Peek(10); err == nil && string(h[:3]) == "ID3" {
+		skip := 10 + (int(h[6]&0x7f)<<21 | int(h[7]&0x7f)<<14 | int(h[8]&0x7f)<<7 | int(h[9]&0x7f))
+		if h[5]&0x10 != 0 {
+			skip += 10
+		}
+		if _, err := br.Discard(skip); err != nil {
+			return nil // a tag and nothing after it
 		}
 	}
-	t, pieceStart, pieceFrom := 0.0, 0.0, pos
-	for pos+4 <= len(data) {
-		length, secs := mp3Frame(data[pos:])
+	var piece []byte
+	t, pieceStart := 0.0, 0.0
+	for {
+		h, _ := br.Peek(4)
+		if len(h) < 4 {
+			break // less than a frame's header left
+		}
+		length, secs := mp3Frame(h)
 		if length == 0 {
 			// Not a frame: look for the next sync a byte on.
-			pos++
+			b, _ := br.ReadByte()
+			piece = append(piece, b)
 			continue
 		}
 		if t-pieceStart >= PieceSeconds {
-			if err := f(pieceStart, data[pieceFrom:pos], "piece.mp3"); err != nil {
+			if err := f(pieceStart, piece, "piece.mp3"); err != nil {
 				return err
 			}
-			pieceStart, pieceFrom = t, pos
+			pieceStart, piece = t, nil
 		}
-		pos += length
+		at := len(piece)
+		piece = append(piece, make([]byte, length)...)
+		n, err := io.ReadFull(br, piece[at:])
+		piece = piece[:at+n]
+		if err != nil {
+			break
+		}
 		t += secs
 	}
-	if pos > len(data) {
-		pos = len(data)
-	}
-	if pos > pieceFrom {
-		return f(pieceStart, data[pieceFrom:pos], "piece.mp3")
+	if len(piece) > 0 {
+		return f(pieceStart, piece, "piece.mp3")
 	}
 	return nil
 }
