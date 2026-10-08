@@ -37,3 +37,6 @@ Dockerfile text eol=lf
 box/rootfs/** text eol=lf
 *.m4b binary
 *.gz binary
+
+# The fuzzer's saved inputs are read byte for byte by go test.
+**/testdata/fuzz/** -text
