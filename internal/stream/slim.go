@@ -437,6 +437,9 @@ func (p *Proxy) slimMP3(ctx context.Context, target source.Target, first []byte,
 // 0 when it cannot be trusted: a variable-bitrate file announces itself with
 // a Xing or Info frame whose own bitrate says nothing about the rest.
 func mp3FrameKbps(frame []byte) float64 {
+	if len(frame) < 4 {
+		return 0
+	}
 	if bytes.Contains(frame, []byte("Xing")) || bytes.Contains(frame, []byte("VBRI")) {
 		return 0
 	}
@@ -600,6 +603,9 @@ func mp4Seconds(moov []byte) float64 {
 // stripMoov copies moov without its udta and meta children. A fragmented
 // file (mvex) is refused: its fragments carry offsets of their own.
 func stripMoov(moov []byte) ([]byte, error) {
+	if len(moov) < 8 {
+		return nil, errors.New("short moov")
+	}
 	out := make([]byte, 8, len(moov))
 	copy(out, moov[:8])
 	for off := 8; off < len(moov); {

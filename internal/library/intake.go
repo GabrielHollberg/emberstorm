@@ -1620,7 +1620,12 @@ func tagSegment(value, fallback string) string {
 		for cut > 0 && !utf8.RuneStart(value[cut]) {
 			cut--
 		}
-		value = strings.TrimSpace(value[:cut])
+		// Cut short, it is trimmed again: ". . . 0" cut before its last
+		// character left a folder called "." (found by fuzzing).
+		value = strings.TrimRight(strings.TrimSpace(value[:cut]), ". ")
+		if value == "" {
+			return fallback
+		}
 	}
 	return value
 }

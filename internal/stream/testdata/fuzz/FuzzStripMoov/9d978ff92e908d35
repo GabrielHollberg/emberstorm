@@ -1,0 +1,4 @@
+go test fuzz v1
+[]byte("\x00\x00\x00lmv")
+int64(100)
+int64(-50)
