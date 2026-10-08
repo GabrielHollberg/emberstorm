@@ -69,7 +69,9 @@ object ServerDiscovery {
     private fun secureName(plain: String): String? {
         val body = get("$plain/api/session", 3000) ?: return null
         val name = runCatching { JSONObject(body).optString("secureName") }.getOrNull()?.lowercase() ?: return null
-        if (!Regex("^[a-z0-9][a-z0-9.-]*\\.soundstorm\\.dev$").matches(name)) return null
+        // One of the install's own names, under the zone it lives in now or
+        // the one from before the rename.
+        if (!Regex("^[a-z0-9][a-z0-9.-]*$").matches(name) || ServerAddress.zoneOf(name) == null) return null
         val secure = "https://$name:$PORT"
         return if (isEmberStorm(secure)) "$secure/" else null
     }
