@@ -77,6 +77,13 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	// The caretaker's own choices go back to their defaults; the version
 	// running is kept, being a fact about the box.
 	_ = os.Remove(filepath.Join(u.cfg.StateDir, "settings.json"))
+	// The drive is readied again as at boot: the models built into the box go
+	// back into the emptied caches (photo search, Make an ebook and read-along
+	// work with no internet), and the shelves and folders are as they should
+	// be. Without it they came back only at the next boot.
+	if err := u.run(ctx, u.cfg.Prepare); err != nil {
+		u.log.Error("could not ready the drive again", "err", err)
+	}
 
 	if err := u.run(ctx, u.cfg.Up); err != nil {
 		u.set(func(s *Status) {

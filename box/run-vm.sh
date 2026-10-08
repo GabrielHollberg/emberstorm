@@ -10,6 +10,18 @@
 # SoundStorm answers at http://localhost:8399, SSH (a DEV_SSH build) at
 # localhost port 2222, and the console is written to box/out/vm/console.log.
 #
+# The box has a USB controller, as the ME Mini does, and QEMU's monitor
+# listens on box/out/vm/monitor.sock - which is how a USB drive is plugged in
+# and pulled out, and the power button pressed:
+#
+#   echo 'drive_add 0 if=none,id=usb1,file=/root/usb.img,format=raw' | socat - UNIX:monitor.sock
+#   echo 'device_add usb-storage,bus=xhci.0,drive=usb1,id=stick1' | socat - UNIX:monitor.sock
+#   echo 'device_del stick1' | socat - UNIX:monitor.sock
+#   echo 'system_powerdown' | socat - UNIX:monitor.sock     (the power button)
+#
+# A VM made before the controller was added may stop at the UEFI shell, its
+# boot entry pointing at the old layout: delete box/out/vm/vars.fd.
+#
 # OFFLINE=1 cuts the VM off from the internet (the forwarded ports still
 # work): a box built with its images must start with no downloads at all.
 #
@@ -60,5 +72,7 @@ qemu-system-x86_64 \
 	-device nvme,drive=data,serial=SSDATA0001 \
 	-nic user,model=virtio-net-pci$restrict,hostfwd=tcp::8399-:8099,hostfwd=tcp::2222-:22 \
 	-display none -serial file:"$vm/console.log" \
+	-monitor unix:"$vm/monitor.sock",server,nowait \
+	-device qemu-xhci,id=xhci \
 	-daemonize -pidfile "$vm/qemu.pid"
 echo "Started. Console: box/out/vm/console.log  SoundStorm: http://localhost:8399"

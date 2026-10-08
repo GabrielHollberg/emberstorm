@@ -170,7 +170,7 @@ virt-customize -a "$disk" \
 	--run-command 'growpart /dev/sda 1 && resize2fs /dev/sda1' \
 	$copy_args \
 	--run-command 'chmod 755 /usr/local/lib/soundstorm/*.sh /usr/local/bin/soundstorm-caretaker' \
-	--run-command 'chmod 644 /etc/systemd/system/soundstorm*.service /etc/systemd/system/ssh-hostkeys.service' \
+	--run-command 'chmod 644 /etc/systemd/system/soundstorm*.service /etc/systemd/system/ssh-hostkeys.service /etc/udev/rules.d/90-soundstorm-usb.rules /etc/systemd/logind.conf.d/soundstorm-button.conf /etc/tmpfiles.d/soundstorm-drives.conf' \
 	--run-command 'docker compose version' \
 	--run-command 'systemctl enable docker soundstorm-grow soundstorm-storage soundstorm-images soundstorm soundstorm-caretaker soundstorm-screen ssh-hostkeys avahi-daemon' \
 	--run-command 'rm -f /etc/ssh/ssh_host_*' \

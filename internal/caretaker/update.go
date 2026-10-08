@@ -24,6 +24,10 @@ type Config struct {
 	ComposeDir string
 	// Up starts the stack (no arguments) and stops it ("stop").
 	Up string
+	// Prepare readies the data drive (box/rootfs/.../storage.sh): run again
+	// after a reset, so the models built into the box are laid back into the
+	// caches it emptied.
+	Prepare string
 	// StateDir is the caretaker's own: the running manifest, the last one.
 	StateDir string
 	// Volumes is the data drive's subvolume holding every data volume -
@@ -51,6 +55,7 @@ func (c Config) Defaults() Config {
 	}
 	set(&c.ComposeDir, "/opt/soundstorm")
 	set(&c.Up, "/usr/local/lib/soundstorm/up.sh")
+	set(&c.Prepare, "/usr/local/lib/soundstorm/storage.sh")
 	set(&c.StateDir, "/var/lib/soundstorm-caretaker")
 	set(&c.Volumes, "/srv/soundstorm/volumes")
 	set(&c.Cache, "/srv/soundstorm/cache")
