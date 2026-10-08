@@ -147,3 +147,22 @@ func TestTheButtonsResetIsOnlyFromHome(t *testing.T) {
 		}
 	}
 }
+
+// The request log never carries a secret that rode in an address.
+func TestSecretsInAddressesAreNotLogged(t *testing.T) {
+	for in, want := range map[string]string{
+		"/invite/AAAAAAAAAAAAAAAAAAAAAA":      "/invite/...",
+		"/api/invite/AAAAAAAAAAAAAAAAAAAAAA":  "/api/invite/...",
+		"/api/link/0123456789abcdef/qr.png":   "/api/link/.../qr.png",
+		"/api/link/code/KXT4PM":               "/api/link/code/...",
+		"/api/login/pending/0123456789abcdef": "/api/login/pending/...",
+		"/api/devices/pending/0123456789abcd": "/api/devices/pending/...",
+		"/link/KXT4PM":                        "/link/...",
+		"/api/search":                         "/api/search",
+		"/api/players/abcdef0123456789/next":  "/api/players/abcdef0123456789/next",
+	} {
+		if got := logPath(in); got != want {
+			t.Errorf("%s logged as %s, want %s", in, got, want)
+		}
+	}
+}

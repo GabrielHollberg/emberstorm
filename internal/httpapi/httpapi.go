@@ -66,6 +66,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/voices"
 	"github.com/GabrielHollberg/soundstorm/internal/webui"
 	"path/filepath"
+	"regexp"
 )
 
 // maxCredentialBody caps a login or signup body. Credentials are short; this
@@ -2652,11 +2653,21 @@ func (s *Server) withLogging(next http.Handler) http.Handler {
 		}
 		s.log.Log(r.Context(), level, "request",
 			"method", r.Method,
-			"path", r.URL.Path,
+			"path", logPath(r.URL.Path),
 			"status", rec.status,
 			"tookMs", time.Since(start).Milliseconds(),
 		)
 	})
+}
+
+// secretInPath is the addresses whose last part is a secret: an invitation's
+// token, a TV sign-in's codes and ids, a held sign-in's id. The log is read
+// by more than the owner - the Windows setup puts its last lines in the file
+// people are asked to send - so those parts never reach it.
+var secretInPath = regexp.MustCompile(`^(/invite/|/link/|/api/invite/|/api/login/pending/|/api/link/code/|/api/link/|/api/devices/pending/)[^/]+`)
+
+func logPath(p string) string {
+	return secretInPath.ReplaceAllString(p, "${1}...")
 }
 
 type statusRecorder struct {
