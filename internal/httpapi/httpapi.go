@@ -2852,6 +2852,19 @@ func sameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			// Reading needs no guard, but some reads start work - a film's
+			// conversion, a song heard, a voice's sample, the bin measured -
+			// and any other site's page could fire them through a visitor's
+			// browser; under the shared zone another install's page counts
+			// as the same site (the blind security review). The app's own
+			// pages are same-origin, and the phone apps' players send no
+			// such header.
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				if site := r.Header.Get("Sec-Fetch-Site"); site == "same-site" || site == "cross-site" {
+					writeError(w, http.StatusForbidden, "cross-site request refused")
+					return
+				}
+			}
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -2,6 +2,10 @@ package caretaker
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"fmt"
+	"math/big"
 	"errors"
 	"os"
 	"path/filepath"
@@ -147,7 +151,17 @@ const ButtonWindow = 15 * time.Minute
 type presses struct {
 	mu    sync.Mutex
 	until time.Time
+	// code is shown on the box's own screen while the window is open, and a
+	// new password needs it: being on the home network is not being at the
+	// box (a guest's laptop could have set it first), and the box's screen is
+	// somewhere only somebody there can read (the blind security review).
+	code  string
+	wrong int
 }
+
+// maxWrongCodes closes the window: a code of six digits is not guessed
+// before it shuts.
+const maxWrongCodes = 5
 
 func (u *Updater) buttonOpen() (bool, time.Time) {
 	u.button.mu.Lock()
@@ -155,10 +169,49 @@ func (u *Updater) buttonOpen() (bool, time.Time) {
 	return time.Now().Before(u.button.until), u.button.until
 }
 
+// buttonCode is the code to show on the box's screen, while the window is open.
+func (u *Updater) buttonCode() string {
+	u.button.mu.Lock()
+	defer u.button.mu.Unlock()
+	if !time.Now().Before(u.button.until) {
+		return ""
+	}
+	return u.button.code
+}
+
+// claimButton closes the window if code is the one on the screen, in one
+// step: two asks at once cannot both have it. A wrong code counts, and the
+// fifth closes the window too.
+func (u *Updater) claimButton(code string) bool {
+	u.button.mu.Lock()
+	defer u.button.mu.Unlock()
+	if !time.Now().Before(u.button.until) || u.button.code == "" {
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(code), []byte(u.button.code)) != 1 {
+		u.button.wrong++
+		if u.button.wrong >= maxWrongCodes {
+			u.button.until, u.button.code = time.Time{}, ""
+		}
+		return false
+	}
+	u.button.until, u.button.code = time.Time{}, ""
+	return true
+}
+
 func (u *Updater) closeButton() {
 	u.button.mu.Lock()
-	u.button.until = time.Time{}
+	u.button.until, u.button.code = time.Time{}, ""
 	u.button.mu.Unlock()
+}
+
+// sixDigits is a code to read off a screen and type.
+func sixDigits() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%06d", n.Int64())
 }
 
 // Pressed is a run of presses of the power button, counted once it ends.
@@ -167,6 +220,7 @@ func (u *Updater) Pressed(ctx context.Context, n int) {
 	case n >= 5:
 		u.button.mu.Lock()
 		u.button.until = time.Now().Add(ButtonWindow)
+		u.button.code, u.button.wrong = sixDigits(), 0
 		u.button.mu.Unlock()
 		u.log.Warn("the power button was pressed five times: the owner's password can be set for 15 minutes")
 	case n == 1:

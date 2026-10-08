@@ -278,11 +278,20 @@ var cgnat = netip.MustParsePrefix("100.64.0.0/10")
 // a Plex address there would reach whatever listens only on the host itself.
 var dockerDesktop = netip.MustParsePrefix("192.168.65.0/24")
 
+// dockerBridges is the range Docker gives its own networks (172.17.0.0/16
+// for the default bridge, the rest for compose's): the host answers on each
+// one's gateway - 172.17.0.1 - though this container is on none of them, so
+// localNetworks cannot see it (the twelfth security pass). A home network in
+// this range is rare enough to give up; Plex there is still reached by its
+// plex.direct name through the relay.
+var dockerBridges = netip.MustParsePrefix("172.16.0.0/12")
+
 // DialAllowed is the rule dialGuard applies, given the networks this machine
 // is on.
 func DialAllowed(ip netip.Addr, local []netip.Prefix) bool {
 	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsUnspecified() || ip.IsMulticast() || cgnat.Contains(ip) || dockerDesktop.Contains(ip) {
+		ip.IsUnspecified() || ip.IsMulticast() || cgnat.Contains(ip) || dockerDesktop.Contains(ip) ||
+		dockerBridges.Contains(ip) {
 		return false
 	}
 	for _, p := range local {

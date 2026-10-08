@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"math/rand/v2"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/GabrielHollberg/soundstorm/internal/collections"
 	"github.com/GabrielHollberg/soundstorm/internal/discover"
 	"github.com/GabrielHollberg/soundstorm/internal/media"
 	"github.com/GabrielHollberg/soundstorm/internal/source"
-	"strings"
 )
 
 // Music discovery: an artist's bio and the artists like them, from
@@ -112,7 +113,7 @@ func (s *Server) handleArtistAbout(w http.ResponseWriter, r *http.Request) {
 		similar = []source.Artist{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"enabled": true, "found": found, "bio": info.Bio, "bioUrl": info.BioURL, "similar": similar,
+		"enabled": true, "found": found, "bio": info.Bio, "bioUrl": wikipediaPage(info.BioURL), "similar": similar,
 	})
 }
 
@@ -240,4 +241,21 @@ func (s *Server) lookUpLater(name string) {
 	if _, _, err := s.discover.Artist(ctx, name); err != nil {
 		s.log.Debug("music discovery in the background", "err", err)
 	}
+}
+
+// wikipediaPage is a link to a Wikipedia article, or nothing: the address
+// is what an outside service answered (and is kept on disk), and the page
+// makes a link of it - so the server checks it too, not only the page (the
+// twelfth security pass).
+func wikipediaPage(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	lang, ok := strings.CutSuffix(host, ".wikipedia.org")
+	if !ok || lang == "" || strings.Trim(lang, "abcdefghijklmnopqrstuvwxyz-") != "" {
+		return ""
+	}
+	return u.String()
 }

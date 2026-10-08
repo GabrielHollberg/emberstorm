@@ -23,8 +23,21 @@ func PersonalFolder(name string) string {
 }
 
 // EnsurePersonalFolder makes a person's photo folder if it is not there yet,
-// and returns it relative to pictures/.
+// and returns it relative to pictures/ - once BeforePersonal, when set, has
+// said photos may be put there (main: the owner's photo library leaves the
+// folder out). Everything that puts photos in somebody's folder asks it.
 func (l *Library) EnsurePersonalFolder(name string) (string, error) {
+	rel := PersonalFolder(name)
+	if l.BeforePersonal != nil {
+		if err := l.BeforePersonal(rel); err != nil {
+			return "", err
+		}
+	}
+	return l.MakePersonalFolder(name)
+}
+
+// MakePersonalFolder is EnsurePersonalFolder without asking BeforePersonal.
+func (l *Library) MakePersonalFolder(name string) (string, error) {
 	rel := PersonalFolder(name)
 	return rel, ensureDir(filepath.Join(l.PathFor(media.KindPicture), filepath.FromSlash(rel)))
 }

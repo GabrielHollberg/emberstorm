@@ -257,6 +257,12 @@ func (s *Source) scan(ctx context.Context) error {
 		if !s.formats[formatOf(d.Name())] {
 			return nil
 		}
+		// A link is not followed: one named like a book could point anywhere
+		// on the server, and the shelf would then serve that file (the
+		// twelfth security pass).
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
 
 		info, err := d.Info()
 		if err != nil {
@@ -449,7 +455,7 @@ func (s *Source) findSidecarCover(b *book) {
 		stem + ".jpg", stem + ".jpeg", stem + ".png",
 	} {
 		candidate := filepath.Join(dir, name)
-		if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
+		if st, err := os.Lstat(candidate); err == nil && st.Mode().IsRegular() {
 			b.Cover.SidecarPath = candidate
 			return
 		}

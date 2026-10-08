@@ -188,7 +188,16 @@ func (t *TakeoutIndex) Lookup(entry string) (Meta, bool) {
 // keyed by the photo's file name.
 type ICloudIndex struct {
 	taken map[string]time.Time
+	read  int64 // bytes of details read, against maxICloudBytes
 }
+
+// A download's details are a line a photo: these are far past any real
+// library, and stop a crafted one filling memory a file at a time (the blind
+// security review).
+const (
+	maxICloudBytes = 256 << 20
+	maxICloudRows  = 2_000_000
+)
 
 func NewICloudIndex() *ICloudIndex { return &ICloudIndex{taken: map[string]time.Time{}} }
 
@@ -207,7 +216,12 @@ var iCloudDate = []string{
 
 // AddCSV reads one details file.
 func (c *ICloudIndex) AddCSV(r io.Reader) {
-	cr := csv.NewReader(io.LimitReader(r, 64<<20))
+	if c.read >= maxICloudBytes || len(c.taken) >= maxICloudRows {
+		return
+	}
+	counted := &countingReader{r: io.LimitReader(r, min(64<<20, maxICloudBytes-c.read))}
+	defer func() { c.read += counted.n }()
+	cr := csv.NewReader(counted)
 	cr.FieldsPerRecord = -1
 	cr.LazyQuotes = true
 	head, err := cr.Read()
@@ -226,7 +240,7 @@ func (c *ICloudIndex) AddCSV(r io.Reader) {
 	if nameCol < 0 || dateCol < 0 {
 		return
 	}
-	for {
+	for len(c.taken) < maxICloudRows {
 		row, err := cr.Read()
 		if err == io.EOF {
 			return

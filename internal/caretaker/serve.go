@@ -42,8 +42,9 @@ func (u *Updater) saveSettings(s Settings) error {
 //	GET  /settings          {"auto": true}
 //	PUT  /settings          change it
 //	POST /reset             {"mode": "start-over"|"erase"} (reset.go)
-//	GET  /button            {"open": true, "until": ...} after five presses
-//	POST /button/used       the owner's password was set: closed again
+//	GET  /button            {"open": true, "until": ..., "code": ...} after five presses
+//	POST /button/claim      {"code"}: the code on the box's screen, closing the window
+//	POST /button/used       closed again
 //
 // EmberStorm decides who may press these (the owner); the caretaker trusts
 // whoever reaches the socket, which is why nothing else is ever given it.
@@ -120,8 +121,20 @@ func (u *Updater) Handler() http.Handler {
 		out := map[string]any{"open": open}
 		if open {
 			out["until"] = until
+			out["code"] = u.buttonCode()
 		}
 		reply(w, out)
+	})
+	mux.HandleFunc("POST /button/claim", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Code string `json:"code"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body); err != nil || !u.claimButton(body.Code) {
+			w.WriteHeader(http.StatusForbidden)
+			reply(w, map[string]any{"claimed": false})
+			return
+		}
+		reply(w, map[string]any{"claimed": true})
 	})
 	mux.HandleFunc("POST /button/used", func(w http.ResponseWriter, r *http.Request) {
 		u.closeButton()

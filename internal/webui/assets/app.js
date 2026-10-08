@@ -663,7 +663,7 @@ function showGate(hasAccount, setupCodeRequired) {
       if (!ok || !body || $('gate-form').dataset.mode !== 'login') return;
       show($('gate-button-hint'), Boolean(body.box) && !body.open);
       if (body.open) {
-        $('gate-button-text').textContent = `The power button on the box was pressed. Choose a new password for ${body.owner}:`;
+        $('gate-button-text').textContent = `The power button on the box was pressed. Choose a new password for ${body.owner}, with the code a screen plugged into the box shows:`;
         show($('gate-button'), true);
       }
     });
@@ -905,7 +905,7 @@ async function showInvite() {
 // The owner's new password, after the box's button was pressed five times.
 $('gate-button-save').addEventListener('click', async () => {
   const { ok, body } = await api('/api/reset/owner-password', {
-    method: 'POST', body: JSON.stringify({ password: $('gate-button-password').value }),
+    method: 'POST', body: JSON.stringify({ password: $('gate-button-password').value, code: $('gate-button-code').value }),
   });
   const err = $('gate-error');
   if (!ok) {
@@ -914,6 +914,7 @@ $('gate-button-save').addEventListener('click', async () => {
     return;
   }
   $('gate-button-password').value = '';
+  $('gate-button-code').value = '';
   show($('gate-button'), false);
   show(err, false);
   $('gate-username').value = body.owner || '';

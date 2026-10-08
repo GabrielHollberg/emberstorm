@@ -29,7 +29,7 @@ func TestCrossSiteWritesAreRefused(t *testing.T) {
 		{"POST", map[string]string{"Sec-Fetch-Site": "same-origin"}, 204},
 		{"POST", map[string]string{"Origin": "http://mine.example:8099"}, 204},
 		{"POST", nil, 204}, // not a browser page
-		{"GET", map[string]string{"Sec-Fetch-Site": "cross-site"}, 204}, // reads are not writes
+		{"GET", map[string]string{"Sec-Fetch-Site": "cross-site"}, 403}, // some reads start work
 	}
 	for _, c := range cases {
 		r := httptest.NewRequest(c.method, "http://mine.example:8099/api/users", nil)

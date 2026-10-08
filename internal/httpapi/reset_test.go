@@ -40,11 +40,17 @@ func startCaretaker(t *testing.T) *fakeCaretaker {
 		defer c.mu.Unlock()
 		json.NewEncoder(w).Encode(map[string]bool{"open": c.open})
 	})
-	mux.HandleFunc("POST /button/used", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /button/claim", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Code string }
+		json.NewDecoder(r.Body).Decode(&body)
 		c.mu.Lock()
+		defer c.mu.Unlock()
+		if !c.open || body.Code != "123456" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		c.open = false
-		c.asked = append(c.asked, "used")
-		c.mu.Unlock()
+		c.asked = append(c.asked, "claimed")
 	})
 	mux.HandleFunc("POST /reset", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Mode string }
@@ -71,19 +77,23 @@ func TestTheBoxButtonSetsTheOwnersPassword(t *testing.T) {
 	h.signUp(t)
 	stranger := h.another(t)
 
-	if resp, _ := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"violet tractor glacier"}`); resp.StatusCode != http.StatusForbidden {
+	if resp, _ := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"violet tractor glacier","code":"123456"}`); resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("set without the button: %d", resp.StatusCode)
 	}
 	c.mu.Lock()
 	c.open = true
 	c.mu.Unlock()
-	if _, body := stranger.do(t, http.MethodGet, "/api/reset/button", ""); !strings.Contains(string(body), `"owner": "gabe"`) {
+	if _, body := stranger.do(t, http.MethodGet, "/api/reset/button", ""); !strings.Contains(string(body), `"owner": "gabe"`) || strings.Contains(string(body), "123456") {
 		t.Fatalf("the button's window: %s", body)
 	}
-	if resp, _ := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"short"}`); resp.StatusCode != http.StatusBadRequest {
+	if resp, _ := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"short","code":"123456"}`); resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("a weak password was taken: %d", resp.StatusCode)
 	}
-	if resp, body := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"violet tractor glacier"}`); resp.StatusCode != http.StatusOK {
+	// Somebody on the home network who is not at the box has no code.
+	if resp, _ := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"violet tractor glacier","code":"654321"}`); resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("set without the code on the box's screen: %d", resp.StatusCode)
+	}
+	if resp, body := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"violet tractor glacier","code":"123 456"}`); resp.StatusCode != http.StatusOK {
 		t.Fatalf("setting it: %d %s", resp.StatusCode, body)
 	}
 	if resp, _ := h.do(t, http.MethodGet, "/api/favorites", ""); resp.StatusCode != http.StatusUnauthorized {
@@ -92,7 +102,7 @@ func TestTheBoxButtonSetsTheOwnersPassword(t *testing.T) {
 	if status, _ := signInAs(t, h.another(t), "gabe", "violet tractor glacier"); status != http.StatusOK {
 		t.Fatalf("the new password: %d", status)
 	}
-	if resp, _ := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"another long passphrase"}`); resp.StatusCode != http.StatusForbidden {
+	if resp, _ := stranger.do(t, http.MethodPost, "/api/reset/owner-password", `{"password":"another long passphrase","code":"123456"}`); resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("the window was used twice: %d", resp.StatusCode)
 	}
 }
@@ -163,6 +173,35 @@ func TestSecretsInAddressesAreNotLogged(t *testing.T) {
 	} {
 		if got := logPath(in); got != want {
 			t.Errorf("%s logged as %s, want %s", in, got, want)
+		}
+	}
+}
+
+// Another site's page cannot start work on this server through a visitor's
+// browser, reading or writing; the app's own pages, and players that say
+// nothing, can.
+func TestOtherSitesCannotStartWorkByReading(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	h := sameOrigin(ok)
+	for _, c := range []struct {
+		path, site string
+		want       int
+	}{
+		{"/api/hls/jellyfin/x/master.m3u8", "cross-site", http.StatusForbidden},
+		{"/api/music/beats", "same-site", http.StatusForbidden},
+		{"/api/music/beats", "same-origin", http.StatusOK},
+		{"/api/stream/navidrome/1", "", http.StatusOK},
+		{"/api/search", "none", http.StatusOK},
+		{"/invite/abc", "cross-site", http.StatusOK},
+	} {
+		r := httptest.NewRequest(http.MethodGet, c.path, nil)
+		if c.site != "" {
+			r.Header.Set("Sec-Fetch-Site", c.site)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != c.want {
+			t.Errorf("%s from %q: %d, want %d", c.path, c.site, w.Code, c.want)
 		}
 	}
 }

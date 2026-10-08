@@ -7,11 +7,12 @@
 # "what does the box's screen say?" is a question support can ask.
 #
 # Run by soundstorm-screen.service on tty1, in place of the login prompt,
-# and redrawn when anything on it changes (checked every 10 seconds).
+# and redrawn when anything on it changes (checked every few seconds).
 set -u
 
 env=/opt/soundstorm/.env
 port=8099
+caretaker=/run/soundstorm-caretaker/caretaker.sock
 
 # Big letters, where the font is there (console-setup-linux), and no kernel
 # messages written over the screen.
@@ -86,8 +87,19 @@ draw() {
 			printf '      http://%s\n' "$local_name"
 			[ -n "$ip" ] && printf '   or http://%s\n' "$ip"
 		fi
-		printf '\n   Forgot the password? Press the power button on the box\n'
-		printf '   five times quickly, then choose a new one on the sign-in screen.\n'
+		# The power button pressed five times: the code a new password
+		# needs, shown here only - somebody at the box is who may set it.
+		button=$(curl -fsS -m 3 --unix-socket "$caretaker" http://caretaker/button 2>/dev/null || true)
+		bcode=$(field "$button" code)
+		if [ -n "$bcode" ]; then
+			printf '\n   The power button was pressed. To choose a new password,\n'
+			printf '   open the sign-in screen and type this code:\n\n'
+			printf '      %s %s\n\n' "$(printf %s "$bcode" | cut -c1-3)" "$(printf %s "$bcode" | cut -c4-6)"
+			printf '   It works once, for fifteen minutes.\n'
+		else
+			printf '\n   Forgot the password? Press the power button on the box\n'
+			printf '   five times quickly, then choose a new one on the sign-in screen.\n'
+		fi
 		;;
 	esac
 }
@@ -101,5 +113,6 @@ while :; do
 		printf '%s\n' "$now"
 		last=$now
 	fi
-	sleep 10
+	# Every few seconds, so a button code shows soon after the presses.
+	sleep 3
 done

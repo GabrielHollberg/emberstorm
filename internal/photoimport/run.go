@@ -52,6 +52,9 @@ func (e ErrNoRoom) Error() string { return e.Err.Error() }
 // goes and stopping early if stop says so. Albums and their duplicates
 // (Takeout copies a photo into every album it is in) become one file each.
 func Run(zipPath string, t Target, progress func(Progress), stop func() bool) (Progress, error) {
+	if err := preflight(zipPath); err != nil {
+		return Progress{}, err
+	}
 	zr, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return Progress{}, fmt.Errorf("not a zip that can be opened: %w", err)

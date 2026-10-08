@@ -42,6 +42,17 @@ type bookHLS struct {
 	// Where a book's files are, by source/item, so a fragment does not ask
 	// the backend each time.
 	files map[string]filesEntry
+	// Books being opened now, by key, so twenty asks for one book read its
+	// index once; and at most two read at a time - a long book's index is
+	// hundreds of megabytes while it is read (the blind security review).
+	opening map[string]*bookOpening
+	slots   chan struct{}
+}
+
+type bookOpening struct {
+	done chan struct{}
+	ob   *openBook
+	err  error
 }
 
 type openBook struct {
@@ -157,9 +168,30 @@ func (s *Server) openHLS(path string) (*openBook, error) {
 			return ob, nil
 		}
 	}
+	if wait, ok := s.bookHLS.opening[key]; ok {
+		s.bookHLS.mu.Unlock()
+		<-wait.done
+		return wait.ob, wait.err
+	}
+	if s.bookHLS.opening == nil {
+		s.bookHLS.opening = map[string]*bookOpening{}
+		s.bookHLS.slots = make(chan struct{}, 2)
+	}
+	call := &bookOpening{done: make(chan struct{})}
+	s.bookHLS.opening[key] = call
+	slots := s.bookHLS.slots
 	s.bookHLS.mu.Unlock()
+	defer func() {
+		s.bookHLS.mu.Lock()
+		delete(s.bookHLS.opening, key)
+		s.bookHLS.mu.Unlock()
+		close(call.done)
+	}()
+	slots <- struct{}{}
 	b, err := mp4hls.Open(path)
+	<-slots
 	if err != nil {
+		call.err = err
 		return nil, err
 	}
 	var gz bytes.Buffer
@@ -173,6 +205,7 @@ func (s *Server) openHLS(path string) (*openBook, error) {
 		s.bookHLS.open = s.bookHLS.open[len(s.bookHLS.open)-bookHLSOpen:]
 	}
 	s.bookHLS.mu.Unlock()
+	call.ob = ob
 	return ob, nil
 }
 

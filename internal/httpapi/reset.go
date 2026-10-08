@@ -102,9 +102,27 @@ func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request
 	}
 	var body struct {
 		Password string `json:"password"`
+		Code     string `json:"code"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "expected a JSON body with password")
+		writeError(w, http.StatusBadRequest, "expected a JSON body with password and code")
+		return
+	}
+	if err := s.auth.OwnerPasswordProblem(body.Password); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// The code on the box's own screen, checked and the window closed in
+	// one step by the caretaker: only somebody at the box can read it, and
+	// only one ask can have it.
+	code := strings.Map(func(c rune) rune {
+		if c >= '0' && c <= '9' {
+			return c
+		}
+		return -1
+	}, body.Code)
+	if status, err := s.caretakerCall(r.Context(), http.MethodPost, "/button/claim", map[string]string{"code": code}, nil); err != nil || status != http.StatusOK {
+		writeError(w, http.StatusForbidden, "That is not the code on the box's screen.")
 		return
 	}
 	owner, err := s.auth.SetOwnerPassword(body.Password)
@@ -112,7 +130,6 @@ func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	_, _ = s.caretakerCall(r.Context(), http.MethodPost, "/button/used", nil, nil)
 	s.log.Warn("the owner's password was set from the box's button", "owner", owner.Name, "remote", r.RemoteAddr)
 	writeJSON(w, http.StatusOK, map[string]any{"owner": owner.Name})
 }

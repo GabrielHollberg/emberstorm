@@ -96,9 +96,21 @@ func (s *Server) handleRecordPlay(w http.ResponseWriter, r *http.Request) {
 // for long) and reading positions (each rewrites state.json, under the lock
 // every request takes).
 type allowance struct {
-	mu   sync.Mutex
-	left map[string]playBucket
+	mu     sync.Mutex
+	left   map[string]playBucket
+	pruned time.Time
 }
+
+// allowanceKeep is how many buckets an allowance holds before it forgets
+// the full ones - those are exactly as if never asked - and allowanceMost
+// the most it holds at all: some are keyed by address, and a table nothing
+// ever emptied grew with every address that asked (the twelfth security
+// pass). Past the most, somebody new waits until room is made: only a flood
+// of addresses gets there, and letting it in would reset everybody's limits.
+const (
+	allowanceKeep = 1024
+	allowanceMost = 100_000
+)
 
 type playBucket struct {
 	tokens float64
@@ -120,6 +132,18 @@ func (p *allowance) allow(userID string, now time.Time, burst float64, every tim
 	}
 	b, ok := p.left[userID]
 	if !ok {
+		if len(p.left) >= allowanceKeep && now.Sub(p.pruned) >= time.Minute {
+			p.pruned = now
+			full := time.Duration(burst) * every
+			for k, old := range p.left {
+				if now.Sub(old.at) >= full {
+					delete(p.left, k)
+				}
+			}
+		}
+		if len(p.left) >= allowanceMost {
+			return false
+		}
 		b = playBucket{tokens: burst, at: now}
 	}
 	b.tokens = min(burst, b.tokens+now.Sub(b.at).Seconds()/every.Seconds())

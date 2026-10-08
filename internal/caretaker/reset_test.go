@@ -86,9 +86,29 @@ func TestThePowerButtonCountsRuns(t *testing.T) {
 	if open, _ := b.u.buttonOpen(); !open {
 		t.Fatal("five presses did not open the owner's password")
 	}
-	b.u.closeButton()
-	if open, _ := b.u.buttonOpen(); open {
+	code := b.u.buttonCode()
+	if len(code) != 6 {
+		t.Fatalf("the code for the box's screen: %q", code)
+	}
+	wrong := "000000"
+	if code == wrong {
+		wrong = "111111"
+	}
+	if b.u.claimButton(wrong) {
+		t.Fatal("a wrong code was taken")
+	}
+	if !b.u.claimButton(code) {
+		t.Fatal("the right code was refused")
+	}
+	if open, _ := b.u.buttonOpen(); open || b.u.claimButton(code) {
 		t.Fatal("still open after it was used")
+	}
+	b.u.Pressed(ctx, 5)
+	for range maxWrongCodes {
+		b.u.claimButton("guess")
+	}
+	if open, _ := b.u.buttonOpen(); open {
+		t.Fatal("guessing did not close the window")
 	}
 	b.u.Pressed(ctx, 1)
 	b.mu.Lock()

@@ -346,3 +346,28 @@ func TestSnapchatAndTelegram(t *testing.T) {
 		}
 	}
 }
+
+// A zip claiming a million entries is refused from the few bytes at its end,
+// before its whole directory is read into memory.
+func TestAZipOfMillionsOfEntriesIsRefusedFirst(t *testing.T) {
+	end := make([]byte, 22)
+	binary.LittleEndian.PutUint32(end, 0x06054b50)
+	binary.LittleEndian.PutUint16(end[8:], 0xFFFF)
+	binary.LittleEndian.PutUint16(end[10:], 0xFFFF)
+	binary.LittleEndian.PutUint32(end[12:], 0xFFFFFFFF)
+	binary.LittleEndian.PutUint32(end[16:], 0xFFFFFFFF)
+	rec := make([]byte, 56)
+	binary.LittleEndian.PutUint32(rec, 0x06064b50)
+	binary.LittleEndian.PutUint64(rec[32:], 1_000_000)
+	binary.LittleEndian.PutUint64(rec[40:], 50<<20)
+	loc := make([]byte, 20)
+	binary.LittleEndian.PutUint32(loc, 0x07064b50)
+	binary.LittleEndian.PutUint64(loc[8:], 0)
+	p := filepath.Join(t.TempDir(), "big.zip")
+	if err := os.WriteFile(p, append(append(rec, loc...), end...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := preflight(p); err != ErrImplausible {
+		t.Fatalf("preflight = %v", err)
+	}
+}

@@ -151,6 +151,17 @@ func (m *Manager) VerifyOwnPassword(ctx context.Context, client string, actor st
 // SetOwnerPassword sets the owner's password without the old one - only for
 // the box's power button pressed five times (httpapi/reset.go), which proves
 // somebody is at the box - and signs the owner out everywhere.
+// OwnerPasswordProblem is why password would be refused as the owner's, or
+// nil: asked before the box's window is used up on a password too weak.
+func (m *Manager) OwnerPasswordProblem(password string) error {
+	for _, u := range m.store.Users() {
+		if u.IsOwner() {
+			return checkPassword(password, u.Name)
+		}
+	}
+	return ErrInvalidCredentials
+}
+
 func (m *Manager) SetOwnerPassword(password string) (state.User, error) {
 	for _, u := range m.store.Users() {
 		if !u.IsOwner() {

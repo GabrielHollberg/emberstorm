@@ -56,3 +56,27 @@ func TestAFolderCannotServeAKindItCannotRead(t *testing.T) {
 		t.Error("a book folder agreed to serve video")
 	}
 }
+
+// A link named like a book is not a book: it could point anywhere on the
+// server.
+func TestALinkIsNotFollowed(t *testing.T) {
+	root, outside := t.TempDir(), t.TempDir()
+	secret := filepath.Join(outside, "secret.pdf")
+	os.WriteFile(secret, []byte("%PDF-1.4\n%%EOF\n"), 0o644)
+	if err := os.Symlink(secret, filepath.Join(root, "Taxes.pdf")); err != nil {
+		t.Skip("no symlinks here:", err)
+	}
+	os.WriteFile(filepath.Join(root, "Real.pdf"), []byte("%PDF-1.4\n%%EOF\n"), 0o644)
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	s, err := New(Config{ID: "documents", Root: root, Kind: media.KindDocument, Log: quiet})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	items, _ := s.Search(context.Background(), media.Query{Limit: 50})
+	if len(items) != 1 {
+		t.Fatalf("listed %d, want only the real file", len(items))
+	}
+}

@@ -2,12 +2,14 @@ package provision
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/GabrielHollberg/soundstorm/internal/httpx"
 )
@@ -53,6 +55,15 @@ func (m *Manager) SyncPhotoPrivacy(ctx context.Context) {
 	if owner == "" {
 		return // no owner yet: nothing to keep from them
 	}
+	allDone, anyLib := true, false
+	defer func() {
+		m.privacy.mu.Lock()
+		defer m.privacy.mu.Unlock()
+		m.privacy.owner, m.privacy.none = owner, !anyLib
+		if allDone {
+			m.privacy.left = others
+		}
+	}()
 	for _, t := range m.targets {
 		if t.Type != "immich" || t.MediaPath == "" {
 			continue
@@ -61,6 +72,7 @@ func (m *Manager) SyncPhotoPrivacy(ctx context.Context) {
 		if !ok || creds.LibraryID == "" {
 			continue
 		}
+		anyLib = true
 		var want []string
 		for f := range others {
 			want = append(want, path.Join(t.MediaPath, globEscape(f))+"/**")
@@ -69,6 +81,7 @@ func (m *Manager) SyncPhotoPrivacy(ctx context.Context) {
 		changed, err := setExclusions(ctx, creds.BaseURL, creds.Token, creds.LibraryID, t.MediaPath, want)
 		if err != nil {
 			m.log.Warn("could not keep others' photos out of the owner's library", "backend", t.ID, "err", err)
+			allDone = false
 			continue
 		}
 		if changed {
@@ -147,4 +160,48 @@ func globEscape(s string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+// photoPrivacy is what the last SyncPhotoPrivacy found and did.
+type photoPrivacy struct {
+	mu    sync.Mutex
+	owner string          // the owner's own folder
+	left  map[string]bool // folders every photo library leaves out
+	none  bool            // no photo library set up yet: nothing to leave out of
+	// syncing makes the asks of PhotoFolderPrivate wait on one sync.
+	syncing sync.Mutex
+}
+
+// PhotoFolderPrivate is nil once the owner's photo library is known to
+// leave out folder (relative to pictures/), or folder is the owner's own -
+// else it brings the library up to date, and refuses if that fails. Asked
+// before anything is put in somebody's own folder, so a photo library that
+// could not be told (down, or refusing) holds a member's photos back rather
+// than showing them in the owner's app until the next try (the twelfth
+// security pass).
+func (m *Manager) PhotoFolderPrivate(ctx context.Context, folder string) error {
+	if m.privateKnown(folder) {
+		return nil
+	}
+	m.privacy.syncing.Lock()
+	defer m.privacy.syncing.Unlock()
+	if m.privateKnown(folder) {
+		return nil
+	}
+	m.SyncPhotoPrivacy(ctx)
+	if m.privateKnown(folder) {
+		return nil
+	}
+	return errors.New("the photo library is not ready for new photos yet; try again in a few minutes")
+}
+
+func (m *Manager) privateKnown(folder string) bool {
+	m.privacy.mu.Lock()
+	defer m.privacy.mu.Unlock()
+	if m.privacy.owner == "" {
+		// Not synced since start, or nobody owns the server yet: until a
+		// sync, only the case with no owner at all is answered here.
+		return len(m.store.Users()) == 0 || m.PhotoFolder == nil
+	}
+	return m.privacy.none || strings.EqualFold(folder, m.privacy.owner) || m.privacy.left[folder]
 }

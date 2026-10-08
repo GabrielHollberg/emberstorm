@@ -268,7 +268,14 @@ func run(log *slog.Logger) error {
 		if !ok {
 			return "", fmt.Errorf("no such account")
 		}
-		return lib.EnsurePersonalFolder(u.Name)
+		return lib.MakePersonalFolder(u.Name)
+	}
+	// Nothing goes in somebody's own folder until the owner's photo library
+	// is known to leave it out.
+	lib.BeforePersonal = func(rel string) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return setup.PhotoFolderPrivate(ctx, rel)
 	}
 	setup.PersonalFolders = func() []string {
 		entries, err := os.ReadDir(filepath.Join(lib.PathFor(media.KindPicture), library.PersonalDir))

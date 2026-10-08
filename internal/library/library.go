@@ -217,6 +217,11 @@ type Library struct {
 	hint string
 	log  *slog.Logger
 
+	// BeforePersonal, when set, is asked before photos go into a person's
+	// own folder (EnsurePersonalFolder), with the folder relative to
+	// pictures/. Set once by main, before serving.
+	BeforePersonal func(rel string) error
+
 	mu        sync.Mutex
 	cached    []Folder
 	countedAt time.Time
