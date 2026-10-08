@@ -166,13 +166,13 @@ qemu-img resize -q "$disk" "$SIZE"
 # shellcheck disable=SC2086
 virt-customize -a "$disk" \
 	--hostname soundstorm \
-	--install docker.io,docker-compose,btrfs-progs,cloud-guest-utils,avahi-daemon,openssh-server,curl \
+	--install docker.io,docker-compose,btrfs-progs,cloud-guest-utils,avahi-daemon,openssh-server,curl,qrencode,kbd,console-setup-linux \
 	--run-command 'growpart /dev/sda 1 && resize2fs /dev/sda1' \
 	$copy_args \
 	--run-command 'chmod 755 /usr/local/lib/soundstorm/*.sh /usr/local/bin/soundstorm-caretaker' \
 	--run-command 'chmod 644 /etc/systemd/system/soundstorm*.service /etc/systemd/system/ssh-hostkeys.service' \
 	--run-command 'docker compose version' \
-	--run-command 'systemctl enable docker soundstorm-grow soundstorm-storage soundstorm-images soundstorm soundstorm-caretaker ssh-hostkeys avahi-daemon' \
+	--run-command 'systemctl enable docker soundstorm-grow soundstorm-storage soundstorm-images soundstorm soundstorm-caretaker soundstorm-screen ssh-hostkeys avahi-daemon' \
 	--run-command 'rm -f /etc/ssh/ssh_host_*' \
 	$ssh_args \
 	--truncate /etc/machine-id

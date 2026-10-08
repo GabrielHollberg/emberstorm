@@ -1,0 +1,18 @@
+[Unit]
+Description=EmberStorm on the box's own screen
+# The screen is the box's, in place of a login prompt nobody should need.
+Conflicts=getty@tty1.service
+After=systemd-user-sessions.service getty@tty1.service
+
+[Service]
+ExecStart=/usr/local/lib/soundstorm/screen.sh
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
