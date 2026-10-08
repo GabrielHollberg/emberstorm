@@ -26,7 +26,7 @@
 
 EmberStorm™ turns a computer at home into your own streaming service. Put your
 files in its folders, or drag them onto the window, and they appear, sorted,
-with covers, ready to play on every phone, tablet, TV and computer in the
+with covers, ready to play on the phones, tablets, TVs and computers in the
 house. There are no subscriptions, no adverts and no accounts with anybody
 but yourself, and nothing to set up by hand.
 
@@ -47,8 +47,8 @@ but yourself, and nothing to set up by hand.
   [ListenBrainz](https://listenbrainz.org) scrobbling.
 
 **Films and TV**
-- Plays anything, including files a browser normally can't. They are converted
-  as they play.
+- Plays nearly any video file, including ones a browser normally can't: they
+  are converted as they play.
 - Subtitles, a choice of audio languages, **Continue watching**, and **Up next**
   into the next episode.
 - **Picture quality** per device: the original at home, lighter away from home
@@ -114,7 +114,7 @@ but yourself, and nothing to set up by hand.
 | | |
 | --- | --- |
 | **Computer** | Windows 10 or 11, a Mac, or Linux, left switched on while you use it |
-| **Memory** | 16 GB recommended; 8 GB works if you leave photos out (photo search alone wants several GB) |
+| **Memory** | 16 GB recommended (it runs several media servers; photo search alone wants several GB) |
 | **Disk** | About 20 GB for EmberStorm itself, plus room for your media |
 | **Internet** | For the first install (a large download); afterwards it runs at home |
 
@@ -138,9 +138,9 @@ downloading, and keep the window open until it says it's finished. Along the way
 
 - **Windows asks for permission** to install Docker (the engine EmberStorm runs
   on) and sometimes Windows Subsystem for Linux. Click **Yes**. The setup
-  answers Docker's own first questions for you, so there is nothing to click in
-  Docker and no Docker account. (If you already had Docker installed but never
-  opened it, it asks you to accept its terms once: click **Accept**.)
+  answers Docker's own first questions for you; if a Docker window appears
+  anyway, click **Accept** for its terms and **Skip** for anything else. No
+  Docker account is needed.
 - **You choose where to keep your library.** Keep the suggested folder, or pick
   one on another drive.
 - **"Windows Security Alert"** for Docker Desktop Backend: click **Allow access**.
@@ -179,9 +179,10 @@ curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/ins
 ```
 
 It sets up Docker if the computer does not have it (the engine EmberStorm runs
-on: plain Docker on Linux, Docker Desktop on a Mac, with nothing to click in it
-and no Docker account), downloads everything, sets it all up and prints the
-address to open. Your computer asks for your password once, to install Docker.
+on: plain Docker on Linux, Docker Desktop on a Mac), downloads everything, sets
+it all up and prints the address to open. Your computer asks for your password
+once, to install Docker. On a Mac, a Docker window may open the first time:
+click **Skip**, no Docker account is needed.
 
 <details>
 <summary>Already use Docker Compose? Install by hand</summary>
@@ -318,17 +319,30 @@ file along with a description when you
 
 ## Privacy: what leaves your house
 
-Your media, searches and passwords stay on your computer. EmberStorm contacts
-the internet only for:
+Your media, searches and passwords stay on your computer, and nothing about
+what you watch or play is sent anywhere. EmberStorm sends no usage data, and
+switches off the anonymous statistics Navidrome would otherwise send. It
+contacts the internet for:
 
 - **Its secure address.** A small name service gives your server its
-  `….emberstorm.app` name and certificate. It only knows your server's *home
-  network* address.
-- **Updates**, when you run them.
+  `….emberstorm.app` name, and helps it get a free certificate from
+  [Let's Encrypt](https://letsencrypt.org). It knows your server's *home
+  network* address, and its internet address only if you turn on remote
+  access. It never carries your media.
+- **Updates**, only when you run them: the programs are downloaded from
+  GitHub's and Docker's registries. EmberStorm does not check for updates by
+  itself.
 - **Things you switch on**, all off by default: finding missing lyrics online
   ([LRCLIB](https://lrclib.net)), artist bios and similar artists
   ([MusicBrainz](https://musicbrainz.org), [ListenBrainz](https://listenbrainz.org),
   Wikipedia), remote access, scrobbling, and importing from Plex.
+
+The media servers it runs also go online on their own, for their usual jobs:
+Jellyfin looks up film and show details and posters (from TheMovieDb and
+similar), Immich downloads its photo-search models the first time they are used
+and checks for its own new versions, the speech recognition behind *Make an
+ebook* downloads its model once, and Storyteller (read along) checks its
+changelog.
 
 ## Built on
 
@@ -343,6 +357,8 @@ servers, which EmberStorm installs, sets up and keeps out of your way:
 | Photos | [Immich](https://immich.app) | AGPL-3.0 |
 | Read along | [Storyteller](https://storyteller-platform.dev) | MIT |
 | Moods and "sounds like" | [AudioMuse-AI](https://github.com/NeptuneHub/AudioMuse-AI) | AGPL-3.0 |
+| Make an audiobook (voice) | [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI) | Apache-2.0 |
+| Make an ebook (speech recognition) | [Whisper ASR Webservice](https://github.com/ahmetoner/whisper-asr-webservice) | MIT |
 | Ebook reader | [foliate-js](https://github.com/johnfactotum/foliate-js) | MIT |
 | Video player | [hls.js](https://github.com/video-dev/hls.js) | Apache-2.0 |
 

@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EmberStorm: your own private cloud, at home</title>
-  <meta name="description" content="One app for your family's photos, films, TV, music, audiobooks and books, on every phone and TV. Runs on your own computer at home. Free and open source, no subscriptions.">
+  <meta name="description" content="One app for your family's photos, films, TV, music, audiobooks and books, on your phones and TVs. Runs on your own computer at home. Free and open source, no subscriptions.">
   <meta property="og:title" content="EmberStorm: your own private cloud, at home">
-  <meta property="og:description" content="One app for your family's photos, films, music and books, on every phone and TV. Free and open source.">
+  <meta property="og:description" content="One app for your family's photos, films, music and books, on your phones and TVs. Free and open source.">
   <meta property="og:image" content="https://emberstorm.app/social-preview.png">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
@@ -54,7 +54,7 @@
     <section class="hero">
       <div class="hero-text">
         <h1>Your own private cloud, at home.</h1>
-        <p class="lead">One app for your family's photos, films, TV, music, audiobooks and books, on every phone and TV.
+        <p class="lead">One app for your family's photos, films, TV, music, audiobooks and books, on your phones and TVs.
           It runs on a computer in your house, so your memories stay yours. Free, open source, and no subscriptions.</p>
         <div class="cta">
           <a class="button primary" href="#install">Install it free</a>
@@ -75,7 +75,7 @@
       <div class="grid">
         <article>
           <h3>Photos</h3>
-          <p>Every phone backs up by itself. A timeline of months and days, people and places, videos and Live Photos.
+          <p>Your phones back up by themselves. A timeline of months and days, people and places, videos and Live Photos.
             Bring your library in from Google or Apple, and send photos to each other.</p>
         </article>
         <article>
@@ -86,12 +86,12 @@
         <article>
           <h3>Music</h3>
           <p>Albums, artists, playlists, radio and moods, synced lyrics, and animations that move with every beat.
-            Bring your playlists from Plex.</p>
+            Bring your playlists from Plex, or any player that saves M3U files.</p>
         </article>
         <article>
           <h3>Audiobooks &amp; books</h3>
           <p>Chapters, speed and a sleep timer. Read along as the page turns with the narrator,
-            or read alone at your own pace. Turn any ebook into an audiobook, on your own computer.</p>
+            or read alone at your own pace. Turn an ebook into an audiobook, or an audiobook into an ebook, on your own computer.</p>
         </article>
         <article>
           <h3>For the whole family</h3>
@@ -100,8 +100,8 @@
         </article>
         <article>
           <h3>At home and away</h3>
-          <p>Works on your Wi-Fi from the first minute, and away from home with a secure address of its own.
-            No account with anyone.</p>
+          <p>Works on your Wi-Fi from the first minute, with a secure address of its own. Away from home too,
+            once you turn it on and where your internet connection allows it. No account with anyone.</p>
         </article>
       </div>
     </section>
@@ -119,9 +119,11 @@
       <h2>Yours, and private</h2>
       <div class="grid two">
         <article>
-          <h3>Nothing leaves your house</h3>
-          <p>Your photos, films, music, searches and passwords stay on your own computer.
-            EmberStorm only contacts the internet for its secure address, for updates, and for things you switch on.</p>
+          <h3>Your media stays in your house</h3>
+          <p>Your photos, films, music, searches and passwords stay on your own computer, and EmberStorm sends no usage data.
+            It goes online for its secure address, for updates when you run them, and for things you switch on;
+            the media servers inside it also fetch film posters and download their own models.
+            <a href="https://github.com/GabrielHollberg/emberstorm#privacy-what-leaves-your-house">Exactly what, and why</a>.</p>
         </article>
         <article>
           <h3>Free and open source</h3>
@@ -134,7 +136,8 @@
     <!-- Install: the actual steps, the same as the README's. -->
     <section id="install" class="install">
       <h2>Install it</h2>
-      <p class="section-lead">About 10 to 30 minutes, mostly downloading. You need a computer that stays on, ideally with 16 GB of memory.</p>
+      <p class="section-lead">About 10 to 30 minutes, mostly downloading. You need a computer that stays on, ideally with 16 GB of memory,
+        and about 20 GB of disk for EmberStorm itself, plus your media.</p>
       <div class="tabs" role="tablist">
         <button class="tab on" role="tab" data-os="windows" aria-selected="true">Windows</button>
         <button class="tab" role="tab" data-os="unix" aria-selected="false">Mac &amp; Linux</button>
@@ -153,13 +156,14 @@
             <div class="code"><code id="unix-cmd">curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh</code>
               <button class="copy" type="button" data-copy="unix-cmd">Copy</button></div>
           </li>
-          <li>It sets up Docker if needed (your computer asks for your password once), then everything else, and prints the address to open.</li>
+          <li>It sets up Docker if needed (your computer asks for your password once), then everything else, and prints the address to open.
+            <span class="note">On a Mac, a Docker window may open the first time: click Skip, no account needed.</span></li>
         </ol>
       </div>
       <h3 class="apps-head">Then get the apps</h3>
       <ul class="apps">
         <li><strong>Android, Google TV and Fire TV:</strong> <a href="https://github.com/GabrielHollberg/emberstorm/releases">from the releases page</a> (the android ones). They find your server by themselves.</li>
-        <li><strong>iPhone and Apple TV:</strong> coming to the App Store.</li>
+        <li><strong>iPhone and Apple TV:</strong> in testing, coming to the App Store. Until then an iPhone uses it in Safari.</li>
         <li><strong>Any phone or computer:</strong> works in the web browser too, and adds to the home screen.</li>
       </ul>
     </section>
