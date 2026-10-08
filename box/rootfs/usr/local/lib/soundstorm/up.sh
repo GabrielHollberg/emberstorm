@@ -9,5 +9,7 @@ files="-f compose.yml -f compose.box.yml"
 [ -f compose.images.yml ] && files="$files -f compose.images.yml"
 case "$1" in
 stop) exec docker compose $files stop ;;
+# A reset's: the containers go, the volumes stay (never -v).
+down) exec docker compose $files down --remove-orphans ;;
 *) exec docker compose $files up -d --remove-orphans ;;
 esac

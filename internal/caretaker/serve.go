@@ -191,7 +191,11 @@ func (u *Updater) schedule(ctx context.Context) {
 		}
 		wait = 6 * time.Hour
 		m, err := u.Check(ctx)
-		if err != nil || m == nil || !u.settings().Auto {
+		// Off, the owner is asked first - for a month: a release still not
+		// installed then is installed anyway, so updates cannot be put off
+		// for good, by the owner or by anything able to reach this socket
+		// (the twelfth security pass).
+		if err != nil || m == nil || (!u.settings().Auto && time.Since(m.Created) < maxPutOff) {
 			continue
 		}
 		// At night: wait for the window, then install.
@@ -202,6 +206,9 @@ func (u *Updater) schedule(ctx context.Context) {
 		_ = u.Update(ctx, m)
 	}
 }
+
+// maxPutOff is how long an update can wait for the owner with Auto off.
+const maxPutOff = 30 * 24 * time.Hour
 
 // untilHour is how long from now until the next time it is h o'clock.
 func untilHour(now time.Time, h int) time.Duration {

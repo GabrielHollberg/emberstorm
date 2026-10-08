@@ -30,6 +30,10 @@ type Manifest struct {
 	// Version is what a person is shown ("2026.10.3").
 	Version string    `json:"version"`
 	Created time.Time `json:"created"`
+	// Expires is when a box stops believing it: an old release, signed and
+	// all, cannot be served to a box for ever in place of newer ones (the
+	// twelfth security pass). A release is signed again before then.
+	Expires time.Time `json:"expires"`
 	// Images is each compose service's image, pinned by digest.
 	Images map[string]string `json:"images"`
 	// Notes is "what's new", in plain words, for the app.
@@ -54,6 +58,9 @@ func (m *Manifest) Validate() error {
 	}
 	if len(m.Images) == 0 {
 		return errors.New("manifest: no images")
+	}
+	if m.Expires.IsZero() || !m.Expires.After(m.Created) {
+		return errors.New("manifest: no expiry")
 	}
 	for svc, ref := range m.Images {
 		if !serviceName.MatchString(svc) {

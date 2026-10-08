@@ -52,7 +52,8 @@ func TestResetEmptiesWhatItSays(t *testing.T) {
 		b.mu.Lock()
 		ran := strings.Join(b.ran, "; ")
 		b.mu.Unlock()
-		if !strings.HasPrefix(ran, "up stop") || !strings.HasSuffix(ran, "up") || !strings.Contains(ran, "btrfs subvolume delete "+filepath.Join(srv, "volumes-before-7")) {
+		if !strings.HasPrefix(ran, "up down") || !strings.HasSuffix(ran, "up") || !strings.Contains(ran, "btrfs subvolume delete "+filepath.Join(srv, "volumes-before-7")) ||
+			!strings.Contains(ran, "forget.sh "+string(mode)) {
 			t.Errorf("%s ran: %s", mode, ran)
 		}
 	}

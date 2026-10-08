@@ -22,6 +22,7 @@ const digest = "@sha256:0123456789abcdef0123456789abcdef0123456789abcdef01234567
 
 func release(serial int64) *Manifest {
 	return &Manifest{Serial: serial, Version: "2026.10." + string(rune('0'+serial)),
+		Created: time.Now().Add(-time.Hour).UTC().Truncate(time.Second), Expires: time.Now().Add(30 * 24 * time.Hour).UTC().Truncate(time.Second),
 		Images: map[string]string{
 			"soundstorm": "ghcr.io/gabrielhollberg/soundstorm" + digest,
 			"navidrome":  "deluan/navidrome" + digest,
@@ -215,5 +216,37 @@ func TestADownloadThatFailsChangesNothing(t *testing.T) {
 	}
 	if b.images() != "" || b.u.Status().State != "failed" {
 		t.Fatalf("state %q, images %q", b.u.Status().State, b.images())
+	}
+}
+
+// A box takes nothing older than it was built with, nothing past its expiry,
+// and no release that leaves out a service it runs.
+func TestOldExpiredAndPartialReleasesAreRefused(t *testing.T) {
+	b := newBox(t)
+	ctx := context.Background()
+	b.u.cfg.MinSerial = 4
+	b.publish(release(3))
+	if m, err := b.u.Check(ctx); err != nil || m != nil {
+		t.Fatalf("a release older than the box was offered: %v %v", m, err)
+	}
+	stale := release(5)
+	stale.Created, stale.Expires = time.Now().Add(-100*24*time.Hour), time.Now().Add(-10*24*time.Hour)
+	b.publish(stale)
+	if m, err := b.u.Check(ctx); err == nil || m != nil {
+		t.Fatalf("an expired release was offered: %v %v", m, err)
+	}
+	b.publish(release(5))
+	m, err := b.u.Check(ctx)
+	if err != nil || m == nil {
+		t.Fatalf("check: %v %v", m, err)
+	}
+	if err := b.u.Update(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	partial := release(6)
+	delete(partial.Images, "navidrome")
+	b.publish(partial)
+	if m, err := b.u.Check(ctx); err == nil || m != nil {
+		t.Fatalf("a release leaving out a service was offered: %v %v", m, err)
 	}
 }

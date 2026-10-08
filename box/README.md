@@ -55,6 +55,13 @@ the key built into it (`box/release.pub`, or `RELEASE_KEY` when building)
 and only one with a higher serial than it runs, so neither a forged nor an
 old replayed one moves it. Releases are looked for at the GitHub release
 `box-channel` (`RELEASES` when building points a development box elsewhere).
+A release also says when it expires (90 days after it is made, `-days` on
+`soundstorm-caretaker manifest`) and boxes refuse it after that, so it must
+be made and signed again before then; it must name every service the box
+runs; and a box built with `SERIAL` never takes a release not newer than
+that. Auto off asks the owner first, for a month - a release still waiting
+then is installed anyway. A box to sell is built with `PRODUCTION=1`, which
+refuses `DEV_SSH`, `RELEASES`, `RELEASE_KEY` and a missing `SERIAL`.
 
 An update downloads every image first (nothing changes if that fails), stops
 the stack, snapshots the `volumes` subvolume, writes `compose.images.yml`

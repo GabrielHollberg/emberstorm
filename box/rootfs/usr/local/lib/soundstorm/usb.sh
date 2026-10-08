@@ -27,14 +27,18 @@ mount)
 	case $label in SSDATA | SSBACKUP) exit 0 ;; esac
 	# Read-only, and nothing on it runs or acts as a device. Filesystems with
 	# owners keep theirs; those without are readable by SoundStorm's user.
+	#
+	# Only the filesystems drives come in: a drive is anybody's, and each
+	# filesystem the kernel reads is code a crafted one can aim at (the
+	# twelfth security pass). FAT and exFAT (cards, most bought drives) and
+	# ext (Linux) by the kernel; NTFS (Windows) by ntfs-3g, outside the
+	# kernel. xfs, btrfs and HFS+ - rare on a drive somebody brings - are not
+	# opened.
 	opts=ro,nosuid,nodev,noexec
 	case $type in
 	vfat | exfat) opts=$opts,umask=022 ;;
-	ntfs | ntfs3) type=ntfs3 opts=$opts,umask=022 ;;
+	ntfs | ntfs3) type=ntfs-3g opts=$opts,umask=022 ;;
 	ext2 | ext3 | ext4) opts=$opts,noload ;;
-	xfs) opts=$opts,norecovery ;;
-	btrfs) opts=$opts,rescue=nologreplay ;;
-	hfsplus) ;;
 	*)
 		log "$part: $type is not a filesystem SoundStorm opens"
 		exit 0

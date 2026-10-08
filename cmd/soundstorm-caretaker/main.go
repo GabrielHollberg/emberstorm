@@ -27,6 +27,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -78,6 +79,10 @@ func onBox(cmd string, log *slog.Logger) error {
 		return err
 	}
 	cfg := caretaker.Config{Key: key, ManifestURL: os.Getenv("SOUNDSTORM_RELEASES")}
+	// The release the box was built with (box/build.sh): nothing older.
+	if n, err := strconv.ParseInt(os.Getenv("SOUNDSTORM_MIN_SERIAL"), 10, 64); err == nil {
+		cfg.MinSerial = n
+	}
 	u := caretaker.New(cfg, log)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -143,11 +148,13 @@ func manifest(args []string) error {
 	serial := fs.Int64("serial", 0, "release serial, higher than the last")
 	version := fs.String("version", "", "version shown to people")
 	notes := fs.String("notes", "", "what's new")
+	days := fs.Int("days", 90, "days boxes believe it; sign again before then")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	now := time.Now().UTC().Truncate(time.Second)
 	m := caretaker.Manifest{Serial: *serial, Version: *version, Notes: *notes,
-		Created: time.Now().UTC().Truncate(time.Second), Images: map[string]string{}}
+		Created: now, Expires: now.AddDate(0, 0, *days), Images: map[string]string{}}
 	for _, a := range fs.Args() {
 		svc, ref, ok := strings.Cut(a, "=")
 		if !ok {

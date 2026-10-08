@@ -51,7 +51,9 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	u.log.Warn("resetting the box", "mode", mode)
 	u.set(func(s *Status) { s.State = "resetting"; s.Message = "Starting over" })
 
-	if err := u.run(ctx, u.cfg.Up, "stop"); err != nil {
+	// Down, not only stopped: the containers go, and with them what each
+	// kept of its own - its logs above all (the twelfth security pass).
+	if err := u.run(ctx, u.cfg.Up, "down"); err != nil {
 		u.set(func(s *Status) {
 			s.State = "failed"
 			s.Message = "Could not stop EmberStorm to start over. Nothing was changed."
@@ -81,6 +83,10 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	// The caretaker's own choices go back to their defaults; the version
 	// running is kept, being a fact about the box.
 	_ = os.Remove(filepath.Join(u.cfg.StateDir, "settings.json"))
+	// And what the box keeps beside the data drive.
+	if err := u.run(ctx, u.cfg.Forget, string(mode)); err != nil {
+		u.log.Error("could not clear what the box keeps beside the drive", "err", err)
+	}
 	// The drive is readied again as at boot: the models built into the box go
 	// back into the emptied caches (photo search, Make an ebook and read-along
 	// work with no internet), and the shelves and folders are as they should

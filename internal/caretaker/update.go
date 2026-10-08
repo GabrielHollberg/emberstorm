@@ -28,6 +28,9 @@ type Config struct {
 	// after a reset, so the models built into the box are laid back into the
 	// caches it emptied.
 	Prepare string
+	// Forget is run on a reset, with its mode, once the stack is down: what
+	// the box keeps beside the data drive (box/rootfs/.../forget.sh).
+	Forget string
 	// StateDir is the caretaker's own: the running manifest, the last one.
 	StateDir string
 	// Volumes is the data drive's subvolume holding every data volume -
@@ -44,6 +47,11 @@ type Config struct {
 	HealthURL string
 	// HealthWait is how long a new version has to come up healthy.
 	HealthWait time.Duration
+	// MinSerial is the release the box was built with: anything not newer
+	// is never installed, though nothing has been installed yet (a fresh box
+	// would otherwise take the oldest release still signed - the twelfth
+	// security pass).
+	MinSerial int64
 }
 
 // Defaults fills in the box's own paths for anything left empty.
@@ -56,6 +64,7 @@ func (c Config) Defaults() Config {
 	set(&c.ComposeDir, "/opt/soundstorm")
 	set(&c.Up, "/usr/local/lib/soundstorm/up.sh")
 	set(&c.Prepare, "/usr/local/lib/soundstorm/storage.sh")
+	set(&c.Forget, "/usr/local/lib/soundstorm/forget.sh")
 	set(&c.StateDir, "/var/lib/soundstorm-caretaker")
 	set(&c.Volumes, "/srv/soundstorm/volumes")
 	set(&c.Cache, "/srv/soundstorm/cache")
@@ -218,8 +227,24 @@ func (u *Updater) check(ctx context.Context) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cur := u.Status().Current; cur != nil && m.Serial <= cur.Serial {
+	if time.Now().After(m.Expires) {
+		return nil, errors.New("the published release has expired; it will be signed again")
+	}
+	if m.Serial <= u.cfg.MinSerial {
 		return nil, nil
+	}
+	cur := u.Status().Current
+	if cur != nil && m.Serial <= cur.Serial {
+		return nil, nil
+	}
+	// A release names every service the running one does: one left out
+	// would carry on as it is, unnoticed.
+	if cur != nil {
+		for svc := range cur.Images {
+			if _, ok := m.Images[svc]; !ok {
+				return nil, fmt.Errorf("the published release leaves out %s", svc)
+			}
+		}
 	}
 	return m, nil
 }

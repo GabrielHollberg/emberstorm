@@ -20,7 +20,22 @@
 #                    own test channel; the default is the published one)
 #   SIZE=28G         the system disk's size; it grows to fill the real disk
 #                    (the ME Mini's 64GB eMMC) on first boot
+#   SERIAL=N         the release the box's images are (box/release.sh's
+#                    serial): the box never installs one not newer
+#   PRODUCTION=1     a box to sell: refuses DEV_SSH, another release channel,
+#                    a release key other than box/release.pub, and no SERIAL
 set -eu
+
+# A box that is sold must not carry a development build's ways in or out
+# (the twelfth security pass): SSH for root, a test channel, a test key, or
+# no floor under the releases it takes.
+if [ "${PRODUCTION:-}" = 1 ]; then
+	[ "${DEV_SSH:-}" != 1 ] || { echo "PRODUCTION: DEV_SSH is for development boxes." >&2; exit 1; }
+	[ -z "${RELEASES:-}" ] || { echo "PRODUCTION: RELEASES points at a test channel." >&2; exit 1; }
+	[ -z "${RELEASE_KEY:-}" ] || { echo "PRODUCTION: only box/release.pub signs a sold box's updates." >&2; exit 1; }
+	[ -n "${SERIAL:-}" ] || { echo "PRODUCTION: SERIAL, the release these images are, is needed." >&2; exit 1; }
+fi
+case "${SERIAL:-0}" in *[!0-9]*) echo "SERIAL is a number." >&2; exit 1 ;; esac
 
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(dirname "$here")
@@ -83,9 +98,10 @@ mkdir -p "$stage/usr/local/bin" "$stage/etc/soundstorm"
 key=${RELEASE_KEY:-$here/release.pub}
 [ -f "$key" ] || { echo "No release key at $key (soundstorm-caretaker keygen makes one)." >&2; exit 1; }
 cp "$key" "$stage/etc/soundstorm/release.pub"
-if [ -n "${RELEASES:-}" ]; then
-	echo "SOUNDSTORM_RELEASES=$RELEASES" > "$stage/etc/soundstorm/caretaker.env"
-fi
+{
+	[ -z "${RELEASES:-}" ] || echo "SOUNDSTORM_RELEASES=$RELEASES"
+	[ -z "${SERIAL:-}" ] || echo "SOUNDSTORM_MIN_SERIAL=$SERIAL"
+} > "$stage/etc/soundstorm/caretaker.env"
 
 say "Container images"
 # Every image the stack runs goes into the disk, so a box starts with no
@@ -173,7 +189,7 @@ qemu-img resize -q "$disk" "$SIZE"
 # shellcheck disable=SC2086
 virt-customize -a "$disk" \
 	--hostname soundstorm \
-	--install docker.io,docker-compose,btrfs-progs,cloud-guest-utils,avahi-daemon,curl,qrencode,kbd,console-setup-linux$ssh_pkg \
+	--install docker.io,docker-compose,btrfs-progs,cloud-guest-utils,avahi-daemon,curl,qrencode,kbd,console-setup-linux,ntfs-3g$ssh_pkg \
 	--run-command 'growpart /dev/sda 1 && resize2fs /dev/sda1' \
 	$copy_args \
 	--run-command 'chmod 755 /usr/local/lib/soundstorm/*.sh /usr/local/bin/soundstorm-caretaker' \
