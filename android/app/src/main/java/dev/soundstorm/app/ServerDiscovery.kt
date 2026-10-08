@@ -62,7 +62,7 @@ object ServerDiscovery {
         conn.instanceFollowRedirects = false
         conn.useCaches = false
         try {
-            if (conn.responseCode != 200) null else conn.inputStream.bufferedReader().use { it.readText().take(64 * 1024) }
+            if (conn.responseCode != 200) null else ServerAddress.capped(conn.inputStream, 64 * 1024)
         } finally {
             conn.disconnect()
         }
@@ -84,7 +84,11 @@ object ServerDiscovery {
         // the one from before the rename.
         if (!Regex("^[a-z0-9][a-z0-9.-]*$").matches(name) || ServerAddress.zoneOf(name) == null) return null
         val secure = "https://$name:$PORT"
-        return if (isEmberStorm(secure)) "$secure/" else null
+        // The same install, not one that only says so: anybody can get a
+        // name under the zone, and a found box hands its setup code on to
+        // the secure name (the twelfth security pass).
+        val here = health(plain)?.optString("id")?.takeIf { it.isNotEmpty() } ?: return null
+        return if (health(secure)?.optString("id") == here) "$secure/" else null
     }
 
     /**

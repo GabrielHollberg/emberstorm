@@ -79,6 +79,9 @@ object PhotoBackup {
         prefs(c).edit().putString("server", o).apply()
     }
 
+    /** The secure address photos go to now, or null. */
+    fun rememberedServer(c: Context): String? = prefs(c).getString("server", null)
+
     /** The addresses to try, best first: the page's secure one, its away
      *  twin (a home name is unreachable away from home), the typed one. */
     fun servers(c: Context): List<Uri> {
@@ -93,7 +96,12 @@ object PhotoBackup {
                 ).build()
             }
         }
-        ServerAddress.saved(c)?.let { s -> if (out.none { ServerAddress.origin(it) == ServerAddress.origin(s) }) out += s }
+        // The typed address only when it is a secure one: photos and the
+        // sign-in never cross the Wi-Fi in the clear (the twelfth security
+        // pass).
+        ServerAddress.saved(c)?.takeIf { it.scheme == "https" }?.let { s ->
+            if (out.none { ServerAddress.origin(it) == ServerAddress.origin(s) }) out += s
+        }
         return out
     }
 
@@ -321,7 +329,7 @@ object PhotoBackup {
         conn.outputStream.use { it.write(JSONObject().put("items", list).toString().toByteArray()) }
         val code = conn.responseCode
         if (code !in 200..299) throw Refused(code, errorOf(conn))
-        val have = JSONObject(conn.inputStream.bufferedReader().readText()).getJSONArray("have")
+        val have = JSONObject(ServerAddress.capped(conn.inputStream)).getJSONArray("have")
         return BooleanArray(items.size) { have.optBoolean(it) }
     }
 
@@ -365,7 +373,7 @@ object PhotoBackup {
     }
 
     private fun errorOf(conn: HttpURLConnection): String =
-        runCatching { JSONObject(conn.errorStream.bufferedReader().readText()).optString("error") }.getOrNull()
+        runCatching { JSONObject(ServerAddress.capped(conn.errorStream, 64 * 1024)).optString("error") }.getOrNull()
             ?.takeIf { it.isNotBlank() } ?: "the server answered ${conn.responseCode}"
 }
 

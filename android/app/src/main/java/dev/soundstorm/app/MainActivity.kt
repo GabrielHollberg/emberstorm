@@ -480,7 +480,17 @@ class MainActivity : Activity() {
                 if (screen != connectScreen) return@askSetupCode
                 ServerAddress.remember(this, box.url)
                 hideKeyboard(field)
-                showWeb(box.url.buildUpon().appendQueryParameter("setup", code).build())
+                // The code goes in the address only to the box's own secure
+                // name (ServerDiscovery checks it is the same box). Over
+                // plain http the page asks for it on screen instead, where
+                // the person sees the address it goes to (the twelfth
+                // security pass).
+                if (box.url.scheme == "https") {
+                    showWeb(box.url.buildUpon().appendQueryParameter("setup", code).build())
+                } else {
+                    Toast.makeText(this, "Type the setup code again on the next screen: $code", Toast.LENGTH_LONG).show()
+                    showWeb(box.url)
+                }
             }
         }
         fun foundButton(label: String, onTap: () -> Unit) = Button(this).apply {
@@ -799,7 +809,7 @@ class MainActivity : Activity() {
                     tell("not-ours")
                     return@addOnSuccessListener
                 }
-                webView?.evaluateJavascript("window.__soundstormLink && window.__soundstormLink(" + JSONObject.quote(code) + ")", null)
+                webView?.evaluateJavascript("window.__soundstormLink && window.__soundstormLink(" + JSONObject.quote(code) + ", 'scanned')", null)
             }
             .addOnFailureListener { tell("failed") }
     }
@@ -927,8 +937,10 @@ class MainActivity : Activity() {
         // "Allow" would sign their TV in as this person (a security review).
         // The install's chosen name is known only by where it leads: the
         // same address as the server saved.
+        // A link naming no server is nobody's in particular: not handed to
+        // the saved one (the twelfth security pass).
         val server = match ?: when {
-            wanted == null -> saved
+            wanted == null -> null
             saved != null && sameAddress(wanted, saved) -> saved
             else -> null
         } ?: return null
@@ -1039,10 +1051,7 @@ class MainActivity : Activity() {
             "playerLog" -> webView?.evaluateJavascript(
                 "window.__soundstormPlayerLog && window.__soundstormPlayerLog(" +
                     JSONObject.quote(PlayerLog.text(applicationContext)) + ")", null)
-            "backup" -> {
-                PhotoBackup.rememberServer(applicationContext, ServerAddress.current)
-                backup(message.optString("cmd"), message.optJSONObject("options") ?: JSONObject())
-            }
+            "backup" -> backup(message.optString("cmd"), message.optJSONObject("options") ?: JSONObject())
         }
     }
 
@@ -1055,6 +1064,33 @@ class MainActivity : Activity() {
         if (isTv) return
         when (cmd) {
             "set" -> {
+                // Where photos go is this phone's question, never the page's
+                // alone: a page could otherwise send a phone's whole camera
+                // roll to another server (the twelfth security pass). The
+                // first time, and whenever the page is another server's,
+                // the phone asks, naming it.
+                val here = ServerAddress.current?.takeIf { it.startsWith("https://") }
+                if (options.optBoolean("enabled")) {
+                    if (here == null) {
+                        Toast.makeText(this, "Photos are backed up only over a secure address. Open EmberStorm by its emberstorm.app address first.", Toast.LENGTH_LONG).show()
+                        options.put("enabled", false)
+                    } else if (here != PhotoBackup.rememberedServer(this) && options.optBoolean("confirmedHere").not()) {
+                        val host = Uri.parse(here).host ?: here
+                        AlertDialog.Builder(this)
+                            .setTitle("Back up this phone's photos?")
+                            .setMessage("Your photos and videos will be sent to $host. Do it only if that is your own EmberStorm.")
+                            .setPositiveButton("Back up") { _, _ ->
+                                PhotoBackup.rememberServer(applicationContext, here)
+                                backup("set", options.put("confirmedHere", true))
+                            }
+                            .setNegativeButton("Not now") { _, _ ->
+                                PhotoBackup.configure(applicationContext, JSONObject().put("enabled", false))
+                                reportBackup()
+                            }
+                            .show()
+                        return
+                    }
+                }
                 if (options.optBoolean("enabled") && !PhotoBackup.hasPermission(this)) {
                     pendingBackup = options
                     requestPermissions(PhotoBackup.permissions(), BACKUP_PERMISSION)
@@ -1220,8 +1256,12 @@ class MainActivity : Activity() {
                     // names the very address in use: an attacker's name would
                     // point at their own machine (a security review).
                     Thread {
+                        // The name leads to the address in use, and both say
+                        // they are one install: any install can point a name
+                        // at any private address (the twelfth security pass).
                         val same = runCatching {
-                            java.net.InetAddress.getAllByName(target.host).any { it.hostAddress == current.host }
+                            java.net.InetAddress.getAllByName(target.host).any { it.hostAddress == current.host } &&
+                                ServerAddress.installIdAt(current).let { id -> id != null && id == ServerAddress.installIdAt(target) }
                         }.getOrDefault(false)
                         if (same) content.post { if (server == current) showWeb(target) }
                     }.start()

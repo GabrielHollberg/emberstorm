@@ -97,8 +97,22 @@ object Shared {
             file?.let { f ->
                 val copied = runCatching {
                     f.parentFile?.mkdirs()
-                    c.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it, 1 shl 20) } }
-                        ?: error("unreadable")
+                    // No more than the file said it was: a sharing app that
+                    // streams on past it would fill the phone (the twelfth
+                    // security pass).
+                    c.contentResolver.openInputStream(uri)?.use { input ->
+                        f.outputStream().use { out ->
+                            val buf = ByteArray(1 shl 20)
+                            var total = 0L
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n < 0) break
+                                total += n
+                                if (total > size) error("larger than it said")
+                                out.write(buf, 0, n)
+                            }
+                        }
+                    } ?: error("unreadable")
                     if (size < 0) size = f.length()
                     f.setLastModified(modified)
                 }.isSuccess

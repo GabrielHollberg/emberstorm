@@ -294,7 +294,7 @@ object Uploads {
                 }
             } ?: throw Refused(0, "could not read the file")
             val code = conn.responseCode
-            val body = runCatching { (if (code in 200..299) conn.inputStream else conn.errorStream).bufferedReader().readText() }.getOrNull() ?: ""
+            val body = runCatching { ServerAddress.capped(if (code in 200..299) conn.inputStream else conn.errorStream, 64 * 1024) }.getOrNull() ?: ""
             if (code in 200..299) return runCatching { JSONObject(body).optString("dest") }.getOrNull() ?: ""
             val msg = runCatching { JSONObject(body).optString("error") }.getOrNull()?.takeIf { it.isNotBlank() } ?: "the server answered $code"
             throw Refused(code, msg)

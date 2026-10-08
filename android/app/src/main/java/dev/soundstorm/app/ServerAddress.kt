@@ -49,6 +49,25 @@ object ServerAddress {
      * The install id the server at [base] answers with (/healthz's "id"), or
      * null. Run off the main thread.
      */
+    /**
+     * At most [max] bytes of a reply, as text: a server - or anything
+     * answering where one was looked for - decides how much it sends, and a
+     * reply read whole could be any size (the twelfth security pass).
+     */
+    fun capped(stream: java.io.InputStream?, max: Int = 1 shl 20): String {
+        if (stream == null) return ""
+        return stream.use { s ->
+            val out = java.io.ByteArrayOutputStream()
+            val buf = ByteArray(16 * 1024)
+            while (out.size() < max) {
+                val n = s.read(buf, 0, minOf(buf.size, max - out.size()))
+                if (n < 0) break
+                out.write(buf, 0, n)
+            }
+            out.toString("UTF-8")
+        }
+    }
+
     fun installIdAt(base: Uri): String? {
         val conn = java.net.URL(base.buildUpon().path("/healthz").clearQuery().fragment(null).build().toString())
             .openConnection() as java.net.HttpURLConnection
@@ -56,7 +75,7 @@ object ServerAddress {
         conn.readTimeout = 5000
         return try {
             if (conn.responseCode != 200) return null
-            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            val body = capped(conn.inputStream, 64 * 1024)
             org.json.JSONObject(body).optString("id").takeIf { it.isNotEmpty() }
         } catch (e: Exception) {
             null
@@ -199,8 +218,7 @@ object ServerAddress {
         }
         try {
             val code = conn.responseCode
-            val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
-                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            val body = capped(if (code in 200..299) conn.inputStream else conn.errorStream, 64 * 1024)
             val ok = code == 200 && runCatching {
                 val json = JSONObject(body)
                 json.optString("status") == "ok" && json.has("sources")
