@@ -72,7 +72,9 @@ on <code>/pictures</code>, mounted read-only, so Immich can never move, rename o
 Folder watching is switched on by reading <code>/api/system-config</code>, changing
 <code>library.watch.enabled</code> and sending the whole document back - a test holds that it
 changes nothing else. Members get an Immich account each whose one library is their own folder
-(<code>PhotoAccountFor</code>), made the first time they look.</p>
+(<code>PhotoAccountFor</code>), made the first time they look, and the owner's library leaves every
+member's folder out by Immich's exclusion patterns (<code>SyncPhotoPrivacy</code>), kept in step as
+people come and go.</p>
 
 <h3>Storyteller (read-along)</h3>
 <p>The first account is a Next.js server action on <code>/init</code>, which works as a plain
@@ -96,6 +98,10 @@ is reset rather than refused.</p>
 <h3>Ebooks and documents</h3>
 <p>No backend: EmberStorm reads those folders itself (<code>source/localbooks</code>), so
 "provisioning" is the first scan, run synchronously, with a ticker for the rest.</p>
+
+<h3>Kokoro and Whisper (making books)</h3>
+<p>Nothing to set up: each is a plain HTTP service on the compose network, called only when
+somebody makes an audiobook or an ebook (see <a href="books.html#making">Books</a>).</p>
 
 <h2 id="credentials">What is kept</h2>
 <p>Credentials go into <code>state.json</code> beside the accounts: base URL, username and

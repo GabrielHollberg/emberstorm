@@ -192,7 +192,9 @@ visualizer, no Looks button. What changes for a book:</p>
 <p>The sleep timer offers set times, a custom time, or the end of this song or chapter, and fades
 out over eight seconds. It once never stopped with the screen off - which is when a sleep timer is
 used - because the fade was stepped by animation frames, and a phone with its screen off draws
-none. It is stepped by a timer now.</p>
+none. It is stepped by a timer now. In the phone apps the native player keeps the timer itself
+(<code>soundstormApp.sleepAt</code>), since a phone also sleeps the page's timers while its own
+player plays on.</p>
 <p>Crossfade uses a second, hidden audio element for the fade-in only. Everything else - lyrics,
 lock screen, queue, leveling - listens to the one main player, so at the end of a song the main
 element takes over from where the hidden one reached. It is skipped within an album playing in
@@ -214,8 +216,9 @@ ignores a page's volume, so leveling does nothing on an iPhone in the browser.</
 <h2 id="lockscreen">Lock screen, headphones, car</h2>
 <p>The Media Session API carries title, artist, album and cover to the lock screen, notification,
 headphones and a car over Bluetooth, with previous and next stepping through the queue (or
-seeking, for a book). Previous more than three seconds into a song restarts it. On Android the app
-goes further and plays songs natively (see <a href="android.html">Android</a>). CarPlay and
+seeking, for a book). Previous more than three seconds into a song restarts it. The Android and
+iPhone apps go further and play songs and audiobooks natively (see <a href="android.html">Android</a>
+and <a href="iphone.html">iPhone</a>). CarPlay and
 Android Auto are not attempted: both need a native app.</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>

@@ -29,7 +29,9 @@ when a load fails, and hands file pickers and a film's full screen to the platfo
   <tr><td><code>NativeAudio.kt</code>, <code>AudioService.kt</code></td><td>Songs played natively by Media3</td></tr>
   <tr><td><code>PlaybackService.kt</code>, <code>MediaBridge.kt</code></td><td>The lock-screen player for what the page plays itself</td></tr>
   <tr><td><code>PhotoBackup.kt</code></td><td>Phone photo backup</td></tr>
-  <tr><td><code>WebCookies.kt</code>, <code>ServerAddress.kt</code></td><td>Cookies for native requests; the saved servers</td></tr>
+  <tr><td><code>Uploads.kt</code>, <code>Shared.kt</code></td><td>Sending Add media's files in the background; EmberStorm in the system's Share sheet</td></tr>
+  <tr><td><code>WebCookies.kt</code>, <code>ServerAddress.kt</code>, <code>ServerDiscovery.kt</code></td><td>Cookies for native requests; the saved servers; finding a server on the home network</td></tr>
+  <tr><td><code>PlayerLog.kt</code></td><td>A playback log, for chasing sound that cuts out</td></tr>
 </table>
 <p>The web app cannot tell the Android and iPhone apps apart, by design. Both give the page
 <code>window.soundstormApp</code> and the same message channel
@@ -59,8 +61,8 @@ media session. Two bugs came from that, both reported from a real phone:</p>
   had to come back from the background - which Android 12 and later refuse, and the uncaught refusal
   took the app down.</li>
 </ul>
-<p>Each got a workaround, and then the owner chose the real fix: <strong>songs from the server are
-played by Media3's ExoPlayer</strong> in a media session service (<code>AudioService</code>), which
+<p>Each got a workaround, and then the owner chose the real fix: <strong>songs and audiobooks from
+the server are played by Media3's ExoPlayer</strong> in a media session service (<code>AudioService</code>), which
 Android treats as a music player. It keeps the foreground, pauses for an alarm or call and plays on
 after, pauses when headphones come out, and gives the lock screen, notification and car their
 controls.</p>
@@ -72,9 +74,10 @@ element's own events - <code>playing</code>, <code>pause</code>, <code>timeupdat
 <code>ended</code>. The lyrics, the looks and the timeline keep reading <code>currentTime</code> as
 before and never know the difference.</p>
 <p>What stays in the page: downloads (they are <code>blob:</code> addresses the native player cannot
-read), audiobooks and crossfade's second element, which is why crossfade is off in the app. For
-those, <code>PlaybackService</code> still provides the lock-screen player from the page's media
-session.</p>
+read) and crossfade's second element, which is why crossfade is off in the app. For those,
+<code>PlaybackService</code> still provides the lock-screen player from the page's media session.
+The player also keeps a sleep timer of its own, since Android sleeps a page whose screen is off, and
+picks a paused song up again after Android has ended its idle service.</p>
 
 <h3 id="handover">Handing over the next songs</h3>
 <p>The next song is handed to the player ahead of time (<code>queueNext</code>), so it moves into it
@@ -114,9 +117,10 @@ photos has the switch and options and talks to the app through
   allows it, since an ordinary job is stopped at ten minutes - one long video on a slow link.</li>
   <li><strong>One refused photo is passed over</strong> and named, rather than stopping the whole
   backup.</li>
-  <li><strong>Nothing sent twice.</strong> What was sent is remembered by its MediaStore id, and each
-  batch of 100 is first checked with the server (<code>POST /api/photos/backup/check</code>), so a
-  reinstall or a new phone sends nothing it already has.</li>
+  <li><strong>Nothing sent twice.</strong> The phone keeps no list of what it sent (since 0.37): each
+  run asks the server about every photo (<code>POST /api/photos/backup/check</code>, a hundred at a
+  time), so the server is the one record and a reinstall or a new phone sends nothing it already
+  has.</li>
   <li><strong>The original file</strong> (<code>setRequireOriginal</code>, with the media-location
   permission). Otherwise Android hands over a copy without the place it was taken, which would empty
   Places and differ in size.</li>
@@ -136,6 +140,17 @@ latest used first, the one in use ticked, a tap to switch, a long press to renam
 (<code>ServerAddress.all</code>, kept as a list beside the current address). Each server keeps its
 own sign-in, since cookies belong to an address, so switching back asks for nothing. The iPhone and
 Apple TV apps have the same list.</p>
+<p>The connect screen also looks for a server on the home network (<code>ServerDiscovery</code>, Wi-Fi
+and wired networks only) and shows servers by their name; a new box with no owner yet is offered as
+<strong>Set it up</strong>, with the setup code scanned or typed.</p>
+
+<h2 id="uploads">Add media and Share</h2>
+<p>In the app, Add media's files are sent by the app rather than the page (0.30,
+<code>Uploads.kt</code>): a WorkManager job sends them one at a time with the web view's cookie,
+in the foreground with a notification and a Stop, so they carry on with the app closed; Only on Wi-Fi
+and Only while charging are choices beside it. And the app is in the system's Share sheet for audio,
+video, pictures, EPUB, PDF and zips (0.33, <code>Shared.kt</code>): what is shared gets the same review
+as Add media.</p>
 
 <h2 id="screen">Full screen and the camera cutout</h2>
 <p>Both system bars are hidden everywhere, at the owner's asking - something the installed web app
@@ -189,11 +204,12 @@ focus, outputs, the page's commands) - for chasing sound that cuts out mid-song 
 install shows it.</p>
 
 <h2 id="releases">Releases</h2>
-<p>APKs are built on the Windows development machine from <code>android/</code> on main
+<p>The app is not on Google Play: it is installed from the project's GitHub releases. APKs are built on the Windows development machine from <code>android/</code> on main
 (<code>gradlew assembleDebug</code>), with <code>versionCode</code> raised every time so a phone
 installs over the last one. They are published as GitHub pre-releases named
 <code>android-&lt;version&gt;</code> and never marked Latest, because the Latest release is where the
-server's Windows installer lives.</p>
+server's Windows installer lives. Nothing updates an installed copy by itself; each release is
+installed over the last.</p>
 
 <h2 id="tv">The same app on a TV</h2>
 <p>Google TV, Android TV and Fire TV run this same app, not a second one. The manifest adds the

@@ -78,7 +78,10 @@ PDF would read its own metadata and land under a different author from its m4b.<
 
 <h3>Not restructured</h3>
 <p>Films and television keep their dropped shape: Jellyfin matches on the <em>name</em>, not the
-depth, and anything dropped there is already folder-shaped. Documents keep theirs too - a tax
+depth, and anything dropped there is already folder-shaped. A film's <em>name</em> is tidied,
+though (<code>library/filmnames.go</code>): a disc ripper's <code>_t00</code> comes off, "PT. 1" or
+"Disc 2" at the end becomes Jellyfin's " - part1", and a loose film goes in a folder of its own name,
+so that Jellyfin finds its poster. Documents keep theirs too - a tax
 form has no author, and <code>Taxes/2024/</code> is exactly how somebody finds it again.
 Pictures are sorted by date into each person's own folder, which has
 <a href="photos.html">its own page</a>.</p>
@@ -140,12 +143,18 @@ and invisible anywhere but beside its film. So the first file in a group that ca
 decides for all of them, and companions - subtitles, artwork, .nfo, .opf - get no vote and
 inherit the answer. A folder of nothing but companions names no shelf and is skipped: a lone
 .srt has no home.</p>
-<p>Some evidence is decisive: <code>.epub</code> is a book, <code>.m4b</code> an audiobook, a
-path mentioning audiobooks is believed, and <code>S01E01</code>, <code>1x02</code> or a
+<p>Some evidence is decisive: <code>.epub</code> is a book, <code>.m4b</code> an audiobook, and
+<code>S01E01</code>, <code>1x02</code> or a
 <code>Season 01</code> folder is television. A group of only images is pictures; images beside
 audio or a book are artwork. A video named the way a camera names it (<code>MVI_</code>,
 <code>PXL_</code>, <code>GOPR</code>, a date and time) is a clip for the photo shelf even on its
-own - the first test filed a camera's .MOV as a film.</p>
+own - the first test filed a camera's .MOV as a film. A file's own type may decide; a name may only
+ask: a folder called "Audiobooks" used to send every audio file in it there unasked, FLAC and all,
+and now raises the question instead.</p>
+<p>A drop that mixes shelves is <strong>split where its subfolders disagree</strong>
+(<code>splitGroup</code>): a folder of everything - music, a film, a show, an audiobook, phone photos
+- goes to each shelf, rather than wholly to whichever the first clear file named. An album with its
+scans, or a film with its subtitles and poster, stays whole.</p>
 
 <h2 id="questions">When it cannot tell, it asks</h2>
 <p>There is one drop zone and no shelf targets. Guessing wrong costs somebody moving files on
@@ -156,12 +165,23 @@ drop would be worse than the occasional wrong guess:</p>
   <tr><th>Case</th><th>Why it is ambiguous</th></tr>
   <tr><td>mp3, and only mp3</td><td>flac, wav and alac are music in practice; m4a is music because audiobooks use m4b. Mp3 really is both - every LibriVox recording is one.</td></tr>
   <tr><td>Three or more videos in a folder with no episode numbering</td><td>One or two unnumbered .mkv files is a film and its extras; six is a series somebody named badly.</td></tr>
+  <tr><td>Any audio in a drop whose name says "audiobook"</td><td>"Audiobook soundtracks" or a narrator's album is music. A name raises the question; it never answers it.</td></tr>
   <tr><td>A loose PDF with no evidence</td><td>A PDF is a book or a gas bill. Beside a <code>metadata.opf</code> or under <code>Books</code> it is a book; under <code>Taxes</code> or <code>Manuals</code> a document. Otherwise asked, once per dropped folder.</td></tr>
 </table>
 <p>A question is asked per <em>group</em>, so a thirty-chapter audiobook is one decision, and the
 answer goes back to the plan endpoint, which re-plans - the destination shown is always the one
 the server will use. A question offers only shelves the account may see, and with one option
 left it stops being a question. Uploading follows the same permission as reading.</p>
+<p><strong>Nothing moves until it has been seen.</strong> The questions and the sorted parts of the
+drop are shown together on one screen - "Everything/Movies -> Films - 3 files" - each with
+<strong>Change</strong> (another shelf, or Don't add), and any single file can be sent its own way.
+Before that, <code>POST /api/upload/check</code> finds planned files that would land on a name
+already used: an exact copy (compared by a sample of the file) is never sent, and a different file is
+asked about once - <strong>Keep both</strong>, Skip, or Replace (owner only, the old one to the bin).
+Kept both, the new one is named for what makes it different, never "(2)": "Dune (2021) -
+2160p.mkv", "IMG_0001 - iPhone 15 Pro.jpg", a song's bitrate, an audiobook's narrator.</p>
+<p><strong>Move to</strong>, in any item's menu (owner only, <code>POST /api/move</code>), refiles
+something put on the wrong shelf by the new shelf's own rule, never over a file already there.</p>
 
 <h2 id="staging">Nothing appears until all of it is there</h2>
 <p>Navidrome and Audiobookshelf watch these folders, and a half-written file is exactly what a

@@ -11,8 +11,9 @@
 <main>
 <h1>iPhone</h1>
 <p class="lede">The iPhone app exists so EmberStorm can be on the App Store rather than only a
-home-screen web app. It is a native Swift shell around the server's own page today, with native
-audio planned as the second stage - and a deliberate decision not to rewrite the app in Swift.</p>
+home-screen web app (it is in TestFlight for now, not yet on the store). It is a native Swift shell
+around the server's own page, with songs and audiobooks played by the app's own native player - and
+a deliberate decision not to rewrite the app in Swift.</p>
 
 <h2 id="shapes">Three shapes, and the one chosen</h2>
 <p>Three ways of building it were weighed:</p>
@@ -32,10 +33,10 @@ grow screen by screen later if that ever looks worth it.</div>
 no Media Session API and is stopped in the background; an iPhone's <code>WKWebView</code> is Safari's
 engine, and with background audio enabled (<code>UIBackgroundModes</code>) and the
 <code>.playback</code> audio session, the page's <code>&lt;audio&gt;</code> keeps playing when the
-phone locks.</p>
+phone locks. That turned out not to be enough (see <a href="#stage-two">stage two</a>).</p>
 
 <h2 id="stage-one">Stage one: the shell</h2>
-<p>Plain Swift in <code>ios/EmberStorm</code>, with no Capacitor. Capacitor is built to bundle a web
+<p>Plain Swift in <code>ios/SoundStorm</code>, with no Capacitor. Capacitor is built to bundle a web
 app inside the app, and this web app lives on each person's own server; stage two is Swift anyway.
 What the shell does:</p>
 <ul>
@@ -66,7 +67,10 @@ took that move for a link out of EmberStorm and sent it to Safari.</p>
 port, where the id is the current name's own. It follows the move for this launch and <strong>does not
 save it</strong>. A phone leaves the house; with the home name saved, the app would stop working the
 moment it did. Not saving also closes a hole a security review found: from a plain-http address,
-anybody on the same Wi-Fi could otherwise have pinned the app to a server of their own.</p>
+anybody on the same Wi-Fi could otherwise have pinned the app to a server of their own. A move to
+a different name of the same install - its owner's chosen name, such as
+<code>yourname.home.emberstorm.app</code> - is followed only when both addresses' <code>/healthz</code>
+answer with the same install id.</p>
 
 <h2 id="status-bar">The status bar in Now Playing</h2>
 <p>The status bar hides while Now Playing is open, and only then - the owner's choice. Android hides
@@ -79,23 +83,29 @@ the time, so everywhere else it stays. The app watches the page's body for the
 <p>A <code>WKWebView</code> runs a service worker only for App-Bound Domains: a fixed list of at most
 ten, set when the app is built. Every install has its own address, so the list cannot name them. The
 practical result is that opening the app with no connection shows the "can't reach" screen rather
-than the downloads. That is expected, not a bug in the shell; offline downloads on the iPhone are
-part of stage two.</p>
+than the downloads. That is expected, not a bug in the shell.</p>
 
 <h2 id="stage-two">Stage two: native audio</h2>
-<p>The plan is an <code>AVPlayer</code> behind a bridge the page talks to in place of
-<code>&lt;audio&gt;</code>, giving the system's Now Playing, remote commands and, later, CarPlay - the
-same shape the Android app already uses with Media3. It is not a small bridge, because the page's
-audio is not one element:</p>
+<p>Reported from a real iPhone: paused on the lock screen, the music could not be started again
+there. The page played it in the web view, and iOS suspends an app playing nothing a few seconds
+after a pause - the web view with it - so the lock screen's play had nothing awake to answer. So the
+app does what the Android app does: <code>NativeAudio.swift</code>, an <code>AVQueuePlayer</code>
+behind a stand-in on the page's <code>&lt;audio id="audio-player"&gt;</code>, speaking the same
+"audio" messages as Android's, so the page needed no change.</p>
 <ul>
-  <li>crossfade uses a second, hidden element;</li>
-  <li>gapless playback preloads the next song into memory;</li>
-  <li>leveling sets <code>volume</code>, and audiobooks set <code>playbackRate</code>;</li>
-  <li>downloads play from the Cache API through blob addresses.</li>
+  <li>Play, pause and the seek bar on the lock screen are the player's own
+  (<code>MPRemoteCommandCenter</code>), answered with the page asleep; next, previous and a book's
+  jumps go to the page's media session handlers.</li>
+  <li>The songs ahead are handed over, so the player moves into them by itself.</li>
+  <li>A sleep timer is kept by the player too (<code>sleepAt</code>), since a phone sleeps a page
+  whose screen is off.</li>
+  <li>A downloaded song (a <code>blob:</code> address) still plays in the page, and crossfade is off
+  in the app.</li>
+  <li>A playback log (<code>PlayerLog.swift</code>) can be sent from the developer's own install to
+  diagnose dropouts.</li>
 </ul>
-<p>The bridge has to answer for all of those. One question decides how urgent it is: whether the lock
-screen shows the page's Media Session title and controls on a real iPhone. The simulator cannot say,
-and it has not yet been checked on a device.</p>
+<p>Checked in the simulator. A real lock screen, a call or an alarm have not all been tried on a
+device.</p>
 
 <h2 id="backup">Photo backup</h2>
 <p>The iPhone app backs up the camera roll to the person's own photo folder
@@ -106,13 +116,15 @@ charging) are the same Settings card.</p>
 <ul>
   <li><strong>What it reads:</strong> the photo library, with full or limited access, asked for when
   backup is turned on. Newest first.</li>
-  <li><strong>Nothing twice:</strong> each batch is first checked with
-  <code>POST /api/photos/backup/check</code> by name and month (size 0, since sizing a photo kept in
-  iCloud would mean downloading it), so a reinstall or a new phone sends nothing the server has.</li>
+  <li><strong>Nothing twice:</strong> the phone keeps no list of what it sent. Each run asks
+  <code>POST /api/photos/backup/check</code> about every photo, by name, month and size (the size
+  Photos records, 0 for one held only in iCloud), so the server is the one record and a reinstall or
+  a new phone sends nothing it has.</li>
   <li><strong>How it sends:</strong> each original is written to a file
-  (<code>PHAssetResourceManager</code>, iCloud allowed; a Live Photo's still only) and uploaded to
-  <code>PUT /api/photos/backup</code> in a background <code>URLSession</code>, so a file already
-  going finishes with the app put away. It sends the web view's own session cookie - WKWebView keeps
+  (<code>PHAssetResourceManager</code>, iCloud allowed; a Live Photo as its still and its moving
+  part) and handed ahead to a background <code>URLSession</code> - up to 200 files or 1&nbsp;GB
+  waiting - which uploads them to <code>PUT /api/photos/backup</code> with the phone locked, at a
+  pace iOS decides. It sends the web view's own session cookie - WKWebView keeps
   its cookies apart from URLSession's - to the server only, never through a redirect.</li>
   <li><strong>When:</strong> while the app is open, 30 seconds after a photo is added, and as a
   <code>BGProcessingTask</code> iOS starts when it chooses (needing power if "only while charging").
@@ -125,6 +137,10 @@ charging) are the same Settings card.</p>
 <p>Checked against a local server in the simulator: the six sample photos arrived in the right
 year and month, byte for byte. The background task and an upload finishing with the app closed
 want a real iPhone over a night.</p>
+
+<p><strong>Add media</strong> in the app asks the app for files (Photos or Files,
+<code>soundstormApp.pickFiles</code>), since a web view keeps its own picker's files to itself; the
+page plans and asks as ever, and the app then sends them in the same kind of background session.</p>
 
 <h2 id="servers">Several saved servers</h2>
 <p>A phone may know several servers - its owner's, and a parent's. The connect screen is
@@ -142,8 +158,8 @@ UI test is how the app gets driven. Two small traps from building it: a centred 
 multi-line label as one line until <code>preferredMaxLayoutWidth</code> is set, and in the UI test the
 keyboard's accessory bar sits over the web form's submit button, so the test presses Return instead -
 which is also what a person does.</p>
-<p>The iPhone and Apple TV apps share one bundle id, so Apple's Universal Purchase makes them a single
-App Store listing (see <a href="tv.html#apple-tv">TVs</a>).</p>
+<p>The iPhone and Apple TV apps share one bundle id, so Apple's Universal Purchase will make them a
+single App Store listing (see <a href="tv.html#apple-tv">TVs</a>).</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

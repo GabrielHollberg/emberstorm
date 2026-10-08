@@ -19,9 +19,12 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><th>Path</th><th>What it is</th></tr>
   <tr><td><code>cmd/soundstorm/</code></td><td>The server's <code>main</code>, plus its subcommands: <code>backup</code>, <code>restore</code>, <code>reset-password</code>, <code>train-looks</code>. Any argument it does not know is an error, never a second server.</td></tr>
   <tr><td><code>cmd/soundstorm-names/</code></td><td>The names service: gives each install a name under <code>emberstorm.app</code> and publishes ACME challenges. Deployed separately, with its own Dockerfile.</td></tr>
+  <tr><td><code>cmd/soundstorm-caretaker/</code></td><td>The box's caretaker: signed updates, snapshots and roll-back, Start over and the power button. Only on a box.</td></tr>
   <tr><td><code>internal/</code></td><td>Every server package (below).</td></tr>
   <tr><td><code>android/</code></td><td>The Android app (Kotlin): phones, Google TV, Android TV and Fire TV.</td></tr>
   <tr><td><code>ios/</code></td><td>The Xcode project: the iPhone app, the Apple TV app (<code>SoundStormTV/</code>), shared code and UI tests.</td></tr>
+  <tr><td><code>box/</code></td><td>The system image for selling EmberStorm preinstalled on a small computer (being tried), and its scripts.</td></tr>
+  <tr><td><code>web/</code></td><td>The public website, emberstorm.app.</td></tr>
   <tr><td><code>library/</code></td><td>The folder skeleton with a <code>README.txt</code> per shelf, so a fresh clone has somewhere to put media. Contents are ignored by git.</td></tr>
   <tr><td><code>scripts/</code></td><td>Development tools (below).</td></tr>
   <tr><td><code>docs/</code></td><td>Older Markdown guides and the README's screenshots. Some of it predates later changes; the working notes and the code are the reference.</td></tr>
@@ -33,6 +36,7 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>install.sh</code></td><td>The Mac and Linux installer, plain <code>/bin/sh</code> so it runs on dash.</td></tr>
   <tr><td><code>tailscale-serve.json</code></td><td>The Tailscale sidecar's proxy config, written on every install because compose bind-mounts it.</td></tr>
   <tr><td><code>.github/workflows/publish.yml</code></td><td>CI: checks, then publishes the image to the GitHub container registry.</td></tr>
+  <tr><td><code>.github/workflows/website.yml</code></td><td>Publishes the website, with this site under <code>/docs</code>; run by hand.</td></tr>
   <tr><td><code>CLAUDE.md</code></td><td>The project's working notes: every decision, reversal and trap, in detail. The main source for this site.</td></tr>
 </table>
 
@@ -74,6 +78,7 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>tags</code></td><td>Reads just enough of an audio file (ID3, MP4 atoms, Vorbis comments) to know where to file it.</td></tr>
   <tr><td><code>epub</code></td><td>Reads metadata and resources out of EPUB files, with zip-bomb guards.</td></tr>
   <tr><td><code>pdf</code></td><td>Reads what metadata a PDF is willing to admit to - XMP, then the Info dictionary, then the file name.</td></tr>
+  <tr><td><code>mp4hls</code></td><td>Serves a long audiobook (.m4b) as HLS pieces cut from the file itself, so it starts at once.</td></tr>
   <tr><td><code>flac</code></td><td>Decodes FLAC, just enough to hear a song's beats on the server.</td></tr>
   <tr><td><code>photoimport</code></td><td>Brings a photo library in from Google, Apple and others: dates, places, duplicates.</td></tr>
   <tr><td><code>starter</code></td><td>Ships one item per shelf inside the binary, unpacked once.</td></tr>
@@ -89,6 +94,8 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>discover</code></td><td>Finds out about an artist from open music services (opt-in).</td></tr>
   <tr><td><code>scrobble</code></td><td>Sends plays to a person's own ListenBrainz account.</td></tr>
   <tr><td><code>plex</code></td><td>Brings playlists across from a Plex server.</td></tr>
+  <tr><td><code>voices</code></td><td>Makes an audiobook from an ebook (Kokoro) and an ebook from an audiobook (Whisper).</td></tr>
+  <tr><td><code>caretaker</code></td><td>The box's caretaker (updates, resets, the power button); not used by an ordinary install.</td></tr>
   <tr><td><code>training</code></td><td>Learns the looks from the developer's own taps (one install only).</td></tr>
 </table>
 
@@ -102,10 +109,12 @@ the CSP forbids inline script), and <code>vendor/</code>. It is embedded in the 
 web view, system bars, back), <code>PageScript</code> (injected before the page's own scripts),
 <code>NativeAudio</code> and <code>AudioService</code> (songs through Media3 ExoPlayer),
 <code>PlaybackService</code> and <code>MediaBridge</code> (media session),
-<code>PhotoBackup</code> (WorkManager jobs), <code>ServerAddress</code>,
+<code>PhotoBackup</code> and <code>Uploads</code> (WorkManager jobs), <code>Shared</code> (the
+Share sheet), <code>ServerAddress</code> and <code>ServerDiscovery</code>, <code>PlayerLog</code>,
 <code>WebCookies</code>.</p>
 <p><strong>iOS</strong> (<code>ios/</code>): <code>SoundStorm/</code> is the iPhone shell
-(<code>ConnectViewController</code>, <code>WebViewController</code>); <code>SoundStormTV/</code> the
+(<code>ConnectViewController</code>, <code>WebViewController</code>, <code>NativeAudio</code>,
+<code>PhotoBackup</code>); <code>SoundStormTV/</code> the
 native Apple TV app (player, reader, photo viewer, all twelve visualizers, song analysis);
 <code>Shared/</code> what both use; <code>SoundStormUITests/</code> the XCUITest that drives the
 phone app.</p>
@@ -113,6 +122,7 @@ phone app.</p>
 <h2 id="scripts">Scripts</h2>
 <table>
   <tr><td><code>acme-rehearsal.sh</code></td><td>Runs the ACME client against Pebble, Let's Encrypt's test authority, in CI.</td></tr>
+  <tr><td><code>after-deploy.sh</code>, <code>smoke-stack.sh</code>, <code>smoke/</code></td><td>The check after every deploy: the live server, then a throwaway test server walked by a browser at phone, TV and computer size.</td></tr>
   <tr><td><code>beats-parity.js</code></td><td>Runs the web app's own <code>hearSong</code> under Node on the Go test's samples, to prove the server hears songs identically.</td></tr>
   <tr><td><code>check-images.py</code></td><td>Verifies every committed PNG against its per-chunk CRC32 and decoded size.</td></tr>
   <tr><td><code>fetch-starter-media.sh</code></td><td>Fetches and records how each starter-library file is made.</td></tr>

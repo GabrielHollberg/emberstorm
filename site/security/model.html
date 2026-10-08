@@ -60,8 +60,9 @@ take a context, so no handler can reach a source without the restriction applied
 films and TV from one account, so every Jellyfin target checks the item comes back from a query
 limited to its own types - an id alone cannot cross from TV to films.</p>
 <p>Photos are private by design: each member has a folder of their own and an Immich account whose
-only library is that folder, so faces, places and search see their photos alone. The owner sees
-everybody's. Deleting, people, settings and remote access are the owner's routes, mounted behind an
+only library is that folder, so faces, places and search see their photos alone. The owner's own
+library leaves every member's folder out, so the owner does not see members' photos in the app
+either; photos pass between people only when sent or shared. Deleting, people, settings and remote access are the owner's routes, mounted behind an
 owner check.</p>
 
 <h2 id="files">Files from other people</h2>

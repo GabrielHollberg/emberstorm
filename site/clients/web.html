@@ -20,7 +20,7 @@ and what the Android and iPhone apps wrap.</p>
 <table>
   <tr><th>File</th><th>Job</th></tr>
   <tr><td><code>index.html</code></td><td>The shell: one page, every screen hidden or shown by class.</td></tr>
-  <tr><td><code>app.js</code></td><td>Almost everything - the library, search, the player and Now Playing, the visualizers, settings, downloads, the TV mode. About 17,000 lines.</td></tr>
+  <tr><td><code>app.js</code></td><td>Almost everything - the library, search, the player and Now Playing, the visualizers, settings, downloads, the TV mode. About 24,000 lines.</td></tr>
   <tr><td><code>reader.js</code></td><td>The book reader, around the vendored foliate-js (see <a href="reader.html">The reader</a>).</td></tr>
   <tr><td><code>sw.js</code>, <code>sw-register.js</code></td><td>The service worker and the file that registers it.</td></tr>
   <tr><td><code>style.css</code></td><td>All styling, including the TV mode (<code>html.tv</code>) and the safe-area variables.</td></tr>
@@ -33,7 +33,8 @@ and what the Android and iPhone apps wrap.</p>
 which were off the screen on a phone. Now there are five tabs: <strong>Home</strong>,
 <strong>Music</strong> (mixes, radio, playlists, songs, albums, artists), <strong>Watch</strong>
 (films, TV), <strong>Books</strong> (audiobooks, ebooks, documents, authors, series, read
-along) and <strong>Photos</strong> (photos, people, places). They sit along the bottom on a
+along) and <strong>Photos</strong> (a timeline of photos, photos and videos, people, places,
+videos, live photos, albums). They sit along the bottom on a
 phone and down the side on a computer. The old chips are still in the page, hidden, and a tab
 simply presses one, so every search path underneath stayed the same.</p>
 <p>Inside a tab, a row of <em>pills</em> picks the page. A few things about them are worth
@@ -87,10 +88,12 @@ was already in the menu, so they went. What is left on a cover is a small green 
   <li><strong>Press, slide, release.</strong> A menu opened by a hold can be used without lifting
   the finger: slide over an option and it lights, lift on it to choose it. Lifting without having
   moved leaves the menu open to tap.</li>
-  <li><strong>In a shelf's list, a hold selects instead.</strong> Keep the finger down and drag on
-  to another card, and everything between is selected, as a phone's photo gallery does. The
-  bottom 120px of the screen scrolls the page, so a drag can reach any number of items. Hold any
-  selected card to get the menu for the whole selection.</li>
+  <li><strong>Select</strong> in the menu starts selecting, with that item ticked; from then taps
+  tick more, and a hold on an unticked card ticks it and lets the finger drag on across others,
+  everything between selected, as a phone's photo gallery does. The bottom 120px of the screen
+  scrolls the page, so a drag can reach any number of items. Hold any ticked card to get the menu
+  for the whole selection. (For a while a hold selected at once; that was reversed at the owner's
+  asking.)</li>
   <li><strong>A mouse</strong> uses right-click, the menu key or Shift+F10; a hover "..." button
   appears only for a fine pointer.</li>
 </ul>

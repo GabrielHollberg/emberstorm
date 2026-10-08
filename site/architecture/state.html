@@ -34,7 +34,7 @@ play and a shelf an account has lost drops out.</p>
   <tr><td><code>beats/</code>, <code>lyrics/</code>, <code>discover/</code></td><td>Caches: song analysis, LRCLIB answers, artist info</td><td>Nothing - rebuilt</td></tr>
   <tr><td><code>tls/</code></td><td>Local authority, server certificate, Let's Encrypt certificate</td><td>Devices that installed the authority must install it again</td></tr>
   <tr><td><code>training/</code></td><td>The developer's own taps for training the looks (one install only)</td><td>Recordings</td></tr>
-  <tr><td>Library folders</td><td>The media, plus hidden <code>.uploads</code>, <code>.trash</code>, <code>.imports</code></td><td>The media - which nothing in EmberStorm ever deletes outright</td></tr>
+  <tr><td>Library folders</td><td>The media, plus hidden <code>.uploads</code>, <code>.trash</code>, <code>.imports</code>, <code>.photo-inbox</code></td><td>The media - which nothing in EmberStorm ever deletes outright</td></tr>
   <tr><td>Backend volumes</td><td>Each backend's own database, thumbnails, transcode cache</td><td>Re-provisioning, or a lost password</td></tr>
   <tr><td>The browser</td><td>Downloads, the offline shell, small per-device settings</td><td>That device's downloads</td></tr>
 </table>
@@ -114,7 +114,7 @@ Plex token during an import (30 minutes, never written down).</p>
 <h2 id="library">The library folders</h2>
 <p>The media is the person's, in plain folders: <code>music/</code>, <code>movies/</code>,
 <code>tv/</code>, <code>audiobooks/</code>, <code>ebooks/</code>, <code>documents/</code> and
-<code>pictures/</code>, under <code>SOUNDSTORM_LIBRARY_PATH</code>. Three hidden top-level
+<code>pictures/</code>, under <code>SOUNDSTORM_LIBRARY_PATH</code>. Four hidden top-level
 folders sit beside them, hidden for the same reason: no backend has a top-level dot-directory
 mounted, so whatever is in them is invisible to every scanner.</p>
 <ul>
@@ -124,6 +124,8 @@ mounted, so whatever is in them is invisible to every scanner.</p>
   them, so Undo can put them back. Owner only.</li>
   <li><code>.imports</code> - Google Takeout and iCloud zips being uploaded and sorted into a
   person's photo folder, deleted once sorted.</li>
+  <li><code>.photo-inbox</code> - photos one person has sent another, waiting until they are
+  taken or turned down.</li>
 </ul>
 <p>A <code>README.txt</code> in each shelf is load-bearing: Jellyfin refuses to remove items when
 a library folder comes back empty (it cannot tell "everything deleted" from "the drive did not

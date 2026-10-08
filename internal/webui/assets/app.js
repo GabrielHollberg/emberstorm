@@ -1710,7 +1710,7 @@ async function refreshMyPhotos() {
   // Said plainly: a member's photos are on somebody else's server.
   $('my-photos-where').textContent = me.owner
     ? `Photos you add or back up from a phone go to ${body.folder}, in folders by year and month. You see everyone's photos; each person sees only their own.`
-    : `Photos you add or back up from your phone are kept in ${body.folder} on this server, in folders by year and month. The owner of the server can see them; nobody else can.`;
+    : `Photos you add or back up from your phone are kept in ${body.folder} on this server, in folders by year and month. Only you see them in the app; whoever looks after the server's computer can still open its folders.`;
   // Dropping sorts by date; folders of one's own are kept only by putting
   // them in the folder on the server's drive directly.
   $('my-photos-folders').textContent = me.owner
@@ -1785,7 +1785,7 @@ function maybeAskBackup() {
   if (!BACKUP_APP || !st || st.enabled || !hasPictures() || localStorage.getItem('soundstorm.backupAsked')) return;
   $('backup-ask-text').textContent = state.me && state.me.owner
     ? 'New photos and videos are sent to your server in the background, on Wi-Fi, into your own folder. Photos already on the server are not sent again. You can change this in Settings.'
-    : 'New photos and videos are sent to this server in the background, on Wi-Fi, into your own folder. Photos already on the server are not sent again. The owner of the server can see them; nobody else can. You can change this in Settings.';
+    : 'New photos and videos are sent to this server in the background, on Wi-Fi, into your own folder. Photos already on the server are not sent again. Only you see them in the app; whoever looks after the server\'s computer can still open its folders. You can change this in Settings.';
   show($('backup-ask'), true);
 }
 function answerBackup(on) {

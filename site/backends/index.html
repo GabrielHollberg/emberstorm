@@ -23,6 +23,8 @@ credentials it generated, and drives it through its API - so the person using Em
   <tr><td><a href="immich.html">Immich</a></td><td>Photos</td><td><code>immich-app/*:v3</code></td><td>Admin sign-up, API key, external library</td><td>Thumbnails, previews, smart search, people, places, per-member accounts</td></tr>
   <tr><td><a href="storyteller.html">Storyteller</a></td><td>Read-along timing</td><td>pinned by digest</td><td>A server action on <code>/init</code>, then tokens</td><td>Sentence-level alignment of ebook text to audiobook audio</td></tr>
   <tr><td><a href="audiomuse.html">AudioMuse-AI</a></td><td>Song analysis</td><td>pinned by digest</td><td><code>/api/setup</code> before its first save</td><td>Moods, energy, tempo, "sounds like"</td></tr>
+  <tr><td>Kokoro</td><td>An AI voice</td><td>pinned by digest</td><td>Nothing to set up</td><td>Reading an ebook aloud, chapter by chapter, for Make an audiobook (see <a href="../server/books.html#making">Books</a>)</td></tr>
+  <tr><td>Whisper</td><td>Speech to text</td><td>pinned by digest</td><td>Nothing to set up; fetches its model on first start</td><td>Writing an audiobook down, word by word, for Make an ebook</td></tr>
   <tr><td><a href="local.html">EmberStorm itself</a></td><td>Ebooks, documents</td><td>-</td><td>Nothing to provision; it scans the folders</td><td>EPUB and PDF metadata, covers, the reader's resources</td></tr>
 </table>
 <p>Jellyfin is provisioned once and registered as two sources sharing one token -

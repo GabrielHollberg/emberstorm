@@ -50,7 +50,10 @@ lives on Docker's own Linux disk on every host.</div>
 <h2 id="members">An account per member</h2>
 <p>Each member gets an Immich account (<code>/api/admin/users</code>, made the first time they look)
 whose one external library reads only <code>pictures/Personal/&lt;name&gt;/</code>. The owner keeps the
-administrator's account, whose library is the whole folder. The adapter acts as the person asking
+administrator's account, whose library is the whole folder - but with every other person's
+<code>Personal/&lt;name&gt;</code> folder left out as Immich exclusion patterns
+(<code>provision.SyncPhotoPrivacy</code>), so the owner sees their own photos and the household's
+shared ones, never a member's. The adapter acts as the person asking
 (<code>immich.Config.ActAs</code>): every request carries their own key - never a fallback to the
 administrator's. Filtering one shared account was rejected because Immich groups faces across every photo
 it can see; separate accounts keep People, Places and search to each person's own photos. Verified first:
@@ -68,6 +71,9 @@ member deletes their account with <code>force</code> and keeps their folder. See
   <tr><td><code>/api/assets/{id}/video/playback</code></td><td>Clips; honors <code>Range</code>, so seeking works through the proxy</td></tr>
   <tr><td><code>/api/people</code>, <code>PUT /api/people/{id}</code></td><td>People, faces, naming someone found but unnamed</td></tr>
   <tr><td><code>/api/search/cities</code></td><td>Places</td></tr>
+  <tr><td><code>/api/timeline/buckets</code>, <code>/api/timeline/bucket</code></td><td>The Photos timeline, month by month (with each photo's ThumbHash for a blurred stand-in)</td></tr>
+  <tr><td><code>/api/albums</code> and its <code>/assets</code> and <code>/users</code></td><td>Albums, and sharing them with others in the house</td></tr>
+  <tr><td><code>PUT /api/jobs/sidecar</code></td><td>Making Immich read a date file written beside a photo it already has (a rescan does not)</td></tr>
   <tr><td><code>POST /api/libraries/{id}/scan</code></td><td>"Look now" - every library, members' included</td></tr>
 </table>
 
@@ -84,6 +90,8 @@ member deletes their account with <code>force</code> and keeps their folder. See
   order.</li>
   <li><strong>Memories are not used.</strong> Immich makes them overnight and only for days it picked (empty
   on a real library), so On this day is EmberStorm's own.</li>
+  <li><strong>It goes online by itself</strong>: it downloads its machine-learning models on first use
+  and checks GitHub for new versions.</li>
   <li><strong>Dates and places from imports</strong> are written as XMP sidecars beside the photo, which
   Immich reads; checked with a Takeout photo whose sidecar put it in the right city and year.</li>
 </ul>

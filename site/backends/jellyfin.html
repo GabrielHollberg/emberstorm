@@ -44,7 +44,7 @@ wrong.</div>
   <tr><td><code>/Items/{id}/PlaybackInfo</code></td><td>Negotiating playback with a device profile</td></tr>
   <tr><td><code>/videos/{id}/master.m3u8</code> and children</td><td>HLS transcodes, proxied under <code>/api/hls/</code></td></tr>
   <tr><td><code>/Videos/{item}/{source}/Subtitles/{n}/Stream.vtt</code></td><td>Subtitles as WebVTT</td></tr>
-  <tr><td><code>DELETE /Videos/ActiveEncodings</code></td><td>Stopping a transcode when the viewer leaves</td></tr>
+  <tr><td><code>DELETE /Videos/ActiveEncodings</code></td><td>Stopping a transcode whose play session has gone quiet</td></tr>
   <tr><td><code>/Shows/{id}/Episodes</code></td><td>A show's page, season by season</td></tr>
   <tr><td><code>/Items/{id}/Images/Primary</code></td><td>Posters, resized by Jellyfin</td></tr>
   <tr><td><code>POST /Library/Refresh</code></td><td>"Look now" after an upload (every library; there is no per-library trigger without its id)</td></tr>
@@ -68,12 +68,14 @@ only costs an unnecessary transcode.</p>
   device and the play session - and EmberStorm is always one device - so the <code>playSessionId</code>
   from <code>PlaybackInfo</code> goes in the HLS query. Without it, a change of quality or language got
   the old conversion's pieces. A person's live conversions are capped at four.</li>
-  <li><strong>Film quality is per device</strong>: under the bitrate cap Jellyfin copies the picture
+  <li><strong>Film quality is per device</strong> (smart, original, 20&nbsp;Mbit standard, 4&nbsp;Mbit
+  data saver): under the bitrate cap Jellyfin copies the picture
   untouched and converts only sound a browser cannot play (TrueHD, DTS) to AAC with up to 5.1 channels.
   Another audio language is always HLS with <code>AudioStreamIndex</code>.</li>
   <li><strong>Transcodes must be stopped.</strong> A transcode is an ffmpeg process that outlives the
-  request, so <code>Target.OnDone</code> sends <code>DELETE /Videos/ActiveEncodings</code> (verified: it
-  answers 204 where a made-up path answers 404).</li>
+  request, so a play session that has asked for nothing for three minutes gets
+  <code>DELETE /Videos/ActiveEncodings</code> (<code>StopPlaySession</code>; verified: it answers 204
+  where a made-up path answers 404). The call was dead code until a review found it.</li>
 </ul>
 
 <h2 id="quirks">Verified against live servers</h2>

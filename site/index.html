@@ -17,7 +17,7 @@ down, one level per click, to the decisions inside each part.</p>
 
 <h2 id="what">What it is</h2>
 <p>EmberStorm is a front end for a self-hosted media library. Somebody installs it on a
-computer at home, makes an account, and puts their media in five folders - or drags it onto
+computer at home, makes an account, and puts their media in seven folders - or drags it onto
 the window. From then on everybody in the house uses one app, on a computer, a phone or a TV,
 with one sign-in, and never needs to know what runs behind it.</p>
 <p>The person who asked for it put it like this: <em>"an all-encompassing server that can do
@@ -52,6 +52,7 @@ does not build itself is at the bottom. Each box links to the part of this site 
   <div class="row">
     <a class="box" href="backends/audiomuse.html">AudioMuse-AI<small>hears moods</small></a>
     <a class="box" href="backends/storyteller.html">Storyteller<small>read-along timing</small></a>
+    <a class="box" href="server/books.html">Kokoro &middot; Whisper<small>making audiobooks and ebooks</small></a>
   </div>
   <div class="arrow">&#8595; each reads exactly one folder &#8595;</div>
   <div class="label">The library</div>
@@ -91,10 +92,12 @@ and photo passes through it, signed in as the person asking.</div>
 <h2 id="numbers">In numbers</h2>
 <table>
   <tr><th>Server</th><td>One Go program, no third-party Go dependencies, embedded web app</td></tr>
-  <tr><th>Backends</th><td>Navidrome, Jellyfin, Audiobookshelf, Immich, Storyteller, AudioMuse-AI - all provisioned with nobody logging in</td></tr>
-  <tr><th>Apps</th><td>Web app (installable), Android (phones and Google/Android/Fire TV), iPhone, Apple TV</td></tr>
+  <tr><th>Backends</th><td>Navidrome, Jellyfin, Audiobookshelf, Immich, Storyteller, AudioMuse-AI, plus Kokoro and Whisper for making books - all provisioned with nobody logging in</td></tr>
+  <tr><th>Apps</th><td>Web app (installable), Android (phones and Google/Android/Fire TV; installed from GitHub releases), iPhone and Apple TV (in TestFlight, not yet on the App Store)</td></tr>
   <tr><th>Install</th><td>Docker Compose behind a double-click installer on Windows, a one-line script on Mac and Linux</td></tr>
-  <tr><th>Outside services</th><td>None needed. A small name service gives each install a trusted certificate; lyrics, music discovery and scrobbling are opt-in.</td></tr>
+  <tr><th>Outside services</th><td>No account and no telemetry. A small name service gives each install a trusted certificate (Let's Encrypt); lyrics, music discovery and scrobbling are opt-in. Some backends go online by themselves - film posters and details, model downloads, version checks.</td></tr>
+  <tr><th>License</th><td>AGPL-3.0 (versions before 2026-10-04 stay MIT); the source is at <code>github.com/GabrielHollberg/emberstorm</code>, the website at emberstorm.app</td></tr>
+  <tr><th>Needs</th><td>16 GB of RAM recommended (five media servers; Immich alone wants 6-8 GB), and about 20 GB of disk for EmberStorm itself (most of it the programs), plus room for the media</td></tr>
 </table>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>

@@ -64,7 +64,7 @@ login, saving a position is guarded hard:</p>
 them.</p>
 
 <h2 id="reader">The reader, server side</h2>
-<p>Rendering is foliate-js, vendored - the one piece of third-party code in the project, pinned by
+<p>Rendering is foliate-js, vendored - with hls.js, the only third-party code in the project, pinned by
 content and embedded. What is EmberStorm's is that the server unzips: the reader fetches each chapter,
 stylesheet and image from <code>/api/book/resource</code>, so no zip library runs in the browser.</p>
 <p>A book is somebody else's file, opened in the owner's signed-in session, and three review passes
@@ -104,6 +104,12 @@ Details of the API's sharp edges - <code>progress</code> not derived from <code>
 a single m4b as well as one file per chapter - so a single-file book has navigation too. Without a
 chapter list, the files stand in. Books in progress appear in the Continue row through
 <code>source.InProgressLister</code>.</p>
+<p><strong>A long book in one file plays in pieces</strong> (<code>internal/mp4hls</code>). Every
+Audible .m4b keeps its index at the end, and a long one's is big (33.5&nbsp;MB for a 52-hour book), so
+a player fetched the whole index before a word - 33 seconds away from home. A file whose index is
+2&nbsp;MB or more is offered as HLS made from the file itself: an init segment and ten-second pieces
+holding the original bytes, remuxed, nothing transcoded. Measured on the 52-hour book: sound in
+0.7&nbsp;s, a jump to hour 50 in 0.6&nbsp;s. Downloads keep the file.</p>
 
 <h2 id="pairs">Read Along: finding pairs</h2>
 <p><code>GET /api/books/pairs</code> lists what somebody has as both an ebook and an audiobook. It
@@ -141,6 +147,26 @@ found, turned to and lit; turning the page by hand pauses the following for twel
 10-hour book takes about 40 minutes to sync.</p>
 <p><code>POST /api/readalong</code> accepts only a pair Read Along lists, and a Storyteller book needs
 audiobook access as well as ebook access to read, since it holds the audiobook's audio.</p>
+
+<h2 id="making">Making an audiobook from an ebook, and an ebook from an audiobook</h2>
+<p>Both directions, on the server, with nothing sent out of the house. <strong>Make an
+audiobook</strong> is in an ebook's hold menu and <strong>Make an ebook</strong> in an audiobook's,
+for the owner and anybody the owner allows in People (a book ties the server up for hours). If the
+other version already exists the app says so and offers to use it instead. Books are made one at a
+time in the background (<code>internal/voices</code>, <code>/api/voices/...</code>), with a queue in
+Settings showing how far each is.</p>
+<ul>
+  <li><strong>An audiobook</strong> is read by <strong>Kokoro</strong> (an 82M-parameter voice, Apache
+  2.0, run unmodified in its own container), one MP3 a chapter, tagged with the voice as its narrator
+  ("AI voice: Heart"), and filed as <code>audiobooks/&lt;Author&gt;/&lt;Title&gt; (AI voice)/</code>.
+  Measured on a 4-core PC: about 4.4 times real time.</li>
+  <li><strong>An ebook</strong> is written down by <strong>Whisper</strong> (whisper-asr-webservice
+  with faster-whisper's base.en, MIT), the recording sent in pieces of about ten minutes and never
+  re-encoded. The EPUB carries its own sentence timeline, so it pairs with its recording in Read Along
+  with no Storyteller step. Whisper downloads its model on its first start.</li>
+</ul>
+<p>Not built yet: the voice's word timings for a made audiobook (it is not synced for Read Along),
+and choosing between several versions of one book.</p>
 
 <h2 id="downloads">Downloads</h2>
 <p>Downloading is the web app's (the Cache API, with an index in local storage), but the server shapes

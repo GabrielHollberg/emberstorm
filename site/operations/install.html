@@ -15,6 +15,16 @@ file to double-click, which installs Docker itself and shows a window rather tha
 Mac and Linux it is one command. Either way it ends with a setup code and an address, and the first
 person to sign up with that code owns the server.</p>
 
+<h2 id="needs">What it needs</h2>
+<ul>
+  <li><strong>Memory:</strong> 16&nbsp;GB of RAM is recommended. It runs five media servers, and Immich
+  alone wants 6-8&nbsp;GB.</li>
+  <li><strong>Disk:</strong> about 20&nbsp;GB for EmberStorm itself, most of it the programs (the
+  container images), plus room for the media.</li>
+  <li><strong>The internet while installing and updating</strong>, to download the images from the
+  GitHub container registry and Docker Hub.</li>
+</ul>
+
 <h2 id="pieces">The pieces</h2>
 <p><code>docker-compose.yml</code> names a <strong>published image</strong> and contains no
 <code>build:</code> key, so it works on its own in an empty folder for somebody who never cloned
@@ -87,8 +97,9 @@ temp folder.</p>
   with its terms accepted by its installer's own <code>--accept-license</code> (the setup says so, and
   links Docker's terms: it is free for personal use and small businesses). Its dashboard is turned off,
   and its sign-in and survey marked done (<code>DisplayedOnboarding</code>), in Docker's settings file
-  <em>before</em> it is installed, because it launches itself the moment its installer finishes. So a
-  Docker the setup installs asks nothing: nothing to click, no Docker account.</li>
+  <em>before</em> it is installed, because it launches itself the moment its installer finishes. The
+  aim is that a Docker the setup installs asks nothing and needs no Docker account; that has not yet
+  been tried on a PC that has never had Docker, so a Docker window may still appear on first start.</li>
 </ol>
 <p>A Docker already on the PC but never opened has not had its terms accepted, and that is the
 person's to do: before its first start a window says it will ask one thing - click
@@ -116,7 +127,9 @@ rules. A work (domain) network is left alone.</p>
 nothing), and writes it into <code>.env</code> as <code>SOUNDSTORM_TLS_HOSTS</code>. The container
 cannot work this out: inside Docker, the only addresses visible are the container's own. On every
 launch the address is updated if the old one has gone from every adapter, so a laptop that moves
-keeps working.</p>
+keeps working. On a Mac or Linux the same rule runs on every install or update, and a small check
+(<code>soundstorm-address.sh</code>, from the user's crontab) runs at start-up and every ten
+minutes.</p>
 
 <h3 id="refusals">One install per computer</h3>
 <p>The compose project name is fixed, so a second install in a second folder would adopt the first
@@ -139,10 +152,11 @@ at boot, and the account added to the <code>docker</code> group - used at once t
 read as "Docker is not running"). Where Docker's installer does not know the system by name - Arch,
 openSUSE, Alpine, Linux Mint and other Ubuntu-based ones - Docker comes from the system's own package
 manager instead (apt, dnf, pacman, zypper or apk). Tested on fresh Debian 13, Ubuntu 24.04, Fedora 44,
-Arch and Linux Mint machines. On a Mac it is Docker Desktop, made quiet as on Windows: its own
-command-line install with <code>--accept-license --user</code>, and <code>DisplayedOnboarding</code>
-and <code>OpenUIOnStartupDisabled</code> written before its first start, then started in the
-background and waited for. A Docker already installed but stopped is started rather than reported.</p>
+Arch and Linux Mint machines. On a Mac it is Docker Desktop: its own command-line install with
+<code>--accept-license --user</code>, then started in the background and waited for. The installer does
+not change Docker Desktop's settings on a Mac (macOS guards that folder, and asking for permission
+ended the setup), so a Docker window may open on its first start - click Skip; no account is needed.
+A Docker already installed but stopped is started rather than reported.</p>
 <table>
   <tr><th>Option</th><th>What it does</th></tr>
   <tr><td><code>--library PATH</code></td><td>Keep the media library somewhere else, such as an external drive</td></tr>

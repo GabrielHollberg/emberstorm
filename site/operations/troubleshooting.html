@@ -36,8 +36,9 @@ publicly.</div>
   Backend" was cancelled during setup, Windows added a Block rule, and Block beats Allow. The same
   update step removes the block for private networks.</li>
   <li><strong>Did the computer's address change?</strong> A laptop that moves, or a router that hands out
-  a new address, breaks the secure name. The installer updates it on every launch on Windows; elsewhere
-  update <code>SOUNDSTORM_TLS_HOSTS</code> in <code>.env</code>. Giving the computer a fixed address in
+  a new address, breaks the secure name. The installer updates it on every launch on Windows, and on a Mac
+  or Linux a small check does it at start-up and every ten minutes; failing that, update
+  <code>SOUNDSTORM_TLS_HOSTS</code> in <code>.env</code>. Giving the computer a fixed address in
   the router (a DHCP reservation) prevents it.</li>
 </ol>
 
@@ -152,7 +153,8 @@ going back to full quality by itself once the connection is fast again.</p>
 <p>More on <a href="remote.html">Away from home</a>.</p>
 
 <h2 id="backup">Photo backup messages</h2>
-<p>The Android app's photo backup shows why it stopped in Settings &rarr; Your photos, and the message is
+<p>The phone apps' photo backup shows why it stopped in Settings &rarr; Your photos (the wording
+below is the Android app's), and the message is
 meant to say what to do:</p>
 <table>
   <tr><th>Message</th><th>What it means</th></tr>
@@ -163,7 +165,8 @@ meant to say what to do:</p>
   <tr><td>Could not reach the server; it will try again</td><td>A network problem. Android retries by itself.</td></tr>
   <tr><td>It carries on when the phone is on Wi-Fi</td><td>Not an error: backup is set to Wi-Fi only.</td></tr>
 </table>
-<p>Android decides when backup jobs run, so a large backup proceeds in stretches, especially with
+<p>The phone decides when backup runs - Android its jobs, iOS its background uploads - so a large
+backup proceeds in stretches, especially with
 "only while charging" on. Photos already on the server are never sent twice, even after a reinstall.</p>
 
 <h2 id="password">Locked out</h2>

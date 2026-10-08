@@ -11,7 +11,7 @@
 <main>
 <h1>Architecture</h1>
 <p class="lede">Four layers: apps that people hold, one Go server in the middle, a set of
-media servers it drives on their behalf, and five plain folders at the bottom. This page is the
+media servers it drives on their behalf, and seven plain folders at the bottom. This page is the
 map; the pages under it go down into the decisions, a single request, where data lives and how
 the repository is laid out.</p>
 
@@ -41,6 +41,7 @@ the repository is laid out.</p>
   <div class="row">
     <a class="box" href="../backends/audiomuse.html">AudioMuse-AI<small>moods</small></a>
     <a class="box" href="../backends/storyteller.html">Storyteller<small>read-along</small></a>
+    <a class="box" href="../server/books.html">Kokoro &middot; Whisper<small>making books</small></a>
   </div>
   <div class="arrow">&#8595; each reads one folder &#8595;</div>
   <div class="label">4. The library</div>
@@ -56,7 +57,7 @@ the repository is laid out.</p>
 <h3>Apps</h3>
 <p>The web app (<code>internal/webui/assets</code>) is the product: one page, <code>app.js</code>,
 covering every kind of media. The Android and iPhone apps are native shells around that same
-page, adding only what a web page cannot do - native audio on Android, the lock screen, hiding
+page, adding only what a web page cannot do - native audio for songs and books, the lock screen, hiding
 system bars, photo backup. The Apple TV has no web view, so it is the one app written natively,
 against the same API the page uses.</p>
 
@@ -73,7 +74,7 @@ documents are the exception: they need no transcoding and describe themselves, s
 reads those folders itself.</p>
 
 <h3>The library</h3>
-<p>Five folders (with films and TV split, and documents beside ebooks) are the one part of the
+<p>Seven folders (with films and TV split, and documents beside ebooks) are the one part of the
 system a person can touch without EmberStorm. Media can be copied in with a file manager or
 dropped onto the app's window, which files it in the same place. Nothing scans the same folder
 twice.</p>

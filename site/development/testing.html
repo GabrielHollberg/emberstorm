@@ -101,6 +101,15 @@ exactly as the arrows do.</p>
 produce real ones, so the folder-walking code (<code>readEntries</code> until an empty batch) is
 tested with a fake entry tree.</p>
 
+<h2 id="smoke">The check after every deploy</h2>
+<p><code>scripts/after-deploy.sh</code> runs after every deploy: the live server healthy and its page
+loading without a script error, then a throwaway test server (<code>scripts/smoke-stack.sh</code>: its
+own generated music, film, photos and the starter book, an account of its own, its data in Docker
+volumes) given the new build and walked by a browser at phone, TV and computer size - a song plays and
+Now Playing opens, Photos shows and a photo and a video open, a film plays, a book opens, Settings
+opens. It was proved against the two bugs that prompted it, each put back on purpose and each caught.
+A screen it does not walk is not covered; a step is added when one is built.</p>
+
 <h2 id="real">Real media</h2>
 <p><code>scripts/fetch-test-library.ps1</code> builds about 750&nbsp;MB from Project Gutenberg,
 LibriVox, the Internet Archive and the Blender open movies - public domain or CC, resumable,

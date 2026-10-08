@@ -66,10 +66,12 @@ book scan. One sync runs at a time. Measured on the development machine: 8 minut
 again, since the synced EPUB embeds the audio. A failed pair is not retried automatically - a failure
 retried every half hour would be the better part of an hour of CPU, repeated - and is never unmatched,
 because failure is usually Storyteller, not the match. "Not the same book" deletes Storyteller's copies
-only; its delete touches nothing outside its own storage.</p>
+only; its delete touches nothing outside its own storage. An ebook EmberStorm made from an audiobook
+(Make an ebook) carries its own timeline, so that pair needs no Storyteller at all.</p>
 
 <h2 id="quirks">Quirks and open items</h2>
 <ul>
+  <li>It downloads its transcription model on first use, into a volume of its own.</li>
   <li>It still syncs its changelog from GitLab on a daily schedule despite
   <code>STORYTELLER_SYNC_CHANGELOG=false</code>, which only stops the one at start.</li>
   <li>Its secret key has a default, reachable only on the compose network - recorded as a decision left

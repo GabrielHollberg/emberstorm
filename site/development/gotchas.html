@@ -40,7 +40,9 @@ down.</p>
   <code>/Videos/{item}/{source}/Subtitles/{index}/Stream.vtt</code> works for every text track.
   Picture subtitles (PGS, VOBSUB) are not offered - attached, they render nothing.</li>
   <li><strong>Transcodes must be stopped</strong>: ffmpeg outlives the request, so
-  <code>OnDone</code> sends <code>DELETE /Videos/ActiveEncodings</code>.</li>
+  a play session that has asked for nothing for three minutes gets
+  <code>DELETE /Videos/ActiveEncodings</code>. The first version of this call was dead code, found by
+  a review.</li>
   <li><strong>It will not remove items from an empty library folder</strong> - it cannot tell
   "everything deleted" from "the drive did not mount". A generated <code>README.txt</code> in each
   shelf keeps folders non-empty, so deleted films do leave search.</li>
@@ -183,6 +185,9 @@ down.</p>
   <li><strong>A PWA needs a trusted certificate, not merely https.</strong> Chrome treats a
   self-signed origin as a certificate error and will not register a worker there - hidden by every
   test run on localhost.</li>
+  <li><strong>Code that runs as <code>app.js</code> loads must not touch a <code>const</code>
+  declared further down</strong>: it throws, and one thrown error stops the whole page. A syntax check
+  does not see it; loading the page and looking for an error does.</li>
   <li><strong>Nothing may assume <code>fetch</code> resolves.</strong> A failed handshake left the
   boot spinner turning; <code>api()</code> now returns an offline result.</li>
 </ul>
@@ -229,8 +234,10 @@ down.</p>
   account libraries list and the hidden-pills list both.</li>
   <li><strong>An unknown command-line argument is an error</strong>; it once started a second server
   against the same state volume.</li>
-  <li><strong>The rename invalidated every provisioned volume</strong>, since backend account names
-  and the state path changed. Remember it if the project is ever renamed again.</li>
+  <li><strong>The first rename (from atrium) invalidated every provisioned volume</strong>, since
+  backend account names and the state path changed. That is why the rename to EmberStorm changed only
+  what people see: every internal <code>soundstorm</code> - environment names, containers, cookies,
+  backend accounts, app ids - stayed.</li>
 </ul>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>

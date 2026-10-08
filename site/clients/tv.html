@@ -105,8 +105,8 @@ new back callback (see <a href="android.html#back">Android</a>).</p>
 <h2 id="apple-tv">Apple TV: a native app</h2>
 <p>tvOS has no web view, so the page cannot be wrapped as it is on Android TV. The owner decided on a
 real Apple TV app rather than relying on AirPlay. It is a second target in the iPhone project, written
-in SwiftUI, with the same bundle id as the iPhone app so that Universal Purchase makes them one App
-Store listing. What carries over is not code but every behaviour already settled for Android TV - OK
+in SwiftUI, with the same bundle id as the iPhone app so that Universal Purchase will make them one App
+Store listing; for now it is in TestFlight. What carries over is not code but every behaviour already settled for Android TV - OK
 plays and pauses, buttons fade after four seconds, the playing song first in the side bar, photos and
 books keep the music playing - so the app was built to those rules rather than working them out
 again.</p>
@@ -130,7 +130,8 @@ given the cookies explicitly (<code>AVURLAssetHTTPCookiesKey</code>), or the ser
   <tr><td>Signing in</td><td><strong>Sign in with your phone</strong> first: a short code and a QR code a signed-in phone scans or types (see <a href="../server/accounts.html#tvlink">accounts</a>). Or a username and password, waiting for approval where new devices need it.</td></tr>
   <tr><td>Who's listening?</td><td>The people kept on the TV, asked every time it opens, with their PINs (see <a href="../server/accounts.html#profiles">profiles</a>); Switch person in Settings.</td></tr>
   <tr><td>Account rules</td><td>A screen for choosing a new password when the account is held to one; while new devices need approval, a signed-in TV is asked to allow other sign-ins, and Back means "Not now", never "Don't allow".</td></tr>
-  <tr><td>Servers</td><td>Several saved servers on the connect screen, shared code with the iPhone app (<code>ios/Shared</code>).</td></tr>
+  <tr><td>Servers</td><td>Several saved servers on the connect screen, shared code with the iPhone app (<code>ios/Shared</code>), and a server on the home network found by itself (<code>ServerDiscovery</code>).</td></tr>
+  <tr><td>Controlled from a phone</td><td>The TV is a player like any open page: it reports what it plays and obeys a phone's commands (play, seek, a look, subtitles, audio, quality), and asks before somebody else takes it over (<code>Remote.swift</code>).</td></tr>
 </table>
 <p>Crossfade is not built on the TV: it is off by default on the page and set per device, so the TV
 would need a setting of its own just to turn it on.</p>

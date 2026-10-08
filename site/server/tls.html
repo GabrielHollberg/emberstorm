@@ -99,8 +99,8 @@ keeps it from becoming a trap:</p>
   domain, however many installs.</li>
   <li><strong>It holds no state.</strong> An install's token is an HMAC of its id; the DNS provider
   (Porkbun) is the only record of anything. Once a name resolves it resolves without the service,
-  and an outage stops registration and renewal, never a lookup - with a month of slack, since
-  renewal starts with a third of the certificate's life left.</li>
+  and an outage stops registration and renewal, never a lookup - with weeks of slack, since
+  renewal starts well before the certificate runs out.</li>
   <li><strong>It only names private addresses</strong> for the home name. A trusted certificate on
   a public address is a phishing kit with the project's name on it. It also only publishes values
   shaped like an ACME challenge, and caps challenges per install, per client network and overall,
@@ -148,9 +148,30 @@ in 13 seconds and found three things Pebble could not:</p>
   <li><strong>A push to main redeploys the service</strong>, and a request in flight gets a bare 502.
   The install retries in five minutes, which is correct.</li>
 </ul>
+<p><strong>Renewals say what they replace</strong> (ACME Renewal Information, RFC 9773). Let's
+Encrypt's 50 certificates a week per registered domain counts ordinary renewals too, and every
+install shares one domain, so <code>RenewalWindow</code> asks the authority when to renew, the
+install renews at a moment in that window chosen from the certificate's id, and the new order
+carries <code>replaces</code>. With no answer, a third of the life left still decides, and a week
+left always does. Only new installs then count against the weekly allowance.</p>
 <p>The issuer is recorded beside the certificate, so changing the ACME directory forces a new one
 rather than keeping a staging certificate until renewal. The certificate loop checks every twelve
 hours, and an unanswered check is retried after five minutes.</p>
+
+<h2 id="chosen">A chosen name, and finding the server from the website</h2>
+<p>An address that starts with a random code is hard to get back to. Two things help, both in
+Settings, Devices, Your web address:</p>
+<ul>
+  <li><strong>A chosen name</strong> such as <code>yourname</code>: claimed at the names service
+  and kept as a DNS TXT record holding the install's id (still no database), first come first served.
+  Claiming makes <code>yourname.home.emberstorm.app</code> and <code>yourname.net...</code> point at
+  the install's own names, the install certifies them beside its code's, and from then the page moves
+  to the chosen name. The code's names stay underneath, never shown. Single common first and last
+  names are held back; asking for one says only that it is not available.</li>
+  <li><strong>Open my EmberStorm</strong> on emberstorm.app finds an install on the visitor's own
+  internet connection: an install that allows it says so with its address announcements, and the
+  names service keeps that in memory only. On a phone the button opens the app.</li>
+</ul>
 
 <h2 id="move">The page moves itself, after checking</h2>
 <p><code>GET /api/session</code> offers <code>secureName</code> to a page not already on it. The

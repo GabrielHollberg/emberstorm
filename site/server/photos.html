@@ -28,9 +28,12 @@ neither HEIC nor raw). The original is a download, and a clip plays through the 
 player with seeking, since Immich's playback endpoint honors <code>Range</code>.</p>
 
 <h2 id="own">Everyone's own photos</h2>
-<p>Designed by the owner: <strong>each member has their own folder, sees only their own photos, and
-the owner sees everybody's.</strong> There is no setting to show anyone the owner's photos; what the
-owner controls is whether a member has Pictures at all, and how much space their photos may take.</p>
+<p>Designed by the owner: <strong>each person has their own folder and sees only their own photos
+- the owner included</strong>, who sees their own and the household's shared ones (anything outside
+<code>Personal/</code>), never a member's. (The owner used to see everybody's; that was reversed on
+2026-10-04, at the owner's call.) What the owner controls is whether a member has Pictures at all,
+and how much space their photos may take. Photos move between people only by being sent or shared
+(below).</p>
 <ul>
   <li><strong>The folder</strong> is <code>pictures/Personal/&lt;name&gt;/</code>
   (<code>library.PersonalFolder</code>, the account name made safe as a folder). Everything a member
@@ -38,7 +41,10 @@ owner controls is whether a member has Pictures at all, and how much space their
   account whose folder would be somebody else's - or a removed person's, kept - is refused.</li>
   <li><strong>Their own Immich account</strong> (<code>provision.PhotoAccountFor</code>, made the
   first time they look), whose one library reads only their folder. The owner keeps the
-  administrator's account, whose library is the whole pictures folder.</li>
+  administrator's account, whose library is the whole pictures folder less every other person's
+  <code>Personal/&lt;name&gt;</code>, left out as Immich exclusion patterns
+  (<code>provision.SyncPhotoPrivacy</code>). Immich only ever reads the folder, so leaving one out
+  deletes nothing.</li>
   <li><strong>The adapter acts as the person asking</strong> (<code>immich.Config.ActAs</code>):
   every request, stream and thumbnail carries that person's own key. If a member's account cannot be
   made it is an error - never a fallback to the administrator's key.</li>
@@ -56,14 +62,17 @@ member's photos are processed twice (thumbnails, faces) - once per library - tho
 default or one person's limit (or none); the owner's own photos have no limit. Use is measured by
 walking the folder, kept for a minute and added to as files land. At the limit an upload, backup or
 import gets a 507 saying so - nothing is ever deleted. A member's Settings shows how much is used,
-and says plainly that the owner of the server can see their photos.</p>
+and says plainly that only they see their photos in the app, while whoever looks after the server's computer can still open its folders.</p>
 
 <h2 id="backup">Phone backup</h2>
 <p><strong>The server half</strong> is two endpoints. <code>POST /api/photos/backup/check</code>
 asks "which of these do you have" by name, time taken and size, so a reinstall or a new phone sends
 nothing twice. <code>PUT /api/photos/backup?name=&amp;taken=</code> takes one file as the body and
 files it under <code>Personal/&lt;name&gt;/&lt;year&gt;/&lt;month&gt;/</code>, keeping a different
-file of the same name beside it. These uploads are exempt from the 30-second body deadline, which
+file of the same name beside it under a name for what makes it different (its camera, or when it
+was taken). The server is the one record of what was sent: the phones keep no list, and ask about
+every photo on each run; a photo deleted from a person's folder is remembered, so the phone does not
+send it back. These uploads are exempt from the 30-second body deadline, which
 would cut off a phone's video on a slow uplink.</p>
 <p><strong>The Android half</strong> (<code>PhotoBackup.kt</code>) runs as WorkManager jobs, so
 Android decides when (Wi-Fi only unless turned off, charging if asked) and it carries on with the app
@@ -77,9 +86,10 @@ a job runs in the foreground with a quiet notification where Android allows, sin
 is stopped at ten minutes.</p>
 <p><strong>The iPhone half</strong> (<code>ios/SoundStorm/PhotoBackup.swift</code>) answers the same
 messages with the same status, so the page has no iPhone code. It reads the photo library (full or
-limited access), checks each batch with the server by name and month, writes each original to a
-file (iCloud allowed) and sends it in a background <code>URLSession</code>, so a file already going
-finishes with the app put away. It runs while the app is open, shortly after a photo is added, and
+limited access), checks every photo with the server by name, month and size, writes each original
+to a file (iCloud allowed; a Live Photo as its still and its moving part) and hands it ahead to a
+background <code>URLSession</code> - up to 200 files or 1&nbsp;GB waiting - which sends them with the
+phone locked, at a pace iOS decides. It runs while the app is open, shortly after a photo is added, and
 as a background task iOS starts when it chooses. See <a href="../clients/iphone.html#backup">iPhone</a>.</p>
 <div class="warn"><strong>A shared phone.</strong> A security review found backup carried on into
 the next person's folder after a different account signed in. Now signing out, or another account
@@ -111,7 +121,7 @@ anywhere on the window. <code>internal/photoimport</code> does the sorting.</p>
   <tr><td>The download's own record</td><td>Takeout's JSON sidecars, found despite Takeout's naming (edited copies, "(1)" copies, names cut at 47 characters, album copies whose sidecar lives in the year's folder); iCloud's "Photo Details.csv", whose date has an unquoted comma; Facebook, Instagram and Flickr JSON.</td></tr>
   <tr><td>EXIF</td><td>Found by its marker, so in a HEIC too (<code>ExifTaken</code>).</td></tr>
   <tr><td>A date in the name</td><td><code>IMG_20191225_090000</code>, <code>PXL_...</code>, screenshots, WhatsApp's, Telegram's (<code>NameTaken</code>).</td></tr>
-  <tr><td>The file's own date</td><td>If not the day of the download.</td></tr>
+  <tr><td>The file's own date</td><td>In a download, if not the day of the download. For a dropped file, only a video's (a still's file date is when it was saved or scanned).</td></tr>
   <tr><td>Nothing</td><td><code>Undated/</code> - never today's month.</td></tr>
 </table>
 <p>That last rule came from the first walkthrough, which filed a photo under the current month: the
@@ -136,8 +146,11 @@ beside the photo as an XMP sidecar (<code>&lt;file&gt;.xmp</code>). The photo it
 Immich reads the sidecar. Checked: a Takeout photo at the Eiffel Tower showed its 2019 date in Paris.</p>
 <p>Every upload to the picture shelf - not just imports - is sorted the same way
 (<code>savePhoto</code>, <code>library.SaveDecided</code>, which places a file once its bytes have
-arrived), with the browser sending the file's own date as a last resort, which on a camera's card is
-when it was taken.</p>
+arrived). For a video with no date inside, the browser sends the file's own date as a last resort,
+which on a camera's card is when it was filmed; a still with no date inside it or in its name goes to
+<code>Undated/</code>, since its file date is usually when it was saved from a chat or scanned. A
+video dropped as a film but carrying a phone's or camera's make and model goes to the person's photos
+instead (<code>tags.VideoCamera</code>).</p>
 
 <h2 id="duplicates">Duplicates improve the kept copy</h2>
 <p>Takeout copies a photo into every album, and the same photo is often in Google, iCloud and the
@@ -157,6 +170,25 @@ and city.</p>
 a folder somebody arranged and copied in by hand does not stop a copy being filed by date, and is never
 improved or moved: their folders are left exactly as they are. Such a photo then shows twice, which
 "Your photos" says. Near-duplicates (re-compressed or edited copies) are not caught.</p>
+
+<h2 id="timeline">The timeline, albums and sharing</h2>
+<ul>
+  <li><strong>The Photos tab is a timeline</strong>: every month under its heading and every day
+  within it, newest first, each month loaded as it comes near (<code>/api/photos/months</code>,
+  <code>/month</code>, over Immich's own timeline buckets), with a handle down the edge to drag
+  through the years, pinch to change how many fit a row, and a blurred stand-in from each photo's
+  ThumbHash while it loads. Pills for Photos (stills), Photos &amp; videos, Videos, Live photos,
+  People, Places and Albums.</li>
+  <li><strong>Videos play in the viewer</strong>, in the same swipe as the photos, and a Live Photo's
+  moving part plays over its still.</li>
+  <li><strong>Albums</strong> are Immich's own, made in the person's own photo account, so as private
+  as the photos.</li>
+  <li><strong>Send to...</strong> hands somebody else here a copy of some photos: they wait, and the
+  other person chooses <strong>Add to my photos</strong> (copies filed by date in their own folder) or
+  No thanks.</li>
+  <li><strong>Sharing an album</strong> lets others see it (or add to it) while they are in it -
+  the files stay the owner's - and <strong>Save to my photos</strong> makes real copies.</li>
+</ul>
 
 <h2 id="browse">People, Places and On this day</h2>
 <p><code>source.PhotoBrowser</code> exposes what Immich works out itself: <code>GET /api/people</code>

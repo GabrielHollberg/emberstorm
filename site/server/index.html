@@ -21,7 +21,8 @@ belong to a person rather than to the media.</p>
 (<code>crypto/pbkdf2</code>), not for the ACME client that gets real certificates, not for the
 FLAC decoder the beat analysis uses. The web app is embedded in the same binary with
 <code>go:embed</code>, so the image is the program and nothing else. The only third-party code
-in the whole project is foliate-js, the EPUB renderer, vendored into the web assets.</p>
+in the whole project is foliate-js, the EPUB renderer, and hls.js, both vendored into the web
+assets.</p>
 <p>It runs in a container beside the backends it drives, as an unprivileged user (uid 10001),
 with no access to the Docker socket. That last point is a choice, not an omission: a server
 that cannot drive Docker cannot be turned into a way onto the host, which is also why it
@@ -127,6 +128,7 @@ everything past it speaks <code>media.Item</code>.</p>
   <tr><td><code>beats</code>, <code>flac</code></td><td>Hearing each song once on the server for the visualizers, through a FLAC decoder of its own.</td></tr>
   <tr><td><code>tags</code>, <code>epub</code>, <code>pdf</code>, <code>photoimport</code></td><td>Small readers that answer one question each - where to file a file, what a book is called, when a photo was taken.</td></tr>
   <tr><td><code>lyrics</code>, <code>discover</code>, <code>scrobble</code>, <code>plex</code></td><td>The opt-in outside services: LRCLIB, MusicBrainz and friends, ListenBrainz, and Plex playlist import.</td></tr>
+  <tr><td><code>voices</code>, <code>mp4hls</code></td><td>Making an audiobook from an ebook and an ebook from an audiobook (through Kokoro and Whisper); serving a long audiobook as HLS pieces cut from the file itself.</td></tr>
   <tr><td><code>starter</code>, <code>webui</code></td><td>The embedded starter library and web app.</td></tr>
 </table>
 
@@ -141,7 +143,7 @@ everything past it speaks <code>media.Item</code>.</p>
   <a class="card" href="collections.html"><b>Favorites, playlists, history</b><span>What is kept per person, and why not in the backends.</span></a>
   <a class="card" href="music.html"><b>Music: radio, moods, beats</b><span>Stations, moods from AudioMuse-AI, and hearing every song ahead of time.</span></a>
   <a class="card" href="photos.html"><b>Photos: folders, backup, imports</b><span>Everyone's own photos, phone backup, and bringing a library in from Google or Apple.</span></a>
-  <a class="card" href="books.html"><b>Books and read-along</b><span>Ebooks EmberStorm reads itself, and pages that turn with the audiobook.</span></a>
+  <a class="card" href="books.html"><b>Books and read-along</b><span>Ebooks EmberStorm reads itself, pages that turn with the audiobook, and making one from the other.</span></a>
   <a class="card" href="tls.html"><b>Certificates and names</b><span>TLS modes, the name service, the ACME client and remote access.</span></a>
 </div>
 </main>

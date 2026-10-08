@@ -23,8 +23,13 @@ that holds it together, a single branch, was learnt from a bug that shipped.</p>
 </table>
 <p>The PC deploys with:</p>
 <pre><code>docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build soundstorm
-curl localhost:8099/healthz
+sh scripts/after-deploy.sh
 git push</code></pre>
+<p><code>after-deploy.sh</code> is the check that followed two deploys in one day that broke the app
+for the owner: the live server healthy and its page loading without a script error, then a throwaway
+test server (<code>scripts/smoke-stack.sh</code>, with generated media and an account of its own)
+given the new build and walked by a browser at phone, TV and computer size - a song plays, Photos
+opens, a film plays, a book opens, Settings opens. A screen it does not walk is not covered.</p>
 <p>The dev override adds <code>build: .</code>, which the published compose file deliberately
 lacks so that it works in an empty folder for somebody who never cloned anything.</p>
 <p>Each session has its own memory, which the other never sees. So anything both must know - a
@@ -87,7 +92,13 @@ updates itself.</p>
 <p>Built on the PC from <code>android/</code> on main with <code>gradlew assembleDebug</code>,
 with <code>versionCode</code> raised every time so a phone installs over the last build. Published
 as a GitHub pre-release named <code>android-&lt;version&gt;</code>, <strong>never marked
-Latest</strong>, because Latest is where the README's installer link points.</p>
+Latest</strong>, because Latest is where the README's installer link points. Nothing updates an
+installed copy by itself: each release is installed on the owner's phone, and on the projector by
+<code>adb install -r</code> over the network.</p>
+
+<h3>The websites</h3>
+<p><code>.github/workflows/website.yml</code>, run by hand, publishes the public website
+(<code>web/</code>, emberstorm.app) with this documentation site under <code>/docs</code>.</p>
 
 <h3>The Apple apps</h3>
 <p>Archived on the Mac and sent to TestFlight. The Apple TV's release build is signed by hand with

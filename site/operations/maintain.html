@@ -18,7 +18,11 @@ thing to another computer, and removing it without touching anybody's media.</p>
 <p>There is no separate update path. Running the installer again pulls newer images and restarts,
 keeping the library, accounts and settings. Windows gets an <strong>Update EmberStorm</strong>
 shortcut in the Start menu that does exactly that; on Mac and Linux the install command is run again;
-by hand it is <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>
+by hand it is <code>docker compose pull &amp;&amp; docker compose up -d</code>. EmberStorm never checks
+for updates by itself; nothing changes until somebody runs the installer. (A box sold with EmberStorm
+on it is different: its caretaker checks a signed update channel and installs releases, putting
+everything back if one is not healthy.) The phone apps do not update themselves either: an Android
+release is installed over the last by hand.</p>
 <div class="why">EmberStorm cannot update itself, and should not learn how. It has no access to the
 Docker socket, which is the reason a compromised EmberStorm cannot reach the host. An in-app update
 button would mean handing it that socket.</div>

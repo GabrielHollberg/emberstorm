@@ -44,15 +44,19 @@ expensive - transcoding - still happens in Jellyfin.</div>
   range, caching). When the person stops a film or skips a song, the context ends and the
   upstream fetch stops with it - a cancelled request is the normal way a video ends and is not
   logged as an error.</li>
-  <li><strong>Anything a target started</strong>, such as a Jellyfin transcode, is stopped on
-  every exit path through <code>Target.OnDone</code>, which for Jellyfin sends
-  <code>DELETE /Videos/ActiveEncodings</code>. A transcode is an ffmpeg process that outlives
-  the HTTP request otherwise.</li>
+  <li><strong>A Jellyfin transcode</strong> is an ffmpeg process that outlives the HTTP request,
+  so a play session that has asked for nothing for three minutes is stopped
+  (<code>hlsSessions</code>, <code>source.PlaySessionStopper</code>), which sends
+  <code>DELETE /Videos/ActiveEncodings</code>. Before a review found the stop call dead, every
+  film closed left its conversion running until Jellyfin's own timeout.</li>
 </ul>
 <p>Range support is the difference between seeking and a file that appears corrupt. Navidrome's
 converted streams get a length and ranges through <code>estimateContentLength=true</code>
 (checked: a request from byte 100,000 answered 206), Immich's video playback honors Range, and
-the slim path below implements ranges itself over a virtual file.</p>
+the slim path below implements ranges itself over a virtual file. That estimate is a few percent
+too big for a conversion Navidrome has not made before, and a player waiting for bytes that never
+came stalled near a song's end; the rest of such a song is now sent as zeros
+(<code>padConverted</code>), which a decoder passes over, so the song ends.</p>
 
 <h2 id="slim">Slim headers: the picture inside the song</h2>
 <p>Away from home, songs took 15-40 seconds to start. Caching, pacing and a lower bitrate each

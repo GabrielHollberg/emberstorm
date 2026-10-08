@@ -24,9 +24,13 @@ about their family.</p>
 <p>The owner is always unrestricted, whatever is stored for them. They are the only account that
 can change restrictions, so an owner who locked themselves out of a shelf would have no way
 back in.</p>
-<p>There are no invite links and no open registration. Sign-up is a first-boot action that
-closes the moment an account exists - a second sign-up would be a stranger who found the port
-claiming somebody else's server. After that, only the owner adds accounts. Even the role of the
+<p>There is no open registration. Sign-up is a first-boot action that closes the moment an
+account exists - a second sign-up would be a stranger who found the port claiming somebody else's
+server. After that, only the owner adds accounts: with a password the owner chooses, or by
+<strong>Invite someone</strong> (People), which makes a QR code and a link shown once
+(<code>invites.go</code>). The person opens it, chooses their own password, and is signed in. An
+invitation works once, for seven days, at most twenty waiting, and the state keeps only a hash of
+its 128-bit token. Even the role of the
 first account is decided by the server: <code>AddUser</code> makes the first account the owner
 and everyone after a member under one lock, so two sign-ups racing on a fresh install cannot
 both become owner.</p>

@@ -95,8 +95,8 @@ answers "unknown source" for an account without music - and checks the source im
 Subsonic protocol), plus headers. For a reduced bitrate it adds <code>maxBitRate</code>,
 <code>format=mp3</code> (Navidrome's default, Opus, is patchy on iPhones) and
 <code>estimateContentLength=true</code>, which gives the converted stream a length and Range
-support. A Target can also be a local file or bytes in memory; for Jellyfin it carries an
-<code>OnDone</code> that stops the transcode when the player goes away.</p>
+support. A Target can also be a local file or bytes in memory. (A Jellyfin transcode is stopped
+separately, once its play session has asked for nothing for a few minutes.)</p>
 <p>The credential never reaches the device. Transport errors pass through <code>httpx.Redact</code>
 before they can be logged or shown, because a Subsonic URL carries its credential.</p>
 

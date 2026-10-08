@@ -20,7 +20,7 @@ rounds of security review found a way for a book to run script before it was clo
 <code>internal/webui/assets/vendor/</code>. Writing a reader was considered and rejected for the
 same reason EmberStorm does not transcode video: the two hard parts, the paginator and the EPUB
 CFI code, are about 44KB and 13KB of careful work that already exists.</p>
-<div class="why">It is the only third-party code in the project, and it does not break the
+<div class="why">It and hls.js are the only third-party code in the project, and they do not break the
 zero-dependency rule's intent. The files are checked in and pinned by content, embedded with
 <code>go:embed</code>, and fetched at no point during a build. The Go module still has no
 dependencies at all.</div>
@@ -124,9 +124,18 @@ reads the player's own clock, it follows at any playback speed.</p>
   <li><strong>When the timing cannot be trusted</strong> - Storyteller's audio pieces do not line up
   with Audiobookshelf's chapters - there is no timeline, and the book opens saying it cannot follow
   rather than following the wrong sentence.</li>
+  <li><strong>A long sentence</strong> turns the page as the voice crosses it: within a sentence over
+  two seconds, the voice's place is taken as the same share of its letters as of its time
+  (<code>followWithinSentence</code>).</li>
   <li><strong>Pairs</strong> are matched by title and author surname with edition noise removed. The
-  owner can pair a missed match by hand or mark a wrong one "Not the same book".</li>
+  owner can pair a missed match by hand or mark a wrong one "Not the same book". An ebook made from
+  the audiobook (Make an ebook) carries its own timeline and needs no Storyteller.</li>
 </ul>
+<p>A <strong>double tap</strong> on the book goes round three views: the pages, the book as one
+endless line moving with the voice, and a word at a time in the middle of the screen
+(<code>toggleLine</code>, kept per device). With no audiobook the same views run at a speed of the
+reader's own choosing, in words a minute, and going back to the pages turns to the word
+reached.</p>
 
 <h2 id="wakelock">Keeping the screen on</h2>
 <p>While a book follows its audiobook nobody touches the phone, so it used to sleep mid-chapter.

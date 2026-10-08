@@ -23,7 +23,10 @@ what it sends to a phone away from home.</p>
   <tr><td><code>https://&lt;id&gt;.home.emberstorm.app:8099</code></td><td>The home network</td><td>Let's Encrypt, trusted everywhere</td></tr>
   <tr><td><code>https://&lt;id&gt;.net.emberstorm.app:8099</code></td><td>Anywhere, once remote access is on</td><td>The same certificate, carrying both names</td></tr>
 </table>
-<p>The id is random and per install. All three are served on the same port: EmberStorm's listener tells
+<p>The id is random and per install. The owner can also choose an easier name in Settings, Devices,
+Your web address - <code>yourname.home.emberstorm.app</code> and <code>yourname.net.emberstorm.app</code>
+- which then becomes the address the page moves to, the code's names staying underneath (see
+<a href="../server/tls.html#chosen">Certificates and names</a>). All three are served on the same port: EmberStorm's listener tells
 a TLS connection from a plain HTTP request by its first byte (<code>servetls.Listener</code>), so the
 address people already have keeps working while the secure one is added.</p>
 
@@ -38,7 +41,7 @@ certificate for a server nothing on the internet can reach. It is the same idea 
   <li><strong>It never carries media.</strong> DNS records and a challenge every couple of months cost
   the same however many films are watched; a relay would not.</li>
   <li><strong>It holds no state.</strong> Once a name resolves, it resolves without the service; an outage
-  stops registration and renewal, never a lookup, and renewal starts a month early.</li>
+  stops registration and renewal, never a lookup, and renewal starts weeks before expiry.</li>
   <li><strong>It only names private addresses</strong> for the home name - a trusted certificate on an
   arbitrary public address would be a phishing kit with the project's name on it.</li>
   <li><strong>Every failure falls back.</strong> Until the certificate arrives, or if it never can, the
@@ -147,7 +150,10 @@ Mbps. Several causes were found, one after another:</p>
   remembered on the device for six hours. A song that cannot play six seconds after starting is restarted
   at 128 kbps anyway.</li>
   <li><strong>And back again.</strong> While slow, the link is timed again every fifteen minutes in the
-  background; over 3 Mbps the next song is at full quality. A playing song is never changed.</li>
+  background, and a few seconds after the phone changes network or comes back online; over 3 Mbps the
+  next song is at full quality, and a message says which ("Weak connection" or "Good connection"). A
+  song stuck at full quality for eight seconds mid-way carries on at the lower quality from where it
+  was.</li>
   <li><strong>Covers are card-sized</strong> unless asked otherwise (400px by default), and load at low
   priority behind the song.</li>
 </ul>
