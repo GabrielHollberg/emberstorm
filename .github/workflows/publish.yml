@@ -105,7 +105,7 @@ jobs:
       - name: Committed images still decode
         run: python3 scripts/check-images.py
 
-      # SoundStorm-Setup.cmd is downloaded straight from raw.githubusercontent
+      # EmberStorm-Setup.cmd is downloaded straight from raw.githubusercontent
       # and run by cmd.exe, which does not reliably honor `goto` with LF line
       # endings - and this file uses goto. A repo-wide `sed -i` has quietly
       # stripped the carriage returns out of it twice now, which is not
@@ -121,12 +121,12 @@ jobs:
       # converted, which matching never could.
       - name: The Windows setup file still has CRLF
         run: |
-          returns=$(tr -cd '\r' < SoundStorm-Setup.cmd | wc -c)
-          lines=$(wc -l < SoundStorm-Setup.cmd)
+          returns=$(tr -cd '\r' < EmberStorm-Setup.cmd | wc -c)
+          lines=$(wc -l < EmberStorm-Setup.cmd)
           if [ "$returns" -gt 0 ] && [ "$returns" -eq "$lines" ]; then
-            echo "SoundStorm-Setup.cmd has its carriage returns ($returns of $lines lines)."
+            echo "EmberStorm-Setup.cmd has its carriage returns ($returns of $lines lines)."
           else
-            echo "SoundStorm-Setup.cmd has lost its CRLF line endings."
+            echo "EmberStorm-Setup.cmd has lost its CRLF line endings."
             echo "$returns of $lines lines end with a carriage return; all of them should."
             echo "cmd.exe needs them for goto. See .gitattributes."
             exit 1
@@ -224,5 +224,5 @@ jobs:
               --title "SoundStorm $GITHUB_REF_NAME" \
               --generate-notes
           fi
-          gh release upload "$GITHUB_REF_NAME" SoundStorm-Setup.cmd --clobber
-          echo "Attached SoundStorm-Setup.cmd to $GITHUB_REF_NAME"
+          gh release upload "$GITHUB_REF_NAME" EmberStorm-Setup.cmd --clobber
+          echo "Attached EmberStorm-Setup.cmd to $GITHUB_REF_NAME"

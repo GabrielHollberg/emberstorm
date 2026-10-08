@@ -43,9 +43,9 @@ docker run --rm -v "//h/dev/soundstorm:/src" -w /src golang:1.27-alpine go test 
 
 Releases are tags: pushing `vX.Y.Z` runs `.github/workflows/publish.yml`, which
 tests, builds multi-arch images (amd64 and arm64) to
-`ghcr.io/gabrielhollberg/soundstorm`, and attaches `SoundStorm-Setup.cmd` to the
+`ghcr.io/gabrielhollberg/soundstorm`, and attaches `EmberStorm-Setup.cmd` to the
 GitHub release. The README's download link is
-`/releases/latest/download/SoundStorm-Setup.cmd`, so it always follows the newest
+`/releases/latest/download/EmberStorm-Setup.cmd`, so it always follows the newest
 release.
 
 ## How it works

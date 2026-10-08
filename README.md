@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GabrielHollberg/soundstorm/releases/latest/download/SoundStorm-Setup.cmd"><strong>⬇ Download for Windows</strong></a>
+  <a href="https://github.com/GabrielHollberg/soundstorm/releases/latest/download/EmberStorm-Setup.cmd"><strong>⬇ Download for Windows</strong></a>
   &nbsp;·&nbsp;
   <a href="#mac-and-linux">Mac and Linux</a>
   &nbsp;·&nbsp;
@@ -129,7 +129,7 @@ then, an iPhone uses the web app.
 
 ### Windows
 
-1. **[Download SoundStorm-Setup.cmd](https://github.com/GabrielHollberg/soundstorm/releases/latest/download/SoundStorm-Setup.cmd)**
+1. **[Download EmberStorm-Setup.cmd](https://github.com/GabrielHollberg/soundstorm/releases/latest/download/EmberStorm-Setup.cmd)**
 2. **Right-click** the downloaded file → **Properties** → tick **Unblock** at the bottom → **OK**
 3. **Double-click** it.
 

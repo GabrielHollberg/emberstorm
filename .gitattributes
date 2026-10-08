@@ -12,7 +12,7 @@ install.sh text eol=lf
 Dockerfile text eol=lf
 *.yml text eol=lf
 
-# And the mirror image of it. SoundStorm-Setup.cmd is downloaded straight from
+# And the mirror image of it. EmberStorm-Setup.cmd is downloaded straight from
 # raw.githubusercontent, which serves whatever is in the repository - so the
 # repository has to hold CRLF. cmd.exe tolerates LF for simple lines but not
 # reliably for `goto`, which this file uses, and the failure is a batch script

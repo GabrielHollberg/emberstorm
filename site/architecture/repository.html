@@ -29,7 +29,7 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>docker-compose.yml</code></td><td>The install: EmberStorm and every backend, naming a published image and containing no <code>build:</code> key, so it works alone in an empty folder.</td></tr>
   <tr><td><code>docker-compose.dev.yml</code></td><td>Adds <code>build: .</code> back for development.</td></tr>
   <tr><td><code>Dockerfile</code></td><td>Builds the server image, cross-compiling on the builder's platform for linux/amd64 and linux/arm64.</td></tr>
-  <tr><td><code>install.ps1</code>, <code>SoundStorm-Setup.cmd</code></td><td>The Windows installer (with its own window) and the double-clickable file that starts it.</td></tr>
+  <tr><td><code>install.ps1</code>, <code>EmberStorm-Setup.cmd</code></td><td>The Windows installer (with its own window) and the double-clickable file that starts it.</td></tr>
   <tr><td><code>install.sh</code></td><td>The Mac and Linux installer, plain <code>/bin/sh</code> so it runs on dash.</td></tr>
   <tr><td><code>tailscale-serve.json</code></td><td>The Tailscale sidecar's proxy config, written on every install because compose bind-mounts it.</td></tr>
   <tr><td><code>.github/workflows/publish.yml</code></td><td>CI: checks, then publishes the image to the GitHub container registry.</td></tr>

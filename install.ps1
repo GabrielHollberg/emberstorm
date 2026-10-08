@@ -1,6 +1,6 @@
 # EmberStorm installer for Windows.
 #
-# Double-click SoundStorm-Setup.cmd, or from PowerShell:
+# Double-click EmberStorm-Setup.cmd, or from PowerShell:
 #
 #   irm https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.ps1 | iex
 #
@@ -638,7 +638,7 @@ function ConvertTo-ArgumentList($Bound) {
 # The relaunch. An interactive setup - not the desktop icon (-Launch), not
 # -Console, not somewhere a window cannot be shown - starts itself again with
 # its console hidden and the window as its face, and this console says so and
-# goes. Exit code 99 tells SoundStorm-Setup.cmd not to wait for a key press
+# goes. Exit code 99 tells EmberStorm-Setup.cmd not to wait for a key press
 # under a message pointing somewhere else.
 #
 # The copy it runs is its own temporary file, because the file this run came
