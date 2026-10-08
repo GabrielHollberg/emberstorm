@@ -241,7 +241,7 @@ func (s *Server) handleFind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	if !s.limits.allow("find:"+s.findConn(r), findRate) {
+	if !s.open.allow("find:"+s.findConn(r), findRate) {
 		writeError(w, http.StatusTooManyRequests, "too many lookups; try again later")
 		return
 	}
@@ -420,6 +420,32 @@ func (s *Server) ownerOf(ctx context.Context, name string) (string, error) {
 	return id, nil
 }
 
+// releaseWait is how long a name let go is kept for the install that let it go.
+const releaseWait = 30 * 24 * time.Hour
+
+// releasedBy is the install that let name go within releaseWait, or "".
+func (s *Server) releasedBy(ctx context.Context, name string, now time.Time) string {
+	g, ok := s.DNS.(Getter)
+	if !ok {
+		return ""
+	}
+	vals, err := g.Get(ctx, name+"."+claimLabel, "TXT")
+	if err != nil {
+		return ""
+	}
+	for _, v := range vals {
+		parts := strings.Split(strings.Trim(v, `"`), ":")
+		if len(parts) != 3 || parts[0] != "released" || !validID(parts[1]) {
+			continue
+		}
+		at, err := strconv.ParseInt(parts[2], 10, 64)
+		if err == nil && now.Sub(time.Unix(at, 0)) < releaseWait {
+			return parts[1]
+		}
+	}
+	return ""
+}
+
 // handleClaim gives the install a chosen name: PUT /v1/name {"name": "hollberg",
 // "previous": "old"}. A name another install holds is refused; the previous
 // name, if it is this install's, is let go.
@@ -462,6 +488,13 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 	// install already holding it (which is how it puts its home and away
 	// names back).
 	if owner == "" && held(name) && !s.heldCodeOK(name, body.Code) {
+		writeError(w, http.StatusConflict, notAvailable)
+		return
+	}
+	// A name let go waits a month for anybody else: bookmarks and the
+	// family's apps still lead to it, and a stranger taking it the next day
+	// would be who they reach (the twelfth security pass).
+	if by := s.releasedBy(r.Context(), name, time.Now()); owner == "" && by != "" && by != id {
 		writeError(w, http.StatusConflict, notAvailable)
 		return
 	}
@@ -514,7 +547,9 @@ func (s *Server) release(ctx context.Context, id, name string) {
 	if err != nil || owner != id {
 		return
 	}
-	if err := s.DNS.Delete(ctx, name+"."+claimLabel, "TXT"); err != nil {
+	// Kept as let go, by whom and when, rather than deleted: see
+	// releasedBy.
+	if _, err := s.DNS.Set(ctx, name+"."+claimLabel, "TXT", fmt.Sprintf("released:%s:%d", id, time.Now().Unix())); err != nil {
 		s.Log.Warn("release a name", "name", name, "err", err)
 		return
 	}
@@ -549,7 +584,7 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
-	if !s.limits.allow("launch:"+s.findConn(r), launchRate) {
+	if !s.open.allow("launch:"+s.findConn(r), launchRate) {
 		chosenPage(w, http.StatusTooManyRequests, "Slow down a little", "Too many visits from here just now. Try again in a minute.", nil)
 		return
 	}

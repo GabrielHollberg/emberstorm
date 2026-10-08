@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"regexp"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -147,6 +148,15 @@ func (p *Porkbun) Sweep(ctx context.Context, label string, forgetAfter time.Dura
 	for _, c := range claims {
 		id := strings.Trim(strings.ToLower(c.Content), `"`)
 		name := claimName.FindStringSubmatch(strings.ToLower(strings.TrimSuffix(c.Name, ".")))[1]
+		// A name let go waits its month for anybody else (releasedBy), then
+		// goes.
+		if parts := strings.Split(id, ":"); len(parts) == 3 && parts[0] == "released" {
+			at, err := strconv.ParseInt(parts[2], 10, 64)
+			if err != nil || now.Sub(time.Unix(at, 0)) >= releaseWait {
+				dropNames[name] = true
+			}
+			continue
+		}
 		if records[id] <= 0 {
 			dropNames[name] = true
 			continue

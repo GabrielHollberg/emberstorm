@@ -693,8 +693,24 @@ func remoteNameIn(cert *tls.Certificate, reg names.Registration) string {
 	if cert == nil || cert.Leaf == nil || reg.ID == "" {
 		return ""
 	}
+	// The certificate also carries a chosen name's two, and a chosen home
+	// name is not the remote one (the twelfth security pass): the code's own
+	// away name first, else any name not under the home label.
+	homeLabel := ""
+	if parts := strings.SplitN(reg.Name, ".", 3); len(parts) == 3 {
+		homeLabel = parts[1]
+	}
+	away := func(n string) bool {
+		parts := strings.SplitN(n, ".", 3)
+		return n != reg.Name && len(parts) == 3 && parts[1] != homeLabel
+	}
 	for _, n := range cert.Leaf.DNSNames {
-		if n != reg.Name {
+		if away(n) && strings.HasPrefix(n, reg.ID+".") {
+			return n
+		}
+	}
+	for _, n := range cert.Leaf.DNSNames {
+		if away(n) {
 			return n
 		}
 	}

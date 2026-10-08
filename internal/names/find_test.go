@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fakeDNS answers what a name holds, as Porkbun does, for chosen names.
@@ -191,13 +193,18 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 		t.Errorf("the service's own name: %d", r.StatusCode)
 	}
 
-	// Moving to another name lets the first go, for anybody to take.
+	// Moving to another name lets the first go - for anybody to take a
+	// month later, and for this install again at once.
 	if _, err := home.ClaimName(ctx, mine, "gabe-and-co", "thehollbergs", ""); err != nil {
 		t.Fatal(err)
 	}
-	if dns.get("thehollbergs.claim TXT") != "" {
-		t.Error("the old name was kept")
+	if !strings.HasPrefix(dns.get("thehollbergs.claim TXT"), "released:"+mine.ID+":") {
+		t.Errorf("the old name was kept, or not marked let go: %q", dns.get("thehollbergs.claim TXT"))
 	}
+	if _, err := home.ClaimName(ctx, other, "thehollbergs", "", ""); err == nil {
+		t.Error("a name let go a moment ago was taken by another install")
+	}
+	dns.Set(ctx, "thehollbergs.claim", "TXT", fmt.Sprintf("released:%s:%d", mine.ID, time.Now().Add(-31*24*time.Hour).Unix()))
 	if dns.get("thehollbergs.home CNAME") != "" || dns.get("thehollbergs.net CNAME") != "" {
 		t.Error("the old name still leads to the install")
 	}

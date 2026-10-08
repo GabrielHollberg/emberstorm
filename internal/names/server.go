@@ -90,7 +90,12 @@ type Server struct {
 
 	once   sync.Once
 	limits *limits
-	find   *findIndex
+	// open counts what anybody may ask without an install's key - finding,
+	// opening, signing up - in a table of its own: from many /64s those keys
+	// filled the one table, and then an install's renewal was refused for
+	// want of room (the twelfth security pass).
+	open *limits
+	find *findIndex
 	claims claimCache
 	// claimMu makes finding a name free and claiming it one step: two
 	// installs claiming one free name at once both wrote a claim, and either
@@ -145,6 +150,7 @@ const challengeWait = 4 * time.Minute
 func (s *Server) init() {
 	s.once.Do(func() {
 		s.limits = newLimits()
+		s.open = newLimits()
 		s.find = newFindIndex()
 		if s.Log == nil {
 			s.Log = slog.Default()
@@ -302,8 +308,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusTooManyRequests, "too many registrations today; try again later")
 		return
 	}
-	if !s.limits.allow("register-wide:"+s.clientWide(r), registerWideRate) ||
-		!s.limits.allow("register:"+s.clientNet(r), registerRate) {
+	if !s.open.allow("register-wide:"+s.clientWide(r), registerWideRate) ||
+		!s.open.allow("register:"+s.clientNet(r), registerRate) {
 		writeError(w, http.StatusTooManyRequests, "too many registrations from this address; try again later")
 		return
 	}

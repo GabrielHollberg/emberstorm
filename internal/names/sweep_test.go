@@ -267,22 +267,25 @@ func TestASweepLetsGoOfNamesNobodyHolds(t *testing.T) {
 	z.add("orphan.home", "CNAME", gone+".home.soundstorm.dev", daysAgo(1))
 	z.add("orphan.net", "CNAME", gone+".net.soundstorm.dev", daysAgo(1))
 	z.add("_acme-challenge.orphan.home", "TXT", "z", daysAgo(9))
+	// Let go: kept for its month, then swept.
+	z.add("letgo.claim", "TXT", fmt.Sprintf("released:%s:%d", live, time.Now().Add(-48*time.Hour).Unix()), daysAgo(2))
+	z.add("stale.claim", "TXT", fmt.Sprintf("released:%s:%d", live, time.Now().Add(-40*24*time.Hour).Unix()), daysAgo(40))
 
 	res, err := p.Sweep(context.Background(), "home", halfYear)
 	if err != nil {
 		t.Fatalf("Sweep: %v", err)
 	}
-	for _, name := range []string{"older.claim", "older.home", "orphan.claim", "orphan.home", "orphan.net", "_acme-challenge.orphan.home"} {
+	for _, name := range []string{"older.claim", "older.home", "orphan.claim", "orphan.home", "orphan.net", "_acme-challenge.orphan.home", "stale.claim"} {
 		if !contains(z.deleted, name+".soundstorm.dev") {
 			t.Errorf("%s was kept", name)
 		}
 	}
-	for _, name := range []string{"kept.claim", "kept.home"} {
+	for _, name := range []string{"kept.claim", "kept.home", "letgo.claim"} {
 		if contains(z.deleted, name+".soundstorm.dev") {
 			t.Errorf("%s was swept", name)
 		}
 	}
-	if res.Names != 2 || res.Challenges != 1 {
+	if res.Names != 3 || res.Challenges != 1 {
 		t.Errorf("result = %+v", res)
 	}
 }

@@ -790,3 +790,23 @@ func TestRenewalFollowsTheAuthoritysWindow(t *testing.T) {
 		t.Fatalf("orders said they replace %q; want nothing, then %q", replaced, firstID)
 	}
 }
+
+// After a restart the remote name is read from the certificate, which also
+// carries a chosen name's home and away names: the code's own away name is
+// the remote one, never the chosen home name.
+func TestTheRemoteNameIsTheCodesOwn(t *testing.T) {
+	reg := names.Registration{ID: "k3x9m2p7qa", Name: "k3x9m2p7qa.home.emberstorm.app"}
+	for _, order := range [][]string{
+		{"k3x9m2p7qa.home.emberstorm.app", "yourname.home.emberstorm.app", "yourname.net.emberstorm.app", "k3x9m2p7qa.net.emberstorm.app"},
+		{"yourname.home.emberstorm.app", "k3x9m2p7qa.net.emberstorm.app", "k3x9m2p7qa.home.emberstorm.app"},
+	} {
+		cert := &tls.Certificate{Leaf: &x509.Certificate{DNSNames: order}}
+		if got := remoteNameIn(cert, reg); got != "k3x9m2p7qa.net.emberstorm.app" {
+			t.Errorf("%v: remote name %q", order, got)
+		}
+	}
+	home := &tls.Certificate{Leaf: &x509.Certificate{DNSNames: []string{reg.Name, "yourname.home.emberstorm.app"}}}
+	if got := remoteNameIn(home, reg); got != "" {
+		t.Errorf("a home-only certificate gave remote name %q", got)
+	}
+}
