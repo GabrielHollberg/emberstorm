@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -181,7 +182,18 @@ func (s *Server) noteFind(r *http.Request, id string, allow bool, port int, lan 
 	s.find.note(s.findConn(r), id, port, lan, time.Now())
 }
 
-// siteOrigin reports whether a browser's page is soundstorm.dev's own, which
+// siteHost is the website's host (emberstorm.app), from the first of
+// SiteOrigins, else the zone.
+func (s *Server) siteHost() string {
+	if len(s.SiteOrigins) > 0 {
+		if u, err := url.Parse(strings.TrimSpace(s.SiteOrigins[0])); err == nil && u.Host != "" {
+			return u.Host
+		}
+	}
+	return s.Zone
+}
+
+// siteOrigin reports whether a browser's page is the website's own, which
 // alone may read /v1/find.
 func (s *Server) siteOrigin(origin string) bool {
 	if origin == "" {
@@ -257,7 +269,7 @@ var reservedNames = map[string]bool{
 	"ns": true, "ns1": true, "ns2": true, "dns": true, "cdn": true, "static": true, "assets": true,
 	"dev": true, "test": true, "staging": true, "beta": true, "alpha": true, "demo": true,
 	"login": true, "signin": true, "signup": true, "account": true, "accounts": true, "auth": true,
-	"oauth": true, "sso": true, "root": true, "soundstorm": true, "official": true, "security": true,
+	"oauth": true, "sso": true, "root": true, "soundstorm": true, "emberstorm": true, "official": true, "security": true,
 	"abuse": true, "postmaster": true, "hostmaster": true, "webmaster": true, "info": true,
 	"billing": true, "pay": true, "payment": true, "payments": true, "download": true,
 	"downloads": true, "update": true, "updates": true, "relay": true, "backup": true, "box": true,
@@ -469,8 +481,8 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 		// The same words whether nobody has the name or it is held back: a
 		// visitor is never told a name is free, or that it is kept (held.go).
 		chosenPage(w, http.StatusNotFound, "This EmberStorm is unavailable",
-			"Check the address and try again - or, at home, open soundstorm.dev and choose Open my EmberStorm.",
-			[]link{{"Go to soundstorm.dev", "https://" + s.Zone + "/"}})
+			"Check the address and try again - or, at home, open "+s.siteHost()+" and choose Open my EmberStorm.",
+			[]link{{"Go to " + s.siteHost(), "https://" + s.siteHost() + "/"}})
 		return
 	}
 	e, conn, known := s.find.lookup(id, time.Now())

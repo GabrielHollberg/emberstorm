@@ -59,7 +59,7 @@ func (s *Server) handleSetWebName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.ToLower(strings.TrimSpace(body.Name))
-	name = strings.TrimSuffix(name, ".soundstorm.dev")
+	name = strings.TrimSuffix(strings.TrimSuffix(name, ".emberstorm.dev"), ".soundstorm.dev")
 	previous := s.store.WebName()
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()

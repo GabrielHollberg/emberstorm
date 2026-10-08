@@ -87,9 +87,9 @@ object PhotoBackup {
             val u = Uri.parse(s)
             out += u
             val host = u.host ?: ""
-            if (host.endsWith(".home.soundstorm.dev")) {
+            ServerAddress.awayHost(host)?.let { away ->
                 out += u.buildUpon().encodedAuthority(
-                    host.removeSuffix(".home.soundstorm.dev") + ".net.soundstorm.dev" + if (u.port != -1) ":${u.port}" else ""
+                    away + if (u.port != -1) ":${u.port}" else ""
                 ).build()
             }
         }

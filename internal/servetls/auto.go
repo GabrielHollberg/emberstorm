@@ -387,7 +387,8 @@ func (a *autoCert) step(ctx context.Context) error {
 	// call, and it is how a record somebody deleted, or a service that lost
 	// track, heals without anybody noticing.
 	findable := a.findable != nil && a.findable()
-	if err := a.names.Announce(ctx, reg, a.announce, a.port, findable); err != nil {
+	given, err := a.names.Announce(ctx, reg, a.announce, a.port, findable)
+	if err != nil {
 		var se *names.StatusError
 		if errors.As(err, &se) && se.Status == 401 {
 			// The service no longer recognizes this registration - its secret
@@ -395,6 +396,22 @@ func (a *autoCert) step(ctx context.Context) error {
 			a.forget()
 		}
 		return fmt.Errorf("point %s at %s: %w", reg.Name, a.announce, err)
+	}
+	// The service moved to another zone (soundstorm.dev to emberstorm.dev,
+	// 2026-10-07): the same id under the new zone becomes this install's name,
+	// kept, and the certificate below is made again for it.
+	if given != "" && !strings.EqualFold(given, reg.Name) && strings.HasPrefix(strings.ToLower(given), reg.ID+".") {
+		moved := reg
+		moved.Name = strings.ToLower(given)
+		raw, _ := json.MarshalIndent(moved, "", "  ")
+		if err := os.WriteFile(filepath.Join(a.dir, registrationFile), raw, 0o600); err != nil {
+			return fmt.Errorf("save registration: %w", err)
+		}
+		a.log.Info("this install's name moved", "from", reg.Name, "to", moved.Name)
+		a.mu.Lock()
+		a.reg = moved
+		a.mu.Unlock()
+		reg = moved
 	}
 
 	// The names a certificate should cover: always the LAN name, plus the

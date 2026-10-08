@@ -172,7 +172,7 @@ class MainActivity : Activity() {
         // TV?" for it.
         val link = tvLink(intent)
         if (link != null) pendingLink = link.second
-        // Opened from Open my EmberStorm on soundstorm.dev.
+        // Opened from Open my EmberStorm on emberstorm.app.
         val opened = if (link == null) openLink(intent) else null
         val start = link?.first ?: opened?.first?.takeIf { opened.second } ?: saved
         when {
@@ -360,7 +360,7 @@ class MainActivity : Activity() {
         }, fill(top = if (servers.isEmpty()) 0 else 16, bottom = 28))
         val known = prefill != null && servers.any { ServerAddress.origin(it.url) == ServerAddress.origin(prefill) }
         val field = EditText(this).apply {
-            hint = "abc123.home.soundstorm.dev"
+            hint = "abc123.home.emberstorm.dev"
             // Without the scheme for https (the default when none is typed),
             // with it for plain http, which would otherwise be read as https.
             // A server already in the list is not typed out again.
@@ -458,7 +458,7 @@ class MainActivity : Activity() {
             busy.visibility = View.VISIBLE
             background.execute {
                 // A home name's code finds the away name too, which a phone keeps.
-                val code = server.url.host?.takeIf { it.endsWith(".home.soundstorm.dev") }?.removeSuffix(".home.soundstorm.dev")
+                val code = ServerAddress.homeCode(server.url.host)
                 val url = code?.let { runCatching { ServerAddress.find(it, preferAway) }.getOrNull() } ?: server.url
                 runOnUiThread {
                     checking = false
@@ -797,7 +797,7 @@ class MainActivity : Activity() {
             data.scheme == "soundstorm" && host == "link" ->
                 (data.getQueryParameter("code") ?: return null) to data.getQueryParameter("server")?.let(ServerAddress::parse)
             // The QR's own address, opened by the camera (an App Link).
-            data.scheme == "https" && (host.endsWith(".home.soundstorm.dev") || host.endsWith(".net.soundstorm.dev")) &&
+            data.scheme == "https" && ServerAddress.isInstallName(host) &&
                 data.pathSegments.size == 2 && data.pathSegments[0] == "link" ->
                 data.pathSegments[1] to data.buildUpon().path("/").clearQuery().fragment(null).build()
             else -> return null
@@ -805,7 +805,7 @@ class MainActivity : Activity() {
         val code = rawCode.uppercase().filter { it.isLetterOrDigit() }
         if (code.length != 6) return null
         val known = ServerAddress.all(this).map { it.url } + listOfNotNull(ServerAddress.saved(this))
-        val installId = { u: Uri -> u.host?.substringBefore('.')?.takeIf { u.host?.endsWith(".soundstorm.dev") == true } }
+        val installId = { u: Uri -> u.host?.lowercase()?.takeIf { ServerAddress.zoneOf(it) != null }?.substringBefore('.') }
         val match = wanted?.let { w ->
             known.firstOrNull { ServerAddress.origin(it) == ServerAddress.origin(w) }
                 ?: known.firstOrNull { installId(it) != null && installId(it) == installId(w) }
@@ -816,8 +816,8 @@ class MainActivity : Activity() {
     }
 
     /**
-     * https://names.soundstorm.dev/open?to=<server>, from Open my EmberStorm
-     * on soundstorm.dev. A server this app knows (by its address or the
+     * https://names.emberstorm.dev/open?to=<server> (or names.soundstorm.dev,
+     * from before the rename), from Open my EmberStorm on emberstorm.app. A server this app knows (by its address or the
      * install's id, as tvLink matches) is opened - the saved address, which
      * may be the away name the found home one is a twin of - and true comes
      * with it. One it does not know is not opened: it is put in the Connect
@@ -826,15 +826,15 @@ class MainActivity : Activity() {
      */
     private fun openLink(intent: Intent?): Pair<Uri, Boolean>? {
         val data = intent?.data ?: return null
-        if (data.scheme != "https" || data.host?.lowercase() != "names.soundstorm.dev" || data.path != "/open") return null
+        if (data.scheme != "https" || data.host?.lowercase() !in ServerAddress.ZONES.map { "names.$it" } || data.path != "/open") return null
         // No server named (away from home, where nothing was found): the
         // app's own server.
         if (data.getQueryParameter("to").isNullOrEmpty()) return ServerAddress.saved(this)?.let { it to true }
         val to = data.getQueryParameter("to")?.let(ServerAddress::parse) ?: return null
         val host = to.host?.lowercase() ?: return null
-        if (to.scheme != "https" || !(host.endsWith(".home.soundstorm.dev") || host.endsWith(".net.soundstorm.dev"))) return null
+        if (to.scheme != "https" || !ServerAddress.isInstallName(host)) return null
         val known = ServerAddress.all(this).map { it.url } + listOfNotNull(ServerAddress.saved(this))
-        val installId = { u: Uri -> u.host?.lowercase()?.takeIf { it.endsWith(".soundstorm.dev") }?.substringBefore('.') }
+        val installId = { u: Uri -> u.host?.lowercase()?.takeIf { ServerAddress.zoneOf(it) != null }?.substringBefore('.') }
         val match = known.firstOrNull { ServerAddress.origin(it) == ServerAddress.origin(to) }
             ?: known.firstOrNull { installId(it) != null && installId(it) == installId(to) }
         return if (match != null) match to true else to to false
@@ -976,7 +976,7 @@ class MainActivity : Activity() {
     /**
      * https on one of this install's own names, on the port in use now. When
      * the server is known by one of its names, only its twin (the same id,
-     * home and away) - any install can get a name under soundstorm.dev, and a
+     * home and away) - any install can get a name under emberstorm.dev, and a
      * security review found a page could send the app to another's. From a
      * plain address (a LAN IP) the name cannot be checked, so the move is only
      * followed, never saved (see shouldOverrideUrlLoading).
@@ -985,10 +985,10 @@ class MainActivity : Activity() {
         val s = server ?: return false
         val host = url.host?.lowercase() ?: return false
         if (url.scheme != "https" || isServer(url)) return false
-        if (!host.endsWith(".home.soundstorm.dev") && !host.endsWith(".net.soundstorm.dev")) return false
+        if (!ServerAddress.isInstallName(host)) return false
         if (url.port != s.port) return false
         val current = s.host?.lowercase() ?: return false
-        if (current.endsWith(".soundstorm.dev")) return host.substringBefore('.') == current.substringBefore('.')
+        if (ServerAddress.zoneOf(current) != null) return host.substringBefore('.') == current.substringBefore('.')
         return true
     }
 
@@ -1075,7 +1075,7 @@ class MainActivity : Activity() {
                 // owner's report).
                 url.getQueryParameter("link")?.uppercase()?.filter { it.isLetterOrDigit() }
                     ?.takeIf { it.length == 6 }?.let { pendingLink = it }
-                if (target != null && current != null && !(current.host ?: "").endsWith(".soundstorm.dev")) {
+                if (target != null && current != null && ServerAddress.zoneOf(current.host) == null) {
                     // From a plain address the name cannot be told apart from
                     // another install's by its text, and the page that asked
                     // came over plain http. So it is followed only if it
@@ -1119,15 +1119,16 @@ class MainActivity : Activity() {
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (!request.isForMainFrame) return
-            // A home name (<id>.home.soundstorm.dev) cannot be reached away
+            // A home name (<id>.home.emberstorm.dev) cannot be reached away
             // from home; its away twin (<id>.net...) can, when remote access
             // is on. Tried once, without being saved.
             val s = server
             val host = s?.host?.lowercase()
-            if (s != null && host != null && host.endsWith(".home.soundstorm.dev") && !triedAway) {
+            val awayHost = ServerAddress.awayHost(host)
+            if (s != null && awayHost != null && !triedAway) {
                 triedAway = true
                 val away = s.buildUpon().encodedAuthority(
-                    host.removeSuffix(".home.soundstorm.dev") + ".net.soundstorm.dev" + if (s.port != -1) ":${s.port}" else ""
+                    awayHost + if (s.port != -1) ":${s.port}" else ""
                 ).build()
                 content.post { showWeb(away) }
                 return

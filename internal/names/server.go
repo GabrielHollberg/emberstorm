@@ -77,7 +77,7 @@ type Server struct {
 	// client can send any header it likes.
 	ClientIPHeader string
 
-	// SiteOrigins are the website's own origins (https://soundstorm.dev),
+	// SiteOrigins are the website's own origins (https://emberstorm.app),
 	// the only pages allowed to read which installs are on a visitor's
 	// connection (GET /v1/find).
 	SiteOrigins []string

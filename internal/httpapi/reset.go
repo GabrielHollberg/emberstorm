@@ -16,6 +16,7 @@ import (
 
 	"github.com/GabrielHollberg/soundstorm/internal/auth"
 	"github.com/GabrielHollberg/soundstorm/internal/media"
+	"github.com/GabrielHollberg/soundstorm/internal/names"
 )
 
 // Starting a box over, erasing it, and the way back in when the owner's
@@ -94,7 +95,7 @@ func (s *Server) handleResetButton(w http.ResponseWriter, r *http.Request) {
 // no old one, while the button's window is open - once, and only from the
 // home network: never through the away-from-home name.
 func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request) {
-	if strings.HasSuffix(strings.ToLower(requestHostname(r)), ".net.soundstorm.dev") || !s.buttonOpen(r.Context()) {
+	if names.IsAwayName(requestHostname(r)) || !s.buttonOpen(r.Context()) {
 		writeError(w, http.StatusForbidden, "Press the power button on the box five times quickly, then try again within 15 minutes.")
 		return
 	}

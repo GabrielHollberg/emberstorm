@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 object ServerDiscovery {
     data class Found(val url: Uri) {
         /** What to call it on screen: the code, for a home name. */
-        val label: String get() = (url.host ?: url.toString()).removeSuffix(".home.soundstorm.dev")
+        val label: String get() = ServerAddress.homeCode(url.host) ?: url.host ?: url.toString()
     }
 
     /** EmberStorm's own port; a server moved to another is typed in. */

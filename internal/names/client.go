@@ -14,7 +14,7 @@ import (
 )
 
 // DefaultService is where installs register unless told otherwise.
-const DefaultService = "https://names.soundstorm.dev"
+const DefaultService = "https://names.emberstorm.dev"
 
 // Client talks to the name service from an install.
 type Client struct {
@@ -40,9 +40,17 @@ func (c *Client) SetAddress(ctx context.Context, reg Registration, ip string) er
 // Announce points the registration's name at ip, and says which port the
 // install serves and whether soundstorm.dev may find it from its own internet
 // connection ("Open my EmberStorm"; see find.go).
-func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port int, findable bool) error {
-	return c.do(ctx, http.MethodPut, "/v1/address", reg.Credential(),
-		map[string]any{"ip": ip, "port": port, "find": findable}, nil)
+//
+// It answers the name the service now gives the install, which changes when
+// the service moves to another zone (soundstorm.dev to emberstorm.dev,
+// 2026-10-07) - the id and token stay the same.
+func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port int, findable bool) (string, error) {
+	var out struct {
+		Name string `json:"name"`
+	}
+	err := c.do(ctx, http.MethodPut, "/v1/address", reg.Credential(),
+		map[string]any{"ip": ip, "port": port, "find": findable}, &out)
+	return out.Name, err
 }
 
 // Here tells the service the install is still here, for Open my EmberStorm

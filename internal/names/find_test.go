@@ -96,13 +96,13 @@ func TestABrowserFindsTheServerOnItsOwnConnection(t *testing.T) {
 	elsewhere := from(base, "198.51.100.9")
 	theirs, _ := elsewhere.Register(ctx)
 
-	if err := home.Announce(ctx, mine, "192.168.0.50", 8099, true); err != nil {
+	if _, err := home.Announce(ctx, mine, "192.168.0.50", 8099, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := home.Announce(ctx, hidden, "192.168.0.20", 8099, false); err != nil {
+	if _, err := home.Announce(ctx, hidden, "192.168.0.20", 8099, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := elsewhere.Announce(ctx, theirs, "192.168.1.5", 8099, true); err != nil {
+	if _, err := elsewhere.Announce(ctx, theirs, "192.168.1.5", 8099, true); err != nil {
 		t.Fatal(err)
 	}
 	got := foundURLs(t, base, "203.0.113.7")
@@ -114,7 +114,7 @@ func TestABrowserFindsTheServerOnItsOwnConnection(t *testing.T) {
 		t.Errorf("from a connection with no server found %v", got)
 	}
 	// Turned off in Settings: gone at the next announcement.
-	_ = home.Announce(ctx, mine, "192.168.0.50", 8099, false)
+	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, false)
 	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 0 {
 		t.Errorf("after turning finding off, found %v", got)
 	}
@@ -129,7 +129,7 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	home := from(base, "203.0.113.7")
 	mine, _ := home.Register(ctx)
 	other, _ := home.Register(ctx)
-	_ = home.Announce(ctx, mine, "192.168.0.50", 8099, true)
+	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, true)
 
 	url, err := home.ClaimName(ctx, mine, "TheHollbergs", "", "")
 	if err != nil || url != "https://thehollbergs.soundstorm.dev/" {

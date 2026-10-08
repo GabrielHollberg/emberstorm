@@ -61,7 +61,7 @@ func held(name string) bool {
 	if _, ok := heldNames[name]; ok {
 		return true
 	}
-	return reservedNames[name] || strings.Contains(name, "soundstorm") || validID(name)
+	return reservedNames[name] || strings.Contains(name, "soundstorm") || strings.Contains(name, "emberstorm") || validID(name)
 }
 
 // notAvailable is all anybody is told about a name they cannot have - held,

@@ -16,6 +16,35 @@ import javax.net.ssl.SSLException
  * as the iPhone app does (ios/EmberStorm/ServerAddress.swift).
  */
 object ServerAddress {
+    /** Where install names live: emberstorm.dev, and soundstorm.dev from before the rename (2026-10-07). */
+    val ZONES = listOf("emberstorm.dev", "soundstorm.dev")
+
+    /** The zone [host] is an install's name under, else null. */
+    fun zoneOf(host: String?): String? = host?.lowercase()?.let { h -> ZONES.firstOrNull { h.endsWith(".$it") } }
+
+    /** Whether [host] is an install's home name, <id>.home.<zone>. */
+    fun isHomeName(host: String?): Boolean = host?.lowercase()?.let { h -> ZONES.any { h.endsWith(".home.$it") } } == true
+
+    /** Whether [host] is an install's away name, <id>.net.<zone>. */
+    fun isAwayName(host: String?): Boolean = host?.lowercase()?.let { h -> ZONES.any { h.endsWith(".net.$it") } } == true
+
+    /** Whether [host] is an install's home or away name. */
+    fun isInstallName(host: String?): Boolean = isHomeName(host) || isAwayName(host)
+
+    /** The install's code in a home name ("abc123" of abc123.home.emberstorm.dev), else null. */
+    fun homeCode(host: String?): String? {
+        val h = host?.lowercase() ?: return null
+        val z = ZONES.firstOrNull { h.endsWith(".home.$it") } ?: return null
+        return h.removeSuffix(".home.$z")
+    }
+
+    /** A home name's away twin (abc123.home.Z to abc123.net.Z), else null. */
+    fun awayHost(host: String?): String? {
+        val h = host?.lowercase() ?: return null
+        val z = ZONES.firstOrNull { h.endsWith(".home.$it") } ?: return null
+        return h.removeSuffix(".home.$z") + ".net.$z"
+    }
+
     private const val PREFS = "soundstorm"
     private const val KEY = "serverURL"
 
@@ -81,16 +110,14 @@ object ServerAddress {
     /** "EmberStorm abc123" for an install's own name, else the host. */
     fun defaultName(url: Uri): String {
         val host = url.host ?: return url.toString()
-        for (suffix in listOf(".home.soundstorm.dev", ".net.soundstorm.dev")) {
-            if (host.endsWith(suffix)) return "EmberStorm " + host.removeSuffix(suffix)
-        }
+        if (isInstallName(host)) return "EmberStorm " + host.substringBefore('.')
         return host
     }
 
     /**
      * Turns what somebody typed into the server's root URL. Anything without a
      * scheme is https: the default install has a real certificate on its
-     * soundstorm.dev name. A path is dropped - the app lives at the root.
+     * emberstorm.dev name. A path is dropped - the app lives at the root.
      */
     fun parse(typed: String): Uri? {
         var text = typed.trim()
@@ -163,7 +190,7 @@ object ServerAddress {
             throw e
         } catch (e: SSLException) {
             throw CheckFailed("$host has a certificate this phone doesn't trust. " +
-                "Use the soundstorm.dev address EmberStorm gave you.")
+                "Use the emberstorm.dev address EmberStorm gave you.")
         } catch (e: UnknownHostException) {
             throw CheckFailed("Couldn't find $host. Check the address.")
         } catch (e: SocketTimeoutException) {
@@ -180,26 +207,26 @@ object ServerAddress {
     /**
      * The addresses worth trying for what was typed, best first - as the
      * iPhone and Apple TV apps try them (ServerAddress.candidates). Just the
-     * install's code ("abc123", or "abc123.soundstorm.dev") is its home and
-     * away names, with and without :8099; a soundstorm.dev name typed without
+     * install's code ("abc123", or "abc123.emberstorm.dev") is its home and
+     * away names, with and without :8099; a emberstorm.dev name typed without
      * its port is tried on EmberStorm's own port first (the away name is
-     * "<id>.net.soundstorm.dev:8099", and typed without the port it found
+     * "<id>.net.emberstorm.dev:8099", and typed without the port it found
      * nothing). A phone prefers the away name, which works anywhere (the page
      * moves itself to the home name when it can); a TV, which stays put, the
      * home name. Null when it is not an address at all.
      */
     fun candidates(typed: String, preferAway: Boolean): List<Uri>? {
         val text = typed.trim().lowercase()
-        val bare = text.removeSuffix(".soundstorm.dev")
+        val bare = ZONES.fold(text) { t, z -> t.removeSuffix(".$z") }
         if (!text.contains("://") && Regex("^[a-z0-9][a-z0-9-]{2,62}$").matches(bare) &&
             bare != "localhost" && !bare.all { it.isDigit() }) {
             val levels = if (preferAway) listOf("net", "home") else listOf("home", "net")
             return levels.flatMap { level ->
-                listOf("https://$bare.$level.soundstorm.dev:8099", "https://$bare.$level.soundstorm.dev").mapNotNull(::parse)
+                listOf("https://$bare.$level.${ZONES[0]}:8099", "https://$bare.$level.${ZONES[0]}").mapNotNull(::parse)
             }
         }
         val url = parse(typed) ?: return null
-        if (url.port != -1 || url.scheme != "https" || url.host?.endsWith(".soundstorm.dev") != true) return listOf(url)
+        if (url.port != -1 || url.scheme != "https" || zoneOf(url.host) == null) return listOf(url)
         val withPort = parse("https://${url.host}:8099") ?: return listOf(url)
         return listOf(withPort, url)
     }
