@@ -37,8 +37,35 @@ blank() {
 	return 0
 }
 
+# Whether a device (a disk or one of its partitions) is on an internal disk:
+# not USB, not removable. The data drive is found by its label, and a USB
+# stick anybody labelled the same must never take its place: the box would
+# run on whatever accounts and library were put on it (a security review).
+internal() {
+	disk=$(lsblk -no PKNAME "$1" 2>/dev/null | head -1)
+	[ -n "$disk" ] || disk=${1#/dev/}
+	tran=$(lsblk -dno TRAN "/dev/$disk" 2>/dev/null | tr -d ' ')
+	rm=$(lsblk -dno RM "/dev/$disk" 2>/dev/null | tr -d ' ')
+	[ "$tran" != usb ] && [ "$rm" = 0 ]
+}
+
+# Mounted from a drive that is not internal (an old fstab line by label, or
+# a stick labelled to look like the data drive): let it go before anything
+# reads it.
+if mounted && ! internal "$(findmnt -no SOURCE "$MNT")"; then
+	log "$(findmnt -no SOURCE "$MNT") is not an internal disk; not using it as the data drive"
+	umount "$MNT" || exit 1
+fi
+
 if ! mounted; then
-	dev=$(blkid -L "$LABEL" 2>/dev/null || true)
+	dev=""
+	for d in $(blkid -t LABEL="$LABEL" -o device 2>/dev/null); do
+		if internal "$d"; then
+			dev=$d
+			break
+		fi
+		log "$d is labelled $LABEL but is not an internal disk; leaving it alone"
+	done
 	if [ -z "$dev" ]; then
 		rootd=$(root_disk)
 		# Whole internal disks: not the system disk, not USB, not removable,
@@ -57,8 +84,11 @@ if ! mounted; then
 		done
 	fi
 	if [ -n "$dev" ]; then
-		grep -q "LABEL=$LABEL" /etc/fstab ||
-			echo "LABEL=$LABEL $MNT btrfs defaults,noatime,nofail,x-systemd.device-timeout=10s 0 0" >> /etc/fstab
+		# Mounted by its own UUID, never by a label another drive can carry.
+		uuid=$(blkid -o value -s UUID "$dev")
+		sed -i "\|^LABEL=$LABEL |d" /etc/fstab
+		grep -q "^UUID=$uuid " /etc/fstab ||
+			echo "UUID=$uuid $MNT btrfs defaults,noatime,nofail,x-systemd.device-timeout=10s 0 0" >> /etc/fstab
 		mount "$MNT"
 		log "data drive $dev mounted at $MNT"
 	else
@@ -84,8 +114,12 @@ done
 # left to SoundStorm: Docker starts the backends first and makes any missing
 # folder they mount as root's, 0755, which SoundStorm (uid 10001) then cannot
 # write into - the first VM boot lost its starter song and audiobook so.
+# A shelf that is a link is put back as a folder: this runs as root, and
+# chmod would open whatever a link from inside the library pointed at.
+[ -L "$MNT/library" ] && rm -f "$MNT/library" && mkdir -p "$MNT/library"
 chmod 0777 "$MNT/library"
 for shelf in music movies tv audiobooks ebooks documents pictures; do
+	[ -L "$MNT/library/$shelf" ] && rm -f "$MNT/library/$shelf"
 	mkdir -p "$MNT/library/$shelf"
 	chmod 0777 "$MNT/library/$shelf"
 done

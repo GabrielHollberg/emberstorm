@@ -153,8 +153,15 @@ for top in "$stage"/*; do
 	copy_args="$copy_args --copy-in $top:/"
 done
 
+# A box sold has no way in but the app: no SSH, root locked, no login prompt
+# on the screen's other consoles or a serial port. DEV_SSH, for development,
+# adds SSH with this machine's key.
 ssh_args=""
+ssh_pkg=""
+ssh_units=""
 if [ "${DEV_SSH:-}" = 1 ]; then
+	ssh_pkg=",openssh-server"
+	ssh_units=" ssh-hostkeys"
 	[ -f /root/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -f /root/.ssh/id_ed25519
 	ssh_args="--ssh-inject root:file:/root/.ssh/id_ed25519.pub"
 fi
@@ -166,13 +173,15 @@ qemu-img resize -q "$disk" "$SIZE"
 # shellcheck disable=SC2086
 virt-customize -a "$disk" \
 	--hostname soundstorm \
-	--install docker.io,docker-compose,btrfs-progs,cloud-guest-utils,avahi-daemon,openssh-server,curl,qrencode,kbd,console-setup-linux \
+	--install docker.io,docker-compose,btrfs-progs,cloud-guest-utils,avahi-daemon,curl,qrencode,kbd,console-setup-linux$ssh_pkg \
 	--run-command 'growpart /dev/sda 1 && resize2fs /dev/sda1' \
 	$copy_args \
 	--run-command 'chmod 755 /usr/local/lib/soundstorm/*.sh /usr/local/bin/soundstorm-caretaker' \
-	--run-command 'chmod 644 /etc/systemd/system/soundstorm*.service /etc/systemd/system/ssh-hostkeys.service /etc/udev/rules.d/90-soundstorm-usb.rules /etc/systemd/logind.conf.d/soundstorm-button.conf /etc/tmpfiles.d/soundstorm-drives.conf' \
+	--run-command 'chmod 644 /etc/systemd/system/soundstorm*.service /etc/systemd/system/ssh-hostkeys.service /etc/udev/rules.d/90-soundstorm-usb.rules /etc/systemd/logind.conf.d/soundstorm-button.conf /etc/systemd/logind.conf.d/soundstorm-consoles.conf /etc/tmpfiles.d/soundstorm-drives.conf' \
 	--run-command 'docker compose version' \
-	--run-command 'systemctl enable docker soundstorm-grow soundstorm-storage soundstorm-images soundstorm soundstorm-caretaker soundstorm-screen ssh-hostkeys avahi-daemon' \
+	--run-command "systemctl enable docker soundstorm-grow soundstorm-storage soundstorm-images soundstorm soundstorm-caretaker soundstorm-screen$ssh_units avahi-daemon" \
+	--root-password disabled \
+	--run-command 'ln -sf /dev/null /etc/systemd/system/serial-getty@.service' \
 	--run-command 'rm -f /etc/ssh/ssh_host_*' \
 	$ssh_args \
 	--truncate /etc/machine-id
