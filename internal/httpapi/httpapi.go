@@ -156,6 +156,7 @@ type Server struct {
 	caPEM            []byte
 	lanHosts         []string
 	publicName       func() string
+	installID        func() string
 	remoteReach      func(nonce string) (string, bool)
 	remoteStatus     func() RemoteState
 	setRemoteAccess  func(bool) error
@@ -222,6 +223,11 @@ type Config struct {
 	// PublicName reports the install's real certificate name, or "" while it
 	// has none - see servetls auto mode. Nil when that mode is off.
 	PublicName func() string
+
+	// InstallID is the install's code at the name service (k3x9m2p7qa), or ""
+	// without one: in /healthz, so an app can tell that the install's chosen
+	// name and its code's names are one server.
+	InstallID func() string
 
 	// RemoteReachability answers a name-service reachability challenge - an
 	// HMAC of the nonce under this install's registration token - or reports
@@ -338,6 +344,7 @@ func New(cfg Config) *Server {
 		caPEM:            cfg.CAPEM,
 		lanHosts:         cfg.LANHosts,
 		publicName:       cfg.PublicName,
+		installID:        cfg.InstallID,
 		remoteReach:      cfg.RemoteReachability,
 		remoteStatus:     cfg.RemoteStatus,
 		setRemoteAccess:  cfg.SetRemoteAccess,
@@ -757,7 +764,7 @@ func (s *Server) handleCA(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
+	answer := map[string]any{
 		"status":  "ok",
 		"sources": s.reg.Len(),
 		// What a device searching the network shows: the server's name, and
@@ -765,7 +772,15 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 		// Before anybody signs in, as a Wi-Fi network's name is.
 		"name":  s.store.ServerName(),
 		"setUp": s.auth.HasAccount(),
-	})
+	}
+	// The install's code, which is in its own addresses anyway: an app moved
+	// from them to the chosen name's checks the two answer with the same.
+	if s.installID != nil {
+		if id := s.installID(); id != "" {
+			answer["id"] = id
+		}
+	}
+	writeJSON(w, http.StatusOK, answer)
 }
 
 func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {

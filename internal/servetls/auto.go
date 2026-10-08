@@ -95,7 +95,9 @@ type autoCert struct {
 	// findable says whether soundstorm.dev may find the install from its own
 	// connection; sent with every announcement. Nil is off.
 	findable func() bool
-	port     int
+	// webName is the chosen name, "" for none (Config.WebName).
+	webName func() string
+	port    int
 
 	// kick nudges run to take a step at once, so a toggle takes effect now
 	// rather than at the next scheduled check. Buffered so a send never blocks.
@@ -117,7 +119,10 @@ type autoCert struct {
 	// checkEvery: the name service could not say whether remote access works,
 	// and half a day is too long to leave that unanswered.
 	recheckSoon bool
-	cert        *tls.Certificate
+	// pointed is the chosen name this run has made sure leads here (its home
+	// and away names at the name service), so it is asked once, not every step.
+	pointed string
+	cert    *tls.Certificate
 	// What the authority last said about renewing cert (ACME Renewal
 	// Information): for which certificate, the moment chosen in its window,
 	// and when to ask again.
@@ -181,7 +186,35 @@ func (a *autoCert) name() string {
 	if a.cert == nil || time.Now().After(a.cert.Leaf.NotAfter) {
 		return ""
 	}
+	if home, _ := a.chosenNames(a.reg); home != "" && leafHas(a.cert.Leaf, home) {
+		return home
+	}
 	return a.reg.Name
+}
+
+// chosenNames are the chosen name's home and away names under the install's
+// zone (yourname.home.emberstorm.app, yourname.net.emberstorm.app), or "" when
+// there is no chosen name.
+func (a *autoCert) chosenNames(reg names.Registration) (home, away string) {
+	if a.webName == nil || reg.ID == "" {
+		return "", ""
+	}
+	n := strings.ToLower(strings.TrimSpace(a.webName()))
+	zone, ok := strings.CutPrefix(strings.ToLower(reg.Name), reg.ID+".home.")
+	if n == "" || !ok {
+		return "", ""
+	}
+	return n + ".home." + zone, n + ".net." + zone
+}
+
+// leafHas reports whether a certificate names host.
+func leafHas(leaf *x509.Certificate, host string) bool {
+	for _, d := range leaf.DNSNames {
+		if strings.EqualFold(d, host) {
+			return true
+		}
+	}
+	return false
 }
 
 // checkUpstream asks the router for its WAN address and records what it says
@@ -224,6 +257,9 @@ func (a *autoCert) remoteNameNow() string {
 	// record could not be taken down yet; that is not remote access being up.
 	if a.cert == nil || a.publicName == "" || time.Now().After(a.cert.Leaf.NotAfter) || !a.remoteOn() {
 		return ""
+	}
+	if _, away := a.chosenNames(a.reg); away != "" && leafHas(a.cert.Leaf, away) {
+		return away
 	}
 	return a.publicName
 }
@@ -334,7 +370,11 @@ func (a *autoCert) keepFindable(ctx context.Context) {
 		a.mu.RUnlock()
 		findable := a.findable != nil && a.findable()
 		callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		if err := a.names.Here(callCtx, reg, a.announce, a.port, findable, public); err != nil {
+		chosen := ""
+		if a.webName != nil {
+			chosen = a.webName()
+		}
+		if err := a.names.Here(callCtx, reg, a.announce, a.port, findable, public, chosen); err != nil {
 			a.log.Debug("still here: the name service did not answer", "err", err)
 		}
 		cancel()
@@ -387,7 +427,11 @@ func (a *autoCert) step(ctx context.Context) error {
 	// call, and it is how a record somebody deleted, or a service that lost
 	// track, heals without anybody noticing.
 	findable := a.findable != nil && a.findable()
-	given, err := a.names.Announce(ctx, reg, a.announce, a.port, findable)
+	chosen := ""
+	if a.webName != nil {
+		chosen = strings.ToLower(strings.TrimSpace(a.webName()))
+	}
+	given, err := a.names.Announce(ctx, reg, a.announce, a.port, findable, chosen)
 	if err != nil {
 		var se *names.StatusError
 		if errors.As(err, &se) && se.Status == 401 {
@@ -412,6 +456,22 @@ func (a *autoCert) step(ctx context.Context) error {
 		a.reg = moved
 		a.mu.Unlock()
 		reg = moved
+	}
+	// A chosen name's home and away names lead here once it is claimed; one
+	// claimed before they existed (or after the service lost them) has them
+	// made by claiming it again, which costs this install's own name nothing.
+	a.mu.RLock()
+	pointed := a.pointed
+	a.mu.RUnlock()
+	if chosen != "" && pointed != chosen {
+		if _, err := a.names.ClaimName(ctx, reg, chosen, "", ""); err != nil {
+			a.log.Warn("could not point the chosen name here; using the code's names", "name", chosen, "err", err)
+			chosen = ""
+		} else {
+			a.mu.Lock()
+			a.pointed = chosen
+			a.mu.Unlock()
+		}
 	}
 
 	// The names a certificate should cover: always the LAN name, plus the
@@ -522,6 +582,18 @@ func (a *autoCert) step(ctx context.Context) error {
 	}
 	a.mu.Unlock()
 
+	// The chosen name's home name, and its away name with remote access - so
+	// the chosen name is what the page shows (name, remoteNameNow).
+	if chosen != "" {
+		home, away := a.chosenNames(reg)
+		if home != "" {
+			domains = append(domains, home)
+		}
+		if away != "" && publicName != "" {
+			domains = append(domains, away)
+		}
+	}
+
 	key, err := a.accountKey()
 	if err != nil {
 		return err
@@ -545,7 +617,12 @@ func (a *autoCert) step(ctx context.Context) error {
 	// ever - it also carries remote access being turned off.
 	obtainCtx, cancelObtain := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancelObtain()
-	chain, err := a.newACME(key).Obtain(obtainCtx, domains, certKey, namesSolver{a.names, reg, publicName}, replaces)
+	solver := namesSolver{c: a.names, reg: reg, publicName: publicName}
+	if chosen != "" {
+		solver.chosen = chosen
+		solver.chosenHome, solver.chosenAway = a.chosenNames(reg)
+	}
+	chain, err := a.newACME(key).Obtain(obtainCtx, domains, certKey, solver, replaces)
 	if err != nil {
 		return fmt.Errorf("certificate for %s: %w", strings.Join(domains, ","), err)
 	}
@@ -747,20 +824,31 @@ type namesSolver struct {
 	c          *names.Client
 	reg        names.Registration
 	publicName string // the remote name, or "" when only the LAN name is being certified
+	// chosen is the chosen name, and chosenHome and chosenAway its names,
+	// when they are being certified too.
+	chosen, chosenHome, chosenAway string
 }
 
 func (s namesSolver) Present(ctx context.Context, domain, value string) error {
-	return s.c.SetChallenge(ctx, s.reg, value, s.isPublic(domain))
+	public, chosen := s.which(domain)
+	return s.c.SetChallenge(ctx, s.reg, value, public, chosen)
 }
 
 func (s namesSolver) CleanUp(ctx context.Context, domain string) error {
-	return s.c.ClearChallenge(ctx, s.reg, s.isPublic(domain))
+	public, chosen := s.which(domain)
+	return s.c.ClearChallenge(ctx, s.reg, public, chosen)
 }
 
-// isPublic reports whether a challenge is for the remote name rather than the
-// LAN one, so it is published under the right label.
-func (s namesSolver) isPublic(domain string) bool {
-	return s.publicName != "" && strings.EqualFold(domain, s.publicName)
+// which says where a challenge for domain is published: under the away label
+// or the home one, and under the chosen name or the install's code.
+func (s namesSolver) which(domain string) (public bool, chosen string) {
+	switch {
+	case s.chosen != "" && strings.EqualFold(domain, s.chosenHome):
+		return false, s.chosen
+	case s.chosen != "" && strings.EqualFold(domain, s.chosenAway):
+		return true, s.chosen
+	}
+	return s.publicName != "" && strings.EqualFold(domain, s.publicName), ""
 }
 
 // writeFileAtomic replaces a file whole, so a crash mid-write cannot leave a

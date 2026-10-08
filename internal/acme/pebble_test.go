@@ -36,11 +36,11 @@ type namesSolver struct {
 }
 
 func (s namesSolver) Present(ctx context.Context, _, value string) error {
-	return s.c.SetChallenge(ctx, s.reg, value, false)
+	return s.c.SetChallenge(ctx, s.reg, value, false, "")
 }
 
 func (s namesSolver) CleanUp(ctx context.Context, _ string) error {
-	return s.c.ClearChallenge(ctx, s.reg, false)
+	return s.c.ClearChallenge(ctx, s.reg, false, "")
 }
 
 func TestPebbleIssuesACertificateForARegisteredName(t *testing.T) {

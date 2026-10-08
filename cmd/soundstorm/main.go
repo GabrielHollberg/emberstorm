@@ -246,6 +246,7 @@ func run(log *slog.Logger) error {
 		RemoteEnabled: remoteEnabled,
 		// "Open my EmberStorm" on soundstorm.dev, unless the owner turned it off.
 		Findable: store.Findable,
+		WebName:  store.WebName,
 		Port:     publicPort,
 		Gateway:  gateway,
 		// UPnP fallback: the installer discovers the router's device-description
@@ -378,6 +379,7 @@ func run(log *slog.Logger) error {
 		// the host - was ever in a position to find it out.
 		LANHosts:           splitList(os.Getenv("SOUNDSTORM_TLS_HOSTS")),
 		PublicName:         tlsServer.PublicName,
+		InstallID:          tlsServer.InstallID,
 		RemoteReachability: tlsServer.ReachabilityAnswer,
 		RemoteStatus: func() httpapi.RemoteState {
 			method, mapped := tlsServer.RemoteMapping()

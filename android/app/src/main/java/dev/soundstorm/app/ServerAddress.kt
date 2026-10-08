@@ -45,6 +45,26 @@ object ServerAddress {
         return h.removeSuffix(".home.$z") + ".net.$z"
     }
 
+    /**
+     * The install id the server at [base] answers with (/healthz's "id"), or
+     * null. Run off the main thread.
+     */
+    fun installIdAt(base: Uri): String? {
+        val conn = java.net.URL(base.buildUpon().path("/healthz").clearQuery().fragment(null).build().toString())
+            .openConnection() as java.net.HttpURLConnection
+        conn.connectTimeout = 5000
+        conn.readTimeout = 5000
+        return try {
+            if (conn.responseCode != 200) return null
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            org.json.JSONObject(body).optString("id").takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     private const val PREFS = "soundstorm"
     private const val KEY = "serverURL"
 

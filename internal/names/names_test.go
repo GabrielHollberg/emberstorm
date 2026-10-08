@@ -145,13 +145,13 @@ func TestAChallengeIsPublishedWhereLetsEncryptLooks(t *testing.T) {
 	ctx := context.Background()
 	reg, _ := c.Register(ctx)
 
-	if err := c.SetChallenge(ctx, reg, sampleChallenge, false); err != nil {
+	if err := c.SetChallenge(ctx, reg, sampleChallenge, false, ""); err != nil {
 		t.Fatalf("SetChallenge: %v", err)
 	}
 	if got := dns.get("_acme-challenge." + reg.ID + ".home TXT"); got != sampleChallenge {
 		t.Errorf("TXT = %q", got)
 	}
-	if err := c.ClearChallenge(ctx, reg, false); err != nil {
+	if err := c.ClearChallenge(ctx, reg, false, ""); err != nil {
 		t.Fatalf("ClearChallenge: %v", err)
 	}
 	if got := dns.get("_acme-challenge." + reg.ID + ".home TXT"); got != "" {
@@ -166,7 +166,7 @@ func TestOnlyACMEValuesArePublished(t *testing.T) {
 	ctx := context.Background()
 	reg, _ := c.Register(ctx)
 	for _, v := range []string{"", "google-site-verification=abc", sampleChallenge + "x", strings.Repeat("a", 42) + "="} {
-		err := c.SetChallenge(ctx, reg, v, false)
+		err := c.SetChallenge(ctx, reg, v, false, "")
 		var se *StatusError
 		if !errors.As(err, &se) || se.Status != http.StatusUnprocessableEntity {
 			t.Errorf("%q: err = %v, want refusal", v, err)
@@ -198,12 +198,12 @@ func TestChallengesAreCappedPerInstallAndOverall(t *testing.T) {
 	reg, _ := c.Register(ctx)
 
 	for i := 0; i < challengeRate.n; i++ {
-		if err := c.SetChallenge(ctx, reg, sampleChallenge, false); err != nil {
+		if err := c.SetChallenge(ctx, reg, sampleChallenge, false, ""); err != nil {
 			t.Fatalf("challenge %d refused: %v", i+1, err)
 		}
 	}
 	var se *StatusError
-	if err := c.SetChallenge(ctx, reg, sampleChallenge, false); !errors.As(err, &se) || se.Status != http.StatusTooManyRequests {
+	if err := c.SetChallenge(ctx, reg, sampleChallenge, false, ""); !errors.As(err, &se) || se.Status != http.StatusTooManyRequests {
 		t.Errorf("per-install: err = %v, want 429", err)
 	}
 
@@ -211,7 +211,7 @@ func TestChallengesAreCappedPerInstallAndOverall(t *testing.T) {
 	for s.limits.allow("challenge:*", globalChallengeRate) {
 	}
 	other, _ := c.Register(ctx)
-	if err := c.SetChallenge(ctx, other, sampleChallenge, false); !errors.As(err, &se) || se.Status != http.StatusTooManyRequests {
+	if err := c.SetChallenge(ctx, other, sampleChallenge, false, ""); !errors.As(err, &se) || se.Status != http.StatusTooManyRequests {
 		t.Errorf("global: err = %v, want 429", err)
 	}
 }
@@ -230,7 +230,7 @@ func TestChallengesAreCappedPerNetwork(t *testing.T) {
 			t.Fatalf("register: %v", err)
 		}
 		for i := 0; i < challengeRate.n && spent < challengeNetRate.n; i++ {
-			if err := c.SetChallenge(ctx, reg, sampleChallenge, false); err != nil {
+			if err := c.SetChallenge(ctx, reg, sampleChallenge, false, ""); err != nil {
 				t.Fatalf("challenge %d refused early: %v", spent+1, err)
 			}
 			spent++
@@ -239,7 +239,7 @@ func TestChallengesAreCappedPerNetwork(t *testing.T) {
 
 	fresh, _ := c.Register(ctx)
 	var se *StatusError
-	if err := c.SetChallenge(ctx, fresh, sampleChallenge, false); !errors.As(err, &se) || se.Status != http.StatusTooManyRequests {
+	if err := c.SetChallenge(ctx, fresh, sampleChallenge, false, ""); !errors.As(err, &se) || se.Status != http.StatusTooManyRequests {
 		t.Errorf("past the per-network cap: err = %v, want 429", err)
 	}
 }
@@ -271,7 +271,7 @@ func TestClearsAreRateLimited(t *testing.T) {
 	ctx := context.Background()
 	reg, _ := c.Register(ctx)
 	for i := 0; i < clearRate.n; i++ {
-		if err := c.ClearChallenge(ctx, reg, false); err != nil {
+		if err := c.ClearChallenge(ctx, reg, false, ""); err != nil {
 			t.Fatalf("clear %d refused: %v", i+1, err)
 		}
 	}

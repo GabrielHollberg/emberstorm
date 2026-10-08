@@ -96,13 +96,13 @@ func TestABrowserFindsTheServerOnItsOwnConnection(t *testing.T) {
 	elsewhere := from(base, "198.51.100.9")
 	theirs, _ := elsewhere.Register(ctx)
 
-	if _, err := home.Announce(ctx, mine, "192.168.0.50", 8099, true); err != nil {
+	if _, err := home.Announce(ctx, mine, "192.168.0.50", 8099, true, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := home.Announce(ctx, hidden, "192.168.0.20", 8099, false); err != nil {
+	if _, err := home.Announce(ctx, hidden, "192.168.0.20", 8099, false, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := elsewhere.Announce(ctx, theirs, "192.168.1.5", 8099, true); err != nil {
+	if _, err := elsewhere.Announce(ctx, theirs, "192.168.1.5", 8099, true, ""); err != nil {
 		t.Fatal(err)
 	}
 	got := foundURLs(t, base, "203.0.113.7")
@@ -114,7 +114,7 @@ func TestABrowserFindsTheServerOnItsOwnConnection(t *testing.T) {
 		t.Errorf("from a connection with no server found %v", got)
 	}
 	// Turned off in Settings: gone at the next announcement.
-	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, false)
+	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, false, "")
 	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 0 {
 		t.Errorf("after turning finding off, found %v", got)
 	}
@@ -129,7 +129,7 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	home := from(base, "203.0.113.7")
 	mine, _ := home.Register(ctx)
 	other, _ := home.Register(ctx)
-	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, true)
+	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, true, "")
 
 	url, err := home.ClaimName(ctx, mine, "TheHollbergs", "", "")
 	if err != nil || url != "https://thehollbergs.soundstorm.dev/" {
@@ -137,6 +137,19 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	}
 	if dns.get("thehollbergs.claim TXT") != mine.ID {
 		t.Errorf("claim record = %q", dns.get("thehollbergs.claim TXT"))
+	}
+	// The chosen name is the install's address too: its home and away names
+	// lead to the code's.
+	if got := dns.get("thehollbergs.home CNAME"); got != mine.ID+".home.soundstorm.dev" {
+		t.Errorf("chosen home name = %q", got)
+	}
+	if got := dns.get("thehollbergs.net CNAME"); got != mine.ID+".net.soundstorm.dev" {
+		t.Errorf("chosen away name = %q", got)
+	}
+	// Claiming it again (as an install does to put those back) needs no code
+	// and changes nothing.
+	if _, err := home.ClaimName(ctx, mine, "thehollbergs", "", ""); err != nil {
+		t.Errorf("claiming its own name again: %v", err)
 	}
 	var se *StatusError
 	if _, err := home.ClaimName(ctx, other, "thehollbergs", "", ""); !errors.As(err, &se) || se.Status != http.StatusConflict || se.Message != notAvailable {
@@ -160,14 +173,14 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	}
 
 	host := "thehollbergs.soundstorm.dev"
-	if r := get(t, base, "/", "203.0.113.7", host); r.StatusCode != http.StatusFound || r.Header.Get("Location") != "https://"+mine.ID+".home.soundstorm.dev:8099/" {
+	if r := get(t, base, "/", "203.0.113.7", host); r.StatusCode != http.StatusFound || r.Header.Get("Location") != "https://thehollbergs.home.soundstorm.dev:8099/" {
 		t.Errorf("from home: %d to %q", r.StatusCode, r.Header.Get("Location"))
 	}
 	if r := get(t, base, "/", "198.51.100.9", host); r.StatusCode != http.StatusOK {
 		t.Errorf("from away with remote access off: %d, want the page saying so", r.StatusCode)
 	}
 	s.find.setPublic(mine.ID, true)
-	if r := get(t, base, "/", "198.51.100.9", host); r.StatusCode != http.StatusFound || r.Header.Get("Location") != "https://"+mine.ID+".net.soundstorm.dev:8099/" {
+	if r := get(t, base, "/", "198.51.100.9", host); r.StatusCode != http.StatusFound || r.Header.Get("Location") != "https://thehollbergs.net.soundstorm.dev:8099/" {
 		t.Errorf("from away with remote access on: %d to %q", r.StatusCode, r.Header.Get("Location"))
 	}
 	if r := get(t, base, "/", "198.51.100.9", "nobody-here.soundstorm.dev"); r.StatusCode != http.StatusNotFound {
@@ -184,6 +197,9 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	}
 	if dns.get("thehollbergs.claim TXT") != "" {
 		t.Error("the old name was kept")
+	}
+	if dns.get("thehollbergs.home CNAME") != "" || dns.get("thehollbergs.net CNAME") != "" {
+		t.Error("the old name still leads to the install")
 	}
 	if _, err := home.ClaimName(ctx, other, "thehollbergs", "maria", ""); err != nil {
 		t.Errorf("the freed name could not be taken: %v", err)
@@ -240,7 +256,7 @@ func TestStillHereRefillsTheFinding(t *testing.T) {
 	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 0 {
 		t.Fatalf("found %v before it said anything", got)
 	}
-	if err := home.Here(ctx, mine, "192.168.0.50", 8099, true, false); err != nil {
+	if err := home.Here(ctx, mine, "192.168.0.50", 8099, true, false, ""); err != nil {
 		t.Fatal(err)
 	}
 	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 1 || got[0] != "https://"+mine.ID+".home.soundstorm.dev:8099/" {
@@ -249,7 +265,7 @@ func TestStillHereRefillsTheFinding(t *testing.T) {
 	if len(dns.records) != before {
 		t.Error("still here changed a DNS record")
 	}
-	if err := home.Here(ctx, mine, "8.8.8.8", 8099, true, false); err == nil {
+	if err := home.Here(ctx, mine, "8.8.8.8", 8099, true, false, ""); err == nil {
 		t.Error("a public address was taken")
 	}
 }

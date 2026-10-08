@@ -130,6 +130,11 @@ type Config struct {
 	// a change takes effect at the next announcement (Refresh). Nil is off.
 	Findable func() bool
 
+	// WebName, when set, is the install's chosen name (gabriel), "" for none:
+	// yourname.home.<zone> and yourname.net.<zone> are then its addresses too,
+	// in its certificate, and the ones the page moves itself to.
+	WebName func() string
+
 	// Port is the port the install is reached on, published to the name
 	// service so it can confirm the address is reachable there. Only used with
 	// remote access.
@@ -217,6 +222,14 @@ func (s *Server) PublicName() string {
 	return s.auto.name()
 }
 
+// InstallID is the install's code at the name service, or "" without one.
+func (s *Server) InstallID() string {
+	if s == nil || s.auto == nil {
+		return ""
+	}
+	return s.auto.registration().ID
+}
+
 // SupportsRemote reports whether remote access can be offered at all - it needs
 // auto mode, which is the only mode with a name service and a real certificate.
 func (s *Server) SupportsRemote() bool { return s != nil && s.auto != nil }
@@ -241,7 +254,15 @@ func (s *Server) ClaimWebName(ctx context.Context, name, previous, code string) 
 	if reg.ID == "" {
 		return "", errNoNames
 	}
-	return s.auto.names.ClaimName(ctx, reg, name, previous, code)
+	url, err := s.auto.names.ClaimName(ctx, reg, name, previous, code)
+	if err == nil {
+		// The chosen name's home and away names now lead here: certify them.
+		s.auto.mu.Lock()
+		s.auto.pointed = strings.ToLower(name)
+		s.auto.mu.Unlock()
+		s.Refresh()
+	}
+	return url, err
 }
 
 // ReleaseWebName lets a chosen address go.
@@ -253,7 +274,11 @@ func (s *Server) ReleaseWebName(ctx context.Context, name string) error {
 	if reg.ID == "" {
 		return errNoNames
 	}
-	return s.auto.names.ReleaseName(ctx, reg, name)
+	err := s.auto.names.ReleaseName(ctx, reg, name)
+	if err == nil {
+		s.Refresh()
+	}
+	return err
 }
 
 // errNoNames is a chosen address asked for where there is no name service to
@@ -397,6 +422,7 @@ func loadAuto(cfg Config) (*Server, error) {
 		directory:     directory,
 		remoteEnabled: remoteEnabled,
 		findable:      cfg.Findable,
+		webName:       cfg.WebName,
 		port:          cfg.Port,
 		kick:          make(chan struct{}, 1),
 		names:         &names.Client{Base: namesURL},

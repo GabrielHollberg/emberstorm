@@ -52,6 +52,7 @@ type found struct {
 	id     string
 	port   int
 	lan    string
+	name   string // the install's chosen name, checked against its claim
 	public bool
 	seen   time.Time
 }
@@ -67,7 +68,7 @@ func newFindIndex() *findIndex {
 	return &findIndex{byIP: map[string]map[string]*found{}, byID: map[string]string{}}
 }
 
-func (x *findIndex) note(conn, id string, port int, lan string, now time.Time) {
+func (x *findIndex) note(conn, id string, port int, lan, name string, now time.Time) {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	public := false
@@ -85,7 +86,7 @@ func (x *findIndex) note(conn, id string, port int, lan string, now time.Time) {
 	if x.byIP[conn] == nil {
 		x.byIP[conn] = map[string]*found{}
 	}
-	x.byIP[conn][id] = &found{id: id, port: port, lan: lan, public: public, seen: now}
+	x.byIP[conn][id] = &found{id: id, port: port, lan: lan, name: name, public: public, seen: now}
 	x.byID[id] = conn
 	// A cap on the whole table: each entry is a live install, and the zone
 	// holds 2,500 at most, so this is only a backstop against a flood.
@@ -174,12 +175,24 @@ func (s *Server) findConn(r *http.Request) string { return s.clientNet(r) }
 
 // noteFind records an announcement (handleAddress), or forgets the install
 // when it does not allow finding.
-func (s *Server) noteFind(r *http.Request, id string, allow bool, port int, lan string) {
+//
+// name is the chosen name the install says it has; it is kept only when the
+// install's claim to it checks out, so a page found by it leads to the right
+// server.
+func (s *Server) noteFind(r *http.Request, id string, allow bool, port int, lan, name string) {
 	if !allow || port < 1 || port > 65535 {
 		s.find.forget(id)
 		return
 	}
-	s.find.note(s.findConn(r), id, port, lan, time.Now())
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name != "" {
+		if !nameShape.MatchString(name) {
+			name = ""
+		} else if owner, err := s.ownerOf(r.Context(), name); err != nil || owner != id {
+			name = ""
+		}
+	}
+	s.find.note(s.findConn(r), id, port, lan, name, time.Now())
 }
 
 // siteHost is the website's host (emberstorm.app), from the first of
@@ -232,7 +245,11 @@ func (s *Server) handleFind(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []server{}
 	for _, e := range s.find.at(s.findConn(r), time.Now()) {
-		out = append(out, server{URL: s.homeURL(e.id, e.port), LAN: e.lan})
+		url := s.homeURL(e.id, e.port)
+		if e.name != "" {
+			url = s.chosenHomeURL(e.name, e.port)
+		}
+		out = append(out, server{URL: url, LAN: e.lan})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"servers": out})
 }
@@ -243,6 +260,46 @@ func (s *Server) homeURL(id string, port int) string {
 
 func (s *Server) remoteURL(id string, port int) string {
 	return "https://" + s.PublicNameFor(id) + portSuffix(port) + "/"
+}
+
+// A chosen name is the install's own address too (the owner's design,
+// 2026-10-08): yourname.home.<zone> and yourname.net.<zone> lead where its
+// code's home and away names do, as CNAMEs made when it is claimed, and the
+// install's certificate covers them - so the chosen name, not the code, is
+// what people see. The code's names stay underneath: the install's identity,
+// and every older bookmark.
+
+func (s *Server) chosenHomeURL(name string, port int) string {
+	return "https://" + name + "." + s.Label + "." + s.Zone + portSuffix(port) + "/"
+}
+
+func (s *Server) chosenRemoteURL(name string, port int) string {
+	return "https://" + name + "." + s.PublicLabel + "." + s.Zone + portSuffix(port) + "/"
+}
+
+// pointChosen makes name's home and away names lead to id's.
+func (s *Server) pointChosen(ctx context.Context, id, name string) error {
+	if _, err := s.DNS.Set(ctx, name+"."+s.Label, "CNAME", s.NameFor(id)); err != nil {
+		return err
+	}
+	if s.PublicLabel != "" {
+		if _, err := s.DNS.Set(ctx, name+"."+s.PublicLabel, "CNAME", s.PublicNameFor(id)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// unpointChosen takes a let-go name's home and away names down.
+func (s *Server) unpointChosen(ctx context.Context, name string) {
+	if err := s.DNS.Delete(ctx, name+"."+s.Label, "CNAME"); err != nil {
+		s.Log.Warn("take down a chosen home name", "name", name, "err", err)
+	}
+	if s.PublicLabel != "" {
+		if err := s.DNS.Delete(ctx, name+"."+s.PublicLabel, "CNAME"); err != nil {
+			s.Log.Warn("take down a chosen away name", "name", name, "err", err)
+		}
+	}
 }
 
 func portSuffix(port int) string {
@@ -375,10 +432,6 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 		writeError(w, http.StatusUnprocessableEntity, why)
 		return
 	}
-	if held(name) && !s.heldCodeOK(name, body.Code) {
-		writeError(w, http.StatusConflict, notAvailable)
-		return
-	}
 	if _, ok := s.DNS.(Getter); !ok {
 		writeError(w, http.StatusNotImplemented, "chosen names are not available on this name service")
 		return
@@ -390,6 +443,13 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 		return
 	}
 	if owner != "" && owner != id {
+		writeError(w, http.StatusConflict, notAvailable)
+		return
+	}
+	// A held name needs its code to be taken - not to be claimed again by the
+	// install already holding it (which is how it puts its home and away
+	// names back).
+	if owner == "" && held(name) && !s.heldCodeOK(name, body.Code) {
 		writeError(w, http.StatusConflict, notAvailable)
 		return
 	}
@@ -406,11 +466,19 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 		s.claims.put(name, id, time.Now())
 		s.Log.Info("name claimed", "id", id, "name", name)
 	}
+	if err := s.pointChosen(r.Context(), id, name); err != nil {
+		s.Log.Error("point a chosen name", "name", name, "err", err)
+		writeError(w, http.StatusBadGateway, "the DNS provider refused the change")
+		return
+	}
 	prev := strings.ToLower(strings.TrimSpace(body.Previous))
 	if prev != "" && prev != name && nameShape.MatchString(prev) {
 		s.release(r.Context(), id, prev)
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"name": name, "url": "https://" + name + "." + s.Zone + "/"})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"name": name, "url": "https://" + name + "." + s.Zone + "/",
+		"home": name + "." + s.Label + "." + s.Zone,
+	})
 }
 
 // handleRelease lets a chosen name go: DELETE /v1/name?name=hollberg.
@@ -438,6 +506,7 @@ func (s *Server) release(ctx context.Context, id, name string) {
 		s.Log.Warn("release a name", "name", name, "err", err)
 		return
 	}
+	s.unpointChosen(ctx, name)
 	s.claims.put(name, "", time.Now())
 	s.Log.Info("name released", "id", id, "name", name)
 }
@@ -493,18 +562,18 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 	switch {
 	case known && conn == s.findConn(r):
 		// The same internet connection as the server: at home.
-		http.Redirect(w, r, s.homeURL(id, port), http.StatusFound)
+		http.Redirect(w, r, s.chosenHomeURL(name, port), http.StatusFound)
 	case known && e.public:
-		http.Redirect(w, r, s.remoteURL(id, port), http.StatusFound)
+		http.Redirect(w, r, s.chosenRemoteURL(name, port), http.StatusFound)
 	case known:
 		chosenPage(w, http.StatusOK, "This EmberStorm is at home only",
 			"You seem to be away from the house it is in, and it is not set up to be reached from outside. Open it from home - or ask its owner to turn on Reach it from anywhere in Settings.",
-			[]link{{"Try it anyway", s.homeURL(id, port)}})
+			[]link{{"Try it anyway", s.chosenHomeURL(name, port)}})
 	default:
 		// Nothing known yet (the service restarted): let the visitor say.
 		chosenPage(w, http.StatusOK, "Where are you?",
 			"Choose where you are, and EmberStorm opens the right address.",
-			[]link{{"At home, on its Wi-Fi", s.homeURL(id, port)}, {"Away from home", s.remoteURL(id, port)}})
+			[]link{{"At home, on its Wi-Fi", s.chosenHomeURL(name, port)}, {"Away from home", s.chosenRemoteURL(name, port)}})
 	}
 }
 

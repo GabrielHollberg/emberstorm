@@ -114,10 +114,10 @@ var (
 	globalRegisterRate  = rate{300, 24 * time.Hour}
 	addressRate         = rate{20, time.Hour}      // per install
 	hereRate            = rate{12, time.Hour}      // per install: every 15 minutes, with room
-	challengeRate       = rate{10, 24 * time.Hour} // per install
-	challengeNetRate    = rate{20, 24 * time.Hour} // per client network
-	challengeWideRate   = rate{40, 24 * time.Hour} // per IPv4 /24 (or IPv6 /48)
-	globalChallengeRate = rate{300, 24 * time.Hour}
+	challengeRate       = rate{20, 24 * time.Hour} // per install (up to four names a certificate)
+	challengeNetRate    = rate{40, 24 * time.Hour} // per client network
+	challengeWideRate   = rate{80, 24 * time.Hour} // per IPv4 /24 (or IPv6 /48)
+	globalChallengeRate = rate{600, 24 * time.Hour}
 	publicRate          = rate{20, time.Hour} // per install; each triggers an outbound probe
 	clearRate           = rate{30, time.Hour} // per install; each costs registrar calls
 )
@@ -223,8 +223,9 @@ func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
 	ok := err == nil && to.Scheme == "https" && to.User == nil
 	if ok {
 		host := strings.ToLower(to.Hostname())
-		id, rest, _ := strings.Cut(host, ".")
-		ok = validID(id) && (rest == s.Label+"."+s.Zone || (s.PublicLabel != "" && rest == s.PublicLabel+"."+s.Zone))
+		label, rest, _ := strings.Cut(host, ".")
+		ok = (validID(label) || (nameShape.MatchString(label) && !reservedNames[label])) &&
+			(rest == s.Label+"."+s.Zone || (s.PublicLabel != "" && rest == s.PublicLabel+"."+s.Zone))
 	}
 	if !ok {
 		writeError(w, http.StatusBadRequest, "not a EmberStorm address")
@@ -320,6 +321,8 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 		// before sends neither, and is not findable.
 		Port int   `json:"port"`
 		Find *bool `json:"find"`
+		// Name: the chosen name the install holds, if any (checked).
+		Name string `json:"name"`
 	}
 	if !readJSON(w, r, &body) {
 		return
@@ -355,7 +358,7 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 			s.Log.Warn("clear other family", "id", id, "err", err)
 		}
 	}
-	s.noteFind(r, id, body.Find != nil && *body.Find, body.Port, addr.String())
+	s.noteFind(r, id, body.Find != nil && *body.Find, body.Port, addr.String(), body.Name)
 	s.Log.Info("address set", "id", id)
 	writeJSON(w, http.StatusOK, map[string]string{"name": s.NameFor(id), "ip": addr.String()})
 }
@@ -374,6 +377,7 @@ func (s *Server) handleHere(w http.ResponseWriter, r *http.Request, id string) {
 		Port   int    `json:"port"`
 		Find   bool   `json:"find"`
 		Public bool   `json:"public"`
+		Name   string `json:"name"`
 	}
 	if !readJSON(w, r, &body) {
 		return
@@ -387,7 +391,7 @@ func (s *Server) handleHere(w http.ResponseWriter, r *http.Request, id string) {
 		writeError(w, http.StatusTooManyRequests, "too often; try again later")
 		return
 	}
-	s.noteFind(r, id, body.Find, body.Port, addr.String())
+	s.noteFind(r, id, body.Find, body.Port, addr.String(), body.Name)
 	s.find.setPublic(id, body.Public)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -549,6 +553,9 @@ func (s *Server) handleSetChallenge(w http.ResponseWriter, r *http.Request, id s
 	var body struct {
 		Value  string `json:"value"`
 		Public bool   `json:"public"`
+		// Name: a chosen name the install holds - the challenge is for its
+		// home name, or with public its away name.
+		Name string `json:"name"`
 	}
 	if !readJSON(w, r, &body) {
 		return
@@ -585,6 +592,18 @@ func (s *Server) handleSetChallenge(w http.ResponseWriter, r *http.Request, id s
 	if body.Public {
 		rel, full = s.publicRelative(id), s.PublicNameFor(id)
 	}
+	if body.Name != "" {
+		name, ok := s.ownChosen(r.Context(), id, body.Name)
+		if !ok {
+			writeError(w, http.StatusForbidden, "that name is not this install's")
+			return
+		}
+		label := s.Label
+		if body.Public {
+			label = s.PublicLabel
+		}
+		rel, full = name+"."+label, name+"."+label+"."+s.Zone
+	}
 
 	if _, err := s.DNS.Set(r.Context(), "_acme-challenge."+rel, "TXT", body.Value); err != nil {
 		s.Log.Error("set challenge", "id", id, "err", err)
@@ -611,8 +630,21 @@ func (s *Server) handleClearChallenge(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 	rel := s.relative(id)
-	if r.URL.Query().Get("public") != "" {
+	public := r.URL.Query().Get("public") != ""
+	if public {
 		rel = s.publicRelative(id)
+	}
+	if n := r.URL.Query().Get("name"); n != "" {
+		name, ok := s.ownChosen(r.Context(), id, n)
+		if !ok {
+			writeError(w, http.StatusForbidden, "that name is not this install's")
+			return
+		}
+		label := s.Label
+		if public {
+			label = s.PublicLabel
+		}
+		rel = name + "." + label
 	}
 	if err := s.DNS.Delete(r.Context(), "_acme-challenge."+rel, "TXT"); err != nil {
 		s.Log.Warn("clear challenge", "id", id, "err", err)
@@ -620,6 +652,16 @@ func (s *Server) handleClearChallenge(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ownChosen is name, made plain, when id holds it.
+func (s *Server) ownChosen(ctx context.Context, id, name string) (string, bool) {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if !nameShape.MatchString(name) || reservedNames[name] {
+		return "", false
+	}
+	owner, err := s.ownerOf(ctx, name)
+	return name, err == nil && owner == id
 }
 
 func (s *Server) authed(next func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {

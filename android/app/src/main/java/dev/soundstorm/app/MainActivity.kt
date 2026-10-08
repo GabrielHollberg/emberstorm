@@ -988,7 +988,10 @@ class MainActivity : Activity() {
         if (!ServerAddress.isInstallName(host)) return false
         if (url.port != s.port) return false
         val current = s.host?.lowercase() ?: return false
-        if (ServerAddress.zoneOf(current) != null) return host.substringBefore('.') == current.substringBefore('.')
+        // From one of its names to another: its twin is followed at once; a
+        // different label (the install's chosen name, yourname.home... for
+        // k3x9m2p7qa.net...) only once both answer with the same install id
+        // (shouldOverrideUrlLoading).
         return true
     }
 
@@ -1084,6 +1087,23 @@ class MainActivity : Activity() {
                     Thread {
                         val same = runCatching {
                             java.net.InetAddress.getAllByName(target.host).any { it.hostAddress == current.host }
+                        }.getOrDefault(false)
+                        if (same) content.post { if (server == current) showWeb(target) }
+                    }.start()
+                    return true
+                }
+                val currentHost = current?.host?.lowercase()
+                if (target != null && currentHost != null && ServerAddress.zoneOf(currentHost) != null &&
+                    target.host?.lowercase()?.substringBefore('.') != currentHost.substringBefore('.')) {
+                    // Another of the install's names - its chosen name, the
+                    // owner's design (2026-10-08) - is followed only when it
+                    // and the address in use answer with one install id:
+                    // anybody can get a name under the zone, and a page must
+                    // not be able to send the app to theirs.
+                    Thread {
+                        val same = runCatching {
+                            val here = ServerAddress.installIdAt(current)
+                            here != null && here == ServerAddress.installIdAt(target)
                         }.getOrDefault(false)
                         if (same) content.post { if (server == current) showWeb(target) }
                     }.start()

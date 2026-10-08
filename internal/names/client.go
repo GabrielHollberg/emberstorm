@@ -44,21 +44,24 @@ func (c *Client) SetAddress(ctx context.Context, reg Registration, ip string) er
 // It answers the name the service now gives the install, which changes when
 // the service moves to another zone (soundstorm.dev to emberstorm.app,
 // 2026-10-07) - the id and token stay the same.
-func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port int, findable bool) (string, error) {
+//
+// chosen is the chosen name the install holds ("" for none), so Open my
+// EmberStorm leads to it.
+func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port int, findable bool, chosen string) (string, error) {
 	var out struct {
 		Name string `json:"name"`
 	}
 	err := c.do(ctx, http.MethodPut, "/v1/address", reg.Credential(),
-		map[string]any{"ip": ip, "port": port, "find": findable}, &out)
+		map[string]any{"ip": ip, "port": port, "find": findable, "name": chosen}, &out)
 	return out.Name, err
 }
 
 // Here tells the service the install is still here, for Open my EmberStorm
 // (the service keeps that in memory only, so a restart of it forgets until
 // told again). No DNS record changes.
-func (c *Client) Here(ctx context.Context, reg Registration, ip string, port int, findable, public bool) error {
+func (c *Client) Here(ctx context.Context, reg Registration, ip string, port int, findable, public bool, chosen string) error {
 	return c.do(ctx, http.MethodPut, "/v1/here", reg.Credential(),
-		map[string]any{"ip": ip, "port": port, "find": findable, "public": public}, nil)
+		map[string]any{"ip": ip, "port": port, "find": findable, "public": public, "name": chosen}, nil)
 }
 
 // ClaimName gives the install a chosen name (hollberg.soundstorm.dev),
@@ -119,17 +122,27 @@ func (c *Client) ClearPublic(ctx context.Context, reg Registration) error {
 // install's two names the challenge is for: the remote name when true, the LAN
 // name when false. A single multi-name certificate needs one challenge under
 // each.
-func (c *Client) SetChallenge(ctx context.Context, reg Registration, value string, public bool) error {
+//
+// chosen, when set, is a chosen name the install holds: the challenge is for
+// its home name, or with public its away name.
+func (c *Client) SetChallenge(ctx context.Context, reg Registration, value string, public bool, chosen string) error {
 	return c.do(ctx, http.MethodPut, "/v1/challenge", reg.Credential(),
-		map[string]any{"value": value, "public": public}, nil)
+		map[string]any{"value": value, "public": public, "name": chosen}, nil)
 }
 
 // ClearChallenge takes a challenge down. public selects the same name
 // SetChallenge published under.
-func (c *Client) ClearChallenge(ctx context.Context, reg Registration, public bool) error {
-	path := "/v1/challenge"
+func (c *Client) ClearChallenge(ctx context.Context, reg Registration, public bool, chosen string) error {
+	q := url.Values{}
 	if public {
-		path += "?public=1"
+		q.Set("public", "1")
+	}
+	if chosen != "" {
+		q.Set("name", chosen)
+	}
+	path := "/v1/challenge"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
 	}
 	return c.do(ctx, http.MethodDelete, path, reg.Credential(), nil, nil)
 }

@@ -204,7 +204,7 @@
       // Back from the names service without the app having taken the link:
       // there is no app on this phone, so nothing goes by way of it.
       let noApp = false;
-      const viaApp = (url) => phone && !noApp && /^https:\/\/[a-z2-7]{10}\.(home|net)\.(?:emberstorm\.app|soundstorm\.dev)(:\d+)?\/?$/i.test(url)
+      const viaApp = (url) => phone && !noApp && /^https:\/\/[a-z0-9-]{3,30}\.(home|net)\.(?:emberstorm\.app|soundstorm\.dev)(:\d+)?\/?$/i.test(url)
         ? `https://names.emberstorm.app/open?to=${encodeURIComponent(url)}` : url;
       const remember = (url) => { try { localStorage.setItem(KEY, url); } catch {} };
       const go = (url) => { remember(url); location.href = viaApp(url); };
