@@ -103,3 +103,28 @@ func TestWriteOut(t *testing.T) {
 		f.Close()
 	}
 }
+
+// An index claiming billions of samples is refused at once, rather than
+// planned: a few kilobytes of a crafted book used to take memory without end.
+func TestABookClaimingBillionsOfSamplesIsRefused(t *testing.T) {
+	file, err := os.ReadFile("testdata/short.m4b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	moovSize, err := Layout("testdata/short.m4b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := bytes.LastIndex(file, []byte("moov"))
+	moov := append([]byte(nil), file[at+4:at-4+int(moovSize)]...)
+	// One size for every sample, and four billion of them; the durations
+	// cover them all.
+	stsz := bytes.Index(moov, []byte("stsz")) + 4
+	binary.BigEndian.PutUint32(moov[stsz+4:], 1)
+	binary.BigEndian.PutUint32(moov[stsz+8:], 0xFFFFFFF0)
+	stts := bytes.Index(moov, []byte("stts")) + 4
+	binary.BigEndian.PutUint32(moov[stts+8:], 0xFFFFFFFF)
+	if _, err := parse(moov, int64(len(file))); err == nil {
+		t.Fatal("a book of four billion samples was planned")
+	}
+}

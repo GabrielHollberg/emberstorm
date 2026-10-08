@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"time"
@@ -81,7 +82,7 @@ func (s *Server) buttonOpen(ctx context.Context) bool {
 func (s *Server) handleResetButton(w http.ResponseWriter, r *http.Request) {
 	// box: there is a button to press at all, for the sign-in screen's hint.
 	out := map[string]any{"open": false, "box": s.caretakerSocket != ""}
-	if s.caretakerSocket != "" && s.auth.HasAccount() && s.buttonOpen(r.Context()) {
+	if s.caretakerSocket != "" && fromHomeNetwork(r) && s.auth.HasAccount() && s.buttonOpen(r.Context()) {
 		for _, u := range s.store.Users() {
 			if u.IsOwner() {
 				out["open"], out["owner"] = true, u.Name
@@ -95,7 +96,7 @@ func (s *Server) handleResetButton(w http.ResponseWriter, r *http.Request) {
 // no old one, while the button's window is open - once, and only from the
 // home network: never through the away-from-home name.
 func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request) {
-	if names.IsAwayName(requestHostname(r)) || !s.buttonOpen(r.Context()) {
+	if names.IsAwayName(requestHostname(r)) || !fromHomeNetwork(r) || !s.buttonOpen(r.Context()) {
 		writeError(w, http.StatusForbidden, "Press the power button on the box five times quickly, then try again within 15 minutes.")
 		return
 	}
@@ -114,6 +115,26 @@ func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request
 	_, _ = s.caretakerCall(r.Context(), http.MethodPost, "/button/used", nil, nil)
 	s.log.Warn("the owner's password was set from the box's button", "owner", owner.Name, "remote", r.RemoteAddr)
 	writeJSON(w, http.StatusOK, map[string]any{"owner": owner.Name})
+}
+
+// fromHomeNetwork is whether the connection itself comes from the home
+// network or the box: a private, loopback or link-local address. The name a
+// request asks for (its Host) is the asker's to choose, so it alone said
+// nothing - a stranger reaching the box through remote access could name a
+// home address and set the owner's password the moment the button was
+// pressed. On the box, Docker keeps the real address of a connection from
+// the network; through remote access it is a public one.
+func fromHomeNetwork(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	a, err := netip.ParseAddr(host)
+	if err != nil {
+		return false
+	}
+	a = a.Unmap()
+	return a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast()
 }
 
 // GET /api/reset/summary: what an erase would delete, to say before asking.

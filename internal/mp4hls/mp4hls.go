@@ -36,6 +36,18 @@ const MinIndex = 2 << 20
 // maxIndex refuses a moov too large to keep in memory.
 const maxIndex = 256 << 20
 
+// The index is the file's say-so, and a few kilobytes can claim billions of
+// samples: planning fragments for them, or one fragment holding them all,
+// took memory without end. maxSamples is far past any real book (AAC is
+// about 43 samples a second: 50 million is over 300 hours); a fragment holds
+// at most maxSegmentSamples (a real one about 430) and a book at most
+// maxSegments (over 500 hours of ten-second fragments).
+const (
+	maxSamples        = 50_000_000
+	maxSegmentSamples = 20_000
+	maxSegments       = 200_000
+)
+
 type box struct {
 	typ  string
 	data []byte // the payload, after the header
@@ -151,7 +163,7 @@ func Open(path string) (*Book, error) {
 	if moov == nil {
 		return nil, errors.New("mp4: no moov")
 	}
-	b, err := parse(moov)
+	b, err := parse(moov, st.Size())
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +205,7 @@ func find(boxes []box, typ string) []byte {
 	return nil
 }
 
-func parse(moov []byte) (*Book, error) {
+func parse(moov []byte, fileSize int64) (*Book, error) {
 	top, err := children(moov)
 	if err != nil {
 		return nil, err
@@ -218,12 +230,12 @@ func parse(moov []byte) (*Book, error) {
 		if len(hdlr) < 12 || string(hdlr[8:12]) != "soun" {
 			continue
 		}
-		return track(mvhd, find(trak, "tkhd"), mdia)
+		return track(mvhd, find(trak, "tkhd"), mdia, fileSize)
 	}
 	return nil, errors.New("mp4: no sound track")
 }
 
-func track(mvhd, tkhd []byte, mdia []box) (*Book, error) {
+func track(mvhd, tkhd []byte, mdia []box, fileSize int64) (*Book, error) {
 	b := &Book{}
 	mdhd := find(mdia, "mdhd")
 	if len(mdhd) < 24 {
@@ -297,6 +309,12 @@ func track(mvhd, tkhd []byte, mdia []box) (*Book, error) {
 	if b.samples == 0 || fromStts < uint64(b.samples) {
 		return nil, errors.New("mp4: tables disagree")
 	}
+	// Every sample is at least a byte of the file, and a constant size times
+	// the count must fit in it too.
+	if b.samples > maxSamples || int64(b.samples) > fileSize ||
+		(b.stszFixed != 0 && uint64(b.samples)*uint64(b.stszFixed) > uint64(fileSize)) {
+		return nil, errors.New("mp4: more samples than the file can hold")
+	}
 
 	// Chunks.
 	var offsets []uint64
@@ -331,7 +349,7 @@ func track(mvhd, tkhd []byte, mdia []box) (*Book, error) {
 	}
 	b.chunkOffset = offsets
 	b.chunkFirst = make([]uint32, len(offsets))
-	var sample uint32
+	var sample uint64
 	for i := 0; i < e; i++ {
 		first := binary.BigEndian.Uint32(stsc[8+12*i:])
 		per := binary.BigEndian.Uint32(stsc[12+12*i:])
@@ -343,11 +361,13 @@ func track(mvhd, tkhd []byte, mdia []box) (*Book, error) {
 			return nil, errors.New("mp4: bad stsc")
 		}
 		for c := first; c < last; c++ {
-			b.chunkFirst[c-1] = sample
-			sample += per
+			// Past the samples the track has, the rest is never read; a
+			// running total climbing on would wrap and break chunkOf.
+			b.chunkFirst[c-1] = uint32(min(sample, uint64(b.samples)))
+			sample += uint64(per)
 		}
 	}
-	if sample < b.samples {
+	if sample < uint64(b.samples) {
 		return nil, errors.New("mp4: chunks hold too few samples")
 	}
 
@@ -359,7 +379,10 @@ func track(mvhd, tkhd []byte, mdia []box) (*Book, error) {
 	var s uint32
 	for _, r := range b.stts {
 		for k := uint32(0); k < r.count && s < b.samples; k++ {
-			if t-segStart >= target {
+			if t-segStart >= target || s-b.segSample[len(b.segSample)-1] >= maxSegmentSamples {
+				if len(b.segSample) >= maxSegments {
+					return nil, errors.New("mp4: too many fragments")
+				}
 				b.segSample = append(b.segSample, s)
 				b.segTime = append(b.segTime, t)
 				segStart = t

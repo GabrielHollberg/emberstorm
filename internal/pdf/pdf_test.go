@@ -1,11 +1,13 @@
 package pdf
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // writePDF makes a file that starts like a PDF and contains body verbatim.
@@ -232,5 +234,20 @@ func TestPDFStringForms(t *testing.T) {
 		if meta.Title != c.want {
 			t.Errorf("%s: title = %q, want %q", c.title, meta.Title, c.want)
 		}
+	}
+}
+
+// A file of nothing but unclosed /Title( keys is read in moments, not hours.
+func TestUnclosedTitlesDoNotTakeHours(t *testing.T) {
+	data := append([]byte("%PDF-1.4\n"), bytes.Repeat([]byte("/Title("), 2<<20)...)
+	done := make(chan struct{})
+	go func() {
+		dictString(data, "Title")
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("still reading after 5 seconds")
 	}
 }

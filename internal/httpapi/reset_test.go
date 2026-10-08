@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,5 +124,26 @@ func TestStartingOverNeedsThePasswordAndTheWord(t *testing.T) {
 	defer c.mu.Unlock()
 	if len(c.resets) != 1 || c.resets[0] != "start-over" {
 		t.Fatalf("the caretaker was asked %v", c.resets)
+	}
+}
+
+// The power button's password reset is the home network's: the connection's
+// own address decides, never the name the request asks for.
+func TestTheButtonsResetIsOnlyFromHome(t *testing.T) {
+	for addr, home := range map[string]bool{
+		"192.168.0.20:51000":     true,
+		"10.1.2.3:443":           true,
+		"127.0.0.1:8099":         true,
+		"[fe80::1]:8099":         true,
+		"[::ffff:192.168.1.5]:1": true,
+		"203.0.113.9:51000":      false,
+		"8.8.8.8:443":            false,
+		"[2001:db8::1]:443":      false,
+	} {
+		r := httptest.NewRequest(http.MethodPost, "http://192.168.0.20:8099/api/reset/owner-password", nil)
+		r.RemoteAddr = addr
+		if got := fromHomeNetwork(r); got != home {
+			t.Errorf("%s: from home %v, want %v", addr, got, home)
+		}
 	}
 }

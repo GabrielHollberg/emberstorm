@@ -38,6 +38,7 @@ type SweepResult struct {
 	Unstamped  int // of those, left alone for want of a date
 	Forgotten  int // address records deleted
 	Challenges int // stale challenge records deleted
+	Names      int // chosen names let go: their install gone, or one held beside a newer
 }
 
 // challengeForgetAfter is how long a challenge record may outlive its purpose.
@@ -79,12 +80,30 @@ func (p *Porkbun) Sweep(ctx context.Context, label string, forgetAfter time.Dura
 
 	zone := regexp.QuoteMeta(strings.ToLower(label + "." + p.Domain))
 	installName := regexp.MustCompile(`^[a-z2-7]{10}\.` + zone + `$`)
-	challengeName := regexp.MustCompile(`^_acme-challenge\.[a-z2-7]{10}\.` + zone + `$`)
+	// A challenge for an install's own name or for a chosen one, under any
+	// level: only this service ever writes _acme-challenge records.
+	challengeName := regexp.MustCompile(`^_acme-challenge\.[a-z0-9-]{3,30}\.[a-z]+\.` + regexp.QuoteMeta(strings.ToLower(p.Domain)) + `$`)
+	// Chosen names: the claim (hollberg.claim.<zone>, holding the install's
+	// id) and the home and away names pointed at the install's.
+	claimName := regexp.MustCompile(`^([a-z0-9-]{3,30})\.claim\.` + regexp.QuoteMeta(strings.ToLower(p.Domain)) + `$`)
+	pointedName := regexp.MustCompile(`^([a-z0-9-]{3,30})\.[a-z]+\.` + regexp.QuoteMeta(strings.ToLower(p.Domain)) + `$`)
 	now := p.now()
 
-	var forget, challenges []porkbunRecord
+	var forget, challenges, claims, pointed []porkbunRecord
+	installs := map[string]bool{}
 	for _, r := range all.Records {
 		name := strings.ToLower(strings.TrimSuffix(r.Name, "."))
+		switch {
+		case r.Type == "TXT" && claimName.MatchString(name):
+			claims = append(claims, r)
+			continue
+		case r.Type == "CNAME" && pointedName.MatchString(name):
+			pointed = append(pointed, r)
+			continue
+		}
+		if (r.Type == "A" || r.Type == "AAAA") && installName.MatchString(name) {
+			installs[name[:10]] = true
+		}
 		switch {
 		case (r.Type == "A" || r.Type == "AAAA") && installName.MatchString(name):
 			res.Installs++
@@ -109,14 +128,60 @@ func (p *Porkbun) Sweep(ctx context.Context, label string, forgetAfter time.Dura
 		return res, fmt.Errorf("sweep refused: %d of %d installs look abandoned, more than the %d a single sweep may remove - check the clock and the stamps before trusting it",
 			len(forget), res.Installs, limit)
 	}
+	for _, r := range forget {
+		delete(installs, strings.ToLower(strings.TrimSuffix(r.Name, "."))[:10])
+	}
 
-	for _, r := range append(forget, challenges...) {
+	// An install holds one chosen name, and only while it is there: a name
+	// whose install is gone (or never announced) goes, and of several held
+	// by one install the newest is kept. Unbounded, names claimed and left
+	// filled the provider's record limit for good.
+	dropNames := map[string]bool{}
+	newest := map[string]porkbunRecord{}
+	for _, c := range claims {
+		id := strings.Trim(strings.ToLower(c.Content), `"`)
+		name := claimName.FindStringSubmatch(strings.ToLower(strings.TrimSuffix(c.Name, ".")))[1]
+		if !installs[id] {
+			dropNames[name] = true
+			continue
+		}
+		if prev, ok := newest[id]; ok {
+			a, _ := lastSeen(prev.Notes)
+			b, _ := lastSeen(c.Notes)
+			older := c
+			if b.After(a) {
+				newest[id], older = c, prev
+			}
+			dropNames[claimName.FindStringSubmatch(strings.ToLower(strings.TrimSuffix(older.Name, ".")))[1]] = true
+			continue
+		}
+		newest[id] = c
+	}
+	if limit := max(minSweepFloor, int(maxSweepShare*float64(len(claims)))); len(dropNames) > limit {
+		return res, fmt.Errorf("sweep refused: %d of %d chosen names look abandoned, more than the %d a single sweep may remove",
+			len(dropNames), len(claims), limit)
+	}
+	var names []porkbunRecord
+	for _, c := range claims {
+		if dropNames[claimName.FindStringSubmatch(strings.ToLower(strings.TrimSuffix(c.Name, ".")))[1]] {
+			names = append(names, c)
+		}
+	}
+	for _, c := range pointed {
+		if dropNames[pointedName.FindStringSubmatch(strings.ToLower(strings.TrimSuffix(c.Name, ".")))[1]] {
+			names = append(names, c)
+		}
+	}
+	res.Names = len(dropNames)
+
+	for _, r := range append(append(forget, challenges...), names...) {
 		if _, err := p.call(ctx, "/dns/delete/"+p.Domain+"/"+r.ID, nil); err != nil {
 			return res, fmt.Errorf("sweep: delete %s: %w", r.Name, err)
 		}
-		if r.Type == "TXT" {
+		switch {
+		case r.Type == "TXT" && challengeName.MatchString(strings.ToLower(strings.TrimSuffix(r.Name, "."))):
 			res.Challenges++
-		} else {
+		case r.Type == "A" || r.Type == "AAAA":
 			res.Forgotten++
 		}
 		select {
@@ -151,7 +216,7 @@ func (s *Server) RunSweeper(ctx context.Context, forgetAfter time.Duration) {
 				continue
 			}
 			s.Log.Info("swept", "label", label, "installs", res.Installs, "unstamped", res.Unstamped,
-				"forgotten", res.Forgotten, "challenges", res.Challenges)
+				"forgotten", res.Forgotten, "challenges", res.Challenges, "names", res.Names)
 		}
 	}
 }

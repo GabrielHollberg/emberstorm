@@ -44,8 +44,14 @@ const findMax = 8
 var (
 	findRate     = rate{60, time.Hour}       // per client network
 	launchRate   = rate{240, time.Hour}      // per client network
-	claimRate    = rate{6, 24 * time.Hour}   // per install
-	globalClaims = rate{200, 24 * time.Hour} // everybody's
+	claimRate    = rate{3, 24 * time.Hour}   // per install
+	globalClaims = rate{100, 24 * time.Hour} // everybody's
+	// Every claim asked about costs the registrar a lookup and more - the
+	// registrar's budget is every install's renewals - so asking at all is
+	// limited, before anything is looked up, an install's claim of the name
+	// it already holds (on every start) included.
+	nameAskRate    = rate{20, time.Hour} // per install
+	nameAskNetRate = rate{40, time.Hour} // per client network
 )
 
 type found struct {
@@ -436,6 +442,12 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 		writeError(w, http.StatusNotImplemented, "chosen names are not available on this name service")
 		return
 	}
+	if !s.limits.allow("name-ask:"+id, nameAskRate) || !s.limits.allow("name-ask-net:"+s.clientNet(r), nameAskNetRate) {
+		writeError(w, http.StatusTooManyRequests, "Too many name changes just now. Try again later.")
+		return
+	}
+	s.claimMu.Lock()
+	defer s.claimMu.Unlock()
 	owner, err := s.ownerOf(r.Context(), name)
 	if err != nil {
 		s.Log.Error("look up a chosen name", "name", name, "err", err)

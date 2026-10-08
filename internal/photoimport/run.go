@@ -74,7 +74,7 @@ func Run(zipPath string, t Target, progress func(Progress), stop func() bool) (P
 		}
 		lower := strings.ToLower(name)
 		switch {
-		case strings.HasSuffix(lower, ".json") && f.UncompressedSize64 < 64<<20:
+		case strings.HasSuffix(lower, ".json") && f.UncompressedSize64 < 16<<20:
 			// A Takeout sidecar (small, one per photo), or a social
 			// network's record of its photos (Facebook's, Instagram's,
 			// Flickr's), read either way.

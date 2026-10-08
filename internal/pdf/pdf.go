@@ -277,9 +277,15 @@ func infoObject(raw []byte) ([]byte, bool) {
 
 // dictString finds /key in a dictionary and reads the string after it, as a
 // literal (...) or a hex <...> string.
+//
+// A title is short, so a string is looked for only within maxString of its
+// key, and only the first few keys are tried: a crafted file of /Title(
+// repeated, each scan running to the end of 16MB looking for a closing
+// parenthesis, took hours of a processor.
 func dictString(dict []byte, key string) (string, bool) {
+	const maxString, maxTries = 64 << 10, 64
 	name := []byte("/" + key)
-	for from := 0; ; {
+	for from, tries := 0, 0; tries < maxTries; tries++ {
 		i := bytes.Index(dict[from:], name)
 		if i < 0 {
 			return "", false
@@ -296,17 +302,19 @@ func dictString(dict []byte, key string) (string, bool) {
 		if at >= len(dict) {
 			return "", false
 		}
+		near := dict[at+1 : min(len(dict), at+1+maxString)]
 		switch {
 		case dict[at] == '(':
-			if b, ok := literalString(dict[at+1:]); ok {
+			if b, ok := literalString(near); ok {
 				return decodePDFString(b), true
 			}
 		case dict[at] == '<' && (at+1 >= len(dict) || dict[at+1] != '<'):
-			if end := bytes.IndexByte(dict[at+1:], '>'); end >= 0 {
-				return pdfText(hexString(dict[at+1 : at+1+end])), true
+			if end := bytes.IndexByte(near, '>'); end >= 0 {
+				return pdfText(hexString(near[:end])), true
 			}
 		}
 	}
+	return "", false
 }
 
 func isSpace(c byte) bool {

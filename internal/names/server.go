@@ -92,6 +92,10 @@ type Server struct {
 	limits *limits
 	find   *findIndex
 	claims claimCache
+	// claimMu makes finding a name free and claiming it one step: two
+	// installs claiming one free name at once both wrote a claim, and either
+	// could later be found its owner.
+	claimMu sync.Mutex
 }
 
 // Rates. Each is a count per window, and none of them is anywhere near what

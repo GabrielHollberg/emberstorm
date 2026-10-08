@@ -5785,6 +5785,8 @@ $('intake-close').addEventListener('click', () => {
 // The port is the one in use now, because the server answers http and https
 // on the same one. Resolves false when it stays put.
 async function moveToSecureName(name) {
+  // Only ever one of an install's own names: the page goes nowhere else.
+  if (typeof name !== 'string' || !/^[a-z0-9-]{3,30}\.(home|net)\.(?:emberstorm\.app|soundstorm\.dev)$/.test(name)) return false;
   const port = location.port || (location.protocol === 'https:' ? '443' : '80');
   const target = 'https://' + name + (port === '443' ? '' : ':' + port);
   const controller = new AbortController();

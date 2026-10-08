@@ -248,3 +248,41 @@ func TestSweepRecoveredSurvivesAPanic(t *testing.T) {
 		t.Errorf("err = %v, want it to say it panicked", err)
 	}
 }
+
+// A chosen name lasts while its install does, and an install keeps one: a
+// name whose install was swept, or one held beside a newer, goes with its
+// home and away names, and a challenge left for a chosen name goes too.
+func TestASweepLetsGoOfNamesNobodyHolds(t *testing.T) {
+	z, p := newZone(t)
+	live, gone := fakeID("l", 1), fakeID("g", 2)
+	z.add(live+".home", "A", "192.168.0.10", daysAgo(1))
+	for i := 0; i < 8; i++ {
+		z.add(fakeID("h", i)+".home", "A", "192.168.1.1", daysAgo(1))
+	}
+	z.add("kept.claim", "TXT", live, daysAgo(1))
+	z.add("kept.home", "CNAME", live+".home.soundstorm.dev", daysAgo(1))
+	z.add("older.claim", "TXT", live, daysAgo(40)) // the same install's earlier name
+	z.add("older.home", "CNAME", live+".home.soundstorm.dev", daysAgo(40))
+	z.add("orphan.claim", "TXT", gone, daysAgo(1)) // an install never announced
+	z.add("orphan.home", "CNAME", gone+".home.soundstorm.dev", daysAgo(1))
+	z.add("orphan.net", "CNAME", gone+".net.soundstorm.dev", daysAgo(1))
+	z.add("_acme-challenge.orphan.home", "TXT", "z", daysAgo(9))
+
+	res, err := p.Sweep(context.Background(), "home", halfYear)
+	if err != nil {
+		t.Fatalf("Sweep: %v", err)
+	}
+	for _, name := range []string{"older.claim", "older.home", "orphan.claim", "orphan.home", "orphan.net", "_acme-challenge.orphan.home"} {
+		if !contains(z.deleted, name+".soundstorm.dev") {
+			t.Errorf("%s was kept", name)
+		}
+	}
+	for _, name := range []string{"kept.claim", "kept.home"} {
+		if contains(z.deleted, name+".soundstorm.dev") {
+			t.Errorf("%s was swept", name)
+		}
+	}
+	if res.Names != 2 || res.Challenges != 1 {
+		t.Errorf("result = %+v", res)
+	}
+}

@@ -83,12 +83,22 @@ func ParseTakeoutJSON(r io.Reader) (title string, m Meta, ok bool) {
 // TakeoutIndex finds a photo's sidecar by its folder and name.
 type TakeoutIndex struct {
 	byKey   map[string]Meta     // folder/original name, lowercased
-	byDir   map[string][]string // folder -> original names, for cut-short names
-	byTitle map[string][]Meta   // original name alone, for an album's copy
+	byShort map[string][]string // folder/first cutPrefix letters -> original names, for cut-short names
+	byTitle map[string]Meta     // original name alone, for an album's copy
+	agree   map[string]bool     // whether every sidecar of that name says the same when
 }
 
+// cutPrefix is how much of a name a cut-short one is looked for by, and
+// maxCutCandidates how many names of one folder sharing it are compared: a
+// download of thousands of near-alike names, each compared with all the
+// others, took hours of a processor.
+const (
+	cutPrefix        = 20
+	maxCutCandidates = 1000
+)
+
 func NewTakeoutIndex() *TakeoutIndex {
-	return &TakeoutIndex{byKey: map[string]Meta{}, byDir: map[string][]string{}, byTitle: map[string][]Meta{}}
+	return &TakeoutIndex{byKey: map[string]Meta{}, byShort: map[string][]string{}, byTitle: map[string]Meta{}, agree: map[string]bool{}}
 }
 
 // Add records a sidecar found at entry (its path in the zip).
@@ -96,8 +106,16 @@ func (t *TakeoutIndex) Add(entry, title string, m Meta) {
 	dir := strings.ToLower(path.Dir(entry))
 	key := dir + "/" + strings.ToLower(title)
 	if _, seen := t.byKey[key]; !seen {
-		t.byDir[dir] = append(t.byDir[dir], strings.ToLower(title))
-		t.byTitle[strings.ToLower(title)] = append(t.byTitle[strings.ToLower(title)], m)
+		lower := strings.ToLower(title)
+		if len(lower) >= cutPrefix {
+			short := dir + "/" + lower[:cutPrefix]
+			t.byShort[short] = append(t.byShort[short], lower)
+		}
+		if first, ok := t.byTitle[lower]; !ok {
+			t.byTitle[lower], t.agree[lower] = m, true
+		} else if !first.Taken.Equal(m.Taken) {
+			t.agree[lower] = false
+		}
 	}
 	t.byKey[key] = m
 }
@@ -138,9 +156,9 @@ func (t *TakeoutIndex) Lookup(entry string) (Meta, bool) {
 	}
 	// Cut short: the only original name in the folder that begins with this
 	// one's stem and has its extension.
-	if len(stem) >= 20 {
+	if names := t.byShort[dir+"/"+stem[:min(len(stem), cutPrefix)]]; len(stem) >= cutPrefix && len(names) <= maxCutCandidates {
 		var match string
-		for _, title := range t.byDir[dir] {
+		for _, title := range names {
 			if strings.HasPrefix(title, stem) && path.Ext(title) == ext {
 				if match != "" {
 					return Meta{}, false
@@ -156,14 +174,8 @@ func (t *TakeoutIndex) Lookup(entry string) (Meta, bool) {
 	// year's): the same name anywhere in the download, as long as every
 	// sidecar of that name agrees on when.
 	for _, c := range candidates {
-		if ms := t.byTitle[c]; len(ms) > 0 {
-			agree := true
-			for _, m := range ms[1:] {
-				agree = agree && m.Taken.Equal(ms[0].Taken)
-			}
-			if agree {
-				return ms[0], true
-			}
+		if m, ok := t.byTitle[c]; ok && t.agree[c] {
+			return m, true
 		}
 	}
 	return Meta{}, false
