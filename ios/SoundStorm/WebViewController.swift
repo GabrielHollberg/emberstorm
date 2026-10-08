@@ -41,8 +41,13 @@ final class WebViewController: UIViewController {
     /// TV?" at once if it can (music playing in it carries on); a page that
     /// cannot - not signed in yet, or older - is loaded again with the code
     /// in its address, asked once signed in.
-    func handLink(_ code: String) {
-        let js = "(typeof window.__soundstormLink === 'function' && window.__soundstormLink(\"\(code)\")) === true"
+    ///
+    /// `scanned` when the app's own scanner read it: the page asks at once.
+    /// A code that came in a link is the person's to type, as the TV shows it,
+    /// so one sent by somebody else signs nothing in (the twelfth pass).
+    func handLink(_ code: String, scanned: Bool = false) {
+        let how = scanned ? ", \"scanned\"" : ""
+        let js = "(typeof window.__soundstormLink === 'function' && window.__soundstormLink(\"\(code)\"\(how))) === true"
         webView.evaluateJavaScript(js) { [weak self] took, _ in
             guard (took as? Bool) != true, let self else { return }
             self.pendingLink = code
@@ -643,7 +648,7 @@ final class WebViewController: UIViewController {
                     tell("not-ours")
                     return
                 }
-                self?.handLink(code)
+                self?.handLink(code, scanned: true)
             }
         case "pickFiles":
             FileUploads.shared.pick(over: self) { [weak self] files in
