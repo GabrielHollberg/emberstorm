@@ -108,7 +108,8 @@ runs a Tailscale sidecar that puts EmberStorm on a tailnet at
 <code>https://&lt;hostname&gt;.&lt;tailnet&gt;.ts.net</code>. On Windows a Start menu shortcut,
 <strong>Set up Tailscale</strong>, walks through it: a window with the steps, a button to Tailscale's key
 page, and a box that accepts only something shaped like a Tailscale auth key. On Mac and Linux it is
-<code>--tailscale --auth-key ...</code>.</p>
+<code>TS_AUTHKEY=tskey-... sh install.sh --tailscale</code> (the key in the environment, where other
+accounts on the machine cannot read it, as they can a command line).</p>
 <div class="why">It is opt-in for the same reason Plex was rejected as a backend: it needs an account, an
 auth key and an app on every device, none of which can be automated. EmberStorm works fully without it,
 and nobody is walked through a sign-up they did not ask for. Making it the default would make the

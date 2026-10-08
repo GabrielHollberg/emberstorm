@@ -463,7 +463,7 @@ free Tailscale account and the Tailscale app on each device.
 - **Windows:** Start menu → **Set up Tailscale**, which walks you through it.
 - **Mac and Linux:**
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh -s -- --tailscale --auth-key tskey-...
+  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | TS_AUTHKEY=tskey-... sh -s -- --tailscale
   ```
 
 EmberStorm then answers at `https://soundstorm.<your-tailnet>.ts.net`.

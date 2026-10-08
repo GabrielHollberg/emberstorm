@@ -387,9 +387,12 @@ pick_port() {
 # get_env and set_env read and rewrite one line of .env and leave the rest
 # alone, because the port and the certificate hosts live in there too and were
 # worked out on a run nobody is going to repeat.
+# A $ in a value is written as $$, which compose reads as one $ rather than
+# the start of a variable (a library folder called "My$Music" mounted as
+# "My" - the twelfth security pass), and read back as one.
 get_env() {
 	[ -f .env ] || return 0
-	sed -n "s/^[[:space:]]*$1=//p" .env | head -n 1
+	sed -n "s/^[[:space:]]*$1=//p" .env | head -n 1 | sed 's/\$\$/$/g'
 }
 
 set_env() {
@@ -409,7 +412,7 @@ set_env() {
 		( umask 077; grep -v "^[[:space:]]*$1=" .env > .env.new ) || true
 		mv .env.new .env
 	fi
-	printf '%s=%s\n' "$1" "$2" >> .env
+	printf '%s=%s\n' "$1" "$(printf '%s' "$2" | sed 's/\$/$$/g')" >> .env
 }
 
 # library_path is where this install keeps its media: beside it, unless .env
@@ -1152,6 +1155,7 @@ while [ $# -gt 0 ]; do
 			shift
 			AUTHKEY="${1:-}"
 			[ -n "$AUTHKEY" ] || die "--auth-key needs a key after it"
+			note "a key given on the command line can be read by other accounts here; TS_AUTHKEY=... sh install.sh --tailscale keeps it to this one"
 			;;
 		--library)
 			shift
@@ -1469,7 +1473,11 @@ for shelf in music movies tv audiobooks ebooks documents pictures; do
 	chmod 0777 "$LIBRARY_DIR/$shelf" 2>/dev/null ||
 		note "could not open $LIBRARY_DIR/$shelf to EmberStorm; adding files there may fail"
 done
-chmod 0777 "$LIBRARY_DIR" 2>/dev/null || true
+# The library itself is sticky (1777): its shelves stay open to EmberStorm,
+# but nobody else on the machine can rename one away and put a link in its
+# place, which every backend would then read and write through (the twelfth
+# security pass).
+chmod 1777 "$LIBRARY_DIR" 2>/dev/null || true
 
 # A move: the media first, then the data, and only then does anything start -
 # a backend started on empty volumes would set itself up afresh.
@@ -1486,7 +1494,10 @@ fi
 # Remote access. A separate decision from --https: one is about the wifi at
 # home, the other about being away from it.
 if [ "$TAILSCALE" = "on" ]; then
-	key="$AUTHKEY"
+	# Best in the environment (TS_AUTHKEY=tskey-... sh install.sh --tailscale):
+	# a command line any account on the machine can read, the environment only
+	# this one (the twelfth security pass).
+	key="${AUTHKEY:-${TS_AUTHKEY:-}}"
 	[ -n "$key" ] || key=$(get_env SOUNDSTORM_TAILSCALE_AUTHKEY)
 	if [ -z "$key" ]; then
 		say ""
@@ -1497,20 +1508,23 @@ if [ "$TAILSCALE" = "on" ]; then
 		say "  2. Open the admin console, Settings, then Keys"
 		say "  3. Generate an auth key and copy it"
 		say ""
-		# Only reachable from a flag somebody typed. Piping this script into
-		# sh leaves no terminal to read from, hence --auth-key.
+		# Only reachable from a flag somebody typed. Piped into sh, the
+		# script reads the terminal itself.
 		if [ -t 0 ]; then
 			printf '  Paste the auth key here: '
 			read -r key
+		elif [ -r /dev/tty ] && { : </dev/tty; } 2>/dev/null; then
+			printf '  Paste the auth key here: '
+			read -r key </dev/tty
 		fi
 	fi
 	if [ -z "$key" ]; then
 		die "No auth key, so there is nothing to connect with.
 
 EmberStorm is installed and working on this network either way. Run this again
-with --tailscale when you have a key, or pass it directly:
+with --tailscale when you have a key, or give it directly:
 
-  sh install.sh --tailscale --auth-key tskey-..."
+  TS_AUTHKEY=tskey-... sh install.sh --tailscale"
 	fi
 	set_env SOUNDSTORM_TAILSCALE_AUTHKEY "$key"
 	write_serve_config

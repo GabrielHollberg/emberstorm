@@ -73,6 +73,12 @@ param(
     [switch]$Console
 )
 
+# A Tailscale key handed over by a relaunch comes in the environment, never
+# the command line, which other accounts on the machine can read (the twelfth
+# security pass).
+if (-not $AuthKey -and $env:SOUNDSTORM_TS_KEY) { $AuthKey = $env:SOUNDSTORM_TS_KEY }
+Remove-Item Env:SOUNDSTORM_TS_KEY -ErrorAction SilentlyContinue
+
 if ($Https -and $NoHttps) {
     Write-Host "  -Https and -NoHttps cannot both be given." -ForegroundColor Red
     exit 1
@@ -620,6 +626,11 @@ function ConvertTo-ArgumentList($Bound) {
     $list = @()
     foreach ($key in $Bound.Keys) {
         $value = $Bound[$key]
+        # The key rides in the environment, which the relaunched copy reads.
+        if ($key -eq 'AuthKey') {
+            $env:SOUNDSTORM_TS_KEY = "$value"
+            continue
+        }
         if ($value -is [System.Management.Automation.SwitchParameter]) {
             if ($value.IsPresent) { $list += "-$key" }
         } else {
@@ -920,9 +931,22 @@ function Show-Problem($text) {
 # trying to reach a registry it cannot. From a minimized shortcut that is
 # indistinguishable from the icon doing nothing, so the launcher gives it a
 # limit and reports rather than waiting.
+# Every compose command names its file: left to itself, compose also reads a
+# docker-compose.override.yml (or a compose.yaml) it finds in the folder, which
+# somebody else could have put there (the twelfth security pass).
+function Add-ComposeFile([string[]]$Arguments, [switch]$Quoted) {
+    if (-not $Arguments -or $Arguments[0] -ne 'compose' -or $Arguments -contains '-f') { return $Arguments }
+    $file = Join-Path $Dir 'docker-compose.yml'
+    if ($Quoted) { $file = '"' + $file + '"' }
+    $rest = @()
+    if ($Arguments.Count -gt 1) { $rest = $Arguments[1..($Arguments.Count - 1)] }
+    return @('compose', '-f', $file) + $rest
+}
+
 function Invoke-DockerBounded {
     param([string[]]$Arguments, [int]$TimeoutSeconds = 120)
 
+    $Arguments = Add-ComposeFile $Arguments -Quoted
     $process = Start-Process -FilePath 'docker' -ArgumentList $Arguments `
         -NoNewWindow -PassThru
     # Reading .Handle is not a no-op and is not optional. Start-Process
@@ -946,6 +970,8 @@ function Invoke-DockerBounded {
 # this script by succeeding noisily. Anything that shells out goes through here.
 function Invoke-Docker {
     param([string[]]$Arguments, [switch]$Capture, [switch]$Calm)
+
+    $Arguments = Add-ComposeFile $Arguments
 
     $previousPreference = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
@@ -1246,7 +1272,10 @@ function Get-UpnpUrl([string]$Gateway = '') {
                         $location = $Matches[1].Trim()
                         $locationHost = ''
                         try { $locationHost = ([Uri]$location).Host } catch { }
-                        if (-not $Gateway -or $locationHost -eq $Gateway) {
+                        # Only the gateway's own answer, and only when the
+                        # gateway is known: anything else on the network can
+                        # answer a search (the twelfth security pass).
+                        if ($Gateway -and $locationHost -eq $Gateway -and $location -match '^http://\S+$') {
                             return $location
                         }
                     }
@@ -2070,7 +2099,8 @@ function Get-EnvSettingIn([string]$Folder, [string]$Name) {
     $envFile = Join-Path $Folder '.env'
     if (-not (Test-Path $envFile)) { return $null }
     foreach ($line in (Get-Content -Encoding UTF8 $envFile)) {
-        if ($line -match "^\s*$([regex]::Escape($Name))=(.*)$") { return $Matches[1].Trim() }
+        # A $ is kept in .env as $$, which compose reads as one (Set-EnvSetting).
+        if ($line -match "^\s*$([regex]::Escape($Name))=(.*)$") { return $Matches[1].Trim().Replace('$$', '$') }
     }
     return $null
 }
@@ -2456,7 +2486,10 @@ function Set-EnvSetting([string]$Name, [string]$Value) {
     if (Test-Path $envFile) { $lines = @(Get-Content -Encoding UTF8 $envFile) }
     $pattern = "^\s*$([regex]::Escape($Name))="
     $kept = @($lines | Where-Object { $_ -notmatch $pattern })
-    $kept += "$Name=$Value"
+    # A $ goes in as $$: compose reads a lone $ as the start of a variable,
+    # and a library folder called "My$Music" mounted as "My" (the twelfth
+    # security pass). Get-EnvSettingIn reads it back as one.
+    $kept += "$Name=" + $Value.Replace('$', '$$')
     # UTF-8 without a byte order mark, which compose reads: ASCII turned a
     # library folder like D:\Musica with an accent into a question mark, and
     # every shelf failed to mount (a review).
@@ -3268,6 +3301,31 @@ if ($elsewhere -and $env:SOUNDSTORM_FORCE -ne '1') {
 
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 Set-Location $Dir
+
+# A folder outside this user's own (C:\EmberStorm, a second drive) could have
+# been made, or filled, by another account on the PC: a compose file or a
+# settings file of theirs would run as this user's install. So the folder and
+# what EmberStorm keeps there must be this user's own (the twelfth security
+# pass). Inside the user's folder only they could have put anything.
+function Test-OwnedByMe([string]$Path) {
+    try {
+        $me = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $owner = (Get-Acl -LiteralPath $Path).GetOwner([Security.Principal.SecurityIdentifier])
+        $admins = New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-544'
+        return ($owner -eq $me.User) -or ($owner -eq $admins -and $me.Groups -contains $admins)
+    } catch {
+        return $true # cannot tell (a drive with no ACLs): as before
+    }
+}
+$insideProfile = $Dir.TrimEnd('\').StartsWith($env:USERPROFILE.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
+if (-not $insideProfile) {
+    foreach ($kept in @('.', 'docker-compose.yml', 'docker-compose.override.yml', 'compose.yaml', 'compose.yml', '.env', 'soundstorm.ps1', 'tailscale-serve.json')) {
+        $path = Join-Path $Dir $kept
+        if ((Test-Path -LiteralPath $path) -and -not (Test-OwnedByMe $path)) {
+            Stop-With "  $path belongs to another account on this PC, so EmberStorm will not use it.`n`n  Choose a folder of your own, or remove it and run the setup again."
+        }
+    }
+}
 
 if ($Import) {
     try { $Import = [IO.Path]::GetFullPath($Import) } catch { Stop-With "  Could not open $Import." }

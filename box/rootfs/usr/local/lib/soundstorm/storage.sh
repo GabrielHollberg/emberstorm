@@ -117,7 +117,8 @@ done
 # A shelf that is a link is put back as a folder: this runs as root, and
 # chmod would open whatever a link from inside the library pointed at.
 [ -L "$MNT/library" ] && rm -f "$MNT/library" && mkdir -p "$MNT/library"
-chmod 0777 "$MNT/library"
+# Sticky, so no shelf can be swapped for a link (the twelfth security pass).
+chmod 1777 "$MNT/library"
 for shelf in music movies tv audiobooks ebooks documents pictures; do
 	[ -L "$MNT/library/$shelf" ] && rm -f "$MNT/library/$shelf"
 	mkdir -p "$MNT/library/$shelf"
