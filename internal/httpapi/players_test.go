@@ -210,3 +210,47 @@ func TestTwoPhonesDoNotControlEachOther(t *testing.T) {
 		t.Fatalf("told twice: %s", body)
 	}
 }
+
+// A pretend TV takes nobody over: a member's browser saying it is a TV is
+// not the house's until the owner shares it, and nobody can say hello under
+// a shared TV's id from another device.
+func TestAPretendTVTakesNobodyOver(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t) // gabe, the owner
+	if resp, body := h.do(t, http.MethodPost, "/api/users", `{"username":"mallory","password":"violet tractor glacier"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("adding mallory: %d %s", resp.StatusCode, body)
+	}
+	mallory := h.another(t)
+	if code, _ := signInAs(t, mallory, "mallory", "violet tractor glacier"); code != http.StatusOK {
+		t.Fatalf("mallory signs in: %d", code)
+	}
+	// The owner's own TV: shared as it says hello.
+	real := "dddddddddddddddd4444"
+	if resp, body := h.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+real+`","name":"Living room TV","tv":true}`); resp.StatusCode != http.StatusOK || playerJSON(t, body)["shared"] != true {
+		t.Fatalf("the owner's TV: %d %s", resp.StatusCode, body)
+	}
+	// Mallory takes its id from another device: refused.
+	if resp, _ := mallory.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+real+`","name":"Living room TV","tv":true}`); resp.StatusCode != http.StatusConflict {
+		t.Fatalf("mallory took the TV's id: %d", resp.StatusCode)
+	}
+	// Mallory's own browser as a TV: the owner sending to it switches
+	// nothing, as it is not shared.
+	fake := "eeeeeeeeeeeeeeee5555"
+	if resp, body := mallory.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+fake+`","name":"Den TV","tv":true}`); resp.StatusCode != http.StatusOK || playerJSON(t, body)["shared"] == true {
+		t.Fatalf("mallory's pretend TV: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := h.do(t, http.MethodPost, "/api/players/"+fake+"/command", `{"type":"play","item":{"sourceId":"x","id":"1"}}`); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("the owner's play went to a TV not shared: %d", resp.StatusCode)
+	}
+	_, body := mallory.do(t, http.MethodGet, "/api/players/"+fake+"/next", "")
+	if strings.Contains(string(body), "switch") {
+		t.Fatalf("a switch code reached the pretend TV: %s", body)
+	}
+	// Shared by the owner, it is the house's like any.
+	if resp, body := h.do(t, http.MethodPost, "/api/tvs/"+fake, ""); resp.StatusCode != http.StatusOK {
+		t.Fatalf("sharing: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := mallory.do(t, http.MethodPost, "/api/tvs/"+fake, ""); resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("a member shared a TV: %d", resp.StatusCode)
+	}
+}

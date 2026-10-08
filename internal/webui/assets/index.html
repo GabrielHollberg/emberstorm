@@ -626,6 +626,16 @@
 
       <!-- What phones and TVs call this server when they find it on the
            network, before anybody signs in (owner only). -->
+      <!-- The TVs the whole house may play on (owner only): only these switch
+           to whoever sends them something. -->
+      <div id="shared-tvs-block" class="account-section card hidden" data-hint="TVs everyone in the house can play on" data-cat="devices" data-words="tv television shared house family play switch take over">
+        <h2>Shared TVs</h2>
+        <p class="muted">Everyone in the house can play on these, and the TV switches to
+          whoever sends something. A TV you sign in on is shared by itself; anyone
+          else's is shared when you choose it from the device button and say so.</p>
+        <div id="shared-tvs-list" class="people-list"></div>
+      </div>
+
       <div id="server-name-block" class="account-section card hidden" data-hint="What devices call this server" data-cat="devices" data-words="server name rename call house home">
         <h2>Server name</h2>
         <p class="muted">What phones and TVs show when they find this server on your

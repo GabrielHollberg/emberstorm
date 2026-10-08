@@ -1130,6 +1130,8 @@ function renderAccount() {
     show($('readalong-block'), false);
   }
   show($('server-name-block'), Boolean(me.owner));
+  show($('shared-tvs-block'), Boolean(me.owner));
+  if (me.owner) renderSharedTVs();
   if (!me.owner) show($('web-name-block'), false);
   api('/api/session').then(({ ok, body }) => show($('box-reset-block'), Boolean(ok && body && body.boxReset)));
 }
@@ -21950,9 +21952,48 @@ $('device-name').addEventListener('change', () => {
 
 function playerHello() {
   if (!PLAYER.id || !state.me) return Promise.resolve();
-  return api('/api/players/hello', {
+  const hello = () => api('/api/players/hello', {
     method: 'POST', body: JSON.stringify({ id: PLAYER.id, name: deviceName() || (TV ? 'TV' : ''), tv: TV }),
   });
+  return hello().then((r) => {
+    // The id is another device's (a copied browser profile, say): this one
+    // takes a new one.
+    if (r.status !== 409) return r;
+    PLAYER.id = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    try { localStorage.setItem('soundstorm-player-id', PLAYER.id); } catch { /* full */ }
+    return hello();
+  });
+}
+
+// Settings, Shared TVs (the owner's): the TVs everyone may play on.
+async function renderSharedTVs() {
+  const list = $('shared-tvs-list');
+  const { ok, body } = await api('/api/tvs');
+  if (!ok) return;
+  const tvs = (body && body.tvs) || [];
+  if (!tvs.length) {
+    const p = document.createElement('p');
+    p.className = 'muted';
+    p.textContent = 'None yet.';
+    list.replaceChildren(p);
+    return;
+  }
+  list.replaceChildren(...tvs.sort((a, b) => a.name.localeCompare(b.name)).map((tv) => {
+    const row = document.createElement('div');
+    row.className = 'person';
+    const name = document.createElement('span');
+    name.textContent = tv.open ? tv.name : `${tv.name} (off)`;
+    const stop = document.createElement('button');
+    stop.type = 'button';
+    stop.className = 'ghost small';
+    stop.textContent = 'Stop sharing';
+    stop.addEventListener('click', async () => {
+      const { ok: done } = await api(`/api/tvs/${encodeURIComponent(tv.id)}`, { method: 'DELETE' });
+      if (done) renderSharedTVs();
+    });
+    row.append(name, stop);
+    return row;
+  }));
 }
 
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -22338,6 +22379,15 @@ async function chooseDevice(p) {
     return;
   }
   if (CONTROL.target && CONTROL.target.id === p.id) { closeControlSheet(); return; }
+  // Somebody else's TV the house has not been given (only the owner is
+  // shown these): shared first, or nothing can be sent to it.
+  if (!p.mine && p.tv && !p.shared) {
+    if (!confirm(`Let everyone in the house play on ${p.name}? It then switches to whoever sends something to it.`)) return;
+    const { ok: shared } = await api(`/api/tvs/${encodeURIComponent(p.id)}`, { method: 'POST' });
+    if (!shared) { showToast('Could not share that TV just now.'); return; }
+    p.shared = true;
+    renderSharedTVs();
+  }
   if (RA.on) dropMirror();
   forgetRemote();
   if (!(await claimDevice(p, note))) return;
@@ -22408,7 +22458,9 @@ async function openControlSheet() {
   const { ok, body } = await api(`/api/players?self=${encodeURIComponent(PLAYER.id)}`);
   const players = (ok && body && body.players) || [];
   list.replaceChildren(row(here, 'device', ''), ...players.map((p) => {
-    const detail = p.mine ? (p.state && p.state.playing ? 'Playing' : '') : (p.busy ? `${p.person} is using it` : (p.person ? `${p.person}'s` : ''));
+    const detail = p.mine ? (p.state && p.state.playing ? 'Playing' : '')
+      : !p.shared ? 'Not shared with the house yet'
+        : (p.busy ? `${p.person} is using it` : (p.person ? `${p.person}'s` : ''));
     return row(p, p.tv ? 'film' : 'headphones', detail);
   }));
   note.textContent = players.length ? 'What you play goes to the device chosen. Browsing stays on this phone.'

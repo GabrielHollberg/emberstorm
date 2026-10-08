@@ -157,6 +157,62 @@ const MaxInvites = 20
 // ErrTooManyInvites is one invitation more than may wait.
 var ErrTooManyInvites = errors.New("too many invitations are waiting; cancel some first")
 
+// SharedTV is a device the owner let everybody in the house play on: its
+// name when it was shared, and a hash of the secret its browser holds, so
+// nothing else can say hello under its id.
+type SharedTV struct {
+	Name    string    `json:"name"`
+	KeyHash string    `json:"keyHash"`
+	Shared  time.Time `json:"shared"`
+}
+
+// MaxSharedTVs is how many TVs one house may share.
+const MaxSharedTVs = 50
+
+// ShareTV lets the whole house play on a device.
+func (s *Store) ShareTV(id string, tv SharedTV) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.d.SharedTVs == nil {
+		s.d.SharedTVs = map[string]SharedTV{}
+	}
+	if _, ok := s.d.SharedTVs[id]; !ok && len(s.d.SharedTVs) >= MaxSharedTVs {
+		return errors.New("too many shared TVs; stop sharing one first")
+	}
+	s.d.SharedTVs[id] = tv
+	return s.save()
+}
+
+// UnshareTV makes a device one person's again.
+func (s *Store) UnshareTV(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.d.SharedTVs[id]; !ok {
+		return nil
+	}
+	delete(s.d.SharedTVs, id)
+	return s.save()
+}
+
+// SharedTVFor is the shared TV with this player id, if there is one.
+func (s *Store) SharedTVFor(id string) (SharedTV, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tv, ok := s.d.SharedTVs[id]
+	return tv, ok
+}
+
+// SharedTVs lists every shared TV, by player id.
+func (s *Store) SharedTVs() map[string]SharedTV {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[string]SharedTV, len(s.d.SharedTVs))
+	for k, v := range s.d.SharedTVs {
+		out[k] = v
+	}
+	return out
+}
+
 // HashInvite is what an invitation's token is kept under.
 func HashInvite(token string) string {
 	sum := sha256.Sum256([]byte("invite:" + token))
@@ -471,6 +527,9 @@ type data struct {
 	// hash of their token (httpapi/invites.go): the token itself is in the
 	// QR code and nowhere else.
 	Invites map[string]Invite `json:"invites,omitempty"`
+	// SharedTVs are the devices the owner let the whole house play on, by
+	// player id: only these switch to whoever sends them something.
+	SharedTVs map[string]SharedTV `json:"sharedTVs,omitempty"`
 	// NotPairs are Read & listen matches the owner has said are wrong, each
 	// "ebookSource/id|audiobookSource/id". A decision somebody made, like
 	// StarterInstalled - not a fact read off the media, so nothing here can

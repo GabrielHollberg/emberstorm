@@ -603,6 +603,17 @@ header {
   padding: 9px 12px;
   font-size: 14px;
 }
+#shared-tvs-list { display: grid; gap: 8px; margin-top: 12px; }
+#shared-tvs-list .person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+}
 .person-name { font-weight: 600; }
 .person-role {
   font-size: 11px;

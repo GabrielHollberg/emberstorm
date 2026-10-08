@@ -51,6 +51,10 @@ type player struct {
 	Name     string
 	UserID   string
 	TV       bool
+	// KeyHash is the hash of the device's own secret (its profile cookie):
+	// a player id is only the page's word, and somebody else saying hello
+	// under it took the device over (a security review).
+	KeyHash string
 	Seen     time.Time
 	State    json.RawMessage
 	Playing  bool
@@ -199,6 +203,12 @@ func (s *Server) handlePlayerHello(w http.ResponseWriter, r *http.Request) {
 	if len(name) == 0 {
 		name = []rune(deviceLabel(r.UserAgent()))
 	}
+	keyHash := s.auth.EnsureProfileDevice(w, r)
+	// A shared TV's id is only ever its own device's.
+	if tv, ok := s.store.SharedTVFor(body.ID); ok && tv.KeyHash != keyHash {
+		writeError(w, http.StatusConflict, "that device id is another device's")
+		return
+	}
 	now := time.Now()
 	h := &s.players
 	h.mu.Lock()
@@ -206,6 +216,10 @@ func (s *Server) handlePlayerHello(w http.ResponseWriter, r *http.Request) {
 	h.init()
 	h.pruneLocked(now)
 	p, exists := h.m[body.ID]
+	if exists && p.KeyHash != "" && p.KeyHash != keyHash && now.Sub(p.Seen) <= playerGone {
+		writeError(w, http.StatusConflict, "that device id is another device's")
+		return
+	}
 	if !exists {
 		mine := 0
 		for _, q := range h.m {
@@ -226,8 +240,82 @@ func (s *Server) handlePlayerHello(w http.ResponseWriter, r *http.Request) {
 		p.queue, p.State, p.Playing = nil, nil, false
 		p.asks = map[string]*playerAsk{}
 	}
-	p.UserID, p.Name, p.TV, p.Seen = user.ID, string(name), body.TV, now
-	writeJSON(w, http.StatusOK, map[string]any{"id": p.ID})
+	p.UserID, p.Name, p.TV, p.Seen, p.KeyHash = user.ID, string(name), body.TV, now, keyHash
+	// The owner's own TV is the house's: only the owner could have signed it
+	// in as them. Anybody else's waits for the owner to share it.
+	if body.TV && user.IsOwner() {
+		if _, ok := s.store.SharedTVFor(p.ID); !ok {
+			if err := s.store.ShareTV(p.ID, state.SharedTV{Name: p.Name, KeyHash: keyHash, Shared: now}); err != nil {
+				s.log.Warn("could not share the owner's TV", "err", err)
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": p.ID, "shared": s.sharedTV(p)})
+}
+
+// sharedTV is whether the whole house may play on p: a TV the owner shared,
+// saying hello from the device it was shared from. Only such a TV switches
+// to whoever sends it something - a page saying it is a TV is not enough,
+// or anybody's browser could have been sent a switch to sign in as the
+// sender (a security review).
+func (s *Server) sharedTV(p *player) bool {
+	tv, ok := s.store.SharedTVFor(p.ID)
+	return ok && p.KeyHash != "" && tv.KeyHash == p.KeyHash
+}
+
+// GET /api/tvs: the TVs shared with the house, and whether each is open.
+func (s *Server) handleSharedTVs(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+	h := &s.players
+	h.mu.Lock()
+	h.init()
+	open := map[string]bool{}
+	for id, p := range h.m {
+		open[id] = now.Sub(p.Seen) <= playerGone
+	}
+	h.mu.Unlock()
+	type tv struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Open bool   `json:"open"`
+	}
+	list := []tv{}
+	for id, t := range s.store.SharedTVs() {
+		list = append(list, tv{ID: id, Name: t.Name, Open: open[id]})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tvs": list})
+}
+
+// POST /api/tvs/{id}: the owner lets the whole house play on a TV that is
+// open now. DELETE: it is one person's again.
+func (s *Server) handleShareTV(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if r.Method == http.MethodDelete {
+		if err := s.store.UnshareTV(id); err != nil {
+			writeError(w, http.StatusInternalServerError, "could not save that")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"shared": false})
+		return
+	}
+	h := &s.players
+	h.mu.Lock()
+	h.init()
+	p, ok := h.m[id]
+	var tv state.SharedTV
+	if ok {
+		tv = state.SharedTV{Name: p.Name, KeyHash: p.KeyHash, Shared: time.Now()}
+	}
+	h.mu.Unlock()
+	if !ok || !p.TV || tv.KeyHash == "" {
+		writeError(w, http.StatusNotFound, "that TV is not open")
+		return
+	}
+	if err := s.store.ShareTV(id, tv); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"shared": true})
 }
 
 // ownPlayer is a player acting as this person, or nil after writing why not.
@@ -344,6 +432,9 @@ func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 		Name   string          `json:"name"`
 		TV     bool            `json:"tv"`
 		Mine   bool            `json:"mine"`
+		// Shared: anybody in the house may play on it. The owner is also
+		// shown TVs not yet shared, to share them.
+		Shared bool `json:"shared"`
 		Person string          `json:"person,omitempty"`
 		Busy   bool            `json:"busy"`
 		State  json.RawMessage `json:"state,omitempty"`
@@ -359,10 +450,11 @@ func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		mine := p.UserID == user.ID
-		if !mine && !p.TV {
+		shared := s.sharedTV(p)
+		if !mine && !shared && !(p.TV && user.IsOwner()) {
 			continue
 		}
-		o := out{ID: p.ID, Name: p.Name, TV: p.TV, Mine: mine, Quiet: int(now.Sub(p.Seen).Seconds())}
+		o := out{ID: p.ID, Name: p.Name, TV: p.TV, Mine: mine, Shared: shared, Quiet: int(now.Sub(p.Seen).Seconds())}
 		if mine {
 			o.State = p.State
 		} else {
@@ -415,7 +507,7 @@ func (s *Server) handlePlayerCommand(w http.ResponseWriter, r *http.Request) {
 	defer h.mu.Unlock()
 	h.init()
 	p, ok := h.m[r.PathValue("id")]
-	if !ok || now.Sub(p.Seen) > playerGone || (p.UserID != user.ID && !p.TV) {
+	if !ok || now.Sub(p.Seen) > playerGone || (p.UserID != user.ID && !s.sharedTV(p)) {
 		writeError(w, http.StatusNotFound, "that device is not open")
 		return
 	}
