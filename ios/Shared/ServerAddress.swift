@@ -150,6 +150,36 @@ enum ServerAddress {
         return parts.url
     }
 
+    /// The addresses a host resolves to (itself, for an address).
+    nonisolated static func addresses(of host: String) async -> Set<String> {
+        await Task.detached(priority: .userInitiated) {
+            var hints = addrinfo(ai_flags: 0, ai_family: AF_UNSPEC, ai_socktype: SOCK_STREAM,
+                                 ai_protocol: 0, ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
+            var list: UnsafeMutablePointer<addrinfo>?
+            guard getaddrinfo(host, nil, &hints, &list) == 0, let first = list else { return [] }
+            defer { freeaddrinfo(list) }
+            var out = Set<String>()
+            for p in sequence(first: first, next: { $0.pointee.ai_next }) {
+                var name = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                if getnameinfo(p.pointee.ai_addr, p.pointee.ai_addrlen, &name, socklen_t(name.count), nil, 0, NI_NUMERICHOST) == 0 {
+                    out.insert(String(cString: name))
+                }
+            }
+            return out
+        }.value
+    }
+
+    /// Whether two addresses lead to one machine: their hosts resolve to an
+    /// address in common (the eleventh security pass, as Android 0.49). A
+    /// spoofer on the Wi-Fi can name a server of theirs, but its name does
+    /// not resolve to the server the device is on.
+    nonisolated static func sameMachine(_ a: URL, _ b: URL) async -> Bool {
+        guard let ha = a.host(), let hb = b.host() else { return false }
+        async let x = addresses(of: ha)
+        async let y = addresses(of: hb)
+        return !(await x).isDisjoint(with: await y)
+    }
+
     /// The install's id, as its /healthz says (servers since chosen names
     /// carry it): how two of an install's names are known to be one server.
     nonisolated static func healthID(_ server: URL) async -> String? {

@@ -230,6 +230,7 @@ final class Player {
     }
 
     private func startBook(at seconds: Double) {
+        let seconds = Self.sane(seconds)
         let f = files.lastIndex { $0.start <= seconds } ?? 0
         fileIndex = f
         player.removeAllItems()
@@ -336,7 +337,15 @@ final class Player {
         }
     }
 
+    /// A time as the player can take it: a server's saved place or a
+    /// remote's seek can be any number, and CMTime and Int trap or go wrong
+    /// on one past their range (1e300, infinity, NaN).
+    nonisolated static func sane(_ seconds: Double) -> Double {
+        seconds.isFinite ? min(max(seconds, 0), 1e7) : 0
+    }
+
     func seek(to seconds: Double) {
+        let seconds = Self.sane(seconds)
         let t = max(0, min(seconds, duration > 0 ? duration - 0.5 : seconds))
         if isBook {
             let f = files.lastIndex { $0.start <= t } ?? 0
@@ -440,7 +449,7 @@ final class Player {
         upNext = nil
         playing = playerItem(queue[i])
         player.insert(playing!, after: nil)
-        if start > 0 { player.seek(to: CMTime(seconds: start, preferredTimescale: 600)) }
+        if Self.sane(start) > 0 { player.seek(to: CMTime(seconds: Self.sane(start), preferredTimescale: 600)) }
         enqueueNext()
         try? AVAudioSession.sharedInstance().setActive(true)
         player.play()

@@ -27,7 +27,8 @@ enum WebCookies {
         let now = Date()
         let mine = all.filter { c in
             let domain = c.domain.lowercased()
-            let matches = domain.hasPrefix(".") ? (host == String(domain.dropFirst()) || host.hasSuffix(domain)) : host == domain
+            // Only the server's own: a cookie for a parent (.emberstorm.app) could be set by another install there (the eleventh security pass).
+            let matches = domain == host || domain == "." + host
             return matches && url.path().hasPrefix(c.path) && (!c.isSecure || url.scheme == "https")
                 && (c.expiresDate.map { $0 > now } ?? true)
         }

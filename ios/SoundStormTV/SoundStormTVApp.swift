@@ -180,12 +180,24 @@ final class AppModel {
     /// The secure name a server offers, if this is not already it and it
     /// answers from this TV.
     private func secureAddress(for server: URL, offered: String?) async -> URL? {
-        guard let name = offered?.lowercased(), ServerAddress.installName(name) != nil,
+        guard let name = offered?.lowercased(), let offeredName = ServerAddress.installName(name),
               server.host()?.lowercased() != name,
               var parts = URLComponents(url: server, resolvingAgainstBaseURL: false) else { return nil }
         parts.scheme = "https"
         parts.host = name
-        guard let url = parts.url, (try? await ServerAddress.check(url)) != nil else { return nil }
+        guard let url = parts.url else { return nil }
+        // Only another name of this same install, as Android 0.49 (the
+        // eleventh security pass): from a plain address a spoofer on the
+        // network could offer a name of theirs and be handed the session.
+        // The same label (in either zone) is the same install; any other
+        // name must resolve to the machine this TV is on and give its id.
+        if server.host().flatMap(ServerAddress.installName)?.label != offeredName.label {
+            guard await ServerAddress.sameMachine(url, server) else { return nil }
+            if ServerAddress.installName(server.host() ?? "") != nil {
+                guard let a = await ServerAddress.healthID(url), let b = await ServerAddress.healthID(server), a == b else { return nil }
+            }
+        }
+        guard (try? await ServerAddress.check(url)) != nil else { return nil }
         return url
     }
 

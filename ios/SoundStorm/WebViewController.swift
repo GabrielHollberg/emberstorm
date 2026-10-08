@@ -729,12 +729,18 @@ final class WebViewController: UIViewController {
         else { return false }
         if let mine = current.host().flatMap(ServerAddress.installName) {
             if name.label == mine.label { return true }
+            // Another of the install's names (one its owner chose): the same
+            // id from both, and both names leading to one machine.
             async let theirs = ServerAddress.healthID(url)
             async let ours = ServerAddress.healthID(current)
-            guard let a = await theirs, let b = await ours else { return false }
-            return a == b
+            async let one = ServerAddress.sameMachine(url, current)
+            guard let a = await theirs, let b = await ours, a == b else { return false }
+            return await one
         }
-        return current.scheme == "http"
+        // From a plain-http address: only a home name that resolves to it -
+        // any name was followed before (the eleventh security pass).
+        guard current.scheme == "http" else { return false }
+        return await ServerAddress.sameMachine(url, current)
     }
 }
 

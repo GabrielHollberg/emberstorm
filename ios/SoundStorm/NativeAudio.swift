@@ -1,4 +1,5 @@
 import AVFoundation
+import ImageIO
 import MediaPlayer
 import UIKit
 import WebKit
@@ -220,7 +221,8 @@ final class NativeAudio: NSObject {
         let all = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
         return all.filter { c in
             let domain = c.domain.lowercased()
-            return domain.hasPrefix(".") ? (host == String(domain.dropFirst()) || host.hasSuffix(domain)) : host == domain
+            // Only the server's own: a cookie for a parent (.emberstorm.app) could be set by another install there (the eleventh security pass).
+            return domain == host || domain == "." + host
         }
     }
 
@@ -477,8 +479,27 @@ final class NativeAudio: NSObject {
             for (field, value) in HTTPCookie.requestHeaderFields(with: await cookies(for: url)) {
                 request.setValue(value, forHTTPHeaderField: field)
             }
-            guard let (data, _) = try? await URLSession.shared.data(for: request), data.count < 8 << 20,
-                  let image = UIImage(data: data)?.preparingThumbnail(of: CGSize(width: 600, height: 600)) else { return }
+            // Read up to 8MB and no further, and decoded straight to a
+            // thumbnail (ImageIO) - a server's picture could be any size, and
+            // whole it was read in full and decoded at full size first (the
+            // eleventh security pass).
+            guard let (bytes, response) = try? await URLSession.shared.bytes(for: request),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  response.expectedContentLength < 8 << 20 else { return }
+            var data = Data()
+            do {
+                for try await byte in bytes {
+                    data.append(byte)
+                    if data.count >= 8 << 20 { return }
+                }
+            } catch { return }
+            let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                            kCGImageSourceCreateThumbnailWithTransform: true,
+                                            kCGImageSourceThumbnailMaxPixelSize: 600,
+                                            kCGImageSourceShouldCacheImmediately: true]
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return }
+            let image = UIImage(cgImage: thumb)
             let art = MPMediaItemArtwork(boundsSize: image.size) { @Sendable _ in image }
             artwork = (address, art)
             nowPlaying()

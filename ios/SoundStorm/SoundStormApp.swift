@@ -95,11 +95,16 @@ final class RootViewController: UIViewController {
         }
     }
 
-    private func showConnect(prefill: URL?, offered: URL? = nil) {
+    private func showConnect(prefill: URL?, offered: URL? = nil, invite: String? = nil) {
         let connect = ConnectViewController(prefill: prefill, offered: offered)
         connect.onConnected = { [weak self] url in
             ServerAddress.remember(url)
-            self?.showWeb(url)
+            // An invitation offered here goes on once its server is chosen.
+            let same = invite != nil && offered.map { o in
+                o.host() == url.host() || (o.host().flatMap(ServerAddress.installName)?.label != nil
+                    && o.host().flatMap(ServerAddress.installName)?.label == url.host().flatMap(ServerAddress.installName)?.label)
+            } == true
+            self?.showWeb(url, invite: same ? invite : nil)
         }
         show(connect)
     }
@@ -118,10 +123,18 @@ final class RootViewController: UIViewController {
             }
             return
         }
-        // An invitation: that server's page, making the account.
+        // An invitation: that server's page, making the account - straight
+        // there for a server this app knows; one it does not is offered on
+        // the connect screen, not saved by itself (anybody can make an
+        // invitation for their own install, and the page there would get
+        // the app's bridge and photo backup; the eleventh security pass).
         if let invite = TVLink.invite(url) {
-            ServerAddress.remember(invite.server)
-            showWeb(invite.server, invite: invite.token)
+            if invite.known {
+                ServerAddress.remember(invite.server)
+                showWeb(invite.server, invite: invite.token)
+            } else {
+                showConnect(prefill: (current as? WebViewController)?.serverURL, offered: invite.server, invite: invite.token)
+            }
             return
         }
         guard let link = TVLink.parse(url), let server = link.server ?? ServerAddress.saved else { return }

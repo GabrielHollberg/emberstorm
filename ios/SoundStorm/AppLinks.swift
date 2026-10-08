@@ -49,7 +49,7 @@ enum TVLink {
     /// or, as an invitation is how somebody new is shown the way in, that
     /// soundstorm.dev name itself - and the token. Only the install names
     /// the names service vouches for are taken.
-    static func invite(_ url: URL) -> (server: URL, token: String)? {
+    static func invite(_ url: URL) -> (server: URL, token: String, known: Bool)? {
         let host = url.host()?.lowercased() ?? ""
         let parts = url.pathComponents
         guard url.scheme == "https", ServerAddress.installName(host) != nil,
@@ -57,7 +57,8 @@ enum TVLink {
               parts[2].count == 22, parts[2].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }),
               let server = ServerAddress.parse(host + (url.port.map { ":\($0)" } ?? ""))
         else { return nil }
-        return (known(server) ?? server, parts[2])
+        if let saved = known(server) { return (saved, parts[2], true) }
+        return (server, parts[2], false)
     }
 
     /// Open my SoundStorm on soundstorm.dev

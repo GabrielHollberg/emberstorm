@@ -19,13 +19,30 @@ struct RemoteControlled: ViewModifier {
 
     /// This TV, as the server knows it: kept, so a phone's choice of it
     /// lasts across launches.
-    static let id: String = {
-        let key = "playerID"
-        if let id = UserDefaults.standard.string(forKey: key), id.count == 32 { return id }
+    static var id: String {
+        if let id = UserDefaults.standard.string(forKey: "playerID"), id.count == 32 { return id }
+        return renewID()
+    }
+
+    /// A new id: the server answers a hello with 409 when another device
+    /// used this one in the last 90 seconds, or it is a TV shared from
+    /// another device (players.go, the eleventh security pass).
+    @discardableResult
+    static func renewID() -> String {
         let id = (0..<16).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
-        UserDefaults.standard.set(id, forKey: key)
+        UserDefaults.standard.set(id, forKey: "playerID")
         return id
-    }()
+    }
+
+    /// Hello to the server as this TV, under a new id if the old is taken.
+    private func hello() async {
+        do {
+            try await api.playerHello(Self.id, name: "Apple TV")
+        } catch API.Failure.status(409, _) {
+            Self.renewID()
+            try? await api.playerHello(Self.id, name: "Apple TV")
+        } catch {}
+    }
 
     func body(content: Content) -> some View {
         content
@@ -49,7 +66,7 @@ struct RemoteControlled: ViewModifier {
     }
 
     private func listen() async {
-        try? await api.playerHello(Self.id, name: "Apple TV")
+        await hello()
         while !Task.isCancelled {
             do {
                 let commands = try await api.playerCommands(Self.id)
@@ -60,7 +77,7 @@ struct RemoteControlled: ViewModifier {
                 }
             } catch API.Failure.status(404, _) {
                 // Not known to the server (restarted, or a new person): again.
-                try? await api.playerHello(Self.id, name: "Apple TV")
+                await hello()
                 try? await Task.sleep(for: .seconds(2))
             } catch is CancellationError {
                 return
@@ -87,7 +104,7 @@ struct RemoteControlled: ViewModifier {
             await model.beforeSwitch()
             if (try? await api.playerSwitch(Self.id, code: code)) != nil {
                 model.switched()
-                try? await api.playerHello(Self.id, name: "Apple TV")
+                await hello()
             }
         case "ask":
             guard let ask = c["ask"] as? String else { return }
@@ -253,7 +270,9 @@ struct RemoteControlled: ViewModifier {
     private func report(force: Bool) async {
         guard api.user != nil else { return }
         var st = state()
-        let position = (st["position"] as? Double).map { Int($0 / 5) } ?? 0
+        // Clamped first: Int() traps on a value past its range (a saved place
+        // or a remote's seek of 1e300).
+        let position = (st["position"] as? Double).flatMap { $0.isFinite ? Int(min(max($0, 0), 1e9) / 5) : nil } ?? 0
         let sig = "\(st["kind"] ?? "")|\(st["playing"] ?? "")|\((st["item"] as? [String: Any])?["id"] ?? "")|\(position)|\(st["volume"] ?? "")"
         if !force && sig == lastState && Date().timeIntervalSince(stateAt) < 30 { return }
         lastState = sig
