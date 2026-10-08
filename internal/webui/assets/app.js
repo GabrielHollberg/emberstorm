@@ -765,22 +765,40 @@ function forgetInviteInAddress() {
   history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
 }
 let linkAsking = '';
-async function askLink(code) {
+let linkMustType = false;
+const plainCode = (code) => String(code || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+// seen: the code was typed here, or scanned by this app's own scanner. A
+// code that came in a link - an address, or the app opened by one - could
+// be anybody's TV, sent in a message: then the code is not shown, and the
+// person types what their TV shows (the twelfth security pass).
+async function askLink(code, seen = true) {
   const { ok, body } = await api(`/api/link/code/${encodeURIComponent(code)}`);
   if (!ok) {
     showToast((body && body.error) || 'No TV is showing that code.');
     return false;
   }
   linkAsking = body.code;
-  $('link-ask-text').textContent = `${body.device} showing ${body.code} will be signed in as ${body.as}. `
-    + 'Allow it only if it is a TV in front of you, signing in now.';
+  linkMustType = !seen;
+  $('link-ask-code').value = '';
+  show($('link-ask-code'), !seen);
+  $('link-ask-text').textContent = seen
+    ? `${body.device} showing ${body.code} will be signed in as ${body.as}. `
+      + 'Allow it only if it is a TV in front of you, signing in now.'
+    : `${body.device} wants to be signed in as ${body.as}. To allow it, type the code the TV is showing. `
+      + 'If no TV in front of you is showing a code, choose Don\'t allow.';
   show($('link-ask'), true);
-  $('link-ask-yes').focus();
+  (seen ? $('link-ask-yes') : $('link-ask-code')).focus();
   return true;
 }
 async function answerLink(approve) {
   const code = linkAsking;
+  if (approve && linkMustType && plainCode($('link-ask-code').value) !== plainCode(code)) {
+    showToast('That is not the code. Type the code the TV is showing.');
+    $('link-ask-code').focus();
+    return;
+  }
   linkAsking = '';
+  linkMustType = false;
   show($('link-ask'), false);
   if (!code) return;
   const { ok, body } = await api(`/api/link/code/${encodeURIComponent(code)}`, {
@@ -790,6 +808,9 @@ async function answerLink(approve) {
   else if (approve) showToast('Allowed. The TV is signing in now.');
 }
 $('link-ask-yes').addEventListener('click', () => answerLink(true));
+$('link-ask-code').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') answerLink(true);
+});
 $('link-ask-no').addEventListener('click', () => answerLink(false));
 $('link-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -810,9 +831,11 @@ window.__soundstormScanned = (what) => {
     ? "That is not a TV's sign-in code. Point the camera at the QR code on the TV."
     : 'The scanner could not start. Type the code on the TV instead.');
 };
-window.__soundstormLink = (code) => {
+// how is 'scanned' when the app's own scanner read it; otherwise it came
+// in a link.
+window.__soundstormLink = (code, how) => {
   if (!state.me) return false;
-  askLink(String(code));
+  askLink(String(code), how === 'scanned');
   return true;
 };
 
@@ -839,7 +862,7 @@ function askLinkFromAddress() {
   params.delete('link');
   const rest = params.toString();
   history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
-  askLink(linkFromAddress);
+  askLink(linkFromAddress, false);
 }
 
 $('gate-form').addEventListener('submit', async (event) => {
@@ -10813,16 +10836,24 @@ function isDownloaded(item) {
 // (HTML, XML, SVG, script) would open as a same-origin document in the reader's
 // frame, outside the server's sandbox (a security review). Those are made
 // plain bytes; songs, films, pictures and PDFs keep theirs.
-async function safeBlob(resp) {
+// A kept file keeps its type only when it is one a download is: anything
+// else could be opened as a page (the twelfth security pass: a list of
+// types refused let others through).
+const KEPT_TYPES = /^(audio\/[a-z0-9.+-]+|video\/[a-z0-9.+-]+|image\/(png|jpeg|gif|webp|avif|heic)|application\/(pdf|epub\+zip|vnd\.apple\.mpegurl|x-mpegurl)|text\/vtt)$/i;
+async function safeBlob(resp, type) {
   const blob = await resp.blob();
-  return /html|xml|svg|javascript|ecmascript/i.test(blob.type) ? new Blob([blob], { type: 'application/octet-stream' }) : blob;
+  if (type) return new Blob([blob], { type });
+  const base = String(blob.type || '').split(';')[0].trim();
+  return KEPT_TYPES.test(base) ? blob : new Blob([blob], { type: 'application/octet-stream' });
 }
 
 async function offlineURL(item) {
   try {
     const cache = await caches.open(OFFLINE_CACHE);
     const resp = await cache.match(streamPath(item));
-    return resp ? URL.createObjectURL(await safeBlob(resp)) : '';
+    // A PDF is opened in a frame: it is a PDF and nothing else.
+    const pdf = String((item.extra && item.extra.format) || '').toLowerCase() === 'pdf';
+    return resp ? URL.createObjectURL(await safeBlob(resp, pdf ? 'application/pdf' : '')) : '';
   } catch {
     return '';
   }
@@ -10945,6 +10976,9 @@ async function clearDownloads() {
     await caches.delete(HEARD_CACHE);
     // And the queue kept for the phone's own player: their songs, in order.
     localStorage.removeItem(NATIVE_QUEUE_KEY);
+    // And which TV this phone was playing on, which the next person here
+    // is not (the literal: this runs before CONTROL_KEY may be set).
+    localStorage.removeItem('soundstorm-control');
   } catch {
     // nothing to clear
   }

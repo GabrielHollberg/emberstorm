@@ -34,7 +34,7 @@ if (window.top !== window.self) throw new Error('EmberStorm does not run inside 
 // SVG animation can set an href to javascript: where no attribute shows it,
 // and a link other than a stylesheet can tell an outside party the book was
 // opened (DNS prefetch is outside the CSP) - both found by a review.
-const DROP = 'script, iframe, frame, object, embed, meta[http-equiv], base, set, animate, animateMotion, animateTransform, link:not([rel~="stylesheet" i])';
+const DROP = 'script, iframe, frame, object, embed, meta[http-equiv], base, set, animate, animateMotion, animateTransform';
 // What a book may point at: its own files, which are relative. A reference to
 // the server itself (root-relative, or this address) would be fetched with the
 // reader's sign-in - a cover's <img> starting film conversions as whoever opens
@@ -50,6 +50,46 @@ function pointsAtServer(value) {
     return false;
   }
 }
+// A book's own reference: relative, with no scheme, nothing taken back to
+// the root, and no CSS escape (which could spell any of those) - or a
+// picture inline. Anything else in a stylesheet - url(), @import,
+// image-set() - could reach the server with the reader's sign-in, or tell
+// somebody outside the book was opened (the twelfth security pass).
+function ownReference(value) {
+  const v = String(value || '').trim();
+  // foliate has already made each of the book's own files a blob: of this page.
+  if (v.startsWith(`blob:${location.origin}/`)) return !/[\\\s]/.test(v);
+  if (/^data:image\/(png|jpe?g|gif|webp);/i.test(v)) return !v.includes('\\');
+  return !(v.includes('\\') || /^[a-z][a-z0-9+.-]*:/i.test(v) || v.startsWith('/') || /[\u0000-\u001f]/.test(v));
+}
+function cleanCSS(css) {
+  let out = String(css)
+    .replace(/url\(\s*(["']?)([^"')]*)\1\s*\)/gi, (m, _q, ref) => (ownReference(ref) ? m : 'none'))
+    .replace(/@import\s+(url\([^)]*\)|["'][^"']*["'])[^;]*;?/gi, (m, what) => {
+      const ref = what.replace(/^url\(\s*["']?|["']?\s*\)$|^["']|["']$/g, '');
+      return ownReference(ref) && !/^none$/i.test(what) ? m : '';
+    })
+    .replace(/(-webkit-)?image-set\(([^)]*)\)/gi, (m, _p, inner) => {
+      const refs = [...inner.matchAll(/["']([^"']*)["']/g)].map((x) => x[1]);
+      return refs.every(ownReference) ? m : 'none';
+    });
+  // A reference spelt with escapes (u\72l(...), @\69mport) is one the
+  // patterns above never saw: a stylesheet with one is dropped whole.
+  // Escapes in its text alone (content: "\201C") change nothing here.
+  if (out.includes('\\')) {
+    const words = (text) => (text.match(/url|import|image-set/gi) || []).length;
+    const plain = out.replace(/\\[0-9a-f]{1,6}\s?|\\./gi, (e) => {
+      const hex = e.match(/^\\([0-9a-f]{1,6})/i);
+      return hex ? String.fromCodePoint(Math.min(parseInt(hex[1], 16), 0x10ffff) || 0xfffd) : e.slice(1);
+    });
+    if (words(plain) > words(out)) out = '';
+  }
+  return out;
+}
+// What a part that is not a page may be: anything else is given as text,
+// which a frame can only ever show as text (text/xsl and unknown/unknown
+// went through as they were - the twelfth security pass).
+const PART_TYPES = /^(image\/(png|jpe?g|gif|webp|avif|bmp)|font\/[a-z0-9.+-]+|application\/(font-[a-z]+|x-font-[a-z]+|vnd\.ms-opentype)|audio\/[a-z0-9.+-]+|video\/[a-z0-9.+-]+)$/i;
 function documentType(type) {
   const base = String(type || '').split(';')[0].trim().toLowerCase();
   if (base === 'text/html') return 'text/html';
@@ -62,11 +102,21 @@ function withoutScripts(book) {
   book.transformTarget?.addEventListener('data', ({ detail }) => {
     const type = documentType(detail.type);
     if (!type) {
-      // A part the book gives no type at all becomes an untyped Blob, which
-      // a browser sniffs - and renders as a page, uncleaned, if it looks like
-      // one (a security review). Typed as text, it can only ever be text.
-      // A stylesheet keeps no type, which a browser still accepts as CSS.
-      if (!String(detail.type || '').trim() && !/\.css$/i.test(detail.name || '')) detail.type = 'text/plain';
+      const base = String(detail.type || '').split(';')[0].trim().toLowerCase();
+      if (base === 'text/css' || (!base && /\.css$/i.test(detail.name || ''))) {
+        // A stylesheet of its own is cleaned as one inside a page is.
+        detail.type = 'text/css';
+        detail.data = Promise.resolve(detail.data).then(async (data) => {
+          if (data && typeof data !== 'string' && typeof data.text === 'function') data = await data.text();
+          return typeof data === 'string' ? cleanCSS(data) : '';
+        });
+        return;
+      }
+      // A part the book gives no type at all became an untyped Blob, which
+      // a browser sniffs - and renders as a page, uncleaned, if it looks
+      // like one (a security review). Only the types a book's parts are
+      // keep theirs; anything else is text, and can only ever be text.
+      if (!PART_TYPES.test(base)) detail.type = 'text/plain';
       return;
     }
     // foliate parses and rewrites as text only the four exact types it knows;
@@ -82,6 +132,11 @@ function withoutScripts(book) {
       const doc = new DOMParser().parseFromString(data, type);
       let changed = false;
       for (const el of doc.querySelectorAll(DROP)) { el.remove(); changed = true; }
+      // A link is a stylesheet and nothing else: "stylesheet dns-prefetch"
+      // was let through by a selector reading any one word.
+      for (const el of doc.querySelectorAll('link')) {
+        if (String(el.getAttribute('rel') || '').trim().toLowerCase() !== 'stylesheet') { el.remove(); changed = true; }
+      }
       // Processing instructions other than a CSS stylesheet (XSLT).
       for (const node of [...doc.childNodes]) {
         if (node.nodeType === Node.PROCESSING_INSTRUCTION_NODE && !(node.target === 'xml-stylesheet' && /type\s*=\s*["']text\/css["']/i.test(node.data))) {
@@ -90,8 +145,10 @@ function withoutScripts(book) {
         }
       }
       for (const el of doc.querySelectorAll('style')) {
-        if (/url\(\s*["']?(\/|https?:)/i.test(el.textContent || '')) {
-          el.textContent = el.textContent.replace(/url\(\s*["']?(\/|https?:)[^)]*\)/gi, 'none');
+        const css = el.textContent || '';
+        const clean = cleanCSS(css);
+        if (clean !== css) {
+          el.textContent = clean;
           changed = true;
         }
       }
@@ -106,7 +163,7 @@ function withoutScripts(book) {
           } else if ((REF_ATTRS.has(name) || name.endsWith(':href')) && attr.value.split(',').some((part) => pointsAtServer(part.trim().split(/\s+/)[0] || ''))) {
             el.removeAttribute(attr.name);
             changed = true;
-          } else if (name === 'style' && /url\(\s*["']?(\/|https?:)/i.test(attr.value)) {
+          } else if (name === 'style' && cleanCSS(attr.value) !== attr.value) {
             el.removeAttribute(attr.name);
             changed = true;
           }
