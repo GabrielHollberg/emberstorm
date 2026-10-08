@@ -1,7 +1,7 @@
 #!/bin/sh
 # EmberStorm installer for macOS and Linux.
 #
-#   curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh
 #
 # It downloads one compose file, picks a free port, starts the stack and waits
 # until it answers. Everything it needs is Docker; everything it leaves behind
@@ -23,7 +23,7 @@
 
 set -eu
 
-REPO="${SOUNDSTORM_REPO:-GabrielHollberg/soundstorm}"
+REPO="${SOUNDSTORM_REPO:-GabrielHollberg/emberstorm}"
 BRANCH="${SOUNDSTORM_BRANCH:-main}"
 COMPOSE_URL="${SOUNDSTORM_COMPOSE_URL:-https://raw.githubusercontent.com/$REPO/$BRANCH/docker-compose.yml}"
 DIR="${SOUNDSTORM_DIR:-$PWD/soundstorm}"
@@ -1038,7 +1038,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 # A fresh private file, not a fixed /tmp name another user could plant first.
 t=$(mktemp) || exit 1
 trap 'rm -f "$t"' EXIT
-curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh -o "$t" &&
+curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh -o "$t" &&
 	sh "$t" --import "$here"
 EOF
 	chmod +x "$1/install-here.sh"
@@ -1050,7 +1050,7 @@ EOF
 		'set "HERE=%~dp0"' \
 		'set "HERE=%HERE:~0,-1%"' \
 		'set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"' \
-		'set "SOUNDSTORM_SETUP_URL=https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.ps1"' \
+		'set "SOUNDSTORM_SETUP_URL=https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.ps1"' \
 		'start "" /min "%PS%" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$ProgressPreference = '"'"'SilentlyContinue'"'"'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $f = Join-Path $env:TEMP '"'"'soundstorm-install.ps1'"'"'; try { Invoke-WebRequest -UseBasicParsing -Uri $env:SOUNDSTORM_SETUP_URL -OutFile $f } catch { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show('"'"'EmberStorm could not download its installer. Check the internet connection and try again.'"'"', '"'"'EmberStorm Setup'"'"'); exit 1 }; $env:SOUNDSTORM_WINDOW = '"'"'1'"'"'; $q = [char]34; Start-Process -FilePath (Join-Path $PSHOME '"'"'powershell.exe'"'"') -WindowStyle Hidden -ArgumentList ('"'"'-NoProfile -ExecutionPolicy Bypass -STA -File '"'"' + $q + $f + $q + '"'"' -Import '"'"' + $q + $env:HERE + $q)"' \
 		'exit /b 0' > "$1/Install EmberStorm here.cmd"
 }

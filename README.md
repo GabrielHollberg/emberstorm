@@ -3,13 +3,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GabrielHollberg/soundstorm/releases/latest/download/EmberStorm-Setup.cmd"><strong>⬇ Download for Windows</strong></a>
+  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.cmd"><strong>⬇ Download for Windows</strong></a>
   &nbsp;·&nbsp;
   <a href="#mac-and-linux">Mac and Linux</a>
   &nbsp;·&nbsp;
   <a href="docs/guide.md">User guide</a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/GabrielHollberg/soundstorm/releases">What's new</a>
+  <a href="https://github.com/GabrielHollberg/emberstorm/releases">What's new</a>
 </p>
 
 <!-- The same screenshots as emberstorm.app (web/shots), from test servers
@@ -120,7 +120,7 @@ but yourself, and nothing to set up by hand.
 
 Phones, tablets and other computers need nothing installed: they use EmberStorm
 in their web browser, or add it to their home screen as an app. There is also
-an Android app (from the [releases page](https://github.com/GabrielHollberg/soundstorm/releases),
+an Android app (from the [releases page](https://github.com/GabrielHollberg/emberstorm/releases),
 the `android-` ones, which also run on Google TV, Android TV and Fire TV). The
 iPhone and Apple TV apps are in testing and not in the App Store yet; until
 then, an iPhone uses the web app.
@@ -129,7 +129,7 @@ then, an iPhone uses the web app.
 
 ### Windows
 
-1. **[Download EmberStorm-Setup.cmd](https://github.com/GabrielHollberg/soundstorm/releases/latest/download/EmberStorm-Setup.cmd)**
+1. **[Download EmberStorm-Setup.cmd](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.cmd)**
 2. **Right-click** the downloaded file → **Properties** → tick **Unblock** at the bottom → **OK**
 3. **Double-click** it.
 
@@ -164,7 +164,7 @@ Skipping it is the most common reason nothing happens when you double-click.
 <summary>Rather paste a command? (PowerShell)</summary>
 
 ```powershell
-irm https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.ps1 -OutFile "$env:TEMP\soundstorm.ps1"
+irm https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.ps1 -OutFile "$env:TEMP\soundstorm.ps1"
 powershell -ExecutionPolicy Bypass -File "$env:TEMP\soundstorm.ps1"
 ```
 
@@ -175,7 +175,7 @@ powershell -ExecutionPolicy Bypass -File "$env:TEMP\soundstorm.ps1"
 Run this in a terminal:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh
 ```
 
 It sets up Docker if the computer does not have it (the engine EmberStorm runs
@@ -188,7 +188,7 @@ address to open. Your computer asks for your password once, to install Docker.
 
 ```sh
 mkdir soundstorm && cd soundstorm
-curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/docker-compose.yml -o docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/docker-compose.yml -o docker-compose.yml
 docker compose up -d
 ```
 
@@ -231,7 +231,7 @@ like.
 **3. Put it on your phone.** Open **Settings → Use on your phone or TV** on the
 computer. It shows the address to type on your phone (your phone must be on the
 same Wi-Fi). Then either install the app (Android: the newest `android-` file on
-the [releases page](https://github.com/GabrielHollberg/soundstorm/releases)),
+the [releases page](https://github.com/GabrielHollberg/emberstorm/releases)),
 which also backs up the phone's photos, or add the web app to your home screen
 (on an iPhone, for now, this is the way):
 - **iPhone:** Share → **Add to Home Screen**.
@@ -314,7 +314,7 @@ under **Settings → People**.
 
 **Something else?** The Windows setup window has **Show log file**; send that
 file along with a description when you
-[open an issue](https://github.com/GabrielHollberg/soundstorm/issues).
+[open an issue](https://github.com/GabrielHollberg/emberstorm/issues).
 
 ## Privacy: what leaves your house
 

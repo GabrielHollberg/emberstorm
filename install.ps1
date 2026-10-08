@@ -2,7 +2,7 @@
 #
 # Double-click EmberStorm-Setup.cmd, or from PowerShell:
 #
-#   irm https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.ps1 | iex
 #
 # It is written for somebody who has never opened a terminal. That means it
 # installs Docker Desktop itself rather than sending them to a website, starts
@@ -104,7 +104,7 @@ try {
 
 $ErrorActionPreference = 'Stop'
 
-$Repo       = if ($env:SOUNDSTORM_REPO) { $env:SOUNDSTORM_REPO } else { 'GabrielHollberg/soundstorm' }
+$Repo       = if ($env:SOUNDSTORM_REPO) { $env:SOUNDSTORM_REPO } else { 'GabrielHollberg/emberstorm' }
 $Branch     = if ($env:SOUNDSTORM_BRANCH) { $env:SOUNDSTORM_BRANCH } else { 'main' }
 $RawBase    = "https://raw.githubusercontent.com/$Repo/$Branch"
 
@@ -2741,7 +2741,7 @@ function Register-Uninstaller {
             DisplayVersion  = '0.1'
             Publisher       = 'EmberStorm'
             InstallLocation = $Dir
-            URLInfoAbout    = 'https://github.com/GabrielHollberg/soundstorm'
+            URLInfoAbout    = 'https://github.com/GabrielHollberg/emberstorm'
             UninstallString = "`"$powershell`" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`" -Uninstall"
         }
         foreach ($name in $strings.Keys) {
@@ -2929,7 +2929,7 @@ function Write-MoveLaunchers([string]$Folder) {
         '# A fresh private file, not a fixed /tmp name another user could plant first.',
         't=$(mktemp) || exit 1',
         'trap ''rm -f "$t"'' EXIT',
-        'curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh -o "$t" &&',
+        'curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh -o "$t" &&',
         '	sh "$t" --import "$here"'
     ) -join "`n"
     [IO.File]::WriteAllText((Join-Path $Folder 'install-here.sh'), "$sh`n", (New-Object Text.UTF8Encoding $false))
@@ -2941,7 +2941,7 @@ function Write-MoveLaunchers([string]$Folder) {
         'set "HERE=%~dp0"',
         'set "HERE=%HERE:~0,-1%"',
         'set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"',
-        'set "SOUNDSTORM_SETUP_URL=https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.ps1"',
+        'set "SOUNDSTORM_SETUP_URL=https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.ps1"',
         ('start "" /min "%PS%" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$ProgressPreference = ' + $q + 'SilentlyContinue' + $q + '; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $f = Join-Path $env:TEMP ' + $q + 'soundstorm-install.ps1' + $q + '; try { Invoke-WebRequest -UseBasicParsing -Uri $env:SOUNDSTORM_SETUP_URL -OutFile $f } catch { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show(' + $q + 'EmberStorm could not download its installer. Check the internet connection and try again.' + $q + ', ' + $q + 'EmberStorm Setup' + $q + '); exit 1 }; $env:SOUNDSTORM_WINDOW = ' + $q + '1' + $q + '; $q = [char]34; Start-Process -FilePath (Join-Path $PSHOME ' + $q + 'powershell.exe' + $q + ') -WindowStyle Hidden -ArgumentList (' + $q + '-NoProfile -ExecutionPolicy Bypass -STA -File ' + $q + ' + $q + $f + $q + ' + $q + ' -Import ' + $q + ' + $q + $env:HERE + $q)"'),
         'exit /b 0'
     ) -join "`r`n"

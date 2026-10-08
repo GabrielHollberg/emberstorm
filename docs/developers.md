@@ -20,7 +20,7 @@ decision, and the reason for it, including the ones that were reversed.
 ## Building and running
 
 ```sh
-git clone https://github.com/GabrielHollberg/soundstorm && cd soundstorm
+git clone https://github.com/GabrielHollberg/emberstorm && cd emberstorm
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 

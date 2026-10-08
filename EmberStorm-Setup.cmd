@@ -38,7 +38,7 @@ if exist "%LOCAL%" if exist "%~dp0.git" (
     exit /b 0
 )
 
-if "%SOUNDSTORM_REPO%"=="" set "SOUNDSTORM_REPO=GabrielHollberg/soundstorm"
+if "%SOUNDSTORM_REPO%"=="" set "SOUNDSTORM_REPO=GabrielHollberg/emberstorm"
 if "%SOUNDSTORM_BRANCH%"=="" set "SOUNDSTORM_BRANCH=main"
 set "SOUNDSTORM_SETUP_URL=https://raw.githubusercontent.com/%SOUNDSTORM_REPO%/%SOUNDSTORM_BRANCH%/install.ps1"
 set "SOUNDSTORM_SETUP_ARGS=%*"

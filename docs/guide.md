@@ -389,7 +389,7 @@ Within a minute of starting, EmberStorm also gets a secure address like
 
 **The apps:**
 - **Android** (phones, and Google TV, Android TV and Fire TV): the newest
-  `android-` file on the [releases page](https://github.com/GabrielHollberg/soundstorm/releases).
+  `android-` file on the [releases page](https://github.com/GabrielHollberg/emberstorm/releases).
   Music plays like any music app's, with the lock screen, Bluetooth and car
   controls, and it can back up the phone's photos. On a TV it's driven by the
   remote: the arrows move, OK plays, Back goes back.
@@ -449,7 +449,7 @@ free Tailscale account and the Tailscale app on each device.
 - **Windows:** Start menu → **Set up Tailscale**, which walks you through it.
 - **Mac and Linux:**
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --tailscale --auth-key tskey-...
+  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh -s -- --tailscale --auth-key tskey-...
   ```
 
 EmberStorm then answers at `https://soundstorm.<your-tailnet>.ts.net`.
@@ -467,7 +467,7 @@ Run the installer again with a library folder.
 
 **Mac and Linux:**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --library /mnt/media
+curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh -s -- --library /mnt/media
 ```
 
 Files already in the old library stay where they are: move them across
@@ -540,7 +540,7 @@ or the network, between Windows, Mac and Linux in any direction.
 - **Windows:** Start menu → **Move EmberStorm to another computer**.
 - **Mac and Linux:**
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --export /media/usb
+  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh -s -- --export /media/usb
   ```
   (add `--no-library` to leave the media out)
 
@@ -556,7 +556,7 @@ computer** (`site/operations/move.html`).
 - **Windows:** Settings → Apps → **EmberStorm** → Uninstall.
 - **Mac and Linux:**
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --uninstall
+  curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh -s -- --uninstall
   ```
 
 This removes EmberStorm and the media servers' data. **Your media is never
