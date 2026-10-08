@@ -1,10 +1,10 @@
-// Package state persists the little that SoundStorm must remember across
+// Package state persists the little that EmberStorm must remember across
 // restarts.
 //
 // This is a deliberate departure from the original design, which was proudly
 // stateless. Two v1 requirements force it:
 //
-//   - Nobody types an API key. SoundStorm provisions each backend's credentials on
+//   - Nobody types an API key. EmberStorm provisions each backend's credentials on
 //     first boot, so it has to keep them somewhere it can read again.
 //   - There are logins. Accounts and their sessions have to outlive a restart.
 //
@@ -13,8 +13,8 @@
 // stays a few kilobytes and why losing it costs a re-provision, not a library.
 //
 // One principled exception: reading position for ebooks. For music, film and
-// audiobooks the backend owns play state, so SoundStorm does not. For ebooks
-// there IS no backend - SoundStorm reads the folder itself - so if SoundStorm
+// audiobooks the backend owns play state, so EmberStorm does not. For ebooks
+// there IS no backend - EmberStorm reads the folder itself - so if EmberStorm
 // does not remember where you stopped reading, nothing does.
 package state
 
@@ -34,7 +34,7 @@ import (
 	"time"
 )
 
-// Backend is one provisioned upstream server and the credentials SoundStorm
+// Backend is one provisioned upstream server and the credentials EmberStorm
 // generated for itself on that server.
 type Backend struct {
 	Type    string `json:"type"`    // "navidrome", "jellyfin"
@@ -48,7 +48,7 @@ type Backend struct {
 	Token  string `json:"token,omitempty"`
 	UserID string `json:"userId,omitempty"`
 
-	// LibraryID names which library on the backend SoundStorm should search, for
+	// LibraryID names which library on the backend EmberStorm should search, for
 	// backends that can hold several (Audiobookshelf).
 	LibraryID string `json:"libraryId,omitempty"`
 
@@ -346,7 +346,7 @@ func (s *Session) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-// Identity is the account SoundStorm holds on a backend for one of its users.
+// Identity is the account EmberStorm holds on a backend for one of its users.
 //
 // Most backends are used through a single shared account, because nothing
 // user-visible depends on who is asking. Audiobookshelf is the exception:
@@ -411,7 +411,7 @@ type data struct {
 	// them back the next time the server restarted.
 	//
 	// This is the one thing here that is not a credential or an account, and it
-	// is deliberately not a fact about anybody's media - it says what SoundStorm
+	// is deliberately not a fact about anybody's media - it says what EmberStorm
 	// has done, not what is in the library. The alternative was a marker file in
 	// the library folder, which is worse for a reason that is easy to miss:
 	// Windows Explorer does not hide dot-files, so it would be the single stray
@@ -432,7 +432,7 @@ type data struct {
 	// it in the app, their choice is what stands.
 	RemoteAccess *bool `json:"remoteAccess,omitempty"`
 
-	// NotFindable is the owner turning off "Open my SoundStorm": the server
+	// NotFindable is the owner turning off "Open my EmberStorm": the server
 	// stops telling the name service which port it serves, and soundstorm.dev
 	// no longer finds it from the home's internet connection. Absent is on.
 	NotFindable bool `json:"notFindable,omitempty"`
@@ -441,14 +441,14 @@ type data struct {
 	// hollberg.soundstorm.dev, or "" for none. Held by the name service; kept
 	// here to show, and to let go when it changes.
 	WebName string `json:"webName,omitempty"`
-	// OnlineLyrics is whether the owner lets SoundStorm look up missing
+	// OnlineLyrics is whether the owner lets EmberStorm look up missing
 	// lyrics on LRCLIB. Off unless turned on: it sends a song's artist and
 	// title to an outside service, which nothing else here does.
 	OnlineLyrics bool `json:"onlineLyrics,omitempty"`
 	// PhotoLimitDefaultGB is the household's default limit on each person's
 	// own photos: nil means DefaultPhotoLimitGB, -1 no limit.
 	PhotoLimitDefaultGB *int `json:"photoLimitDefaultGB,omitempty"`
-	// OnlineDiscovery is whether the owner lets SoundStorm ask MusicBrainz,
+	// OnlineDiscovery is whether the owner lets EmberStorm ask MusicBrainz,
 	// ListenBrainz and Wikipedia about artists: similar artists and bios. Off
 	// unless turned on, for the same reason as OnlineLyrics.
 	OnlineDiscovery bool `json:"onlineDiscovery,omitempty"`
@@ -461,7 +461,7 @@ type data struct {
 	// device an account has never signed in on waits for approval.
 	ApproveNewDevices bool `json:"approveNewDevices,omitempty"`
 	// ServerName is what the owner called the server; empty is the
-	// default, "<owner>'s SoundStorm" (see ServerName).
+	// default, "<owner>'s EmberStorm" (see ServerName).
 	ServerName string `json:"serverName,omitempty"`
 	// Kept is who each shared device may switch between ("Who's
 	// listening?"), keyed by a hash of the device's own id cookie, as sessions
@@ -689,7 +689,7 @@ func (s *Store) save() error {
 
 	// Keep the version being replaced, before replacing it.
 	//
-	// This file is the only copy of the credentials SoundStorm generated for
+	// This file is the only copy of the credentials EmberStorm generated for
 	// four backends, and those backends cannot be re-provisioned: an account
 	// already exists on each of them and nothing else knows its password. A
 	// bad write here is not "lose your settings", it is "lose the servers".
@@ -796,7 +796,7 @@ func CopyTo(path, dest string) error {
 // The sibling .bak above covers a bad write. It does nothing for the failure
 // that actually ends an install: `docker compose down -v`, a wiped volume, a
 // replaced machine. After that the backends are still there, still holding
-// accounts SoundStorm created, with passwords that existed in exactly one
+// accounts EmberStorm created, with passwords that existed in exactly one
 // file. The provisioners detect it and say so; they cannot fix it.
 //
 // 0600, and the caller chooses where. This file is worth as much as the
@@ -823,7 +823,7 @@ func (s *Store) BackupTo(path string) error {
 
 // RestoreFrom replaces the state with a backup, after checking it is one.
 //
-// Refusing a file that is not a SoundStorm state is the whole value here: the
+// Refusing a file that is not a EmberStorm state is the whole value here: the
 // alternative is overwriting a working install with a typo and discovering it
 // at the next restart.
 func RestoreFrom(backup, path string) error {
@@ -840,13 +840,13 @@ func RestoreBytes(raw []byte, name, path string) error {
 	backup := name
 	var probe data
 	if err := json.Unmarshal(raw, &probe); err != nil {
-		return fmt.Errorf("%s is not a SoundStorm backup: %w", backup, err)
+		return fmt.Errorf("%s is not a EmberStorm backup: %w", backup, err)
 	}
 	if probe.Version == 0 {
-		return fmt.Errorf("%s has no version field, so it is not a SoundStorm backup", backup)
+		return fmt.Errorf("%s has no version field, so it is not a EmberStorm backup", backup)
 	}
 	if probe.Version > currentVersion {
-		return fmt.Errorf("%s was written by a newer SoundStorm (version %d, this one understands %d)",
+		return fmt.Errorf("%s was written by a newer EmberStorm (version %d, this one understands %d)",
 			backup, probe.Version, currentVersion)
 	}
 
@@ -1071,7 +1071,7 @@ func (s *Store) RequirePasswordChanges() (int, error) {
 }
 
 // DeleteUser removes an account along with everything attached to it: its
-// sessions, its bookmarks, and the accounts SoundStorm made for it on the
+// sessions, its bookmarks, and the accounts EmberStorm made for it on the
 // backends.
 //
 // The owner cannot be deleted. Nothing could then manage accounts, and the
@@ -1119,7 +1119,7 @@ func (s *Store) DeleteUser(id string) error {
 	return s.save()
 }
 
-// Identity returns the account SoundStorm holds for a user on one backend.
+// Identity returns the account EmberStorm holds for a user on one backend.
 func (s *Store) Identity(userID, backendID string) (Identity, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1127,7 +1127,7 @@ func (s *Store) Identity(userID, backendID string) (Identity, bool) {
 	return id, ok
 }
 
-// SetIdentity records an account SoundStorm created for a user on a backend.
+// SetIdentity records an account EmberStorm created for a user on a backend.
 func (s *Store) SetIdentity(userID, backendID string, id Identity) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1183,7 +1183,7 @@ func (s *Store) RemoteAccess() (on, chosen bool) {
 }
 
 // Findable reports whether soundstorm.dev may find this server from the
-// home's own internet connection ("Open my SoundStorm"). On unless turned off.
+// home's own internet connection ("Open my EmberStorm"). On unless turned off.
 func (s *Store) Findable() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1469,17 +1469,19 @@ const MaxServerNameLength = 60
 
 // ServerName is the name devices show for this server - in a search of the
 // network, a list of servers, and its sign-in - before anybody signs in:
-// the owner's choice, else "<owner>'s SoundStorm", else "" while it is not
+// the owner's choice, else "<owner>'s EmberStorm", else "" while it is not
 // set up.
 func (s *Store) ServerName() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.d.ServerName != "" {
-		return s.d.ServerName
+		// A name chosen before the product was renamed from SoundStorm
+		// (2026-10-07) - "Gabriel's SoundStorm" - takes the new name.
+		return strings.ReplaceAll(s.d.ServerName, "SoundStorm", "EmberStorm")
 	}
 	for _, u := range s.d.Users {
 		if u.IsOwner() {
-			return u.Name + "'s SoundStorm"
+			return u.Name + "'s EmberStorm"
 		}
 	}
 	return ""

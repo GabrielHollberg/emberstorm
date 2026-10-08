@@ -85,7 +85,7 @@ func TestAnUnknownModeIsRefused(t *testing.T) {
 	}
 }
 
-// The point of the local authority: install it once and everything SoundStorm
+// The point of the local authority: install it once and everything EmberStorm
 // serves is trusted, including certificates it has not issued yet.
 func TestAClientThatTrustsTheAuthorityGetsNoWarning(t *testing.T) {
 	s := selfSigned(t, t.TempDir())
@@ -242,7 +242,7 @@ func TestTheAuthoritySurvivesARestart(t *testing.T) {
 }
 
 // The key can mint a certificate for any name, so it is the one genuinely
-// sensitive file SoundStorm writes.
+// sensitive file EmberStorm writes.
 func TestTheAuthorityKeyIsNotWorldReadable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// Windows has no mode bits to check; the file is protected by its

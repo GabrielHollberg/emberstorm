@@ -1,9 +1,9 @@
-// Package auth is SoundStorm's login.
+// Package auth is EmberStorm's login.
 //
 // The whole product claim is "one login". That means this package, not the four
 // backends, is what a person authenticates against - and it means the backends
 // must never be reachable from a browser, because their own logins still exist
-// and SoundStorm is not in front of them if you can dial them directly.
+// and EmberStorm is not in front of them if you can dial them directly.
 //
 // There are two roles and the gap between them is deliberately thin. The owner
 // is whoever installed the server; they can add and remove accounts. Everyone
@@ -103,7 +103,7 @@ type Manager struct {
 	// Off by default, and it has to be: the header is a plain request header
 	// that any client can set, so trusting it unconditionally would let anyone
 	// claim their connection was encrypted. It is only meaningful when
-	// SoundStorm is behind a proxy that sets it and strips an incoming one.
+	// EmberStorm is behind a proxy that sets it and strips an incoming one.
 	TrustForwardedProto bool
 
 	// throttle guards every password check a request can trigger.
@@ -160,7 +160,7 @@ func (m *Manager) CreateUser(actor state.User, name, password, role string) (sta
 		role = state.RoleMember
 	}
 	// One owner. Two would let either remove the other, which is a household
-	// argument SoundStorm should not be the venue for.
+	// argument EmberStorm should not be the venue for.
 	if role == state.RoleOwner {
 		role = state.RoleMember
 	}
@@ -695,7 +695,7 @@ func (m *Manager) Authenticated(r *http.Request) bool {
 
 // --- cookies -------------------------------------------------------------------
 
-// OverTLS reports whether this request reached SoundStorm encrypted.
+// OverTLS reports whether this request reached EmberStorm encrypted.
 //
 // A Secure cookie on a plain HTTP connection is silently dropped by the
 // browser, which makes a login appear to succeed and do nothing - so getting

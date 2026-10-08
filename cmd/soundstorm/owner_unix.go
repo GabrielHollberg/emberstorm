@@ -13,7 +13,7 @@ import (
 // original - so the file that ends up there belongs to whoever ran the
 // command, not to whoever owned it a moment ago. Run as root, which is what a
 // bare `docker run` gives you, that leaves state.json owned by root while
-// SoundStorm runs as an unprivileged user; the server then crash-loops at
+// EmberStorm runs as an unprivileged user; the server then crash-loops at
 // startup on "read state: permission denied".
 //
 // Found the hard way, on a live install, while doing exactly that. The

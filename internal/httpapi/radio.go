@@ -342,7 +342,7 @@ func buildStation(rng *rand.Rand, p radioParams, pool []media.Item, l radioListe
 			return station{}, fmt.Errorf("no such mood")
 		}
 		if len(h.moods) == 0 {
-			return station{}, fmt.Errorf("moods appear once SoundStorm has listened to your music")
+			return station{}, fmt.Errorf("moods appear once EmberStorm has listened to your music")
 		}
 		return weighted(d.Title, d.Subtitle, func(it media.Item) float64 {
 			m, ok := h.moods[it.ID]

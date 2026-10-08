@@ -1,7 +1,7 @@
 package httpapi
 
 // Playing on another device from your phone, and controlling it (the
-// owner's design, 2026-10-02). Every open SoundStorm page is a player: it
+// owner's design, 2026-10-02). Every open EmberStorm page is a player: it
 // says hello, reports what it is playing, and waits for commands by asking
 // the server (a long poll), so there is no pairing and no "same Wi-Fi" - the
 // phone and the TV only ever talk to the server.

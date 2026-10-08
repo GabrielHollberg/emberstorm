@@ -10,7 +10,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/names"
 )
 
-// The owner's web address and Open my SoundStorm: a name is claimed at the
+// The owner's web address and Open my EmberStorm: a name is claimed at the
 // name service and kept, a taken one is refused with the service's words,
 // clearing it lets it go, and turning finding off is saved and announced now.
 // A member can do neither.

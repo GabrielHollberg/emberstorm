@@ -7,7 +7,7 @@ package httpapi
 //
 //	GET /api/music/beats?source=&id=   what was heard in one song
 //
-// A song is fetched from Navidrome as mono FLAC (a transcoding SoundStorm
+// A song is fetched from Navidrome as mono FLAC (a transcoding EmberStorm
 // adds to it, see subsonic/listen.go), decoded
 // (internal/flac) and heard (internal/beats, hearSong from app.js step for
 // step). The results are kept under the state dir's beats/, never in the

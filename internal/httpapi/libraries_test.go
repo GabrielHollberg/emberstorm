@@ -337,7 +337,7 @@ func TestSessionSaysWhichLibrariesYouHave(t *testing.T) {
 	if out.User.AllLibraries {
 		t.Error("a restricted account reports having everything")
 	}
-	// SoundStorm's own order, not the order they were sent in, so a UI built
+	// EmberStorm's own order, not the order they were sent in, so a UI built
 	// from this does not reshuffle its tabs.
 	if strings.Join(out.User.Libraries, ",") != "music,ebook" {
 		t.Errorf("libraries = %v", out.User.Libraries)

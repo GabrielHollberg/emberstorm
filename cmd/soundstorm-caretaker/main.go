@@ -1,6 +1,6 @@
-// Command soundstorm-caretaker looks after a SoundStorm box: it installs
+// Command soundstorm-caretaker looks after a EmberStorm box: it installs
 // updates, and undoes one that does not come up healthy. It runs on the box
-// as root, never inside SoundStorm's container (see internal/caretaker).
+// as root, never inside EmberStorm's container (see internal/caretaker).
 //
 // On the box:
 //

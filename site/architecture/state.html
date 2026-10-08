@@ -3,23 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>State and data - SoundStorm</title>
+<title>State and data - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="architecture/state" data-root="..">
 <main>
 <h1>State and data</h1>
-<p class="lede">SoundStorm started out stateless and had to learn to remember. What it remembers
+<p class="lede">EmberStorm started out stateless and had to learn to remember. What it remembers
 is kept small and deliberately shaped: credentials, accounts and decisions in one file, each
 person's lists in their own, rebuildable caches beside them - and never a fact about the media,
 which belongs to the backends and the folders.</p>
 
 <h2 id="line">The line that matters</h2>
-<div class="note"><strong>SoundStorm keeps nothing about the media itself.</strong> No index of
+<div class="note"><strong>EmberStorm keeps nothing about the media itself.</strong> No index of
 songs, no copy of metadata, no list of what is in a folder. That is why nothing it keeps can go
 stale when somebody copies files in with a file manager.</div>
-<p>Per-person things that are SoundStorm's own - favorites, playlists, film positions - are stored
+<p>Per-person things that are EmberStorm's own - favorites, playlists, film positions - are stored
 as references (a source and an id, with a snapshot of how the backend described the item), and
 are filtered through the registry each time they are shown, so a deleted song simply fails to
 play and a shelf an account has lost drops out.</p>
@@ -34,7 +34,7 @@ play and a shelf an account has lost drops out.</p>
   <tr><td><code>beats/</code>, <code>lyrics/</code>, <code>discover/</code></td><td>Caches: song analysis, LRCLIB answers, artist info</td><td>Nothing - rebuilt</td></tr>
   <tr><td><code>tls/</code></td><td>Local authority, server certificate, Let's Encrypt certificate</td><td>Devices that installed the authority must install it again</td></tr>
   <tr><td><code>training/</code></td><td>The developer's own taps for training the looks (one install only)</td><td>Recordings</td></tr>
-  <tr><td>Library folders</td><td>The media, plus hidden <code>.uploads</code>, <code>.trash</code>, <code>.imports</code></td><td>The media - which nothing in SoundStorm ever deletes outright</td></tr>
+  <tr><td>Library folders</td><td>The media, plus hidden <code>.uploads</code>, <code>.trash</code>, <code>.imports</code></td><td>The media - which nothing in EmberStorm ever deletes outright</td></tr>
   <tr><td>Backend volumes</td><td>Each backend's own database, thumbnails, transcode cache</td><td>Re-provisioning, or a lost password</td></tr>
   <tr><td>The browser</td><td>Downloads, the offline shell, small per-device settings</td><td>That device's downloads</td></tr>
 </table>
@@ -88,7 +88,7 @@ playlists (200, of up to 5,000 songs each, 25,000 in all), listening history (co
 play, 5,000 songs), preferences such as the pill order and Now Playing look, and the ListenBrainz
 queue. One change writes one small file. Removing a person removes their file, art and
 listens.</p>
-<p>Favorites and playlists are SoundStorm's rather than Navidrome's, although Navidrome has both:
+<p>Favorites and playlists are EmberStorm's rather than Navidrome's, although Navidrome has both:
 the house shares one Navidrome account, so lists kept there would be everybody's at once. The same
 reasoning keeps film positions in <code>state.json</code> rather than in Jellyfin.</p>
 <p><strong>Listens</strong> are append-only JSON lines, one file per person per year
@@ -132,7 +132,7 @@ mount"), so an empty folder would keep deleted films searchable for ever.</p>
 <h2 id="backends">The backends' own volumes</h2>
 <p>Each backend keeps its database and caches in named volumes - <code>navidrome-data</code>,
 <code>jellyfin-config</code>, <code>abs-config</code>, <code>immich-db</code> and so on. These are
-the backends' business; SoundStorm never reads them. Immich's Postgres in particular must sit on a
+the backends' business; EmberStorm never reads them. Immich's Postgres in particular must sit on a
 named volume, because it must not live on a network share or an NTFS drive. Caches and downloaded
 models (<code>jellyfin-cache</code>, <code>immich-models</code>, <code>storyteller-models</code>)
 are left out of a move to another computer.</p>
@@ -143,7 +143,7 @@ are left out of a move to another computer.</p>
   index in localStorage, keyed by the address the app would ask the server for. Songs, books,
   films (as a file, or as an HLS playlist and its pieces) and photos.</li>
   <li><strong>The offline shell</strong> (<code>soundstorm-offline-shell-v1</code>) lets the app open
-  with no connection, only on <code>*.soundstorm.dev</code> names with a trusted certificate.</li>
+  with no connection, only on <code>*.emberstorm.dev</code> names with a trusted certificate.</li>
   <li><strong>Per-device settings</strong> in localStorage: streaming quality, film quality,
   visualizer timing, the station tuner, keep-the-screen-on.</li>
   <li><strong>Heard songs</strong>, the last 500 analyses, so a song played before follows its beats
@@ -155,7 +155,7 @@ anybody else who signs in.</p>
 <h2 id="backup">Backup and restore</h2>
 <p><code>soundstorm backup</code> writes the state file plus a <code>collections</code> field with
 everyone's lists. A field rather than a wrapper, so a backup still is a state file: an older
-SoundStorm restores the accounts and ignores the lists, and with no lists the backup is the state
+EmberStorm restores the accounts and ignores the lists, and with no lists the backup is the state
 file byte for byte. Pictures and listens are not included; moving to another computer copies the
 whole state volume instead.</p>
 <pre><code>(umask 077; docker compose run --rm -T soundstorm backup - &gt; soundstorm-backup.json)
@@ -170,7 +170,7 @@ credentials never scroll past on screen. Restore checks the lists before touchin
 damaged backup changes nothing. The uninstaller takes a backup before <code>down -v</code>,
 the one moment the credentials would otherwise stop existing anywhere.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

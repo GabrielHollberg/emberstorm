@@ -1,6 +1,6 @@
 // Package flac decodes FLAC, just enough to hear a song's beats on the
 // server: Navidrome converts any song to FLAC for it (a transcoding
-// SoundStorm adds, subsonic/listen.go), and FLAC is simple enough to read
+// EmberStorm adds, subsonic/listen.go), and FLAC is simple enough to read
 // with the standard library alone, where MP3 and AAC are not.
 //
 // It reads what ffmpeg writes - every subframe type, both residual codings,

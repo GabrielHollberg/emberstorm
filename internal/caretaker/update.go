@@ -36,7 +36,7 @@ type Config struct {
 	ManifestURL string
 	// Key is the release key built into the box.
 	Key ed25519.PublicKey
-	// HealthURL is SoundStorm's /healthz, as reached from the box.
+	// HealthURL is EmberStorm's /healthz, as reached from the box.
 	HealthURL string
 	// HealthWait is how long a new version has to come up healthy.
 	HealthWait time.Duration
@@ -219,7 +219,7 @@ func (u *Updater) check(ctx context.Context) (*Manifest, error) {
 	return m, nil
 }
 
-// Health is what SoundStorm's /healthz says.
+// Health is what EmberStorm's /healthz says.
 type Health struct {
 	Status  string `json:"status"`
 	Sources int    `json:"sources"`
@@ -239,7 +239,7 @@ var ErrBusy = errors.New("an update is already under way")
 
 // Update moves the box to m: the new images are downloaded first (nothing
 // changes if that fails), then the stack is stopped, the volumes snapshotted,
-// the new images started, and SoundStorm given HealthWait to answer as healthy
+// the new images started, and EmberStorm given HealthWait to answer as healthy
 // with at least as many sources as before. If it does not, everything is put
 // back as it was - images and volumes both, since a new version may have
 // changed its database on the way up - and the update is reported as undone.
@@ -251,7 +251,7 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	u.set(func(s *Status) { s.State = "updating"; s.Message = "Downloading SoundStorm " + m.Version })
+	u.set(func(s *Status) { s.State = "updating"; s.Message = "Downloading EmberStorm " + m.Version })
 
 	before, _ := u.health(ctx)
 
@@ -264,9 +264,9 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 	imagesPath := filepath.Join(u.cfg.ComposeDir, "compose.images.yml")
 	previous, _ := os.ReadFile(imagesPath)
 
-	u.set(func(s *Status) { s.Message = "Installing SoundStorm " + m.Version })
+	u.set(func(s *Status) { s.Message = "Installing EmberStorm " + m.Version })
 	if err := u.run(ctx, u.cfg.Up, "stop"); err != nil {
-		return u.fail(err, "The update could not stop SoundStorm. Nothing was changed.")
+		return u.fail(err, "The update could not stop EmberStorm. Nothing was changed.")
 	}
 	snap := ""
 	if u.snapshots(u.cfg.Volumes) {
@@ -278,7 +278,7 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 	}
 	if err := writeFile(imagesPath, ImagesFile(m)); err != nil {
 		u.rollback(ctx, imagesPath, previous, snap)
-		return u.fail(err, "The update could not be installed. SoundStorm is back as it was.")
+		return u.fail(err, "The update could not be installed. EmberStorm is back as it was.")
 	}
 	if err := u.run(ctx, u.cfg.Up); err != nil || !u.healthy(ctx, before) {
 		u.rollback(ctx, imagesPath, previous, snap)
@@ -288,7 +288,7 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 		u.log.Warn("update undone", "version", m.Version, "err", err)
 		u.set(func(s *Status) {
 			s.State = "rolled-back"
-			s.Message = "SoundStorm " + m.Version + " did not start properly, so the box went back to the version you had. Nothing was lost."
+			s.Message = "EmberStorm " + m.Version + " did not start properly, so the box went back to the version you had. Nothing was lost."
 		})
 		return err
 	}
@@ -304,7 +304,7 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 		s.Current = m
 		s.Available = nil
 		s.State = "updated"
-		s.Message = "Updated to SoundStorm " + m.Version + "."
+		s.Message = "Updated to EmberStorm " + m.Version + "."
 	})
 	u.log.Info("updated", "version", m.Version, "serial", m.Serial)
 	return nil
@@ -316,7 +316,7 @@ func (u *Updater) fail(err error, message string) error {
 	return err
 }
 
-// healthy waits for SoundStorm to say ok with at least the sources it had.
+// healthy waits for EmberStorm to say ok with at least the sources it had.
 func (u *Updater) healthy(ctx context.Context, before Health) bool {
 	deadline := time.Now().Add(u.cfg.HealthWait)
 	for time.Now().Before(deadline) {

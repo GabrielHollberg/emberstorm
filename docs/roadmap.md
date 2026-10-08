@@ -1,10 +1,10 @@
 # Roadmap
 
-SoundStorm works end to end today: one sign-in and one search over music,
+EmberStorm works end to end today: one sign-in and one search over music,
 films and TV, audiobooks, ebooks, documents and photos, on the web and in apps
 for Android (phones, Google TV, Android TV, Fire TV), iPhone and Apple TV. It
 sets up its media servers itself, with nobody logging in, and keeps them out
-of sight. What follows is ordered by what most changes whether SoundStorm is
+of sight. What follows is ordered by what most changes whether EmberStorm is
 usable by somebody other than the people building it - not by what is most
 interesting to build.
 
@@ -26,12 +26,12 @@ next step is making sure a stranger's first hour goes well.
   Plex account; Live Photos through sending, sharing and saving; very large
   libraries (a 100,000-song library, Jellyfin's first scan of a big film
   collection, several people converting video at once).
-- **An iPhone Share extension**, so Share > SoundStorm adds to the library as
+- **An iPhone Share extension**, so Share > EmberStorm adds to the library as
   it already does on Android.
 
-## 2. SoundStorm on a box
+## 2. EmberStorm on a box
 
-A small computer with SoundStorm already on it, for people leaving the cloud:
+A small computer with EmberStorm already on it, for people leaving the cloud:
 plug it into power and the router, scan the code on the sticker, make an
 account. The system image and its signed, self-reverting updates work in a
 virtual machine; a test unit is next. See [`box/README.md`](../box/README.md).
@@ -40,7 +40,7 @@ virtual machine; a test unit is next. See [`box/README.md`](../box/README.md).
   password reset (pressed five times), Start over and Erase everything, and
   bringing media in from a USB drive.
 - **Setting up from the sticker:** a setup code made when the box is prepared
-  and printed on it, and the Android app's "We found your new SoundStorm - Set
+  and printed on it, and the Android app's "We found your new EmberStorm - Set
   it up" (the iPhone app has it).
 - **Backups to a USB drive:** nightly once one is plugged in, with the app
   saying plainly when there is no backup or one has not run.
@@ -50,7 +50,7 @@ virtual machine; a test unit is next. See [`box/README.md`](../box/README.md).
 
 ## 3. Growing beyond a handful of installs
 
-Every install shares the `soundstorm.dev` name service. It is cheap and holds
+Every install shares the `emberstorm.dev` name service. It is cheap and holds
 no state, and it has limits to plan for:
 
 - **Let's Encrypt's rate limits.** Renewals now say what they replace (ACME
@@ -100,9 +100,9 @@ every main screen; and the license, now the GNU AGPL.
 
 ## Deliberately not planned
 
-Transcoding *by SoundStorm*, metadata scraping, library scanning, and
+Transcoding *by EmberStorm*, metadata scraping, library scanning, and
 rebuilding an app store - each has sunk projects like this one, and each is
-done better by the servers SoundStorm runs. See CLAUDE.md for why.
+done better by the servers EmberStorm runs. See CLAUDE.md for why.
 
 TV apps were on this list, and were built anyway, knowingly: Android TV and
 Google TV run the Android app with the page's TV mode, and Apple TV has a

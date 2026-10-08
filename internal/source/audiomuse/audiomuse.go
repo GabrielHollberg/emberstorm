@@ -4,7 +4,7 @@
 // which is machine learning over every track - the expensive layer this
 // project does not own. So it is a backend, as read-along is: AudioMuse-AI
 // (AGPL, Docker, run unmodified) pulls each song through Navidrome's own
-// API, analyzes it once, and SoundStorm reads the result. Every endpoint
+// API, analyzes it once, and EmberStorm reads the result. Every endpoint
 // used here was checked against 3.6.3 first.
 //
 // It is registered as a music source that finds nothing, like Storyteller is
@@ -34,7 +34,7 @@ const featuresFor = 30 * time.Minute
 type Config struct {
 	ID      string
 	BaseURL string
-	Token   string // the API token SoundStorm generated at provisioning
+	Token   string // the API token EmberStorm generated at provisioning
 	Timeout time.Duration
 }
 
@@ -115,7 +115,7 @@ func (s *Source) getJSON(ctx context.Context, path string, params url.Values, ou
 }
 
 // syncTrack is one song as /api/sync exports it. The id is Navidrome's own
-// song id - the one SoundStorm already uses - so nothing needs matching.
+// song id - the one EmberStorm already uses - so nothing needs matching.
 type syncTrack struct {
 	ID            string   `json:"id"`
 	Energy        *float64 `json:"energy"`
@@ -308,7 +308,7 @@ func (s *Source) Analyze(ctx context.Context) error {
 // music server scans first, and AudioMuse-AI finds new songs through it.
 const listenAfter = 3 * time.Minute
 
-// Rescan answers SoundStorm's "look for new files": a listen for what is new,
+// Rescan answers EmberStorm's "look for new files": a listen for what is new,
 // once the music server has indexed it. A burst of uploads is one listen.
 func (s *Source) Rescan(context.Context) error {
 	s.mu.Lock()

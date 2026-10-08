@@ -3,22 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Photos: folders, backup, imports - SoundStorm</title>
+<title>Photos: folders, backup, imports - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="server/photos" data-root="..">
 <main>
 <h1>Photos: folders, backup, imports</h1>
-<p class="lede">Photos are delegated to Immich, the way music is to Navidrome. What SoundStorm adds
+<p class="lede">Photos are delegated to Immich, the way music is to Navidrome. What EmberStorm adds
 is the part that makes them a household's rather than one account's: everybody has their own folder
 and sees only their own photos, phones back up into it, and a lifetime of photos can be brought in
 from Google, Apple and the rest - sorted by when they were taken, with duplicates noticed.</p>
 
 <h2 id="why-immich">Why photos are delegated</h2>
-<p>SoundStorm owns a media type only when it is self-describing and needs no transcoding. Photos
+<p>EmberStorm owns a media type only when it is self-describing and needs no transcoding. Photos
 fail that concretely: <strong>iPhones save HEIC, and Go's standard library cannot decode it</strong>,
-so SoundStorm could not even show a thumbnail of most phone photos without a dependency; phone clips
+so EmberStorm could not even show a thumbnail of most phone photos without a dependency; phone clips
 need transcoding; and a photo library of any size is the scanning-and-indexing job this project
 exists not to rebuild. Immich was chosen over lighter options for search by what is in a picture -
 the feature people compare against Google Photos - at the price of four containers and 6-8 GB of
@@ -88,7 +88,7 @@ appearing, turns backup off; the phone sends the account it was turned on for
 the secure name the page was on, never plain http on the Wi-Fi when a secure one exists.</div>
 
 <h2 id="imports">Bringing a photo library in</h2>
-<p>Google and Apple give no way for SoundStorm to pull photos out - Google's Photos API stopped
+<p>Google and Apple give no way for EmberStorm to pull photos out - Google's Photos API stopped
 reading a person's library in 2025, and iCloud never had one - but both hand out a download of
 everything as zips. So "Your photos" walks through each service's export, and the zips can be dropped
 anywhere on the window. <code>internal/photoimport</code> does the sorting.</p>
@@ -153,7 +153,7 @@ Immich: an undated photo, then Google's copy - moved to the right month, and Imm
 and city.</p>
 
 <h3>Managed and arranged folders</h3>
-<p>Only the dated folders count as SoundStorm's (<code>managedPhoto</code>). A photo that sits only in
+<p>Only the dated folders count as EmberStorm's (<code>managedPhoto</code>). A photo that sits only in
 a folder somebody arranged and copied in by hand does not stop a copy being filed by date, and is never
 improved or moved: their folders are left exactly as they are. Such a photo then shows twice, which
 "Your photos" says. Near-duplicates (re-compressed or edited copies) are not caught.</p>
@@ -163,7 +163,7 @@ improved or moved: their folders are left exactly as they are. Such a photo then
 (a face is art id <code>person:&lt;id&gt;</code>), a person's photos, <code>GET /api/search/cities</code>
 for towns (the id carries city, state and country, since towns share names) and their photos. Somebody
 found but unnamed can be named by anyone who can see the photos - a name is for the household.</p>
-<p><strong>On this day is SoundStorm's own</strong>, not Immich's memories, which are made overnight
+<p><strong>On this day is EmberStorm's own</strong>, not Immich's memories, which are made overnight
 and only for days Immich picked (empty on a real library). It is one metadata search per earlier year,
 25 years back, in parallel, cached an hour; 29 February asks only leap years.</p>
 <p>Browsing breaks the title order paging depends on - nobody browses a camera roll alphabetically - so
@@ -171,7 +171,7 @@ photos carry a <code>SortKey</code> that is their rank in Immich's newest-first 
 needs models Immich downloads on first use, so until they arrive the adapter falls back to a filename
 search.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

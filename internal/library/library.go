@@ -1,12 +1,12 @@
 // Package library owns the folder layout a user actually interacts with.
 //
-// This is the first thing anyone touches after installing SoundStorm, and it is
+// This is the first thing anyone touches after installing EmberStorm, and it is
 // the only part of the product with no UI: you put a file in a folder and it
 // appears. That makes the folders themselves the interface, so they are created
 // for you, named unambiguously, and described in the app rather than only in a
 // README nobody reads.
 //
-// SoundStorm reads this directory for two narrow purposes - creating it, and
+// EmberStorm reads this directory for two narrow purposes - creating it, and
 // counting what is in it so the UI can say "1,240 files, none searchable yet,
 // Navidrome is still scanning". It does NOT index it. Indexing is the backends'
 // job, except for ebooks, which have no backend (see internal/epub for why that
@@ -40,7 +40,7 @@ type Folder struct {
 	Name string     `json:"name"`
 
 	// Hint is the path as the *user* sees it from where they ran compose,
-	// which is the only path worth showing them. SoundStorm's own view is inside
+	// which is the only path worth showing them. EmberStorm's own view is inside
 	// a container and means nothing to a human.
 	Hint string `json:"hint"`
 
@@ -107,7 +107,7 @@ var layout = []Folder{
 }
 
 // mediaExtensions is what counts as a media file per folder. Deliberately
-// generous: the point is to tell a user "SoundStorm can see your files", not to
+// generous: the point is to tell a user "EmberStorm can see your files", not to
 // predict what a backend will accept.
 var mediaExtensions = map[media.Kind]map[string]bool{
 	media.KindMusic: {
@@ -159,7 +159,7 @@ func IsPictureFile(name string) bool {
 // a library folder comes back empty: it cannot tell "everything was deleted"
 // from "the drive did not mount", and emptying somebody's library over a bad
 // mount is much the worse mistake. So it skips the folder entirely, and every
-// deleted film stays in search for ever. SoundStorm never shows Jellyfin's own
+// deleted film stays in search for ever. EmberStorm never shows Jellyfin's own
 // UI - that is the whole point of it - so there is nowhere a user could clear
 // that by hand.
 //
@@ -178,7 +178,7 @@ const readmeName = "README.txt"
 // example the home screen shows, so there is one source of truth for both.
 //
 // It does not mention Jellyfin, Navidrome or Audiobookshelf. A user of
-// SoundStorm is never told those exist, and a placeholder file is a poor place
+// EmberStorm is never told those exist, and a placeholder file is a poor place
 // to start.
 func readme(f Folder) string {
 	return fmt.Sprintf(`%s
@@ -187,15 +187,15 @@ func readme(f Folder) string {
 
   %s
 
-SoundStorm picks up new files automatically - there is nothing to import and no
+EmberStorm picks up new files automatically - there is nothing to import and no
 scan to trigger by hand.
 
 Leave this file where it is. It keeps the folder from being empty, and an empty
 folder is ambiguous: it looks the same whether you deleted everything or the
 drive holding it is not mounted. Rather than risk clearing a library over a
-missing disk, SoundStorm leaves a folder in that state alone - which means
+missing disk, EmberStorm leaves a folder in that state alone - which means
 things you deleted would keep appearing in search. This file is what stops the
-folder ever being empty. Delete it and SoundStorm writes it back.
+folder ever being empty. Delete it and EmberStorm writes it back.
 `, f.headline(), f.Description, f.Example)
 }
 
@@ -241,11 +241,11 @@ func Open(root, hint string, log *slog.Logger) (*Library, error) {
 	return l, nil
 }
 
-// Root returns the library root as SoundStorm sees it.
+// Root returns the library root as EmberStorm sees it.
 func (l *Library) Root() string { return l.root }
 
 // Hint returns the library root as the person running it sees it, which is
-// almost never the same path - SoundStorm is in a container and sees
+// almost never the same path - EmberStorm is in a container and sees
 // /library, while compose passes "./library" because that is what is beside
 // their docker-compose.yml. Only the hint is ever worth showing.
 func (l *Library) Hint() string { return l.hint }
@@ -327,7 +327,7 @@ func (l *Library) ensure() error {
 
 // EnsurePlaceholders writes back any README.txt that has gone missing.
 //
-// Called once at startup, and again immediately before SoundStorm asks the
+// Called once at startup, and again immediately before EmberStorm asks the
 // backends to scan. The second one is the one that earns its keep: somebody can
 // empty a folder from their file manager while the server is running, and until
 // the placeholder is back, the backend that owns that folder will not notice

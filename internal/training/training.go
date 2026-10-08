@@ -1,4 +1,4 @@
-// Package training learns the looks from what SoundStorm's developer
+// Package training learns the looks from what EmberStorm's developer
 // recorded: where big moments (lightning) should be, tapped along to songs,
 // and how intense the music should feel, slid along to them (httpapi's
 // training mode, on one install alone). Run as `soundstorm train-looks`
@@ -6,7 +6,7 @@
 // the same analysis the server uses (internal/beats), keeps the raw readings
 // at every moment, lines the taps up with the hits that set them off, fits a
 // model and scores it - and today's rule - on songs it was not trained on.
-// What it learns is written out to be built into SoundStorm, for every
+// What it learns is written out to be built into EmberStorm, for every
 // install, only if it does better than the rule.
 //
 // The model is deliberately simple to begin with: a logistic regression over

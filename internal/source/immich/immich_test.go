@@ -92,7 +92,7 @@ func sampleAssets() []asset {
 }
 
 // Browsing asks for this library, newest first, without offline files - and
-// keeps Immich's order through SoundStorm's merge by way of SortKey.
+// keeps Immich's order through EmberStorm's merge by way of SortKey.
 func TestBrowsingIsNewestFirstAndSkipsMissingFiles(t *testing.T) {
 	f := &fakeImmich{assets: sampleAssets()}
 	s := newSource(t, f)
@@ -155,7 +155,7 @@ func TestSearchFallsBackToFileNamesWithoutMachineLearning(t *testing.T) {
 	}
 }
 
-// Immich's page is at most 1000; SoundStorm pages to 2000 deep.
+// Immich's page is at most 1000; EmberStorm pages to 2000 deep.
 func TestDeepBrowsingAsksForSeveralPages(t *testing.T) {
 	f := &fakeImmich{}
 	for i := 0; i < 1500; i++ {

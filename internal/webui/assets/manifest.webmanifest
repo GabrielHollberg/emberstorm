@@ -1,6 +1,6 @@
 {
-  "name": "SoundStorm",
-  "short_name": "SoundStorm",
+  "name": "EmberStorm",
+  "short_name": "EmberStorm",
   "description": "One login and one search box over your music, films, TV, audiobooks and ebooks.",
   "start_url": "/",
   "scope": "/",

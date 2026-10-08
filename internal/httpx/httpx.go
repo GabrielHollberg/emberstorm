@@ -116,7 +116,7 @@ func (c *Client) resolve(ref string) *url.URL {
 	// An absolute reference would change the host, a second leading slash
 	// would drop the base's path prefix, and a dot segment would climb out of
 	// the path it was meant for - "videos/%2e%2e/System/Info" reached
-	// Jellyfin's admin API with SoundStorm's own token, from a member's
+	// Jellyfin's admin API with EmberStorm's own token, from a member's
 	// playlist request. No legitimate reference has any of them, and a
 	// malformed one is the caller's bug, so all of them resolve to a path
 	// nothing answers: an upstream 404 rather than a silently wrong URL.

@@ -1,4 +1,4 @@
-// Package webui serves SoundStorm's browser UI out of the binary.
+// Package webui serves EmberStorm's browser UI out of the binary.
 //
 // The assets are embedded rather than mounted so deployment stays one artifact
 // and there is no build step to forget. There is no framework and no bundler on
@@ -54,10 +54,10 @@ func Assets() http.Handler {
 // EPUB files may contain scripts. The reader renders book content in an iframe
 // backed by a blob: URL, and a blob: document inherits the creating page's
 // origin - so without a policy, a book downloaded from anywhere could run
-// JavaScript with full access to SoundStorm's session cookie and every API it
+// JavaScript with full access to EmberStorm's session cookie and every API it
 // guards. "Open this book" would be "run this stranger's code as me".
 //
-// script-src 'self' stops that: only SoundStorm's own scripts execute. The cost
+// script-src 'self' stops that: only EmberStorm's own scripts execute. The cost
 // is that books relying on embedded scripting will not be interactive, which is
 // the trade foliate-js's own documentation recommends making.
 //
@@ -79,7 +79,7 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"base-uri 'none'; " +
 	"form-action 'self'"
 
-// ServeServiceWorker writes the worker that makes SoundStorm installable.
+// ServeServiceWorker writes the worker that makes EmberStorm installable.
 //
 // Served from "/" because a service worker's default scope is its own
 // directory: from /static/ it could never control the page at "/", which is

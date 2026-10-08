@@ -1,4 +1,4 @@
-// Package provision gets SoundStorm credentials on each backend without a human
+// Package provision gets EmberStorm credentials on each backend without a human
 // typing anything.
 //
 // This is the load-bearing package of the whole product. Installing four media
@@ -13,7 +13,7 @@
 // write what we get to state. The human sees a progress list, not a form.
 //
 // Provisioning runs in the background and tolerates a backend that is still
-// booting, which is the normal case under `docker compose up`: SoundStorm is
+// booting, which is the normal case under `docker compose up`: EmberStorm is
 // listening seconds after start, Jellyfin takes the better part of a minute.
 package provision
 
@@ -53,10 +53,10 @@ const (
 	StatusWaiting      Status = "waiting"      // backend not reachable yet
 	StatusProvisioning Status = "provisioning" // walking its first-run flow
 	StatusReady        Status = "ready"        // searchable
-	StatusFailed       Status = "failed"       // gave up; SoundStorm still serves
+	StatusFailed       Status = "failed"       // gave up; EmberStorm still serves
 )
 
-// accountName is the account SoundStorm creates for itself on every backend. It
+// accountName is the account EmberStorm creates for itself on every backend. It
 // is deliberately recognizable: someone poking at Navidrome later should be
 // able to tell which account is the gateway's.
 const accountName = "soundstorm"
@@ -68,10 +68,10 @@ const backendTimeout = 20 * time.Second
 
 // giveUpAfter bounds how long we keep retrying a backend that never comes up.
 // A backend can be genuinely absent (image failed to pull, wrong URL) and
-// SoundStorm must stay useful for the ones that did work.
+// EmberStorm must stay useful for the ones that did work.
 const giveUpAfter = 10 * time.Minute
 
-// Target is a backend SoundStorm should bring under its wing.
+// Target is a backend EmberStorm should bring under its wing.
 type Target struct {
 	ID      string // source id, appears in stream URLs: "navidrome"
 	Type    string // "navidrome" or "jellyfin"
@@ -92,7 +92,7 @@ type Target struct {
 	Kind media.Kind
 
 	// For Storyteller: the audiobook shelf as its container sees it. Its data
-	// folder, as SoundStorm sees it, is MediaPath.
+	// folder, as EmberStorm sees it, is MediaPath.
 	AudiobooksRemote string
 }
 
@@ -154,7 +154,7 @@ func New(store *state.Store, reg *source.Registry, log *slog.Logger, targets []T
 }
 
 // Start kicks off provisioning for every target, one goroutine each, and
-// returns immediately. SoundStorm serves (and shows setup progress) while this
+// returns immediately. EmberStorm serves (and shows setup progress) while this
 // runs.
 func (m *Manager) Start(ctx context.Context) {
 	for _, t := range m.targets {
@@ -207,8 +207,8 @@ func (m *Manager) set(id string, status Status, detail, errMsg string) {
 // under here - in this package's own retry logic, in an adapter's response
 // parsing, or in a local book library's first scan reading a file somebody
 // uploaded before this backend ever came up - would otherwise crash
-// SoundStorm entirely rather than leaving one backend marked failed, which is
-// what "SoundStorm still serves" on StatusFailed promises.
+// EmberStorm entirely rather than leaving one backend marked failed, which is
+// what "EmberStorm still serves" on StatusFailed promises.
 func (m *Manager) run(ctx context.Context, t Target) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -229,7 +229,7 @@ func (m *Manager) run(ctx context.Context, t Target) {
 
 // reconnect brings a backend back using credentials we already hold.
 //
-// The subtlety that cost a debugging session: on a restart, SoundStorm is
+// The subtlety that cost a debugging session: on a restart, EmberStorm is
 // listening seconds after the container starts and Jellyfin is not. A health
 // check then fails with "connection refused", which is emphatically NOT the
 // same as "this token is wrong" - but treating them alike meant throwing away
@@ -239,7 +239,7 @@ func (m *Manager) run(ctx context.Context, t Target) {
 //
 // So: a transport failure means wait and try again. Only an answer from the
 // backend that rejects us justifies re-provisioning, and that path still exists
-// because wiping a backend's volume while keeping SoundStorm's is a real thing
+// because wiping a backend's volume while keeping EmberStorm's is a real thing
 // to do.
 func (m *Manager) reconnect(ctx context.Context, t Target, creds state.Backend, log *slog.Logger) {
 	deadline := time.Now().Add(giveUpAfter)
@@ -442,7 +442,7 @@ func fresh(name string) (string, bool, error) {
 //
 // One backend can produce more than one source. Jellyfin does: films and series
 // are separate Jellyfin libraries with separate scrapers, so they become two
-// SoundStorm sources sharing one token - which is what the Source interface
+// EmberStorm sources sharing one token - which is what the Source interface
 // always described and could not actually do until jellyfin.Config grew a Kind.
 func (m *Manager) register(ctx context.Context, t Target, creds state.Backend) error {
 	sources, err := m.buildSources(t, creds)
@@ -624,7 +624,7 @@ func generatePassword() (string, error) {
 
 // --- per-user backend accounts -------------------------------------------------
 
-// backendUsername is what a SoundStorm account is called on a backend.
+// backendUsername is what a EmberStorm account is called on a backend.
 //
 // Prefixed and keyed by id rather than by name, so that renaming or replacing
 // somebody cannot collide with an account already there, and so a human
@@ -633,7 +633,7 @@ func backendUsername(userID string) string {
 	return accountName + "-" + userID
 }
 
-// TokenFor resolves a SoundStorm account to a credential on a backend, making
+// TokenFor resolves a EmberStorm account to a credential on a backend, making
 // one if it does not exist yet.
 //
 // Lazily, on first use, rather than when the account is created: a backend can
@@ -760,10 +760,10 @@ func (m *Manager) PhotoAccountFor(ctx context.Context, backendID, userID string)
 	return identity.Token, identity.LibraryID, nil
 }
 
-// ForgetUser removes the accounts SoundStorm made for somebody on the backends.
+// ForgetUser removes the accounts EmberStorm made for somebody on the backends.
 //
 // Best effort, and deliberately so: a backend that is down must not stop
-// somebody being removed from SoundStorm. What is left behind is an unused
+// somebody being removed from EmberStorm. What is left behind is an unused
 // account on a server nobody can reach, which is untidy rather than unsafe -
 // whereas refusing to remove a person because Audiobookshelf is restarting
 // would be a real problem.

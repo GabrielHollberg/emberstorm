@@ -12,7 +12,7 @@
 // register can never be the reason the app does not start.
 //
 // navigator.serviceWorker is undefined outside a secure context, so over plain
-// http on a LAN address this quietly does nothing and SoundStorm works exactly
+// http on a LAN address this quietly does nothing and EmberStorm works exactly
 // as it did before. That is also why installing to a home screen from a phone
 // needs the installer's --https. localhost counts as secure either way, which
 // is why it works in development without it.

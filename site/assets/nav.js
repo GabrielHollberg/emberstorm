@@ -108,7 +108,7 @@ const SITE = [
   menu.addEventListener('click', () => body.classList.toggle('side-open'));
   const header = el('header', { className: 'site-header' },
     el('a', { className: 'brand', href: url('index.html') },
-      el('img', { className: 'cloud', src: url('assets/favicon.svg'), alt: '' }), el('span', { textContent: 'SoundStorm' }),
+      el('img', { className: 'cloud', src: url('assets/favicon.svg'), alt: '' }), el('span', { textContent: 'EmberStorm' }),
       el('span', { className: 'brand-sub', textContent: 'how it works' })),
     tabs, menu);
   body.prepend(header);
@@ -172,5 +172,5 @@ const SITE = [
   if (at < order.length - 1) pager.append(el('a', { className: 'next', href: url(order[at + 1].href) }, el('small', { textContent: 'Next' }), el('span', { textContent: order[at + 1].title })));
   main.append(pager);
 
-  document.title = page === SITE[0] ? 'SoundStorm - how it works' : `${page.title} - SoundStorm`;
+  document.title = page === SITE[0] ? 'EmberStorm - how it works' : `${page.title} - EmberStorm`;
 })();

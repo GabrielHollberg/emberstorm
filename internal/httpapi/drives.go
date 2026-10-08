@@ -27,7 +27,7 @@ import (
 // browser over Wi-Fi is no way to move a terabyte).
 //
 // The box's own system mounts each drive plugged in, read-only, as a folder
-// under SOUNDSTORM_DRIVES_DIR (box/rootfs). SoundStorm only reads it. The
+// under SOUNDSTORM_DRIVES_DIR (box/rootfs). EmberStorm only reads it. The
 // page plans as for files dropped on it - the same plan, questions, review
 // and taken names, reading the few megabytes it needs through /read - and
 // then hands the plan back here, and the server copies each file from the

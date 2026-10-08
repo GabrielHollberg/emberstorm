@@ -18,7 +18,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
-// storytellerEmail is the account SoundStorm creates on Storyteller, which
+// storytellerEmail is the account EmberStorm creates on Storyteller, which
 // wants an email address and sends nothing to it. .invalid, as for Immich.
 const storytellerEmail = accountName + "@soundstorm.invalid"
 
@@ -28,7 +28,7 @@ const storytellerEmail = accountName + "@soundstorm.invalid"
 // each time rather than written down here.
 var storytellerAction = regexp.MustCompile(`name="(\$ACTION_ID_[0-9a-f]+)"`)
 
-// provisionStoryteller creates SoundStorm's account on a fresh Storyteller,
+// provisionStoryteller creates EmberStorm's account on a fresh Storyteller,
 // trades a login for a long-lived session, and sets it up for read-along:
 // synced books written inside its own data folder (never beside the source,
 // which is the library), chapters left uncut so every timing is relative to a
@@ -66,8 +66,8 @@ func provisionStoryteller(ctx context.Context, c *httpx.Client, sec secrets, log
 	made := page.status != http.StatusOK || action == nil
 	if made && !kept {
 		return state.Backend{}, fmt.Errorf(
-			"storyteller already has an account but SoundStorm has no stored credentials for it; " +
-				"either restore SoundStorm's state file or reset the storyteller volume")
+			"storyteller already has an account but EmberStorm has no stored credentials for it; " +
+				"either restore EmberStorm's state file or reset the storyteller volume")
 	}
 	if made {
 		// Made by an earlier attempt that failed after it: sign in with the

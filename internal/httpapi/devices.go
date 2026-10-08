@@ -224,7 +224,7 @@ func (s *Server) handleSetApproveDevices(w http.ResponseWriter, r *http.Request)
 }
 
 // handleSetServerName sets what devices call this server; empty goes back to
-// "<owner>'s SoundStorm". Owner only.
+// "<owner>'s EmberStorm". Owner only.
 func (s *Server) handleSetServerName(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
@@ -263,7 +263,7 @@ func deviceLabel(ua string) string {
 	case strings.Contains(ua, "SoundStormTV"):
 		app = "The TV app"
 	case strings.Contains(ua, "SoundStormApp"):
-		app = "The SoundStorm app"
+		app = "The EmberStorm app"
 	case strings.Contains(ua, "Edg/"):
 		app = "Edge"
 	case strings.Contains(ua, "Firefox/"):

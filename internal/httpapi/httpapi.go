@@ -1,4 +1,4 @@
-// Package httpapi is SoundStorm's only published surface.
+// Package httpapi is EmberStorm's only published surface.
 //
 // Everything a person touches comes through here: the UI, the login, the
 // search, and the media bytes. The backends are on the internal compose network
@@ -119,7 +119,7 @@ type Server struct {
 	reports allowance
 	// "keep me on this device" (profiles): each rewrites state.json
 	keeps allowance
-	// the open SoundStorm pages, as devices to play on (players.go)
+	// the open EmberStorm pages, as devices to play on (players.go)
 	players        playerHub
 	playerCommands allowance
 	hlsSessions    hlsSessions
@@ -206,7 +206,7 @@ type Config struct {
 	Log              *slog.Logger
 
 	// CAPEM is the local certificate authority to offer for download, when
-	// SoundStorm generated one. Nil when TLS is off or a real certificate was
+	// EmberStorm generated one. Nil when TLS is off or a real certificate was
 	// supplied, in which case there is nothing for anybody to install.
 	CAPEM []byte
 
@@ -274,7 +274,7 @@ type Config struct {
 	// WhisperURL is the backend that writes audiobooks down, for Make an
 	// ebook; empty turns that half off.
 	WhisperURL string
-	// StateDir is SoundStorm's own state folder, for records of its own
+	// StateDir is EmberStorm's own state folder, for records of its own
 	// beside state.json (the photos deleted from backups); empty keeps them
 	// in memory only.
 	StateDir string
@@ -717,7 +717,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 // handleCA hands over the local authority so a device can trust it.
 //
 // Downloaded and installed once per device, after which every certificate
-// SoundStorm issues is trusted - including ones minted later for an address it
+// EmberStorm issues is trusted - including ones minted later for an address it
 // had never seen. That is the difference between a local authority and a bare
 // self-signed certificate, and the reason for the chore being a one-off.
 // handleRemoteReachable answers the name service's reachability challenge, so
@@ -1167,7 +1167,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The backend accounts go first, on purpose. Deleting the SoundStorm
+	// The backend accounts go first, on purpose. Deleting the EmberStorm
 	// account drops the record of which Audiobookshelf user belonged to it, and
 	// after that nothing knows what to clean up - the orphan would sit there
 	// with somebody's listening history in it.
@@ -1558,7 +1558,7 @@ const maxPlanBody = 4 << 20
 // the ones it will not guess at.
 //
 // Nothing is written. This exists so somebody dropping a folder finds out what
-// SoundStorm made of it - which shelf, what it is skipping, and what it needs
+// EmberStorm made of it - which shelf, what it is skipping, and what it needs
 // told - before any bytes move.
 func (s *Server) handleUploadPlan(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -2071,7 +2071,7 @@ func (s *Server) handlePlayback(w http.ResponseWriter, r *http.Request) {
 	// Direct play is the default and the fallback. If negotiation fails it is
 	// better to hand over the file than to refuse: a playable file plays, and
 	// an unplayable one gets a media error from the browser rather than
-	// silence from SoundStorm.
+	// silence from EmberStorm.
 	answer := map[string]any{
 		"mode": source.PlaybackModeDirect,
 		"url":  streamURL(sourceID, itemID),
@@ -2160,7 +2160,7 @@ func (s *Server) handlePlayback(w http.ResponseWriter, r *http.Request) {
 
 // handleSetPosition records how far into an item somebody got.
 //
-// It goes upstream rather than into SoundStorm's state. Audiobookshelf keeps
+// It goes upstream rather than into EmberStorm's state. Audiobookshelf keeps
 // position per title and syncs it to its own apps, so a chapter finished in the
 // car is where a browser picks up. A private copy here would fork from the one
 // every other client reads.
@@ -2583,7 +2583,7 @@ func (s *Server) progressTarget(w http.ResponseWriter, r *http.Request) (sourceI
 	// keeps no reading positions.
 	//
 	// A film or an episode can have one too - how far into it somebody
-	// watched, kept here rather than in Jellyfin, because SoundStorm shares one
+	// watched, kept here rather than in Jellyfin, because EmberStorm shares one
 	// Jellyfin account across the house and a position there would be
 	// everybody's at once. Jellyfin says whether an id is one of its items.
 	known := false

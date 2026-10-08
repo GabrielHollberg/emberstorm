@@ -68,7 +68,7 @@ func TestAManifestMustPinEveryImage(t *testing.T) {
 	}
 }
 
-// box is a pretend box: a manifest server, a SoundStorm health answer and a
+// box is a pretend box: a manifest server, a EmberStorm health answer and a
 // record of what the caretaker ran.
 type box struct {
 	t        *testing.T

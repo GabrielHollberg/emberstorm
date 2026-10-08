@@ -34,7 +34,7 @@ func (u *Updater) saveSettings(s Settings) error {
 }
 
 // Handler is the caretaker's door, served on a Unix socket that only
-// SoundStorm's container is given. It can ask, never command anything else:
+// EmberStorm's container is given. It can ask, never command anything else:
 //
 //	GET  /status            what is running, what is available
 //	POST /check             look for an update now
@@ -45,7 +45,7 @@ func (u *Updater) saveSettings(s Settings) error {
 //	GET  /button            {"open": true, "until": ...} after five presses
 //	POST /button/used       the owner's password was set: closed again
 //
-// SoundStorm decides who may press these (the owner); the caretaker trusts
+// EmberStorm decides who may press these (the owner); the caretaker trusts
 // whoever reaches the socket, which is why nothing else is ever given it.
 func (u *Updater) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -71,7 +71,7 @@ func (u *Updater) Handler() http.Handler {
 			return
 		}
 		u.busy.Unlock()
-		// It outlives the request: the app reloads while SoundStorm restarts.
+		// It outlives the request: the app reloads while EmberStorm restarts.
 		go func() { _ = u.Update(context.Background(), m) }()
 		w.WriteHeader(http.StatusAccepted)
 		reply(w, u.Status())
@@ -105,7 +105,7 @@ func (u *Updater) Handler() http.Handler {
 			return
 		}
 		u.busy.Unlock()
-		// It outlives the request, and SoundStorm with it: the stack stops.
+		// It outlives the request, and EmberStorm with it: the stack stops.
 		go func() {
 			time.Sleep(2 * time.Second) // the answer reaches the page first
 			if err := u.Reset(context.Background(), body.Mode); err != nil {
@@ -130,7 +130,7 @@ func (u *Updater) Handler() http.Handler {
 	return mux
 }
 
-// soundstormGID is the group of SoundStorm's container user (its Dockerfile),
+// soundstormGID is the group of EmberStorm's container user (its Dockerfile),
 // which the socket is shared with.
 const soundstormGID = 10001
 
@@ -146,7 +146,7 @@ func (u *Updater) Serve(ctx context.Context, socket string) error {
 	if err != nil {
 		return err
 	}
-	// Only root, and the group the socket is shared with - SoundStorm's
+	// Only root, and the group the socket is shared with - EmberStorm's
 	// container user's (10001) - may open it.
 	_ = os.Chmod(socket, 0o660)
 	_ = os.Chown(socket, 0, soundstormGID)

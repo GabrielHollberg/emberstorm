@@ -20,7 +20,7 @@ import (
 // Mixes: ready-made queues, the first thing under Music. Some come from the
 // library (shuffle everything, recently added, a genre, a decade), some from
 // what this person has listened to (most played, recently played,
-// rediscover). The listening history is SoundStorm's, per person - see
+// rediscover). The listening history is EmberStorm's, per person - see
 // internal/collections.
 //
 // No "sounds like": that needs the audio of every track analyzed, which is

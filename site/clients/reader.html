@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The reader - SoundStorm</title>
+<title>The reader - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -18,13 +18,13 @@ rounds of security review found a way for a book to run script before it was clo
 <h2 id="foliate">foliate-js, and why it is vendored</h2>
 <p>Rendering is done by foliate-js (MIT licensed), checked in under
 <code>internal/webui/assets/vendor/</code>. Writing a reader was considered and rejected for the
-same reason SoundStorm does not transcode video: the two hard parts, the paginator and the EPUB
+same reason EmberStorm does not transcode video: the two hard parts, the paginator and the EPUB
 CFI code, are about 44KB and 13KB of careful work that already exists.</p>
 <div class="why">It is the only third-party code in the project, and it does not break the
 zero-dependency rule's intent. The files are checked in and pinned by content, embedded with
 <code>go:embed</code>, and fetched at no point during a build. The Go module still has no
 dependencies at all.</div>
-<p>What is SoundStorm's own: the server unzips books (<code>GET /api/book/resource</code>), so no zip
+<p>What is EmberStorm's own: the server unzips books (<code>GET /api/book/resource</code>), so no zip
 library runs in the browser; it remembers the reading position per person; and
 <code>reader.js</code> wraps foliate with the bar, settings, read-along and the security filters
 described below.</p>
@@ -66,11 +66,11 @@ behind it. A film still stops, since it would play behind the book.</p>
 <h2 id="untrusted">Book content is untrusted</h2>
 <p>An EPUB is a zip of web pages, and anyone with upload access to the ebook shelf can add one. A
 member could upload a book whose chapters contain script, then wait for the owner to open it.
-foliate renders each chapter in a <code>blob:</code> iframe, which shares SoundStorm's origin - so a
+foliate renders each chapter in a <code>blob:</code> iframe, which shares EmberStorm's origin - so a
 script that ran there would run with the reader's session.</p>
 <p>Several layers stand in the way:</p>
 <ul>
-  <li><strong>The shell's Content-Security-Policy</strong> allows scripts only from SoundStorm
+  <li><strong>The shell's Content-Security-Policy</strong> allows scripts only from EmberStorm
   itself (<code>script-src 'self'</code>), which blocks inline scripts and <code>blob:</code> scripts
   in chapters. <code>blob:</code> is allowed for styles and fonts, or books render unstyled.</li>
   <li><strong>Everything a browser would run as a page is sandboxed</strong> when served from the
@@ -94,9 +94,9 @@ illustration of why the project runs blind security reviews (see
 <a href="../security/reviews.html">The review passes</a>).</p>
 <table>
   <tr><th>Round</th><th>The door</th><th>The fix</th></tr>
-  <tr><td>First</td><td>A chapter with an <em>absolute</em> <code>&lt;script src="https://this-install/api/book/resource?...x.js"&gt;</code>. foliate rewrites relative references to <code>blob:</code> (blocked), but leaves absolute ones alone - and an absolute reference to SoundStorm's own origin is <code>'self'</code>. The script ran as the owner and reached the accounts API.</td><td>The book resource endpoint answers only <code>fetch()</code> requests, and never emits a JavaScript type.</td></tr>
+  <tr><td>First</td><td>A chapter with an <em>absolute</em> <code>&lt;script src="https://this-install/api/book/resource?...x.js"&gt;</code>. foliate rewrites relative references to <code>blob:</code> (blocked), but leaves absolute ones alone - and an absolute reference to EmberStorm's own origin is <code>'self'</code>. The script ran as the owner and reached the accounts API.</td><td>The book resource endpoint answers only <code>fetch()</code> requests, and never emits a JavaScript type.</td></tr>
   <tr><td>Second</td><td>The cover endpoint served a book's declared cover with a type taken from its file name, so a cover named <code>x.js</code> came back as JavaScript.</td><td>The guard moved to one central place for every stream path; a cover must be declared an image, and SVG is not accepted as one.</td></tr>
-  <tr><td>Third</td><td>A chapter loading SoundStorm's real <code>/static/app.js</code> by absolute address - a genuine script that must stay loadable. It ran against the book's copy of the app's element ids, and an invisible label over a copied switch could turn on remote access at the owner's first tap.</td><td>The reader strips every script from every chapter, and the app refuses to run in a frame.</td></tr>
+  <tr><td>Third</td><td>A chapter loading EmberStorm's real <code>/static/app.js</code> by absolute address - a genuine script that must stay loadable. It ran against the book's copy of the app's element ids, and an invisible label over a copied switch could turn on remote access at the owner's first tap.</td><td>The reader strips every script from every chapter, and the app refuses to run in a frame.</td></tr>
 </table>
 <p>Later passes widened the stripping: a chapter declared <code>text/xml</code> or with a charset
 parameter once skipped it, and chapters foliate hands over as a Blob are now read as text first.
@@ -107,10 +107,10 @@ view passing the policy on.</p>
 <p>When somebody has the same book as an ebook and an audiobook, the <strong>Read Along</strong>
 pill in Books pairs them. Matching a recording to its text sentence by sentence is forced
 alignment - transcribe the audio, find it in the book - which is machine learning, so it is done
-by a backend, <a href="../backends/storyteller.html">Storyteller</a>. SoundStorm provisions it,
+by a backend, <a href="../backends/storyteller.html">Storyteller</a>. EmberStorm provisions it,
 hands it the pairs, and reads back two things: Storyteller's copy of the text, with every sentence
 wrapped in an element with an id, and a timeline converted to the audiobook's whole-book clock.</p>
-<p>Crucially, the audio still plays through SoundStorm's own player, from Audiobookshelf. Storyteller's
+<p>Crucially, the audio still plays through EmberStorm's own player, from Audiobookshelf. Storyteller's
 EPUB carries its own copy of the audio, and playing that would lose the lock screen, the
 mini-player and the listening position shared with Audiobookshelf's apps.</p>
 <p>Four times a second the reader finds the sentence at the player's current time, turns to it
@@ -147,13 +147,13 @@ that.</p>
 
 <h2 id="pdf">PDFs: the browser's own viewer</h2>
 <p>PDFs are not rendered by foliate. They open in the browser's built-in viewer inside an iframe,
-which is why the page may be framed by SoundStorm's own pages (and not by anybody else's). PDFs are
+which is why the page may be framed by EmberStorm's own pages (and not by anybody else's). PDFs are
 the one book resource not sandboxed, because Chrome will not render a PDF in a sandboxed document.
 The cost is that browser viewers do not expose a position, so a PDF keeps no reading place in the
 web app. There are no PDF covers either: extracting one means rendering page one, which needs a PDF
 renderer the project does not carry.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

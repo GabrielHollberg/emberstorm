@@ -27,7 +27,7 @@ import (
 // connection (measured: 1.1 Mbps) downloaded megabytes of pictures ahead of
 // the song somebody had just pressed play on. So covers are card-sized unless
 // a bigger one is asked for; Navidrome, Audiobookshelf and Jellyfin resize
-// their own, and SoundStorm's own (a book's) are resized here.
+// their own, and EmberStorm's own (a book's) are resized here.
 
 const (
 	// defaultArtSize is a card's cover: 400px, sharp at 200 CSS pixels on a

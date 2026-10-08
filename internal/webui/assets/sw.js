@@ -1,4 +1,4 @@
-// SoundStorm's service worker.
+// EmberStorm's service worker.
 //
 // It exists so the app can be installed to a home screen. It is deliberately
 // the smallest thing that does that, because the failure modes of a cache in
@@ -20,7 +20,7 @@
 //      warning. A browser pins a clicked-through exception to one exact
 //      certificate, so a reinstall - or the yearly renewal - made the page
 //      fail, the worker answered with the cached shell, every request behind
-//      it failed, and "cannot reach SoundStorm" was all there was. Opening a
+//      it failed, and "cannot reach EmberStorm" was all there was. Opening a
 //      new tab changed nothing, because the worker answered that too. Left to
 //      the browser, the same failure is a warning people know how to get past.
 //

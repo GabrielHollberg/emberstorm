@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ebooks and documents - SoundStorm</title>
+<title>Ebooks and documents - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="backends/local" data-root="..">
 <main>
 <h1>Ebooks and documents</h1>
-<p class="lede">Ebooks and documents have no backend. SoundStorm reads <code>library/ebooks</code> and
+<p class="lede">Ebooks and documents have no backend. EmberStorm reads <code>library/ebooks</code> and
 <code>library/documents</code> itself, with <code>localbooks</code> as the source and two small readers,
 <code>internal/epub</code> and <code>internal/pdf</code>, that read just enough of each file to describe
 it. An optional OPDS source can still point at a Calibre server running elsewhere.</p>
@@ -35,7 +35,7 @@ is on, and so which permission and rescan it belongs to.</p>
   memory - there is nothing to provision and nothing on disk to go stale.</li>
   <li><strong>Search and browse</strong> are a match over that list. Browsing sorts by title and then
   path before cutting a page, so paging through the merge is exact.</li>
-  <li><strong>Serving.</strong> File targets come from SoundStorm's own disk (<code>Target.FilePath</code>)
+  <li><strong>Serving.</strong> File targets come from EmberStorm's own disk (<code>Target.FilePath</code>)
   and covers extracted from inside an EPUB from memory (<code>Target.Bytes</code>).
   <code>BookOpener</code> serves a book's inner files to the reader.</li>
   <li><strong>Deletion</strong> is the question that cannot arise: the folder is read on every scan, so a
@@ -96,15 +96,15 @@ dropped in. See <a href="../server/library.html">the library</a>.</p>
 
 <h2 id="opds">The optional OPDS source</h2>
 <p><code>internal/source/opds</code> and <code>internal/provision/calibreweb.go</code> remain as an opt-in
-for a Calibre server running somewhere else, via <code>SOUNDSTORM_CALIBREWEB_URL</code>. SoundStorm no
+for a Calibre server running somewhere else, via <code>SOUNDSTORM_CALIBREWEB_URL</code>. EmberStorm no
 longer runs that server, so it cannot vouch for it: a log line used to call its published default password
-safe "because it is unreachable except through SoundStorm", which stopped being true when the bundled
+safe "because it is unreachable except through EmberStorm", which stopped being true when the bundled
 container went, and now says the password is safe only if the operator's own server is. OPDS ids are the
 client's, fetched with the server's credential, so an id must stay under the server's <code>opds/</code>
 tree with no query of its own. A remote catalog cannot serve a book's insides, so the in-browser reader is
 for local books only.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

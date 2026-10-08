@@ -1,16 +1,16 @@
-# SoundStorm for developers
+# EmberStorm for developers
 
 ## The idea
 
 Installing self-hosted media servers is a solved problem. What nobody finishes
 is the *integration*: four containers, four admin accounts, four API keys, four
-web UIs and four search boxes. SoundStorm is that last mile. It runs the
+web UIs and four search boxes. EmberStorm is that last mile. It runs the
 specialist servers, sets up their credentials itself, and puts one interface on
 top. The person using it never learns Jellyfin exists.
 
 Using the real servers instead of reimplementing them is the whole trick. When
 a search for "dune" returns a film with a real poster and synopsis, that is
-Jellyfin's work, not SoundStorm's. SoundStorm owns login, search, playback and
+Jellyfin's work, not EmberStorm's. EmberStorm owns login, search, playback and
 the bytes, and deliberately does **not** own transcoding, metadata scraping or
 library scanning.
 
@@ -61,7 +61,7 @@ release.
 Navidrome   Jellyfin   Audiobookshelf    Immich     Storyteller   AudioMuse-AI   library/ebooks
  music     films + TV    audiobooks      photos     read-along    moods, radio   library/documents
                                                                                  (folders)
-                 — no backend publishes a port; SoundStorm is the only door —
+                 — no backend publishes a port; EmberStorm is the only door —
 ```
 
 Three rules hold it together:
@@ -74,20 +74,20 @@ Three rules hold it together:
 3. **A backend is two halves: search and provisioning.** A backend a human must
    configure by hand defeats the point.
 
-And one consequence: **nothing upstream reaches the browser.** SoundStorm
+And one consequence: **nothing upstream reaches the browser.** EmberStorm
 fetches media server-side and pipes it through, which is what lets the backends
 stay off any published port, and what makes "one login" true.
 
 Ebooks and documents have no backend. An EPUB describes itself and needs no
-transcoding, so SoundStorm reads the folder directly. That is the line:
-SoundStorm owns a media type only when it is self-describing and needs no
+transcoding, so EmberStorm reads the folder directly. That is the line:
+EmberStorm owns a media type only when it is self-describing and needs no
 transcoding. Video never will be.
 
 ## Layout
 
 ```
 cmd/soundstorm/        main, env config, subcommands (backup, restore, reset-password, train-looks)
-cmd/soundstorm-names/  the name service behind *.soundstorm.dev
+cmd/soundstorm-names/  the name service behind *.emberstorm.dev
 internal/media/        Item, Query, Kind - the shared vocabulary
 internal/source/       the Source interface, optional interfaces, Registry
 internal/source/*/     one package per backend (subsonic, jellyfin, audiobookshelf,
@@ -142,7 +142,7 @@ The second half is the one people skip, and the one that matters.
   checked in under `internal/webui/assets/vendor/`, pinned and embedded, fetched
   at no point during a build.
 - **No config file.** Environment variables set by compose, plus the state
-  SoundStorm provisions itself.
+  EmberStorm provisions itself.
 - **Every new `SOUNDSTORM_` setting must also be added to `docker-compose.yml`**,
   which passes settings by name.
 - **Fail loudly at startup, degrade gracefully at runtime.**
@@ -152,7 +152,7 @@ The second half is the one people skip, and the one that matters.
 
 ## API
 
-The UI talks to SoundStorm's JSON API under `/api/`. The routes are listed in
+The UI talks to EmberStorm's JSON API under `/api/`. The routes are listed in
 `Routes()` in `internal/httpapi/httpapi.go`. Every route needs a session except
 sign-up, sign-in and sign-out, `/api/session`, `/api/remote-reachable`,
 `/healthz`, `/ca.crt` and the static files, plus the few a device uses before

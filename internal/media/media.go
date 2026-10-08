@@ -1,6 +1,6 @@
 // Package media defines the vocabulary every backend is translated into.
 //
-// The point of SoundStorm is that a song from Navidrome and a film from
+// The point of EmberStorm is that a song from Navidrome and a film from
 // Jellyfin arrive at the browser as the same shape, from the same origin,
 // behind the same login. Nothing downstream of an adapter knows which server
 // answered.
@@ -29,12 +29,12 @@ const (
 	KindTV      Kind = "tv"    // series and episodes
 )
 
-// AllKinds is the set of kinds SoundStorm understands.
+// AllKinds is the set of kinds EmberStorm understands.
 func AllKinds() []Kind {
 	return []Kind{KindMusic, KindAudiobook, KindEbook, KindDocument, KindPicture, KindVideo, KindTV}
 }
 
-// Valid reports whether k is a kind SoundStorm knows about.
+// Valid reports whether k is a kind EmberStorm knows about.
 func (k Kind) Valid() bool {
 	for _, known := range AllKinds() {
 		if k == known {
@@ -66,8 +66,8 @@ func (k Kind) Player() string {
 //
 // Deliberately absent: any URL pointing at an upstream server. The backends
 // are not reachable from the browser, so an Item carries the identifiers
-// SoundStorm needs to fetch bytes on the client's behalf, and the UI builds
-// SoundStorm-relative paths from SourceID/ID/ArtID.
+// EmberStorm needs to fetch bytes on the client's behalf, and the UI builds
+// EmberStorm-relative paths from SourceID/ID/ArtID.
 type Item struct {
 	// ID is unique within a source, not globally. Pair it with SourceID.
 	ID       string `json:"id"`

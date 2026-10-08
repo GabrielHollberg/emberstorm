@@ -77,7 +77,7 @@ func (m *Manager) SyncPhotoPrivacy(ctx context.Context) {
 	}
 }
 
-// setExclusions makes the library's SoundStorm-written exclusion patterns
+// setExclusions makes the library's EmberStorm-written exclusion patterns
 // exactly want, keeping any others, and asks for a scan when they changed (a
 // scan is what takes left-out photos away and brings let-in ones back).
 func setExclusions(ctx context.Context, baseURL, key, libraryID, mediaPath string, want []string) (bool, error) {

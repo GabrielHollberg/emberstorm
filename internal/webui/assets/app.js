@@ -1,4 +1,4 @@
-/* SoundStorm UI.
+/* EmberStorm UI.
  *
  * Vanilla JS, no build step. Three jobs:
  *   1. gate on /api/session so there is exactly one login
@@ -13,7 +13,7 @@
 // document in a frame, and one that loaded this script (or framed the app)
 // could drive the signed-in account's controls with a tap - so in a frame it
 // stops here. See also the reader, which takes scripts out of books.
-if (window.top !== window.self) throw new Error('SoundStorm does not run inside a frame');
+if (window.top !== window.self) throw new Error('EmberStorm does not run inside a frame');
 
 const $ = (id) => document.getElementById(id);
 
@@ -829,7 +829,7 @@ if (linkFromAddress && phoneApp && !window.soundstormApp) {
   const bar = document.createElement('a');
   bar.className = 'open-in-app';
   bar.href = link;
-  bar.textContent = 'Open in the SoundStorm app';
+  bar.textContent = 'Open in the EmberStorm app';
   document.body.append(bar);
 }
 
@@ -895,7 +895,7 @@ async function showInvite() {
     return;
   }
   $('gate-form').dataset.mode = 'invite';
-  $('gate-blurb').textContent = `${body.by} invited you to ${body.server || 'SoundStorm'}. Choose a password to make your account - at least 12 characters, a few unrelated words make a good one.`;
+  $('gate-blurb').textContent = `${body.by} invited you to ${body.server || 'EmberStorm'}. Choose a password to make your account - at least 12 characters, a few unrelated words make a good one.`;
   $('gate-username').value = body.name;
   $('gate-submit').textContent = 'Make my account';
   show($('gate-phone'), false);
@@ -1233,13 +1233,13 @@ $('invite-form').addEventListener('submit', async (event) => {
   $('invite-url').href = body.url;
   $('invite-for').textContent = `For ${body.name}. Show them this code to scan with their phone's camera, or send them the link.`;
   show($('invite-share'), Boolean(navigator.share));
-  $('invite-share').onclick = () => navigator.share({ title: 'SoundStorm', text: `You're invited to SoundStorm`, url: body.url }).catch(() => {});
+  $('invite-share').onclick = () => navigator.share({ title: 'EmberStorm', text: `You're invited to EmberStorm`, url: body.url }).catch(() => {});
   show($('invite-made'), true);
   loadInvites();
 });
 
 // The server's name, which devices show before anybody signs in. Empty puts
-// back "<owner>'s SoundStorm".
+// back "<owner>'s EmberStorm".
 $('server-name-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const { ok, body } = await api('/api/settings/server-name', {
@@ -1253,7 +1253,7 @@ $('server-name-form').addEventListener('submit', async (event) => {
   }
 });
 
-// Your web address (hollberg.soundstorm.dev) and Open my SoundStorm on
+// Your web address (hollberg.soundstorm.dev) and Open my EmberStorm on
 // soundstorm.dev: the owner's, and only with the name service (auto HTTPS).
 function showWebName(session) {
   const has = Boolean(session && session.webNames);
@@ -1336,7 +1336,7 @@ async function refreshLyricsSetting() {
 }
 
 $('renew-everyone').addEventListener('click', async () => {
-  if (!window.confirm('Ask everyone, you included, to choose a new password before they can use SoundStorm again?')) return;
+  if (!window.confirm('Ask everyone, you included, to choose a new password before they can use EmberStorm again?')) return;
   const { ok, body } = await api('/api/users/new-passwords', { method: 'POST' });
   if (!ok) {
     note($('renew-everyone-note'), (body && body.error) || 'Could not ask.', true);
@@ -1751,7 +1751,7 @@ function renderBackup() {
   $('backup-charging').checked = st.charging;
   show($('backup-options'), st.enabled);
   let text = '';
-  if (st.enabled && !st.permission) text = 'SoundStorm needs permission to read your photos: allow it in the phone\'s settings.';
+  if (st.enabled && !st.permission) text = 'EmberStorm needs permission to read your photos: allow it in the phone\'s settings.';
   else if (st.enabled && st.problem) text = st.problem;
   else if (st.enabled && st.total) {
     text = st.done >= st.total
@@ -2164,9 +2164,9 @@ $('quality-select').addEventListener('change', (event) => {
 });
 
 // The away-from-home address, with its port. The router forwards the port
-// SoundStorm listens on (8099 unless changed), not 443, so an address without
+// EmberStorm listens on (8099 unless changed), not 443, so an address without
 // it knocks on the router's own door - which answers, if at all, with its own
-// certificate and a warning that the site is impersonating SoundStorm.
+// certificate and a warning that the site is impersonating EmberStorm.
 function awayAddress(remote) {
   const port = Number(remote.port) || 443;
   return `https://${remote.name}${port === 443 ? '' : `:${port}`}`;
@@ -2264,7 +2264,7 @@ window.__soundstormPicked = (list) => {
   const files = (list || []).map((f) => new AppFile(f));
   if (files.length) intake({ items: [], files });
 };
-// Files shared to SoundStorm from another app's Share sheet (the Android
+// Files shared to EmberStorm from another app's Share sheet (the Android
 // app's Shared.kt): the same review as Add media, once somebody is signed
 // in. It says whether it took them, so the app asks again until it can.
 window.__soundstormShared = (list) => {
@@ -2352,7 +2352,7 @@ $('file-picker').addEventListener('change', (event) => {
   intake({ items: [], files });
 });
 
-// What each backend is to the person using SoundStorm: a shelf.
+// What each backend is to the person using EmberStorm: a shelf.
 const SETUP_SHELVES = {
   navidrome: 'Music',
   jellyfin: 'Films and TV',
@@ -2403,7 +2403,7 @@ async function pollSetup() {
       const summary = document.createElement('summary');
       summary.textContent = 'Details';
       const text = document.createElement('p');
-      text.textContent = `${backend.error} Restarting SoundStorm usually clears this.`;
+      text.textContent = `${backend.error} Restarting EmberStorm usually clears this.`;
       why.append(summary, text);
       li.append(why);
     }
@@ -3346,8 +3346,8 @@ document.addEventListener('keydown', (event) => {
   else if (event.key === 'ArrowRight' && !photoZoom.zoomed()) stepPhoto(1);
 });
 
-// Ebooks open in SoundStorm's own reader. Downloading is still offered, but as a
-// choice rather than the only option - a result that leaves SoundStorm is a seam,
+// Ebooks open in EmberStorm's own reader. Downloading is still offered, but as a
+// choice rather than the only option - a result that leaves EmberStorm is a seam,
 // and this was the last one.
 function readBook(item) {
   // Music or an audiobook carries on: reading to something is the point,
@@ -3608,7 +3608,7 @@ $('video-close').addEventListener('click', closeVideo);
 
 /* Where you are in a film or an episode.
  *
- * Kept by SoundStorm, per person, in the same record as a book's place - not
+ * Kept by EmberStorm, per person, in the same record as a book's place - not
  * in Jellyfin, because the house shares one Jellyfin account and a position
  * there would be everybody's. The location is the time, "t=1234.5"; the
  * fraction is what the Continue row draws. Saved every half minute while
@@ -4440,8 +4440,8 @@ async function runIntake(dataTransfer) {
     if (photos.length) importPhotos(photos);
     if (other.length) {
       showToast(other.length === 1
-        ? `${other[0].name} is not a photo download, and SoundStorm does not unpack other zips: unzip it and drop what is inside.`
-        : `${other.length} zips are not photo downloads, and SoundStorm does not unpack other zips: unzip them and drop what is inside.`);
+        ? `${other[0].name} is not a photo download, and EmberStorm does not unpack other zips: unzip it and drop what is inside.`
+        : `${other.length} zips are not photo downloads, and EmberStorm does not unpack other zips: unzip them and drop what is inside.`);
     }
     if (!dropped.length) {
       show($('intake'), false);
@@ -4465,7 +4465,7 @@ async function runIntake(dataTransfer) {
       body: JSON.stringify({ paths, choices }),
     });
     if (!ok || !body) {
-      $('intake-title').textContent = (body && body.error) || 'SoundStorm could not take those.';
+      $('intake-title').textContent = (body && body.error) || 'EmberStorm could not take those.';
       return;
     }
 
@@ -4476,7 +4476,7 @@ async function runIntake(dataTransfer) {
     $('intake-note').textContent = '';
     show($('intake-note'), false);
 
-    // One screen (the owner's design): what SoundStorm sorted itself, and
+    // One screen (the owner's design): what EmberStorm sorted itself, and
     // what it could not tell - grouped where alike, answered for all or one
     // by one, any part changed or left out - and nothing moves until Add.
     const questions = body.questions || [];
@@ -4706,14 +4706,14 @@ function reviewPlan(files, review) {
     const adding = going.length;
     const outstanding = [...asked.keys()].filter((g) => !review.choices[g] && !excluded.has(g));
 
-    // Needs your choice: what SoundStorm could not tell, alike ones together.
+    // Needs your choice: what EmberStorm could not tell, alike ones together.
     if (asked.size) host.append(askedBox(files, review, done));
 
     // What else name already taken.
     const conflicts = files.filter((p) => p.conflict && !excluded.has(groupOf(p)));
     if (conflicts.length) host.append(conflictChoice(conflicts, () => done({ redraw: true })));
 
-    // Ready: what SoundStorm sorted itself, each part to change or leave out.
+    // Ready: what EmberStorm sorted itself, each part to change or leave out.
     const ready = files.filter((p) => !asked.has(groupOf(p)) && !excluded.has(groupOf(p)));
     const { parts, skipped } = planParts(ready);
     const list = document.createElement('ul');
@@ -4834,7 +4834,7 @@ function intakeHeading(text) {
   return h;
 }
 
-// What SoundStorm could not tell, alike questions together: a choice for all
+// What EmberStorm could not tell, alike questions together: a choice for all
 // of them, or Choose each opening a line per folder with its own choice and
 // its files to look at; a choice made stays here to change until Add.
 const ASK_TITLES = {
@@ -5350,7 +5350,7 @@ const DRIVE_SENDER = {
   status: async () => { const r = await api('/api/drives/import'); return r.ok ? r.body : null; },
   seen: () => api('/api/drives/import/seen', { method: 'POST', body: '{}' }),
   stop: () => api('/api/drives/import/stop', { method: 'POST', body: '{}' }),
-  note: 'The box copies them straight from the drive, and carries on if you close SoundStorm. Leave the drive plugged in until it is done.',
+  note: 'The box copies them straight from the drive, and carries on if you close EmberStorm. Leave the drive plugged in until it is done.',
   done: 'You can unplug the drive.',
 };
 
@@ -5465,8 +5465,8 @@ function askAboutDrive(d) {
   if (shown('drive-ask')) return;
   const text = $('drive-ask-text');
   text.textContent = d.hasMedia
-    ? `${driveName(d)}. What should SoundStorm do with it?`
-    : `${driveName(d)}. It has no music, films, books or photos on it. What should SoundStorm do with it?`;
+    ? `${driveName(d)}. What should EmberStorm do with it?`
+    : `${driveName(d)}. It has no music, films, books or photos on it. What should EmberStorm do with it?`;
   const holder = $('drive-ask-buttons');
   holder.replaceChildren();
   const button = (label, ghost, act, soon) => {
@@ -5864,14 +5864,14 @@ async function moveToSecureName(name) {
       // work without one.
       message.textContent = 'You are offline.';
       detail.textContent =
-        'SoundStorm needs a connection to your server. Songs you download play '
+        'EmberStorm needs a connection to your server. Songs you download play '
         + 'without one: open an album or playlist and choose Download.';
     } else {
-      message.textContent = 'Cannot reach SoundStorm.';
+      message.textContent = 'Cannot reach EmberStorm.';
       detail.textContent =
         'Check that the computer running it is on, then try again. If your '
         + 'browser warns that the connection is not private, that is expected '
-        + 'after SoundStorm is reinstalled: choose Advanced, then continue.';
+        + 'after EmberStorm is reinstalled: choose Advanced, then continue.';
     }
     const again = document.createElement('button');
     again.type = 'button';
@@ -5879,7 +5879,7 @@ async function moveToSecureName(name) {
     again.addEventListener('click', () => location.reload());
     boot.append(message, detail, again);
   } else {
-    message.textContent = 'SoundStorm is not responding.';
+    message.textContent = 'EmberStorm is not responding.';
     boot.append(message);
   }
 })();
@@ -6211,7 +6211,7 @@ window.addEventListener('soundstorm:reader-closed', () => setTimeout(refreshCont
 
 /* ---------------------------------------------------- favorites, playlists */
 
-// Each person's own, kept by SoundStorm (see internal/collections). The set
+// Each person's own, kept by EmberStorm (see internal/collections). The set
 // of favorite keys is loaded once and kept current, so a card can show its
 // heart and the menu can say "remove" without asking the server per card.
 state.favorites = new Set();
@@ -8040,7 +8040,7 @@ function maybeShowHoldTip() {
 // The Media Session API is how a web page tells the phone what is playing -
 // the lock screen, the notification shade, a car stereo over Bluetooth, a
 // smartwatch - and how their buttons reach the player. Without it a song
-// playing from SoundStorm shows up as "a tab is playing audio" with no cover,
+// playing from EmberStorm shows up as "a tab is playing audio" with no cover,
 // no title and a skip button that does nothing.
 //
 // Next and previous mean the next song in a playlist, or the next chapter of an
@@ -10385,7 +10385,7 @@ function radioPage(catalog) {
     line.className = 'radio-listening';
     line.textContent = heard.songs
       ? `Listening to your music to learn how it sounds: ${heard.songs.toLocaleString()} of ${heard.total.toLocaleString()} songs so far. Moods fill in as it goes.`
-      : 'SoundStorm will listen to each of your songs once, in the background, to learn its mood. Moods appear here as it goes.';
+      : 'EmberStorm will listen to each of your songs once, in the background, to learn its mood. Moods appear here as it goes.';
     parts.push(line);
   }
   parts.push(stationGrid((catalog && catalog.stations) || []));
@@ -11583,7 +11583,7 @@ async function renderWelcome() {
     if (!seen) state.settingsOpen.add('devices');
     steps.push({
       done: seen,
-      what: 'Your SoundStorm address',
+      what: 'Your EmberStorm address',
       how: 'Open it in the browser on any phone, tablet or computer at home, sign in, and save it as a bookmark.',
       extra,
       label: 'Got it', act: async () => { await savePrefs({ addressSeen: true }); renderWelcome(); },
@@ -11612,7 +11612,7 @@ async function renderWelcome() {
   steps.push({
     done: players.ok && players.body && (players.body.players || []).some((p) => p.tv),
     what: 'Set up your TV',
-    how: 'Get the SoundStorm app on your Apple TV or Google TV: it finds this server by itself, and you sign in with your phone.',
+    how: 'Get the EmberStorm app on your Apple TV or Google TV: it finds this server by itself, and you sign in with your phone.',
   });
   if (steps.every((st) => st.done)) {
     savePrefs({ welcomeDone: true });
@@ -13172,7 +13172,7 @@ const bookTask = (item) => ({ label: item.title, run: (progress, stopped) => dow
 async function roomLeft() {
   if (!navigator.storage || !navigator.storage.estimate) return '';
   const est = await navigator.storage.estimate().catch(() => null);
-  return est && est.quota ? ` This device has about ${formatStorage(est.quota - (est.usage || 0))} free for SoundStorm.` : '';
+  return est && est.quota ? ` This device has about ${formatStorage(est.quota - (est.usage || 0))} free for EmberStorm.` : '';
 }
 
 function downloadAllOf(kind) {
@@ -14418,7 +14418,7 @@ function leaveSettingsSearch() {
   if (state.libraryPlaceholder) input.placeholder = state.libraryPlaceholder;
 }
 
-// Support SoundStorm: everywhere but the Apple apps (Apple takes tips only
+// Support EmberStorm: everywhere but the Apple apps (Apple takes tips only
 // through its in-app purchase) and a TV, which has nothing to open a link in.
 (function showSupport() {
   const apple = /iPhone|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
@@ -14893,7 +14893,7 @@ function showSkeleton(view, shape, round) {
 /* ------------------------------------------------- people and places */
 
 // Photos by who is in them and where they were taken. The photo server does
-// the recognizing; these pages show what it found, in SoundStorm's own
+// the recognizing; these pages show what it found, in EmberStorm's own
 // style. Somebody it found but nobody has named yet can be named here, for
 // the whole household.
 async function showPhotoBrowse(seq) {
@@ -15713,7 +15713,7 @@ function recapSlides(d) {
         recapEl('span', 'recap-unit', `minute${d.minutes === 1 ? '' : 's'} of music`),
         recapEl('p', 'recap-lede', `${d.plays.toLocaleString()} plays · ${d.songs.toLocaleString()} songs · ${d.artists.toLocaleString()} artists`));
       if (d.since && d.period === 'year' && new Date(d.since).getMonth() > 0) {
-        box.append(recapEl('p', 'recap-small', `Counting since ${new Date(d.since).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}, when SoundStorm started keeping track.`));
+        box.append(recapEl('p', 'recap-small', `Counting since ${new Date(d.since).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}, when EmberStorm started keeping track.`));
       }
     }
     box.append(recapPeriods(d));
@@ -16756,7 +16756,7 @@ function importReport(results) {
 
 /* ------------------------------------------------------ importing from Plex */
 
-// Sign in on Plex's own page (a new tab; SoundStorm never sees the password),
+// Sign in on Plex's own page (a new tab; EmberStorm never sees the password),
 // then pick playlists. The server holds the Plex token for the import and
 // forgets it after; the page only ever sees names. See internal/plex.
 const plexImport = { timer: null, panel: null, servers: [], server: '', lists: [] };
@@ -20484,7 +20484,7 @@ document.addEventListener('scroll', (e) => {
   }
 }, true);
 
-// Training the looks, on SoundStorm's developer's install alone (the server
+// Training the looks, on EmberStorm's developer's install alone (the server
 // says so in the session: SOUNDSTORM_TRAINING; see httpapi/training.go). In
 // Now Playing, either tap where a big moment - lightning - should be, or hold
 // and slide up and down for how intense the music should feel; what is
@@ -21923,7 +21923,7 @@ function controlAttach(target) {
 
 /* --------------------------------- playing on another device, remotely */
 
-// Every open SoundStorm page is a player (players.go on the server): it says
+// Every open EmberStorm page is a player (players.go on the server): it says
 // hello, reports what it is playing, and waits for commands - a phone's Play
 // on, pause, skip. A TV is shared, so anybody in the house may send
 // something to it, which switches it to them (asking first when somebody
@@ -22410,7 +22410,7 @@ async function openControlSheet() {
     return row(p, p.tv ? 'film' : 'headphones', detail);
   }));
   note.textContent = players.length ? 'What you play goes to the device chosen. Browsing stays on this phone.'
-    : 'No other device is open. Open SoundStorm on the TV, or another computer, and it shows here.';
+    : 'No other device is open. Open EmberStorm on the TV, or another computer, and it shows here.';
 }
 function closeControlSheet() {
   show($('ctl-sheet'), false);

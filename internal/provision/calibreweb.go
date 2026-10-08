@@ -14,7 +14,7 @@ import (
 )
 
 // Calibre-Web ships with a published default login. Everyone knows it, which is
-// precisely why SoundStorm can use it without a human being involved.
+// precisely why EmberStorm can use it without a human being involved.
 const (
 	calibreWebUser     = "admin"
 	calibreWebPassword = "admin123"
@@ -27,7 +27,7 @@ var csrfPattern = regexp.MustCompile(`name="csrf_token"[^>]*value="([^"]+)"`)
 //
 // This is the least pleasant of the four provisioners, and the reason is worth
 // recording: Calibre-Web has no configuration API. Its setup is a Flask form
-// with a session cookie and a CSRF token, so SoundStorm has to drive it the way
+// with a session cookie and a CSRF token, so EmberStorm has to drive it the way
 // a browser would - fetch the page, scrape the token, post the form. That is
 // brittle across releases in a way the other three are not, and if this breaks
 // after an upgrade, a changed field name is the first thing to check.
@@ -39,10 +39,10 @@ var csrfPattern = regexp.MustCompile(`name="csrf_token"[^>]*value="([^"]+)"`)
 // carries every permission as a checkbox and a partial post clears them.
 //
 // This used to be mitigated by network isolation - Calibre-Web ran in
-// SoundStorm's own compose file, on a network only SoundStorm could reach.
+// EmberStorm's own compose file, on a network only EmberStorm could reach.
 // That container is gone; every remaining use of this code points
 // SOUNDSTORM_CALIBREWEB_URL at "a Calibre server running elsewhere" (see
-// CLAUDE.md), which SoundStorm neither runs nor controls the exposure of. So
+// CLAUDE.md), which EmberStorm neither runs nor controls the exposure of. So
 // the well-known default credential this provisioner logs in with is only as
 // safe as whatever network that server actually sits on - the warning below
 // says that plainly rather than repeating the old, no-longer-true claim.
@@ -60,7 +60,7 @@ func provisionCalibreWeb(ctx context.Context, c *httpx.Client, t Target, log *sl
 		return state.Backend{}, err
 	}
 
-	// The OPDS feed is what SoundStorm actually consumes, and it authenticates
+	// The OPDS feed is what EmberStorm actually consumes, and it authenticates
 	// separately with HTTP Basic. Check it before declaring success, so a
 	// working login with a broken catalog is caught here rather than at the
 	// first search.
@@ -68,8 +68,8 @@ func provisionCalibreWeb(ctx context.Context, c *httpx.Client, t Target, log *sl
 		return state.Backend{}, err
 	}
 
-	log.Warn("calibre-web is using its published default password (admin/admin123), and SoundStorm did not " +
-		"set this server up or change that - if it is reachable by anything other than SoundStorm, change " +
+	log.Warn("calibre-web is using its published default password (admin/admin123), and EmberStorm did not " +
+		"set this server up or change that - if it is reachable by anything other than EmberStorm, change " +
 		"the password in its own UI now")
 
 	return state.Backend{

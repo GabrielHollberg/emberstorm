@@ -79,7 +79,7 @@ object Uploads {
         }
     }
 
-    /** A file shared to SoundStorm (Shared), as a picked one is remembered. */
+    /** A file shared to EmberStorm (Shared), as a picked one is remembered. */
     fun rememberFile(name: String, size: Long, uri: Uri) {
         synchronized(picked) {
             picked += Picked(uri, name, size)
@@ -239,7 +239,7 @@ object Uploads {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = NotificationCompat.Builder(c, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_soundstorm)
-            .setContentTitle("Adding ${done + 1} of $total to SoundStorm")
+            .setContentTitle("Adding ${done + 1} of $total to EmberStorm")
             .setContentText(if (size > 0) "$name - ${sent / 1_000_000} of ${size / 1_000_000} MB" else name)
             .setOngoing(true)
             .setSilent(true)
@@ -342,7 +342,7 @@ class UploadWorker(context: Context, params: WorkerParameters) : Worker(context,
                     when (e.code) {
                         409 -> "skipped" to (e.message ?: "already there")
                         401, 403 -> {
-                            Uploads.record(c, problem = "Signed out - open SoundStorm and sign in again.")
+                            Uploads.record(c, problem = "Signed out - open EmberStorm and sign in again.")
                             return Result.failure()
                         }
                         0 -> "failed" to (e.message ?: "could not read the file")

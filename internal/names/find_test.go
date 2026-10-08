@@ -85,7 +85,7 @@ func foundURLs(t *testing.T, base, ip string) []string {
 	return urls
 }
 
-// "Open my SoundStorm": a browser finds the installs that announced from its
+// "Open my EmberStorm": a browser finds the installs that announced from its
 // own connection - only those that allow it, and never another connection's.
 func TestABrowserFindsTheServerOnItsOwnConnection(t *testing.T) {
 	_, _, base := newFindService(t)
@@ -205,7 +205,7 @@ func TestNameRules(t *testing.T) {
 	}
 }
 
-// "Open my SoundStorm" on a phone: the app claims /open; without it the
+// "Open my EmberStorm" on a phone: the app claims /open; without it the
 // browser is sent on to the install's own address, and nowhere else.
 func TestOpenSendsTheBrowserOnToTheServer(t *testing.T) {
 	_, _, base := newFindService(t)

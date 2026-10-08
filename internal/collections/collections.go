@@ -1,9 +1,9 @@
 // Package collections keeps each person's favorites and playlists.
 //
-// They are SoundStorm's, per person, rather than the backends': the house
+// They are EmberStorm's, per person, rather than the backends': the house
 // shares one Navidrome and one Jellyfin account (see "Accounts" in CLAUDE.md),
 // so favorites or playlists kept there would be everybody's at once - the
-// same reason a film's watch position is SoundStorm's.
+// same reason a film's watch position is EmberStorm's.
 //
 // A file per person, not a field in state.json. That file is rewritten whole
 // on every sign-in and every session change, under the lock every request
@@ -127,7 +127,7 @@ func Open(dir string) (*Store, error) {
 }
 
 func (s *Store) path(userID string) (string, error) {
-	// Account ids are SoundStorm's own, but a file name is a file name.
+	// Account ids are EmberStorm's own, but a file name is a file name.
 	if userID == "" || strings.ContainsAny(userID, `/\.`) {
 		return "", fmt.Errorf("collections: bad account id")
 	}
@@ -666,7 +666,7 @@ type Prefs struct {
 	// media, away from home, family, TV) was closed.
 	WelcomeDone bool `json:"welcomeDone,omitempty"`
 	// AddressSeen is whether the owner said "Got it" to the welcome's
-	// address step (their SoundStorm address, to open and save elsewhere).
+	// address step (their EmberStorm address, to open and save elsewhere).
 	AddressSeen bool `json:"addressSeen,omitempty"`
 }
 

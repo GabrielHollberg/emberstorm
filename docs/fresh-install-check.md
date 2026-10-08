@@ -1,6 +1,6 @@
 # Fresh-install check
 
-The run to do before announcing SoundStorm, and again before any big release:
+The run to do before announcing EmberStorm, and again before any big release:
 install it the way a stranger would, on a computer that has never had it, and
 write down everything that confuses, stalls or breaks.
 
@@ -10,7 +10,7 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
 
 ## Before you start
 
-- **A clean computer.** It must never have had SoundStorm or Docker on it:
+- **A clean computer.** It must never have had EmberStorm or Docker on it:
   a spare laptop, a friend's PC, or a Windows 11 virtual machine with
   virtualization switched on for the guest (Docker runs Linux inside it).
   Not the PC that runs the live server.
@@ -46,10 +46,10 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
      said then.
    - Total time from double-click to "finished".
 4. At the end:
-   - Did the browser open SoundStorm by itself?
+   - Did the browser open EmberStorm by itself?
    - Was the **setup code** shown in the window, and did the sign-up page
      already have it filled in?
-   - Is there a SoundStorm icon on the desktop?
+   - Is there an EmberStorm icon on the desktop?
 
 ## Mac or Linux
 
@@ -72,14 +72,14 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
    - Did each file land on the right shelf, and how long until it showed up?
    - Play the film. Open the photos.
 9. **Settings**: open each group once. Anything confusing or broken?
-10. **Restart the computer**, then open SoundStorm from the desktop icon.
+10. **Restart the computer**, then open EmberStorm from the desktop icon.
     Does it come back by itself, and how long does it take?
 
 ## The phone (Android)
 
 11. On the phone, open the address from **Settings → Use on your phone or TV**.
     Did it load, with no certificate warning, and did it move to the
-    `.home.soundstorm.dev` name?
+    `.home.emberstorm.dev` name?
 12. Install the Android app from the newest `android-` release on GitHub.
     - What did Android say about installing an app from outside the Play
       Store, and how many taps did it take?
@@ -98,6 +98,6 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
 - A screenshot of anything that looked wrong, and the exact wording of any
   error.
 - If setup failed: the log file the failure window offers (**Show log file**),
-  `%TEMP%\SoundStorm-setup.log`. It has the setup code taken out, so it is
+  `%TEMP%\EmberStorm-setup.log`. It has the setup code taken out, so it is
   safe to share.
 - The three things that most need fixing before strangers try it.

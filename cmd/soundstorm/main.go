@@ -1,9 +1,9 @@
-// Command SoundStorm is a unified front end for a self-hosted media library.
+// Command EmberStorm is a unified front end for a self-hosted media library.
 //
 // It runs in front of Navidrome (music) and Jellyfin (video), provisions their
 // credentials itself so nobody types an API key, and serves one login, one
 // search box and one player over all of them. The backends need no published
-// port: SoundStorm is the only thing on one.
+// port: EmberStorm is the only thing on one.
 //
 // It deliberately does not scan libraries, scrape metadata or transcode. Those
 // are the things the servers behind it are good at, and reimplementing them is
@@ -57,7 +57,7 @@ func main() {
 	//
 	// An unknown one is an error, and that is not pedantry. This used to fall
 	// through and start the server, so `soundstorm backup` against an older
-	// image quietly launched a *second* SoundStorm against the same state
+	// image quietly launched a *second* EmberStorm against the same state
 	// volume instead of saying the command did not exist. Two writers on the
 	// one file that cannot be regenerated is the worst possible way to answer
 	// a typo.
@@ -244,7 +244,7 @@ func run(log *slog.Logger) error {
 		// Remote access: reach this install from outside the house. Opt-in,
 		// and only meaningful in auto mode (it needs the name service).
 		RemoteEnabled: remoteEnabled,
-		// "Open my SoundStorm" on soundstorm.dev, unless the owner turned it off.
+		// "Open my EmberStorm" on soundstorm.dev, unless the owner turned it off.
 		Findable: store.Findable,
 		Port:     publicPort,
 		Gateway:  gateway,
@@ -288,7 +288,7 @@ func run(log *slog.Logger) error {
 	defer stop()
 
 	// Provisioning runs in the background: a backend can take a minute to boot
-	// and SoundStorm should be showing setup progress during it, not refusing to
+	// and EmberStorm should be showing setup progress during it, not refusing to
 	// start. This is why the registry is populated asynchronously.
 	setup.Start(ctx)
 	// The owner's photo library leaves out everybody else's own photos
@@ -356,8 +356,8 @@ func run(log *slog.Logger) error {
 		discoverFinder = nil
 	}
 
-	// Training the looks is for SoundStorm's developer: one install, by a
-	// setting nobody else has. What is learnt ships in SoundStorm itself.
+	// Training the looks is for EmberStorm's developer: one install, by a
+	// setting nobody else has. What is learnt ships in EmberStorm itself.
 	trainingDir := ""
 	if enabled(env("SOUNDSTORM_TRAINING", "false")) {
 		trainingDir = filepath.Join(stateDir, "training")
@@ -455,7 +455,7 @@ func run(log *slog.Logger) error {
 	} else if tlsServer != nil {
 		scheme = "https"
 	}
-	log.Info("SoundStorm starting",
+	log.Info("EmberStorm starting",
 		"listen", listen,
 		"scheme", scheme,
 		"backends", len(targets),
@@ -499,7 +499,7 @@ func run(log *slog.Logger) error {
 }
 
 // targetsFromEnv reads which backends to manage. A backend is present if its
-// URL is set, so compose decides the stack and SoundStorm adapts.
+// URL is set, so compose decides the stack and EmberStorm adapts.
 func targetsFromEnv(lib *library.Library) ([]provision.Target, error) {
 	var targets []provision.Target
 
@@ -516,7 +516,7 @@ func targetsFromEnv(lib *library.Library) ([]provision.Target, error) {
 			Type:    "jellyfin",
 			BaseURL: url,
 			// The paths as Jellyfin's container sees them, which is what its
-			// library API needs - not SoundStorm's view of the same folders.
+			// library API needs - not EmberStorm's view of the same folders.
 			MediaPath: env("SOUNDSTORM_JELLYFIN_MEDIA_PATH", "/media/movies"),
 			TVPath:    env("SOUNDSTORM_JELLYFIN_TV_PATH", "/media/tv"),
 		})
@@ -540,10 +540,10 @@ func targetsFromEnv(lib *library.Library) ([]provision.Target, error) {
 		})
 	}
 	// Ebooks are served straight off the disk: an EPUB describes itself, so no
-	// backend has to stand between SoundStorm and the folder. The path comes from
+	// backend has to stand between EmberStorm and the folder. The path comes from
 	// the library layout rather than its own variable - there is one answer to
 	// "where do ebooks live" and it should not be configurable into disagreeing
-	// with the folder SoundStorm just created.
+	// with the folder EmberStorm just created.
 	if dir := lib.PathFor(media.KindEbook); dir != "" {
 		targets = append(targets, provision.Target{
 			ID:        "ebooks",

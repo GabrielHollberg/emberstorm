@@ -27,17 +27,17 @@ import (
 //	docker compose run --rm soundstorm reset-password
 //
 // The server must be stopped first, and the command says so rather than
-// assuming: a running SoundStorm holds the state in memory and rewrites the
+// assuming: a running EmberStorm holds the state in memory and rewrites the
 // whole file on its next change, which would silently undo this.
 
-const resetUsage = `SoundStorm password reset
+const resetUsage = `EmberStorm password reset
 
   soundstorm reset-password [username]
 
 Sets a new password for an account and prints it. With one account on the
 server the name can be left out.
 
-Stop SoundStorm first, or it will write its own copy of the state back over
+Stop EmberStorm first, or it will write its own copy of the state back over
 this one:
 
   docker compose down
@@ -59,7 +59,7 @@ func resetPassword(args []string) int {
 	stateDir := env("SOUNDSTORM_STATE_DIR", "/var/lib/soundstorm")
 	path := filepath.Join(stateDir, "state.json")
 	if _, err := os.Stat(path); err != nil {
-		fmt.Fprintf(os.Stderr, "No SoundStorm state at %s\n\n"+
+		fmt.Fprintf(os.Stderr, "No EmberStorm state at %s\n\n"+
 			"Run this inside the container, where the state volume is mounted:\n\n"+
 			"  docker compose run --rm soundstorm reset-password\n", path)
 		return 1
@@ -86,7 +86,7 @@ func resetPassword(args []string) int {
 	users := store.Users()
 	if len(users) == 0 {
 		fmt.Println("There are no accounts on this server yet.")
-		fmt.Println("Open SoundStorm in a browser and the first screen will make one.")
+		fmt.Println("Open EmberStorm in a browser and the first screen will make one.")
 		return 0
 	}
 
@@ -137,7 +137,7 @@ func resetPassword(args []string) int {
 			fmt.Fprintf(os.Stderr,
 				"\n  Warning: the password was changed, but %s could not be\n"+
 					"  given back to its previous owner: %v\n\n"+
-					"  SoundStorm may now fail to start with a permission error.\n"+
+					"  EmberStorm may now fail to start with a permission error.\n"+
 					"  Run this again as the user that owns the file, or hand it\n"+
 					"  back by hand.\n",
 				path, err)

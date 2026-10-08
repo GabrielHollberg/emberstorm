@@ -55,7 +55,7 @@ func TestListensAreSentTheWayListenBrainzAsks(t *testing.T) {
 	meta := first["track_metadata"].(map[string]any)
 	info := meta["additional_info"].(map[string]any)
 	if first["listened_at"].(float64) != 1790000000 || meta["artist_name"] != "Band" ||
-		info["duration_ms"].(float64) != 200000 || info["submission_client"] != "SoundStorm" {
+		info["duration_ms"].(float64) != 200000 || info["submission_client"] != "EmberStorm" {
 		t.Errorf("listen = %v", first)
 	}
 	c.Submit(ctx, "good", []collections.Listen{listenOf("Three", "Band")})

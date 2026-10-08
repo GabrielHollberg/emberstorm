@@ -17,8 +17,8 @@ import (
 
 // This guards a bug that cost a working stack twice, in two different layers.
 //
-// On restart SoundStorm comes up before Jellyfin does. The health check fails,
-// and if that failure is read as "these credentials are wrong", SoundStorm
+// On restart EmberStorm comes up before Jellyfin does. The health check fails,
+// and if that failure is read as "these credentials are wrong", EmberStorm
 // discards good credentials and falls through to provisioning - which can never
 // succeed against a backend that is already set up. One unlucky restart and the
 // backend is permanently broken with its working token still sitting on disk.

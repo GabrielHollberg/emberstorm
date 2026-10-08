@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>iPhone - SoundStorm</title>
+<title>iPhone - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="clients/iphone" data-root="..">
 <main>
 <h1>iPhone</h1>
-<p class="lede">The iPhone app exists so SoundStorm can be on the App Store rather than only a
+<p class="lede">The iPhone app exists so EmberStorm can be on the App Store rather than only a
 home-screen web app. It is a native Swift shell around the server's own page today, with native
 audio planned as the second stage - and a deliberate decision not to rewrite the app in Swift.</p>
 
@@ -35,17 +35,17 @@ engine, and with background audio enabled (<code>UIBackgroundModes</code>) and t
 phone locks.</p>
 
 <h2 id="stage-one">Stage one: the shell</h2>
-<p>Plain Swift in <code>ios/SoundStorm</code>, with no Capacitor. Capacitor is built to bundle a web
+<p>Plain Swift in <code>ios/EmberStorm</code>, with no Capacitor. Capacitor is built to bundle a web
 app inside the app, and this web app lives on each person's own server; stage two is Swift anyway.
 What the shell does:</p>
 <ul>
   <li><strong>Asks for the server's address</strong> on first launch, since every install is somebody's
-  own, and checks that <code>/healthz</code> answers like SoundStorm before keeping it. With no scheme
+  own, and checks that <code>/healthz</code> answers like EmberStorm before keeping it. With no scheme
   typed it assumes https.</li>
   <li><strong>Shows the page full screen</strong>, laid out under the status bar with the same
   <code>env(safe-area-inset-*)</code> values the installed web app uses.</li>
   <li><strong>Shows <code>alert</code>, <code>confirm</code> and <code>prompt</code></strong> - a
-  <code>WKWebView</code> shows none of them unless its app does, and SoundStorm asks before removing
+  <code>WKWebView</code> shows none of them unless its app does, and EmberStorm asks before removing
   downloads.</li>
   <li><strong>Sends links off the server to Safari</strong>, but only for a link that was actually
   tapped in the main frame; other schemes and new windows are not opened on a page's say-so.</li>
@@ -55,14 +55,14 @@ What the shell does:</p>
   (<code>NSAllowsLocalNetworking</code>).</li>
 </ul>
 <p>Messages from the page are accepted only from the server's own origin, port included - anyone can
-get a <code>*.net.soundstorm.dev</code> name, so a matching host alone is not enough.</p>
+get a <code>*.net.emberstorm.dev</code> name, so a matching host alone is not enough.</p>
 
 <h2 id="moves">Moving to the secure name</h2>
 <p>The first TestFlight build had a bug the Android app had had too. Opened at the away-from-home
 name while at home, the page moves itself to the install's home name
 (<code>moveToSecureName</code> - the server offers it to any page not already on it), and the app
-took that move for a link out of SoundStorm and sent it to Safari.</p>
-<p>The app now follows a move to https on <code>&lt;id&gt;.home.soundstorm.dev</code>, on the same
+took that move for a link out of EmberStorm and sent it to Safari.</p>
+<p>The app now follows a move to https on <code>&lt;id&gt;.home.emberstorm.dev</code>, on the same
 port, where the id is the current name's own. It follows the move for this launch and <strong>does not
 save it</strong>. A phone leaves the house; with the home name saved, the app would stop working the
 moment it did. Not saving also closes a hole a security review found: from a plain-http address,
@@ -131,7 +131,7 @@ want a real iPhone over a night.</p>
 <strong>Your servers</strong>: the latest used first, the one in use ticked, a tap to switch, a hold
 for Rename and Remove, and a way to add another. The list (<code>ServerAddress.all</code>, in
 <code>ios/Shared</code> and used by the Apple TV app too) keeps each address and a name; a first name
-is the address without <code>.home.soundstorm.dev</code>. Sign-ins stay with each server, since
+is the address without <code>.home.emberstorm.dev</code>. Sign-ins stay with each server, since
 cookies belong to an address, so switching signs nobody out.</p>
 
 <h2 id="testing">How it is tested</h2>
@@ -145,7 +145,7 @@ which is also what a person does.</p>
 <p>The iPhone and Apple TV apps share one bundle id, so Apple's Universal Purchase makes them a single
 App Store listing (see <a href="tv.html#apple-tv">TVs</a>).</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

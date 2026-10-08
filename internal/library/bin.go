@@ -20,7 +20,7 @@ import (
 
 // The bin.
 //
-// Deleting from SoundStorm never deletes anything at once. An item's files are
+// Deleting from EmberStorm never deletes anything at once. An item's files are
 // moved into library/.trash and kept there for BinKeep, and an Undo puts them
 // back. A wrong tap on a film collection should be a mistake, not a disaster.
 //

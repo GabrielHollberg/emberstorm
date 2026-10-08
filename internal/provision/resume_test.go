@@ -102,8 +102,8 @@ func TestASetupThatFailsHalfWayFinishesOnTheNextAttempt(t *testing.T) {
 }
 
 // Without a kept password, an account somebody else made is still refused:
-// carrying on is only for SoundStorm's own unfinished setup.
-func TestAnAccountSoundStormDidNotMakeIsStillRefused(t *testing.T) {
+// carrying on is only for EmberStorm's own unfinished setup.
+func TestAnAccountEmberStormDidNotMakeIsStillRefused(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/status" {
 			_ = json.NewEncoder(w).Encode(map[string]any{"isInit": true})

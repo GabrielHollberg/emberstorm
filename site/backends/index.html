@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Backends - SoundStorm</title>
+<title>Backends - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -11,19 +11,19 @@
 <main>
 <h1>Backends</h1>
 <p class="lede">A backend is an existing open-source media server that owns one kind of media and one
-folder. SoundStorm installs each one in its own container, sets it up with nobody logging in, keeps the
-credentials it generated, and drives it through its API - so the person using SoundStorm never sees it.</p>
+folder. EmberStorm installs each one in its own container, sets it up with nobody logging in, keeps the
+credentials it generated, and drives it through its API - so the person using EmberStorm never sees it.</p>
 
 <h2 id="table">The backends at a glance</h2>
 <table>
-  <tr><th>Backend</th><th>Kind</th><th>Image</th><th>Provisioned by</th><th>What SoundStorm uses</th></tr>
+  <tr><th>Backend</th><th>Kind</th><th>Image</th><th>Provisioned by</th><th>What EmberStorm uses</th></tr>
   <tr><td><a href="navidrome.html">Navidrome</a></td><td>Music</td><td><code>deluan/navidrome</code></td><td>First-run admin form while no user exists</td><td>Subsonic search, streams, covers, albums, lyrics, ReplayGain, transcoding for beats</td></tr>
   <tr><td><a href="jellyfin.html">Jellyfin</a></td><td>Films, TV</td><td><code>jellyfin/jellyfin</code></td><td>Its startup wizard, a plain REST API</td><td>Search, playback negotiation, HLS transcoding, subtitles, episodes</td></tr>
   <tr><td><a href="audiobookshelf.html">Audiobookshelf</a></td><td>Audiobooks</td><td><code>advplyr/audiobookshelf</code></td><td>Root user, library, per-member users</td><td>Search, tracks, chapters, per-person listening position</td></tr>
   <tr><td><a href="immich.html">Immich</a></td><td>Photos</td><td><code>immich-app/*:v3</code></td><td>Admin sign-up, API key, external library</td><td>Thumbnails, previews, smart search, people, places, per-member accounts</td></tr>
   <tr><td><a href="storyteller.html">Storyteller</a></td><td>Read-along timing</td><td>pinned by digest</td><td>A server action on <code>/init</code>, then tokens</td><td>Sentence-level alignment of ebook text to audiobook audio</td></tr>
   <tr><td><a href="audiomuse.html">AudioMuse-AI</a></td><td>Song analysis</td><td>pinned by digest</td><td><code>/api/setup</code> before its first save</td><td>Moods, energy, tempo, "sounds like"</td></tr>
-  <tr><td><a href="local.html">SoundStorm itself</a></td><td>Ebooks, documents</td><td>-</td><td>Nothing to provision; it scans the folders</td><td>EPUB and PDF metadata, covers, the reader's resources</td></tr>
+  <tr><td><a href="local.html">EmberStorm itself</a></td><td>Ebooks, documents</td><td>-</td><td>Nothing to provision; it scans the folders</td><td>EPUB and PDF metadata, covers, the reader's resources</td></tr>
 </table>
 <p>Jellyfin is provisioned once and registered as two sources sharing one token -
 <code>jellyfin</code> (films) and <code>jellyfin-tv</code> (series and episodes) - because they are
@@ -32,7 +32,7 @@ returns a slice.</p>
 
 <h2 id="why">Why these, and why delegate at all</h2>
 <p>Owning scanning, metadata, artwork and transcoding is years of work to arrive somewhere worse than
-what exists. So each media type goes to the best open server for it, and the test for whether SoundStorm
+what exists. So each media type goes to the best open server for it, and the test for whether EmberStorm
 owns a type itself is: is it self-describing and free of transcoding? EPUB is; video and HEIC photos
 are not. Navidrome rather than Jellyfin for music because its music model is first-class (multi-value
 artists, compilations, ReplayGain, a fast scanner). Jellyfin rather than Plex because Plex needs a
@@ -96,13 +96,13 @@ That rule absorbs a surprising amount of disagreement, each found against a live
   <li><strong>A dead backend never takes search down</strong>: a deadline and an error slot per source,
   always 200, and <code>degraded</code> says what is missing. A panicking adapter is recovered and
   reported the same way.</li>
-  <li><strong>Reconnecting is not provisioning.</strong> On restart SoundStorm can beat a backend to
+  <li><strong>Reconnecting is not provisioning.</strong> On restart EmberStorm can beat a backend to
   listening; only a 401 or 403 means the credentials are wrong. A 5xx, 429 or dial error means wait.
   Treating those as "wrong password" once bricked a working backend.</li>
   <li><strong>Access is per kind</strong>: <code>Registry.All</code>, <code>Matching</code> and
   <code>ByID</code> take the request's context, which carries what the account may see, so a handler
   cannot reach a source without the restriction being applied.</li>
-  <li><strong>No backend publishes a port.</strong> Only SoundStorm's port is published; the backends
+  <li><strong>No backend publishes a port.</strong> Only EmberStorm's port is published; the backends
   are reachable only on the compose network, and the shared HTTP client refuses absolute references,
   dot segments and redirects to another host, since its headers carry admin keys.</li>
 </ul>
@@ -118,7 +118,7 @@ That rule absorbs a surprising amount of disagreement, each found against a live
   <a class="card" href="local.html"><b>Ebooks and documents</b><span>No backend: localbooks, EPUB and PDF metadata, optional OPDS.</span></a>
 </div>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Starting over and erasing (the owner's design, 2026-10-03). SoundStorm
+// Starting over and erasing (the owner's design, 2026-10-03). EmberStorm
 // decides who may ask - the owner, with their password and the word typed -
 // and the caretaker, which can stop the stack and owns the data drive, does
 // the wiping. Both are for good: there is no bin and no snapshot left behind,
@@ -34,7 +34,7 @@ const (
 // ErrBadMode is a reset that is neither.
 var ErrBadMode = errors.New("a reset is start-over or erase")
 
-// Reset stops SoundStorm, empties what the mode takes away and starts it
+// Reset stops EmberStorm, empties what the mode takes away and starts it
 // again. One at a time, and never during an update.
 func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	if mode != ResetStartOver && mode != ResetErase {
@@ -50,7 +50,7 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	if err := u.run(ctx, u.cfg.Up, "stop"); err != nil {
 		u.set(func(s *Status) {
 			s.State = "failed"
-			s.Message = "Could not stop SoundStorm to start over. Nothing was changed."
+			s.Message = "Could not stop EmberStorm to start over. Nothing was changed."
 		})
 		return err
 	}
@@ -81,7 +81,7 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	if err := u.run(ctx, u.cfg.Up); err != nil {
 		u.set(func(s *Status) {
 			s.State = "failed"
-			s.Message = "Started over, but SoundStorm did not start again. Turning the box off and on may help."
+			s.Message = "Started over, but EmberStorm did not start again. Turning the box off and on may help."
 		})
 		return err
 	}
@@ -131,7 +131,7 @@ func emptyKeepingFolders(dir string) error {
 // times quickly, somebody is at the box, and for fifteen minutes the owner's
 // password can be set again from any device on the home network - the way
 // back in for a forgotten password or a lost sticker, which needs nothing
-// erased. SoundStorm asks (GET /button) and says when it was used.
+// erased. EmberStorm asks (GET /button) and says when it was used.
 
 // ButtonWindow is how long five presses leave the owner's password open.
 const ButtonWindow = 15 * time.Minute

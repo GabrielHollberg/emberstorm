@@ -6,7 +6,7 @@
        other than zero, and without it an installed app draws its header under
        the notch and its player under the home indicator. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>SoundStorm</title>
+  <title>EmberStorm</title>
   <meta name="description" content="One login and one search box over your music, films, TV, audiobooks, ebooks, documents and photos.">
   <meta name="theme-color" content="#000000">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
@@ -15,7 +15,7 @@
        the icon are all still these three tags, and only these three. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SoundStorm">
+  <meta name="apple-mobile-web-app-title" content="EmberStorm">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -25,7 +25,7 @@
   <div id="boot" class="centered">
     <!-- The icon alone, on black, the size and place of the app's own opening
          screen, so opening the app runs straight on into it. -->
-    <div class="boot-mark" role="img" aria-label="SoundStorm, loading"></div>
+    <div class="boot-mark" role="img" aria-label="EmberStorm, loading"></div>
     <p id="boot-text" class="muted"></p>
   </div>
 
@@ -35,7 +35,7 @@
   <!-- Who's listening? The people kept on this device (profiles). -->
   <main id="profiles" class="centered hidden">
     <div class="card gate-card profiles-card">
-      <h1 class="wordmark">SoundStorm</h1>
+      <h1 class="wordmark">EmberStorm</h1>
       <h2 class="profiles-title">Who's listening?</h2>
       <div id="profiles-list" class="profiles-list"></div>
       <form id="profiles-secret" class="hidden">
@@ -54,7 +54,7 @@
 
   <main id="renew" class="centered hidden">
     <form id="renew-form" class="card gate-card">
-      <h1 class="wordmark">SoundStorm</h1>
+      <h1 class="wordmark">EmberStorm</h1>
       <p id="renew-blurb" class="muted">Please choose a new password to carry on.</p>
       <label for="renew-current">Your current password</label>
       <input id="renew-current" type="password" autocomplete="current-password" required>
@@ -70,7 +70,7 @@
 
   <main id="gate" class="centered hidden">
     <form id="gate-form" class="card gate-card">
-      <h1 class="wordmark">SoundStorm</h1>
+      <h1 class="wordmark">EmberStorm</h1>
       <p id="gate-blurb" class="muted"></p>
 
       <label for="gate-username">Username</label>
@@ -88,11 +88,11 @@
         <!-- Somebody who reaches this has usually closed the tab setup opened,
              and a log is the last place a non-technical person should be sent,
              so the places are in the order they are easiest to find. -->
-        <p class="setup-detail">On a SoundStorm box, it is printed on the sticker underneath.</p>
+        <p class="setup-detail">On a EmberStorm box, it is printed on the sticker underneath.</p>
         <p class="setup-detail">The setup window showed this code when it finished, under
           <strong>Your setup code</strong>. Capitals and dashes do not matter.</p>
         <p class="setup-detail">Closed that window? The code is saved in the
-          <strong>SoundStorm</strong> folder (on Windows, inside your user folder). Open the
+          <strong>EmberStorm</strong> folder (on Windows, inside your user folder). Open the
           file called <code>.env</code> with Notepad or any text editor, and copy what comes
           after <code>SOUNDSTORM_SETUP_CODE=</code>.</p>
         <p class="setup-detail">Set up with docker compose alone? Run
@@ -116,7 +116,7 @@
       <!-- On a TV: signed in from a phone instead of typing with a remote. -->
       <button id="gate-phone" type="button" class="ghost hidden">Sign in with your phone</button>
       <div id="gate-link" class="gate-link hidden" role="status">
-        <p>On a phone signed in to SoundStorm, scan this - or open SoundStorm on it
+        <p>On a phone signed in to EmberStorm, scan this - or open EmberStorm on it
           and enter the code under Settings, <strong>Sign in a TV</strong>.</p>
         <img id="gate-link-qr" class="gate-link-qr" alt="">
         <p id="gate-link-code" class="gate-link-code"></p>
@@ -143,7 +143,7 @@
   <!-- The app ----------------------------------------------------------- -->
   <div id="app" class="hidden">
     <header>
-      <span class="wordmark small">SoundStorm</span>
+      <span class="wordmark small">EmberStorm</span>
       <form id="search-form" role="search">
         <input id="search-input" type="search" placeholder="Search everything&hellip;"
                autocomplete="off" aria-label="Search your library">
@@ -258,8 +258,8 @@
       <div class="account-section card" data-hint="Upload files and folders" data-cat="library" data-words="upload files folder scan rescan check new">
         <h2>Add media</h2>
         <p class="muted">Music, films, TV, audiobooks, ebooks, documents or
-          photos. SoundStorm puts each one on the right shelf. You can also drag
-          files or whole folders anywhere onto the SoundStorm window.
+          photos. EmberStorm puts each one on the right shelf. You can also drag
+          files or whole folders anywhere onto the EmberStorm window.
           Don't worry about adding something twice by accident: a song, audiobook or photo that is already here is noticed and skipped.</p>
         <div class="account-actions">
           <button id="choose-files" type="button">Add media</button>
@@ -300,7 +300,7 @@
              zips, sorted into the person's own folder by the server. -->
         <div id="photo-import" class="hidden">
           <p class="muted">Wherever your photos and videos are, bring them here: each goes into your folder by when it was taken, with its date and place kept. Pick where they are:</p>
-          <p class="muted"><b>Don't worry about sending the same photos twice.</b> SoundStorm spots copies and keeps one, even when the same photo is in Google, iCloud and your phone's backup - and if a copy knows when or where it was taken better, the one kept is corrected.</p>
+          <p class="muted"><b>Don't worry about sending the same photos twice.</b> EmberStorm spots copies and keeps one, even when the same photo is in Google, iCloud and your phone's backup - and if a copy knows when or where it was taken better, the one kept is corrected.</p>
           <details class="import-source"><summary>Google Photos</summary>
             <ol class="import-steps">
               <li>Open <a href="https://takeout.google.com/settings/takeout/custom/photos" target="_blank" rel="noopener">Google Takeout</a> and sign in. Only Google Photos is ticked.</li>
@@ -319,7 +319,7 @@
               <li>Choose <b>Download or transfer information</b>, then <b>Specific types of information</b>: <b>Posts</b> (your photos and videos are there).</li>
               <li>Date range <b>All time</b>, format <b>JSON</b>, media quality <b>High</b>. When Facebook says it is ready, download the zips and drop them here.</li>
             </ol>
-            <p class="muted small-print">Facebook takes the dates out of photos you uploaded; SoundStorm puts back the date it kept (when it was taken, or when you posted it) and the place. Photos in chats are left out: they are mostly other people's.</p></details>
+            <p class="muted small-print">Facebook takes the dates out of photos you uploaded; EmberStorm puts back the date it kept (when it was taken, or when you posted it) and the place. Photos in chats are left out: they are mostly other people's.</p></details>
           <details class="import-source"><summary>Instagram</summary>
             <ol class="import-steps">
               <li>Open <a href="https://accountscenter.instagram.com/info_and_permissions/dyi" target="_blank" rel="noopener">Download your information</a> and choose your Instagram account.</li>
@@ -345,13 +345,13 @@
             </ol></details>
           <details class="import-source"><summary>WhatsApp and Telegram</summary>
             <ol class="import-steps">
-              <li><b>WhatsApp:</b> photos you receive are on your phone, and the SoundStorm app's backup takes them. For one chat, open it, choose <b>Export chat</b>, <b>Include media</b>, and drop the zip here.</li>
+              <li><b>WhatsApp:</b> photos you receive are on your phone, and the EmberStorm app's backup takes them. For one chat, open it, choose <b>Export chat</b>, <b>Include media</b>, and drop the zip here.</li>
               <li><b>Telegram:</b> in Telegram Desktop, <b>Settings</b>, <b>Advanced</b>, <b>Export Telegram data</b>, tick photos and videos, and drop the folder it makes here.</li>
             </ol></details>
           <details class="import-source"><summary>SD cards, cameras, old phones and computers</summary>
             <ol class="import-steps">
               <li><b>An SD card or camera:</b> put it in a computer and drop its <b>DCIM</b> folder here.</li>
-              <li><b>An old phone:</b> plug it into a computer, open it, and drop its <b>DCIM</b> folder (and <b>Pictures</b>) here. Or install the SoundStorm app on it and turn on backup.</li>
+              <li><b>An old phone:</b> plug it into a computer, open it, and drop its <b>DCIM</b> folder (and <b>Pictures</b>) here. Or install the EmberStorm app on it and turn on backup.</li>
               <li><b>An old computer or drive:</b> drop its <b>Pictures</b> folder (or any folder of photos) here.</li>
             </ol></details>
           <p class="muted">Drop anything here - zips or folders - anywhere on this window, or choose zips below. Large downloads carry on where they stopped if the connection drops; keep this page open while they send.</p>
@@ -455,7 +455,7 @@
           </select>
         </label>
         <p id="awake-unavailable" class="muted small-print hidden">This browser can keep the
-          screen on only for a secure address: open SoundStorm at its https address to use it.</p>
+          screen on only for a secure address: open EmberStorm at its https address to use it.</p>
         <p class="muted small-print">Lower qualities use less data and start faster
           on a slow connection. Downloads always keep the original. Crossfade
           leaves an album that is playing in order alone, so it still flows as
@@ -475,7 +475,7 @@
       <div id="lyrics-block" class="account-section card hidden" data-hint="Finding lyrics online" data-cat="playback" data-words="lyrics words songs online lrclib">
         <h2>Lyrics</h2>
         <p class="muted">Songs with lyrics in their files always show those. For
-          the rest, SoundStorm can look them up on
+          the rest, EmberStorm can look them up on
           <a href="https://lrclib.net" target="_blank" rel="noopener noreferrer">LRCLIB</a>,
           a free lyrics library, the first time each song plays. Its lyrics are
           added by its community of contributors, and Now Playing says so under
@@ -486,7 +486,7 @@
         </label>
         <p class="muted small-print">Sends the artist, title and album of the
           song being played to LRCLIB. Nothing else leaves your server, and the
-          lyrics are kept by SoundStorm, not added to your music folders. To do a
+          lyrics are kept by EmberStorm, not added to your music folders. To do a
           whole library at once, try
           <a href="https://github.com/tranxuanthang/lrcget" target="_blank" rel="noopener noreferrer">LRCGET</a>.</p>
         <p id="lyrics-note" class="muted hidden" role="status"></p>
@@ -498,7 +498,7 @@
         <h2>Music discovery</h2>
         <p class="muted">Artist pages can show a short bio and the artists like them
           that you already have, and artist mixes can play those artists too.
-          SoundStorm finds out from
+          EmberStorm finds out from
           <a href="https://musicbrainz.org" target="_blank" rel="noopener noreferrer">MusicBrainz</a>,
           <a href="https://listenbrainz.org" target="_blank" rel="noopener noreferrer">ListenBrainz</a>
           and Wikipedia - free and open, no account needed. Artist bios are
@@ -516,7 +516,7 @@
       <div id="readalong-block" class="account-section card hidden" data-hint="Pages that follow the audiobook" data-cat="playback" data-words="read along sync storyteller ebook audiobook pages">
         <h2>Read-along</h2>
         <p class="muted">When a book is on the shelf as both an ebook and an
-          audiobook, SoundStorm can line the two up so the page turns with the
+          audiobook, EmberStorm can line the two up so the page turns with the
           audio and the sentence being read is highlighted.</p>
         <label class="remote-switch">
           <input id="readalong-toggle" type="checkbox">
@@ -590,7 +590,7 @@
            the one switch that changes who can reach the server. -->
       <div id="remote-block" class="account-section card hidden" data-hint="Using it away from home" data-cat="devices" data-words="remote away internet outside tailscale router port">
         <h2>Reach it from anywhere</h2>
-        <p class="muted">Use SoundStorm away from home with the same login. No app
+        <p class="muted">Use EmberStorm away from home with the same login. No app
           or extra account needed.</p>
         <p class="warning-line"><strong>This puts your server on the internet:</strong>
           anyone with the address reaches your login screen.</p>
@@ -611,7 +611,7 @@
              double NAT): where Tailscale is set up, since it is the way in. -->
         <p id="remote-tailscale-howto" class="muted hidden">To set it up, open
           <strong>Set up Tailscale</strong> from the Start menu on the computer
-          SoundStorm runs on, or
+          EmberStorm runs on, or
           <a href="https://github.com/GabrielHollberg/soundstorm#tailscale--when-there-is-no-port-to-forward-or-you-would-rather-not"
              target="_blank" rel="noopener noreferrer">read how</a>.</p>
         <!-- Always: the private alternative, for anybody who would rather not
@@ -642,7 +642,7 @@
            (owner only; needs automatic HTTPS, the name service). -->
       <div id="web-name-block" class="account-section card hidden" data-hint="An easy address, and opening it from soundstorm.dev" data-cat="devices" data-words="web address name url soundstorm.dev find open bookmark link easy remember">
         <h2>Your web address</h2>
-        <p class="muted">An easy address to open SoundStorm from any computer:
+        <p class="muted">An easy address to open EmberStorm from any computer:
           <strong>yourname.soundstorm.dev</strong>. At home it opens straight
           away; away from home it needs Reach it from anywhere turned on.</p>
         <form id="web-name-form" class="address-row web-name-row">
@@ -658,8 +658,8 @@
           <input id="findable-toggle" type="checkbox">
           <span>Open from soundstorm.dev at home</span>
         </label>
-        <p class="muted small-print">On soundstorm.dev, Open my SoundStorm sends anyone
-          on your home internet straight here, with nothing to type. SoundStorm
+        <p class="muted small-print">On soundstorm.dev, Open my EmberStorm sends anyone
+          on your home internet straight here, with nothing to type. EmberStorm
           tells its name service the port it uses; nothing about what is on it.</p>
       </div>
 
@@ -714,7 +714,7 @@
 
         <h3>Everyone's passwords</h3>
         <p class="muted small-print">Ask everyone, you included, to choose a new password. Each
-          person sees a screen for it the next time they open SoundStorm, and can do nothing
+          person sees a screen for it the next time they open EmberStorm, and can do nothing
           else until they have; their other devices are then signed out.</p>
         <button id="renew-everyone" type="button" class="ghost">Ask everyone for a new password</button>
         <p id="renew-everyone-note" class="muted hidden" role="status"></p>
@@ -803,12 +803,12 @@
         </form>
       </div>
 
-      <!-- Supporting SoundStorm: a link to GitHub Sponsors. Never shown in the
+      <!-- Supporting EmberStorm: a link to GitHub Sponsors. Never shown in the
            iPhone or Apple TV apps (Apple allows tips to a developer only
            through its own in-app purchase), nor on a TV. -->
       <div id="support-block" class="account-section card hidden" data-hint="Help keep it going" data-cat="account" data-words="support donate donation sponsor sponsors tip money help github">
-        <h2>Support SoundStorm</h2>
-        <p class="muted">SoundStorm is free, open source and made by one person. If it is useful to you,
+        <h2>Support EmberStorm</h2>
+        <p class="muted">EmberStorm is free, open source and made by one person. If it is useful to you,
           you can help keep it going: sponsorships pay for time to build and fix it, test phones and TVs,
           and the service that gives every server its secure address.</p>
         <div class="account-actions">
@@ -816,11 +816,11 @@
         </div>
       </div>
 
-      <!-- SoundStorm is free software (AGPL-3.0): anybody using it may have its
+      <!-- EmberStorm is free software (AGPL-3.0): anybody using it may have its
            source, which the license's network clause expects to be offered. -->
       <div class="account-section card" data-hint="License and source code" data-cat="account" data-words="about source code license open source agpl github">
-        <h2>About SoundStorm</h2>
-        <p class="muted">SoundStorm is free software under the GNU AGPL 3.0. Its source code is
+        <h2>About EmberStorm</h2>
+        <p class="muted">EmberStorm is free software under the GNU AGPL 3.0. Its source code is
           <a href="https://github.com/GabrielHollberg/soundstorm" target="_blank" rel="noopener noreferrer">on GitHub</a>,
           and the media servers it runs alongside keep their own licenses.</p>
       </div>
@@ -867,9 +867,9 @@
     <!-- After the owner's first sign-in: the few things that make a new
          server useful, ticked off as they are done (renderWelcome). -->
     <section id="welcome" class="welcome hidden" aria-labelledby="welcome-title">
-      <h2 id="welcome-title">Welcome to SoundStorm</h2>
+      <h2 id="welcome-title">Welcome to EmberStorm</h2>
       <ol id="welcome-steps" class="welcome-steps"></ol>
-      <p class="muted small-print">After a lot is added, SoundStorm spends a while getting to know it -
+      <p class="muted small-print">After a lot is added, EmberStorm spends a while getting to know it -
         listening to your music and finding faces in your photos - so it may be slower for a day or so.</p>
       <button id="welcome-done" type="button" class="ghost small">Done</button>
     </section>
@@ -1067,7 +1067,7 @@
   <div id="drop-overlay" class="drop hidden">
     <div class="drop-inner">
       <h2>Drop anywhere</h2>
-      <p class="muted">Files or whole folders. SoundStorm sorts them into your
+      <p class="muted">Files or whole folders. EmberStorm sorts them into your
         library, and asks about anything it cannot tell.</p>
     </div>
   </div>

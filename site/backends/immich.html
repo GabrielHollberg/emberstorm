@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Immich (photos) - SoundStorm</title>
+<title>Immich (photos) - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -11,12 +11,12 @@
 <main>
 <h1>Immich (photos)</h1>
 <p class="lede">Immich reads <code>library/pictures</code>, makes thumbnails and previews (from HEIC and
-raw too), recognises faces and places, and searches by what is in a picture. SoundStorm provisions it
+raw too), recognises faces and places, and searches by what is in a picture. EmberStorm provisions it
 with nobody logging in, gives every member an Immich account that sees only their own folder, and never
 lets Immich touch a photo file.</p>
 
 <h2 id="why">Why Immich</h2>
-<p>Photos fail the rule for what SoundStorm owns: iPhones save HEIC, which Go's standard library cannot
+<p>Photos fail the rule for what EmberStorm owns: iPhones save HEIC, which Go's standard library cannot
 decode, clips need transcoding, and a photo library is a scanning job. Immich was chosen over lighter
 options such as Photoview (closer to "the folder is the interface") for search by what is in a picture -
 the feature people compare against Google Photos - at the price of four containers (server, machine
@@ -24,7 +24,7 @@ learning, Postgres with vector search, Valkey), about 5 GB of images and 6-8 GB 
 
 <h2 id="pinning">Pinned to a major version</h2>
 <p>Researched, not assumed: Immich 2.0 (October 2025) promised semver, and 3.0 (July 2026) then broke API
-endpoints "that affect only third-party tools" - which is what SoundStorm is. So every Immich image is
+endpoints "that affect only third-party tools" - which is what EmberStorm is. So every Immich image is
 pinned to its major version, <code>v3</code>, never <code>latest</code>, and moving to v4 is a deliberate
 change with an adapter update behind it.</p>
 
@@ -58,7 +58,7 @@ overlapping libraries are allowed, and a member asking for another's photo by id
 member deletes their account with <code>force</code> and keeps their folder. See
 <a href="../server/photos.html">Photos</a>.</p>
 
-<h2 id="api">The calls SoundStorm makes</h2>
+<h2 id="api">The calls EmberStorm makes</h2>
 <table>
   <tr><th>Call</th><th>Used for</th></tr>
   <tr><td><code>/api/search/metadata</code></td><td>Browsing newest first, filename search, a person's or town's photos, On this day (one search per earlier year)</td></tr>
@@ -83,16 +83,16 @@ member deletes their account with <code>force</code> and keeps their folder. See
   titled media in a browse of everything - and merged paging still holds, because the key is the source's
   order.</li>
   <li><strong>Memories are not used.</strong> Immich makes them overnight and only for days it picked (empty
-  on a real library), so On this day is SoundStorm's own.</li>
+  on a real library), so On this day is EmberStorm's own.</li>
   <li><strong>Dates and places from imports</strong> are written as XMP sidecars beside the photo, which
   Immich reads; checked with a Takeout photo whose sidecar put it in the right city and year.</li>
 </ul>
-<p>Uploads appear about four seconds after landing, through folder watching plus SoundStorm's rescan.
+<p>Uploads appear about four seconds after landing, through folder watching plus EmberStorm's rescan.
 Immich's Postgres uses a fixed default password reachable only on the compose network; generating one
 would require telling a fresh install from an existing database, whose password cannot change under it.
 That is recorded as a decision left open.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

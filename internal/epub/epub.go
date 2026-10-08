@@ -1,13 +1,13 @@
 // Package epub reads metadata and resources out of EPUB files.
 //
-// This is the one place SoundStorm reads a media format directly, and the
+// This is the one place EmberStorm reads a media format directly, and the
 // reason is worth stating because it looks like a violation of the rule that
-// SoundStorm never owns a library: an EPUB is self-describing. The file
+// EmberStorm never owns a library: an EPUB is self-describing. The file
 // contains its own title, author, language and cover, in a documented XML
 // format, inside a zip. A video file does not - "Dune.2021.mkv" needs a scraper
 // and a match against TMDB, which is exactly the work Jellyfin exists to do.
 //
-// So the line is: SoundStorm can own a media type when it is self-describing
+// So the line is: EmberStorm can own a media type when it is self-describing
 // and needs no transcoding. EPUB qualifies. Video never will. Do not use this
 // package as precedent for scanning anything else.
 //

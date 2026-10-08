@@ -14,7 +14,7 @@ func fake(t *testing.T, calls *int32) *Finder {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(calls, 1)
-		if !strings.HasPrefix(r.Header.Get("User-Agent"), "SoundStorm") {
+		if !strings.HasPrefix(r.Header.Get("User-Agent"), "EmberStorm") {
 			http.Error(w, "say who you are", http.StatusForbidden)
 			return
 		}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Android - SoundStorm</title>
+<title>Android - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -18,7 +18,7 @@ Google TV, Android TV and Fire TV.</p>
 <h2 id="shell">A web view shell</h2>
 <p>The app lives in <code>android/</code>: a handful of Kotlin files, no Compose and no AppCompat.
 On first launch it asks for the server's address, checks that <code>/healthz</code> answers like
-SoundStorm before keeping it (so a typo is caught at the door, not as a strange page), and then
+EmberStorm before keeping it (so a typo is caught at the door, not as a strange page), and then
 shows the page edge to edge. It answers <code>alert</code>, <code>confirm</code> and
 <code>prompt</code>, sends links off the server to the browser, offers Try again or Change server
 when a load fails, and hands file pickers and a film's full screen to the platform.</p>
@@ -174,7 +174,7 @@ same job.</p>
   only from a link the person actually tapped.</li>
   <li><strong>The secure-name move is followed, not saved.</strong> From a plain-http address the page
   moves to the install's https name; someone on the same Wi-Fi could once have pinned the app to their
-  own server that way. Now a move from a soundstorm.dev name is accepted only to its own twin (the
+  own server that way. Now a move from an emberstorm.dev name is accepted only to its own twin (the
   same install id), and never written as the saved address.</li>
   <li><strong>No backups of the session</strong> (<code>allowBackup="false"</code> and data extraction
   rules), <code>taskAffinity=""</code> against task hijacking, a non-debuggable build, and a checksum
@@ -202,7 +202,7 @@ phones install it exactly as before. On a TV the web view's user agent gains
 <code>SoundStormTV/1</code>, and the page switches into its TV mode: remote-control focus, films
 full screen, no mini-player. That is described on <a href="tv.html">TVs</a>.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

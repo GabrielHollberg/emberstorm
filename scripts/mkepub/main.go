@@ -4,7 +4,7 @@
 // ebook-convert, borrowed from the Calibre-Web container - and that container
 // is gone. Rather than reintroduce a 500MB image to produce a few kilobytes of
 // test data, this writes the format directly: an EPUB is a zip with two XML
-// files and some XHTML, which is the same reason SoundStorm can read one
+// files and some XHTML, which is the same reason EmberStorm can read one
 // without a backend.
 //
 //	go run ./scripts/mkepub -out book.epub -title "Dune" -author "Frank Herbert"

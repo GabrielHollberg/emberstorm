@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="164.5 153.5 172.0 172.0">
-  <!-- The SoundStorm cloud. Black, and white where the browser is dark, so the
+  <!-- The EmberStorm cloud. Black, and white where the browser is dark, so the
        tab icon never disappears into the tab. Drawn by scripts/make-icons.py. -->
   <style>path, circle, rect, polygon { fill: #000; } @media (prefers-color-scheme: dark) { path, circle, rect, polygon { fill: #fff; } }</style>
   <clipPath id="flat"><rect x="0" y="0" width="1000" height="249.0"/></clipPath>

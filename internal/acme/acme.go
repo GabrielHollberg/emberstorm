@@ -4,7 +4,7 @@
 // It is the smallest client that does that, written against RFC 8555 with the
 // standard library alone. golang.org/x/crypto/acme exists and is good; it
 // would also be the project's first dependency, and the part of ACME that
-// SoundStorm needs - one account, one name, DNS-01, ES256 - is a few hundred
+// EmberStorm needs - one account, one name, DNS-01, ES256 - is a few hundred
 // lines. The same trade as internal/epub and internal/tags: read or speak the
 // little that answers one question.
 //

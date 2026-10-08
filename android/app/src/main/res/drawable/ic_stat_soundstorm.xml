@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The notification icon: the SoundStorm cloud and bolt in one colour, from
+<!-- The notification icon: the EmberStorm cloud and bolt in one colour, from
      the same shapes scripts/make-icons.py draws (the logo's own pixels). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"

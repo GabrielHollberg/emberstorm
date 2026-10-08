@@ -3,25 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Books and read-along - SoundStorm</title>
+<title>Books and read-along - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="server/books" data-root="..">
 <main>
 <h1>Books and read-along</h1>
-<p class="lede">Books are where SoundStorm does the most itself. Ebooks and documents have no backend
+<p class="lede">Books are where EmberStorm does the most itself. Ebooks and documents have no backend
 at all - the server reads the folders - while audiobooks belong to Audiobookshelf. Read Along joins
 the two: an ebook whose page turns with its audiobook, the timing worked out by Storyteller.</p>
 
-<h2 id="owned">The media types SoundStorm owns</h2>
+<h2 id="owned">The media types EmberStorm owns</h2>
 <p>Calibre-Web was the original ebook backend and was removed: it needed a <em>database</em> rather
 than a folder, its setup had no API (it meant scraping forms past CSRF tokens), and its password could
-not be rotated. SoundStorm reads the folder itself instead.</p>
+not be rotated. EmberStorm reads the folder itself instead.</p>
 <div class="why">The justification is narrow and should stay narrow: <strong>an EPUB is
 self-describing.</strong> The file holds its own title, author, language and cover in documented XML,
 and a book needs no transcoding. <code>Dune.2021.mkv</code> holds none of that, which is precisely the
-work Jellyfin exists to do. So the rule is: SoundStorm can own a media type when it is self-describing
+work Jellyfin exists to do. So the rule is: EmberStorm can own a media type when it is self-describing
 and needs no transcoding. EPUB qualifies; video never will; photos fail it on HEIC.</div>
 <p>Documents are a second shelf served the same way (<code>media.KindDocument</code>,
 <code>documents/</code>): a PDF is a book or a gas bill, and the ebook shelf used to hold both.
@@ -49,7 +49,7 @@ sidecars.</p>
 <h2 id="position">Reading position</h2>
 <p>Reflowable text means a page number is meaningless - change the font size and "page 47" is
 different words - so position is a content-anchored locator, an <strong>EPUB CFI</strong>, plus how
-far through the book. It is kept in SoundStorm's own state, keyed
+far through the book. It is kept in EmberStorm's own state, keyed
 <code>userID/sourceID/itemID</code>, so it follows a person across devices (the Apple TV's native
 reader reads and writes the same CFI). Because <code>state.json</code> is rewritten whole by every
 login, saving a position is guarded hard:</p>
@@ -65,7 +65,7 @@ them.</p>
 
 <h2 id="reader">The reader, server side</h2>
 <p>Rendering is foliate-js, vendored - the one piece of third-party code in the project, pinned by
-content and embedded. What is SoundStorm's is that the server unzips: the reader fetches each chapter,
+content and embedded. What is EmberStorm's is that the server unzips: the reader fetches each chapter,
 stylesheet and image from <code>/api/book/resource</code>, so no zip library runs in the browser.</p>
 <p>A book is somebody else's file, opened in the owner's signed-in session, and three review passes
 each found a way for a crafted EPUB to run script. The guards that resulted:</p>
@@ -122,7 +122,7 @@ like the starter-library flag - not facts about the media.</p>
 find it in the book - the ML-shaped layer this project does not own. So it is
 <a href="../backends/storyteller.html">Storyteller</a>. A cheaper chapter-proportional guess was
 offered and declined: a page off by one reads as broken.</p>
-<div class="why">SoundStorm keeps playing the audiobook through its own player. Storyteller's output
+<div class="why">EmberStorm keeps playing the audiobook through its own player. Storyteller's output
 is an EPUB 3 with media overlays and its own copy of the audio; playing that would lose the lock
 screen, the mini-player and Audiobookshelf's listening position. So only its <em>text</em> is used -
 every sentence wrapped in a span with an id - plus its SMIL timings, converted to the audiobook's
@@ -150,7 +150,7 @@ ask the server for, so one index and one Remove serve every kind. Listening and 
 kept on the device too, marked unsynced until a save reaches the server, and an unsynced one wins on the
 next open. The reader reads a downloaded book from the cache before asking the server at all.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

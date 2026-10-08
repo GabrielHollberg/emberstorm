@@ -1,4 +1,4 @@
-// Package servetls gives SoundStorm a TLS configuration without anybody running
+// Package servetls gives EmberStorm a TLS configuration without anybody running
 // openssl.
 //
 // The problem this solves is specific to a home server. A public web service
@@ -10,7 +10,7 @@
 //
 // What makes that bearable is a local certificate authority rather than a bare
 // self-signed certificate. A user installs ONE CA certificate on each device -
-// downloadable from /ca.crt - and from then on every certificate SoundStorm
+// downloadable from /ca.crt - and from then on every certificate EmberStorm
 // issues is trusted, including ones minted later for an address it had never
 // seen. A bare self-signed leaf would have to be re-trusted every time it was
 // renewed or the address changed. This is what mkcert and Caddy's internal
@@ -22,7 +22,7 @@
 // A bare IP address is not, and this is the part that took a wrong turn first.
 // Browsers send no SNI when you dial an IP, so the name has to come from
 // somewhere else - and the obvious somewhere, the local address of the
-// accepted connection, is wrong here. SoundStorm's port is published by
+// accepted connection, is wrong here. EmberStorm's port is published by
 // Docker, which NATs it: inside the container the local address is the
 // container's own 172.20.0.5, not the 192.168.0.50 the client actually
 // dialed. That reads correctly in a unit test with a synthetic connection,
@@ -714,7 +714,7 @@ func loadOrMakeCA(dir string, hosts []string) (ca tls.Certificate, caLeaf *x509.
 		return tls.Certificate{}, nil, nil, "", fmt.Errorf("write authority certificate: %w", err)
 	}
 	// 0600: this key can mint a certificate for any name, so it is the one
-	// genuinely sensitive file SoundStorm writes.
+	// genuinely sensitive file EmberStorm writes.
 	if err := os.WriteFile(keyPath, keyPEM, 0o600); err != nil {
 		return tls.Certificate{}, nil, nil, "", fmt.Errorf("write authority key: %w", err)
 	}

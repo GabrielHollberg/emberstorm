@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Updating, moving, removing - SoundStorm</title>
+<title>Updating, moving, removing - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -16,15 +16,15 @@ thing to another computer, and removing it without touching anybody's media.</p>
 
 <h2 id="update">Updating is installing again</h2>
 <p>There is no separate update path. Running the installer again pulls newer images and restarts,
-keeping the library, accounts and settings. Windows gets an <strong>Update SoundStorm</strong>
+keeping the library, accounts and settings. Windows gets an <strong>Update EmberStorm</strong>
 shortcut in the Start menu that does exactly that; on Mac and Linux the install command is run again;
 by hand it is <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>
-<div class="why">SoundStorm cannot update itself, and should not learn how. It has no access to the
-Docker socket, which is the reason a compromised SoundStorm cannot reach the host. An in-app update
+<div class="why">EmberStorm cannot update itself, and should not learn how. It has no access to the
+Docker socket, which is the reason a compromised EmberStorm cannot reach the host. An in-app update
 button would mean handing it that socket.</div>
 
 <h3 id="self-update">The installer updates itself first</h3>
-<p>For a while, "Update SoundStorm" ran the copy of the script saved by the <em>previous</em> install,
+<p>For a while, "Update EmberStorm" ran the copy of the script saved by the <em>previous</em> install,
 so a fix to the installer only took effect on the update after the one that fetched it. Now a saved
 copy fetches the newest script first and, when it differs, hands over to it with the same arguments.
 A local checkout runs as it is. If the new copy fails, the run ends rather than falling back to the old
@@ -35,8 +35,8 @@ version already installed instead of stopping, since nothing about the install i
 
 <h2 id="backup">Backup and restore</h2>
 <p>One file holds every account, sessions, everyone's favorites and playlists (as one extra field),
-and the passwords SoundStorm generated for each media server. <strong>Those passwords exist nowhere
-else.</strong> If a media server's data survives but SoundStorm's does not, that server has an account
+and the passwords EmberStorm generated for each media server. <strong>Those passwords exist nowhere
+else.</strong> If a media server's data survives but EmberStorm's does not, that server has an account
 whose password nobody holds - the one failure provisioning cannot recover from by itself. Keep a copy
 somewhere other than the server, and treat it like a password.</p>
 <pre><code># Mac and Linux, in the install folder
@@ -57,7 +57,7 @@ docker compose run --rm -v "${PWD}:/backup" soundstorm restore /backup/soundstor
   passwords never scroll past on screen. On Docker Desktop a bind-mounted file appears as the host user's,
   so Windows keeps the bind mount and then locks the file's permissions.</li>
   <li><strong>Restore checks before it changes anything</strong>, refuses anything that is not a
-  SoundStorm backup, keeps what it replaced as <code>state.json.bak</code>, and puts the file's ownership
+  EmberStorm backup, keeps what it replaced as <code>state.json.bak</code>, and puts the file's ownership
   back so the server can read it.</li>
   <li><strong>The uninstaller takes a backup automatically</strong> before removing anything - the one
   moment the credentials would otherwise stop existing.</li>
@@ -73,24 +73,24 @@ docker compose run --rm soundstorm reset-password        # or: reset-password al
 docker compose up -d</code></pre>
 <p>It prints a new password. Two things about it were found by doing it to a live install:</p>
 <ul>
-  <li><strong>The server must be stopped first.</strong> A running SoundStorm holds the state in memory and
+  <li><strong>The server must be stopped first.</strong> A running EmberStorm holds the state in memory and
   rewrites the whole file on its next change, silently undoing the reset.</li>
   <li><strong>File ownership.</strong> Run as root against a volume owned by the container's user, the old
-  tool took ownership of the state file, and SoundStorm then crash-looped on "permission denied". The tool
+  tool took ownership of the state file, and EmberStorm then crash-looped on "permission denied". The tool
   now records the ownership <em>before</em> opening the file and hands it back afterwards.</li>
 </ul>
 <p>Sessions are left alone: recovering your own password is not evidence of a break-in, and signing out
 every device in the house would be its own small disaster. Changing a password from inside the app is
 different - it asks for the current one and signs out every other device.</p>
 <p>The server treats any unknown argument as an error. It used to fall through to starting normally, so
-<code>backup</code> against an image too old to know the command quietly started a second SoundStorm on
+<code>backup</code> against an image too old to know the command quietly started a second EmberStorm on
 the same state.</p>
 
 <h2 id="move">Moving to another computer</h2>
 <p class="note">For the steps alone, in plain words, see <a href="move.html">Moving to a new computer</a>. This section is how it works.</p>
-<p>The installers pack an install into one folder, <code>SoundStorm-move</code>, to carry on a USB drive
+<p>The installers pack an install into one folder, <code>EmberStorm-move</code>, to carry on a USB drive
 or over the network between Windows, Mac and Linux in any direction:</p>
-<pre><code># Windows: Start menu, "Move SoundStorm to another computer", or
+<pre><code># Windows: Start menu, "Move EmberStorm to another computer", or
 .\soundstorm.ps1 -Export E:\
 
 # Mac and Linux
@@ -104,9 +104,9 @@ folder it sits in.</p>
   other side. The export files are readable by the owner only.</li>
   <li><strong>Settings without the old computer:</strong> the port, LAN address, router and library path
   are left out and worked out afresh; the setup code and generated secrets come across.</li>
-  <li><strong>SoundStorm is stopped for the copy</strong>, because a database copied mid-write may not
+  <li><strong>EmberStorm is stopped for the copy</strong>, because a database copied mid-write may not
   open, and started again whatever happens.</li>
-  <li><strong>Import refuses</strong> a computer that already has SoundStorm data: writing over accounts is
+  <li><strong>Import refuses</strong> a computer that already has EmberStorm data: writing over accounts is
   not something to do by accident. Volumes are restored before anything starts, since a media server
   started on an empty volume sets itself up afresh.</li>
 </ul>
@@ -117,7 +117,7 @@ stopped a whole export (now everything that can be copied is, and problem names 
 because a trailing backslash escaped the closing quote.</p>
 
 <h2 id="uninstall">Uninstalling: never touch <code>library/</code></h2>
-<p>Windows registers SoundStorm under the current user's uninstall key, so it appears in Settings &rarr;
+<p>Windows registers EmberStorm under the current user's uninstall key, so it appears in Settings &rarr;
 Apps like anything else, with no administrator needed. On Mac and Linux it is
 <code>install.sh --uninstall</code>.</p>
 <p>The uninstaller takes a backup, runs <code>docker compose down -v</code> - which removes the named
@@ -137,7 +137,7 @@ without ever overwriting, and a daily sweep empties entries older than 30 days. 
 top-level folder that no media server has mounted, so a binned item leaves every server's view at
 once.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

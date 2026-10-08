@@ -8,7 +8,7 @@ import (
 
 // A television series' page - its episodes, season by season, and how far
 // this person is through each - and the episode after one that has ended.
-// The positions are SoundStorm's own (a film's or an episode's place is kept
+// The positions are EmberStorm's own (a film's or an episode's place is kept
 // per person, see "The Continue row"), so one person's half-watched episode
 // is nobody else's.
 

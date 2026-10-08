@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Accounts and sign-in - SoundStorm</title>
+<title>Accounts and sign-in - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="server/accounts" data-root="..">
 <main>
 <h1>Accounts and sign-in</h1>
-<p class="lede">One login is half of what SoundStorm promises, so the server keeps its own
+<p class="lede">One login is half of what EmberStorm promises, so the server keeps its own
 accounts - two roles, a password hash, sessions - and makes the backends' accounts itself.
 <code>internal/auth</code> owns signing in; <code>internal/state</code> keeps what outlives a
 restart.</p>
@@ -41,7 +41,7 @@ assumed.</p>
 nothing: the installers generate it into <code>.env</code> (<code>SOUNDSTORM_SETUP_CODE</code>)
 and open the browser at <code>/?setup=&lt;code&gt;</code>, and the page fills it in. The installer
 also shows it in full at the end, grouped in fours; case, spaces and dashes are ignored when
-typed (<code>NormalizeSetupCode</code>). With no installer, SoundStorm makes one up at each start
+typed (<code>NormalizeSetupCode</code>). With no installer, EmberStorm makes one up at each start
 and logs it until an account exists.</p>
 <div class="note">The page removes <code>?setup=</code> from the address once it knows it is
 staying, so the code is not left in history or a bookmark. That once ran too early: the page
@@ -179,7 +179,7 @@ results is no permission when the address is guessable.</p>
 
 <h2 id="per-person">The few things that are per person</h2>
 <p>Search returns the same results whoever asks, and a film is the same bytes. What differs:
-reading and video positions (kept by SoundStorm, keyed <code>userID/sourceID/itemID</code>),
+reading and video positions (kept by EmberStorm, keyed <code>userID/sourceID/itemID</code>),
 favorites, playlists and history (in <a href="collections.html">collections</a>), audiobook
 listening positions, and photos.</p>
 <h3 id="tvlink">Signing a TV in from a phone</h3>
@@ -245,7 +245,7 @@ fingerprint of their password's salt, so a new password takes them off every dev
   <a href="photos.html">photos</a>.</li>
 </ul>
 <p>Navidrome and Jellyfin keep one shared account on purpose: favorites and watch positions are
-SoundStorm's own, so nothing surfaced from them differs per person. <code>source.WithUserID</code>
+EmberStorm's own, so nothing surfaced from them differs per person. <code>source.WithUserID</code>
 carries the account id to adapters, and lives in <code>internal/source</code> rather than
 <code>internal/auth</code> so an adapter can learn who is asking without depending on how signing
 in works.</p>
@@ -265,7 +265,7 @@ in works.</p>
 <h2 id="removing">Removing somebody</h2>
 <p>Removing a person deletes their sessions, positions, collections file, custom covers, listen
 log and backend accounts. The backend accounts go <strong>first</strong>, because deleting the
-SoundStorm account drops the record of which Audiobookshelf or Immich user belonged to it, and
+EmberStorm account drops the record of which Audiobookshelf or Immich user belonged to it, and
 after that nothing knows what to clean up. It is best effort: a backend that is down must not
 stop somebody being removed. Their photo folder is kept, for the owner to decide about.</p>
 
@@ -276,7 +276,7 @@ supported path, built into the main binary so it is wherever the server is:</p>
 <pre><code>docker compose stop soundstorm
 docker compose run --rm soundstorm reset-password
 docker compose start soundstorm</code></pre>
-<p>The server must be stopped first: a running SoundStorm holds the state in memory and rewrites
+<p>The server must be stopped first: a running EmberStorm holds the state in memory and rewrites
 the whole file on its next change, silently undoing the reset. And because
 <code>state.Open</code> writes the file every time it opens it, a reset run as root against a
 volume owned by uid 10001 would hand ownership of the file to root, and the server would then
@@ -285,7 +285,7 @@ puts the ownership back afterwards. Sessions are left alone: recovering your own
 evidence of a compromise, and signing every device in the house out would be its own small
 disaster.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

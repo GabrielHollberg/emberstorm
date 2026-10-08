@@ -1,6 +1,6 @@
 // Package localbooks serves ebooks straight off the disk, with no backend.
 //
-// Every other source in SoundStorm wraps a media server. This one does not, and
+// Every other source in EmberStorm wraps a media server. This one does not, and
 // the reason is that an ebook library does not need one: an EPUB carries its
 // own title, author and cover (see internal/epub), and a book needs no
 // transcoding. Everything Calibre-Web was doing for us - find the books, read
@@ -10,7 +10,7 @@
 // What that buys: "drop files into a folder" becomes true for ebooks the way it
 // already was for music, film and audiobooks. Calibre-Web was the one backend
 // that needed a *database* rather than a folder, and the one whose credentials
-// SoundStorm could not rotate.
+// EmberStorm could not rotate.
 //
 // Existing Calibre libraries still work, without a SQLite reader: Calibre
 // writes a metadata.opf sidecar next to every book in exactly the format an
@@ -44,7 +44,7 @@ const DefaultRescanInterval = 2 * time.Minute
 // Config configures a local book library.
 type Config struct {
 	ID   string
-	Root string // directory SoundStorm scans
+	Root string // directory EmberStorm scans
 	Log  *slog.Logger
 
 	// Kind is what the folder holds: ebooks (EPUB and PDF), or documents
@@ -460,7 +460,7 @@ func (s *Source) findSidecarCover(b *book) {
 // which scores every source's hits on the same scale.
 // Rescan re-walks the ebook folder now rather than at the next sweep.
 //
-// There is no backend to ask here - SoundStorm is the one that indexes this
+// There is no backend to ask here - EmberStorm is the one that indexes this
 // folder - so this is simply the scan the ticker would have run in up to two
 // minutes' time.
 func (s *Source) Rescan(ctx context.Context) error {
@@ -730,7 +730,7 @@ func (s *Source) ItemByID(_ context.Context, itemID string) (media.Item, bool) {
 }
 
 // Recent is the books whose files changed last, newest first - for a folder
-// SoundStorm reads itself, the file's own date is the record of arrival.
+// EmberStorm reads itself, the file's own date is the record of arrival.
 func (s *Source) Recent(_ context.Context, limit int) ([]media.Item, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

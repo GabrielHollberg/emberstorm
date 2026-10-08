@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw SoundStorm's app icons from the cloud in the logo, and its bolt.
+"""Draw EmberStorm's app icons from the cloud in the logo, and its bolt.
 
 The logo arrived as a 500x500 PNG with the cloud only 150 pixels wide, too
 small to enlarge into a 512px icon without blur. The cloud is three shapes,
@@ -40,7 +40,7 @@ def cloud_svg():
     w, h = right - left, bottom - top
     bx, by, bx2, by2, r = BAR
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="{left - 12} {top - 12 - (w - h) / 2} {w + 24} {w + 24}">
-  <!-- The SoundStorm cloud. Black, and white where the browser is dark, so the
+  <!-- The EmberStorm cloud. Black, and white where the browser is dark, so the
        tab icon never disappears into the tab. Drawn by scripts/make-icons.py. -->
   <style>path, circle, rect, polygon {{ fill: #000; }} @media (prefers-color-scheme: dark) {{ path, circle, rect, polygon {{ fill: #fff; }} }}</style>
   <clipPath id="flat"><rect x="0" y="0" width="1000" height="{by2}"/></clipPath>
@@ -60,7 +60,7 @@ def cloud_mark_svg():
     left, top, right, bottom = BOX
     bx, by, bx2, by2, r = BAR
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="{left} {top} {right - left} {bottom - top}">
-  <!-- The SoundStorm cloud, cropped tight. Drawn by scripts/make-icons.py. -->
+  <!-- The EmberStorm cloud, cropped tight. Drawn by scripts/make-icons.py. -->
   <clipPath id="flat"><rect x="0" y="0" width="1000" height="{by2}"/></clipPath>
   <g clip-path="url(#flat)">
     <circle cx="{BIG[0]}" cy="{BIG[1]}" r="{BIG[2]}"/>
@@ -82,7 +82,7 @@ def placeholder_svg():
     y0 = top - (side - h) / 2
     bx, by, bx2, by2, r = BAR
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.1f} {y0:.1f} {side:.1f} {side:.1f}">
-  <!-- No cover: the SoundStorm cloud on a dark tile. Drawn by scripts/make-icons.py. -->
+  <!-- No cover: the EmberStorm cloud on a dark tile. Drawn by scripts/make-icons.py. -->
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#252c38"/>
@@ -146,7 +146,7 @@ def banner(width, height):
             continue
     if font is None:
         return None  # main() leaves the banner as it is
-    text = "SoundStorm"
+    text = "EmberStorm"
     tb = d.textbbox((0, 0), text, font=font)
     tw, th = tb[2] - tb[0], tb[3] - tb[1]
     left, top, right, bottom = BOX

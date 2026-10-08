@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Storyteller (read-along) - SoundStorm</title>
+<title>Storyteller (read-along) - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -11,13 +11,13 @@
 <main>
 <h1>Storyteller (read-along)</h1>
 <p class="lede">Storyteller transcribes an audiobook and finds every sentence of it in the matching
-ebook. SoundStorm hands it pairs from Read Along, takes back the sentence timings, and uses them to turn
-the reader's page as the audiobook plays - through SoundStorm's own player, not Storyteller's.</p>
+ebook. EmberStorm hands it pairs from Read Along, takes back the sentence timings, and uses them to turn
+the reader's page as the audiobook plays - through EmberStorm's own player, not Storyteller's.</p>
 
 <h2 id="why">Why a backend</h2>
 <p>Pages that turn by themselves need to know, sentence by sentence, where the narrator is. That is forced
 alignment - transcribe the audio, find it in the text - which is machine learning over audio, the
-expensive layer SoundStorm does not own. A cheap alternative, guessing in proportion through each chapter,
+expensive layer EmberStorm does not own. A cheap alternative, guessing in proportion through each chapter,
 was offered and declined: a page off by one reads as broken. Storyteller is MIT-licensed and runs in
 Docker. Its image is 2.9 GB, idle RAM about 300 MB and 0.7 GB while syncing.</p>
 
@@ -46,7 +46,7 @@ fails when they are in different folders - each tries to create the book and the
 id. So the recording is added by reference (never copied), and the ebook is uploaded into that book over
 tus (<code>/api/v2/books/upload</code>). That also keeps the shelf's file untouched when an EPUB 2 - most of
 a Calibre library - has to be upgraded: the upgrade happens to Storyteller's copy. A synced book is found
-again by its audiobook's folder, so SoundStorm stores nothing about it.</p>
+again by its audiobook's folder, so EmberStorm stores nothing about it.</p>
 
 <h2 id="timing">What is used, and the timing conversion</h2>
 <p>Storyteller's output is an EPUB 3 with media overlays and its own copy of the audio inside. Playing that
@@ -77,11 +77,11 @@ only; its delete touches nothing outside its own storage.</p>
   <li>If its long-lived token was never issued, it re-provisions rather than signing in again.</li>
 </ul>
 <p>Verified end to end on an isolated stack with synthetic speech: an EPUB 3 with two MP3s and an EPUB 2
-with a chaptered M4B both synced through SoundStorm's API, each timeline ended exactly where its recording
+with a chaptered M4B both synced through EmberStorm's API, each timeline ended exactly where its recording
 did, and in Chrome the lit sentence moved with the narration and the page turned on its own. See
 <a href="../server/books.html">Books and read-along</a>.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

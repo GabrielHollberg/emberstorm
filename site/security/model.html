@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Threat model - SoundStorm</title>
+<title>Threat model - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -20,7 +20,7 @@ stands between each of them and the household's media and accounts.</p>
   <tr><td>Someone on the same Wi-Fi</td><td>Plain-http traffic on the LAN; the ability to answer router discovery</td><td>Session cookies, photos in transit, to steer an app to their own server</td></tr>
   <tr><td>A member of the household</td><td>A real account, upload rights to the shelves they can see</td><td>Another person's photos or account, the owner's powers, shelves they were refused</td></tr>
   <tr><td>A crafted file</td><td>Whatever a member uploads: EPUB, PDF, MP3, M4A, FLAC, image, zip</td><td>To run script as whoever opens it, or to exhaust memory and CPU</td></tr>
-  <tr><td>A malicious backend or service</td><td>Control over answers SoundStorm reads: a backend, plex.tv, a router, an ACME server</td><td>To redirect credentials elsewhere, crash the server, or reach internal services</td></tr>
+  <tr><td>A malicious backend or service</td><td>Control over answers EmberStorm reads: a backend, plex.tv, a router, an ACME server</td><td>To redirect credentials elsewhere, crash the server, or reach internal services</td></tr>
   <tr><td>Another install</td><td>A trusted name under the same domain as every install</td><td>Cookie tossing, cross-site requests, the name service's shared budgets</td></tr>
 </table>
 
@@ -114,7 +114,7 @@ is unsigned; the name service's daily budgets can be spent by many networks unti
 the Public Suffix List; backends' database passwords are fixed defaults reachable only on the
 compose network; the Android app is signed with a test key.</div>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

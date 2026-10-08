@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A request, end to end - SoundStorm</title>
+<title>A request, end to end - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -15,7 +15,7 @@ Android app, and a search typed on Home that asks every backend at once. Each st
 package or function that does it, so the rest of the site can be read against this one.</p>
 
 <h2 id="play">Pressing play, away from home</h2>
-<div class="diagram" role="img" aria-label="Phone to SoundStorm over TLS; SoundStorm checks the session and access, finds the music source, builds a Navidrome stream URL, fetches it and sends a slimmed, paced stream back.">
+<div class="diagram" role="img" aria-label="Phone to EmberStorm over TLS; EmberStorm checks the session and access, finds the music source, builds a Navidrome stream URL, fetches it and sends a slimmed, paced stream back.">
   <div class="row">
     <div class="box">Android app<small>ExoPlayer, page's cookie</small></div>
   </div>
@@ -30,7 +30,7 @@ package or function that does it, so the rest of the site can be read against th
   <div class="row">
     <div class="box core">stream.Proxy.ServeMedia<small>slim header, pace, Range</small></div>
   </div>
-  <div class="arrow">&#8595; <code>/rest/stream.view</code> with SoundStorm's own credential &#8595;</div>
+  <div class="arrow">&#8595; <code>/rest/stream.view</code> with EmberStorm's own credential &#8595;</div>
   <div class="row">
     <div class="box">Navidrome<small>on the compose network only</small></div>
   </div>
@@ -38,7 +38,7 @@ package or function that does it, so the rest of the site can be read against th
 
 <h3>1. The phone already knows it is away</h3>
 <p>The app is pointed at the install's away-from-home name
-(<code>&lt;id&gt;.net.soundstorm.dev</code>, or a Tailscale <code>ts.net</code> name). On opening,
+(<code>&lt;id&gt;.net.emberstorm.dev</code>, or a Tailscale <code>ts.net</code> name). On opening,
 the page times 128&nbsp;KB from <code>/api/probe</code> once a session; under 1.2&nbsp;Mbps it
 starts songs at 128&nbsp;kbps from the first one, and remembers a slow address for six hours.
 Otherwise it asks for the original.</p>
@@ -62,7 +62,7 @@ service</a>, or the local authority's as a fallback.</p>
 <h3>3. The outer middleware</h3>
 <p>Every route, signed in or not, passes through the same chain built at the end of
 <code>Routes()</code>: logging, security headers, <code>sameOrigin</code> (cross-site writes refused
-on origin, not merely site, because every install shares <code>soundstorm.dev</code>) and
+on origin, not merely site, because every install shares <code>emberstorm.dev</code>) and
 <code>bodyDeadline</code>. There is deliberately no global read or write timeout: a deadline that
 expired mid-response would cancel the request's context, and a film would stop with it.</p>
 
@@ -91,7 +91,7 @@ answers "unknown source" for an account without music - and checks the source im
 
 <h3>6. The adapter builds the upstream request</h3>
 <p>The Subsonic adapter's <code>StreamTarget</code> returns a <code>source.Target</code>: a URL for
-<code>/rest/stream.view</code> with SoundStorm's own Navidrome credential in the query (that is the
+<code>/rest/stream.view</code> with EmberStorm's own Navidrome credential in the query (that is the
 Subsonic protocol), plus headers. For a reduced bitrate it adds <code>maxBitRate</code>,
 <code>format=mp3</code> (Navidrome's default, Opus, is patchy on iPhones) and
 <code>estimateContentLength=true</code>, which gives the converted stream a length and Range
@@ -173,7 +173,7 @@ exactly what was asked for as probably truncated, and paging stops at a depth of
 default) unless the big Now Playing cover asks for more. Tapping a result goes back down the
 first journey.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@ import java.io.RandomAccessFile
 import java.util.UUID
 
 /**
- * Files shared to SoundStorm from another app (the system's Share sheet): a
+ * Files shared to EmberStorm from another app (the system's Share sheet): a
  * song from Files, a film from the gallery, a book from an email - added to
  * the library through the same review as Add media (the owner's asking).
  *
@@ -83,7 +83,7 @@ object Shared {
             // A name is the sharing app's text: only its last part, nothing
             // that climbs out of the folder.
             name = name.substringAfterLast('/').substringAfterLast('\\').trim().ifEmpty { "shared" }.take(200)
-            // SoundStorm files by extension: one missing is taken from the
+            // EmberStorm files by extension: one missing is taken from the
             // file's type, which a share always carries.
             if (!name.contains('.')) {
                 val type = runCatching { c.contentResolver.getType(uri) }.getOrNull() ?: sharedType?.takeUnless { it.endsWith("/*") }

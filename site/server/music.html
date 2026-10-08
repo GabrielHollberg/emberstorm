@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Music: radio, moods, beats - SoundStorm</title>
+<title>Music: radio, moods, beats - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -19,7 +19,7 @@ internet) delegated or opt-in.</p>
 <h2 id="folders">Artists and albums are the folders</h2>
 <p>Navidrome groups by tags. On a real 4,408-song library that made <strong>1,467 albums out of 551
 album folders</strong>: an album whose tracks disagree about the year or album artist splits, and
-"Artist feat. Someone" becomes an artist. SoundStorm files every upload as
+"Artist feat. Someone" becomes an artist. EmberStorm files every upload as
 <code>Artist/Album/track</code>, so the folders are the tidy version, and the music browser shows
 them (<code>internal/source/subsonic/folders.go</code>): the first folder of a song's path is the
 artist, the second the album, a disc folder stays in its album, and a song loose in an artist folder
@@ -73,7 +73,7 @@ tag. A mood station takes songs scoring over 0.6, weighted by how far over.</div
 <h2 id="lyrics">Lyrics</h2>
 <p>Local lyrics come through OpenSubsonic's <code>getLyricsBySongId</code> - a <code>.lrc</code> beside
 a song gives synced lines with millisecond starts. <strong>LRCLIB</strong> (<code>internal/lyrics</code>)
-fills in songs that have none, and is the first thing SoundStorm sends outside the house about what
+fills in songs that have none, and is the first thing EmberStorm sends outside the house about what
 somebody plays, so it is an owner setting, <strong>off by default</strong>. LRCLIB because it needs
 no key or account and has synced lyrics. It is asked only on play, never in bulk, and matched on
 artist, title, album and <strong>duration</strong> - duration is what picks the studio take over a
@@ -121,7 +121,7 @@ only hears a song itself when the server has not.</p>
   <li><strong>Getting PCM.</strong> Go's standard library has no FLAC decoder, so
   <code>internal/flac</code> is one, checked sample for sample against ffmpeg (16- and 24-bit, all
   stereo modes). Navidrome's own "flac" will not do: asked for a lossy song as FLAC, it sends Opus.
-  A transcoding under SoundStorm's own name (<code>subsonic/listen.go</code>) is converted as asked,
+  A transcoding under EmberStorm's own name (<code>subsonic/listen.go</code>) is converted as asked,
   and Navidrome accepts one only with <code>ND_ENABLETRANSCODINGCONFIG</code> on, which compose sets.
   If it is refused, phones hear songs themselves as before.</li>
   <li><strong>The analysis.</strong> 23 ms frames give loudness, a bass band and a high band above
@@ -160,7 +160,7 @@ measurements on real songs:</p>
 asks the server for the same answer rather than computing its own.</p>
 
 <h2 id="training">Training the looks (developer only)</h2>
-<p>A tool for SoundStorm's developer, not a feature: it exists only with
+<p>A tool for EmberStorm's developer, not a feature: it exists only with
 <code>SOUNDSTORM_TRAINING=true</code> in one install's <code>.env</code>, and the routes are owner-only
 and answer 404 elsewhere. In the Looks sheet the developer taps big moments or slides intensity while
 a song plays; each song's taps are kept under the state directory's <code>training/</code> with the
@@ -172,10 +172,10 @@ beat, beat 1-4 and more), lines taps up by the song's median lateness, and fits 
 scored leave-one-song-out against today's rule. On generated click tracks tapped on each bar's first
 beat, the model caught 98% where the rule caught 13%. <code>train-looks rules</code> scores versions
 of the hand-written rule against the taps - which is how the 60% lightning threshold was chosen, over
-2,270 taps on ten songs. What is learnt ships in SoundStorm for every install; nobody else can
+2,270 taps on ten songs. What is learnt ships in EmberStorm for every install; nobody else can
 train.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

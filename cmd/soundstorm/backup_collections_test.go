@@ -55,10 +55,10 @@ func TestBackupCarriesFavoritesAndPlaylists(t *testing.T) {
 	}
 }
 
-// A new backup is still a state file: what an older SoundStorm's restore does
+// A new backup is still a state file: what an older EmberStorm's restore does
 // with it - check the version field and write it - must still work, and the
 // state must read back.
-func TestANewBackupStillRestoresOnAnOlderSoundStorm(t *testing.T) {
+func TestANewBackupStillRestoresOnAnOlderEmberStorm(t *testing.T) {
 	from, _ := newState(t)
 	favorite(t, from, "u1", "aria")
 	t.Setenv("SOUNDSTORM_STATE_DIR", from)

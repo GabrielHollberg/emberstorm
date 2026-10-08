@@ -21,7 +21,7 @@ import (
 // Starting a box over, erasing it, and the way back in when the owner's
 // password is forgotten (the owner's design, 2026-10-03). The box's
 // caretaker does the wiping and watches the power button (internal/caretaker
-// reset.go); SoundStorm decides who may ask, over the caretaker's socket
+// reset.go); EmberStorm decides who may ask, over the caretaker's socket
 // (SOUNDSTORM_CARETAKER, on a box only):
 //
 //   - Start over (owner, password, "START OVER" typed): every account, list

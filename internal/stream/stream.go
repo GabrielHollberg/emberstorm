@@ -1,17 +1,17 @@
 // Package stream pipes media bytes from a backend to the browser.
 //
-// This reverses an explicit decision in SoundStorm's first design, which said
+// This reverses an explicit decision in EmberStorm's first design, which said
 // results carry absolute upstream URLs and the client streams from the source.
-// That kept SoundStorm tiny and out of the data path. It also made the product
+// That kept EmberStorm tiny and out of the data path. It also made the product
 // impossible: an upstream URL only works if the browser can reach the upstream,
 // which means publishing Jellyfin and Navidrome on their own ports, which means
-// their own login screens are one URL away and SoundStorm's single login is a
+// their own login screens are one URL away and EmberStorm's single login is a
 // decoration. You cannot have "one login" and "never touch the bytes" at once.
 //
-// So SoundStorm is in the data path, and the backends need no published port.
-// The costs are real and worth naming: SoundStorm's bandwidth is now the
+// So EmberStorm is in the data path, and the backends need no published port.
+// The costs are real and worth naming: EmberStorm's bandwidth is now the
 // ceiling, and restarting it interrupts playback. Both are acceptable on a home
-// server where SoundStorm and the backends are the same machine; neither is
+// server where EmberStorm and the backends are the same machine; neither is
 // acceptable at scale, and the escape hatch if it ever matters is signed
 // short-lived URLs plus a path-based reverse proxy, which is the same idea with
 // the proxy moved.
@@ -58,7 +58,7 @@ var forwardedResponseHeaders = []string{
 }
 
 // Proxy serves media and artwork from the registered sources.
-// serveFile delivers a file from SoundStorm's own disk.
+// serveFile delivers a file from EmberStorm's own disk.
 func (p *Proxy) serveFile(w http.ResponseWriter, r *http.Request, target source.Target) {
 	f, err := os.Open(target.FilePath)
 	if err != nil {
@@ -78,7 +78,7 @@ func (p *Proxy) serveFile(w http.ResponseWriter, r *http.Request, target source.
 	http.ServeContent(w, r, target.Name, info.ModTime(), f)
 }
 
-// serveBytes delivers something SoundStorm built in memory.
+// serveBytes delivers something EmberStorm built in memory.
 func (p *Proxy) serveBytes(w http.ResponseWriter, r *http.Request, target source.Target) {
 	setContentHeaders(w, target)
 	http.ServeContent(w, r, target.Name, target.ModTime, bytes.NewReader(target.Bytes))
@@ -178,7 +178,7 @@ func (p *Proxy) ServeArt(w http.ResponseWriter, r *http.Request, sourceID, artID
 		http.Error(w, "could not build artwork url", http.StatusBadGateway)
 		return
 	}
-	// SoundStorm's own covers (a book's) are resized here.
+	// EmberStorm's own covers (a book's) are resized here.
 	if px > 0 && (target.FilePath != "" || target.Bytes != nil) {
 		if small, ok := shrinkLocal(target, px); ok {
 			target = small
@@ -331,7 +331,7 @@ func padConverted(w io.Writer, want, sent int64) bool {
 
 // GuardActiveContent sandboxes a response the browser would run as a page.
 // A book, a sidecar or a backend's upload can be HTML, XHTML or SVG with a
-// script in it, and served from SoundStorm's origin that script would run
+// script in it, and served from EmberStorm's origin that script would run
 // with the session cookie of whoever opened the link - the same threat the
 // shell's CSP answers for the reader, reached by pasting the URL instead.
 // Media, PDFs and images are left alone: Chrome's PDF viewer will not render

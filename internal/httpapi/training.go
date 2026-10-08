@@ -1,11 +1,11 @@
 package httpapi
 
-// Training data for the looks, recorded by SoundStorm's developer and no one
+// Training data for the looks, recorded by EmberStorm's developer and no one
 // else: on the one install with SOUNDSTORM_TRAINING on, Now Playing has a
 // training mode - tap where a big moment (lightning) should be, or hold and
 // slide for how intense the music should feel - and what is recorded is kept
 // here, a file per song under the state dir's training/. A training script
-// learns from it, and what it learns ships in SoundStorm itself, for every
+// learns from it, and what it learns ships in EmberStorm itself, for every
 // install. Without the setting none of this exists: the routes answer 404
 // and the session never mentions it.
 //

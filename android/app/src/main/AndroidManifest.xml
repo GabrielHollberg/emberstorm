@@ -50,7 +50,7 @@
             android:launchMode="singleTask"
             android:taskAffinity=""
             android:windowSoftInputMode="adjustResize">
-            <!-- Share > SoundStorm: what another app shares goes into the library
+            <!-- Share > EmberStorm: what another app shares goes into the library
                  (Shared.kt). Media, books and documents, and photo exports'
                  zips; not text or links. -->
             <intent-filter>
@@ -95,7 +95,7 @@
                 <data android:host="*.net.soundstorm.dev" />
                 <data android:pathPrefix="/link/" />
             </intent-filter>
-            <!-- Open my SoundStorm on soundstorm.dev, on a phone:
+            <!-- Open my EmberStorm on soundstorm.dev, on a phone:
                  https://names.soundstorm.dev/open?to=<the server>, an App
                  Link to the names service, which also serves its
                  assetlinks.json; without the app it sends the browser on. -->

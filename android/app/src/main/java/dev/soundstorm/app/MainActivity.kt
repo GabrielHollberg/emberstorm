@@ -165,14 +165,14 @@ class MainActivity : Activity() {
 
         // (A server address given in the launching intent, once used for
         // testing, is gone: the activity is exported, so any app on the device
-        // could have pointed SoundStorm at its own server - found by a
+        // could have pointed EmberStorm at its own server - found by a
         // security review.)
         val saved = ServerAddress.saved(this)
         // Opened from a TV's sign-in code: the server's page asks "Sign in a
         // TV?" for it.
         val link = tvLink(intent)
         if (link != null) pendingLink = link.second
-        // Opened from Open my SoundStorm on soundstorm.dev.
+        // Opened from Open my EmberStorm on soundstorm.dev.
         val opened = if (link == null) openLink(intent) else null
         val start = link?.first ?: opened?.first?.takeIf { opened.second } ?: saved
         when {
@@ -475,7 +475,7 @@ class MainActivity : Activity() {
             nearby.visibility = if (found.isEmpty()) View.GONE else View.VISIBLE
             if (found.isEmpty()) return
             nearby.addView(TextView(this).apply {
-                text = if (found.size == 1) "We found SoundStorm on your network" else "We found SoundStorm on your network - which one?"
+                text = if (found.size == 1) "We found EmberStorm on your network" else "We found EmberStorm on your network - which one?"
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                 setTypeface(Typeface.DEFAULT, Typeface.BOLD)
@@ -704,7 +704,7 @@ class MainActivity : Activity() {
         return code.takeIf { it.length == 6 && (fromLink != null || raw.trim().length <= 9) }
     }
 
-    /** Files shared to SoundStorm, waiting for the page to take them. */
+    /** Files shared to EmberStorm, waiting for the page to take them. */
     private var pendingShare: org.json.JSONArray? = null
 
     /**
@@ -816,7 +816,7 @@ class MainActivity : Activity() {
     }
 
     /**
-     * https://names.soundstorm.dev/open?to=<server>, from Open my SoundStorm
+     * https://names.soundstorm.dev/open?to=<server>, from Open my EmberStorm
      * on soundstorm.dev. A server this app knows (by its address or the
      * install's id, as tvLink matches) is opened - the saved address, which
      * may be the away name the found home one is a twin of - and true comes
@@ -885,7 +885,7 @@ class MainActivity : Activity() {
             "scanCode" -> scanTvCode()
             "uploads" -> uploads(message.optString("cmd"), message.optJSONObject("data") ?: JSONObject())
             "remoteVolume" -> remoteVolume = message.optBoolean("on")
-            // A piece of a file shared to SoundStorm, for the page (Shared).
+            // A piece of a file shared to EmberStorm, for the page (Shared).
             "readFile" -> {
                 val req = message.optLong("req")
                 val id = message.optString("id")
@@ -1018,7 +1018,7 @@ class MainActivity : Activity() {
             isClickable = true
         }
         column.addView(TextView(this).apply {
-            text = "Can't reach SoundStorm at $host"
+            text = "Can't reach EmberStorm at $host"
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             gravity = Gravity.CENTER
@@ -1172,7 +1172,7 @@ class MainActivity : Activity() {
 
     private inner class Chrome : WebChromeClient() {
         // A web view shows alert(), confirm() and prompt() in its own plain
-        // way; these match the system's dialogs. SoundStorm asks before
+        // way; these match the system's dialogs. EmberStorm asks before
         // removing downloads and big files.
         override fun onJsAlert(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
             AlertDialog.Builder(this@MainActivity).setMessage(message)

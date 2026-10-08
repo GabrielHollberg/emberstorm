@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jellyfin (films and TV) - SoundStorm</title>
+<title>Jellyfin (films and TV) - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -12,32 +12,32 @@
 <h1>Jellyfin (films and TV)</h1>
 <p class="lede">Jellyfin identifies films and series in <code>library/movies</code> and
 <code>library/tv</code>, keeps their metadata and artwork, and - the reason it is here - transcodes
-video a browser cannot play. SoundStorm decides nothing about video formats itself; it asks Jellyfin
+video a browser cannot play. EmberStorm decides nothing about video formats itself; it asks Jellyfin
 and does what it is told.</p>
 
 <h2 id="why">Why Jellyfin</h2>
 <p>Asked and answered rather than assumed. Plex needs a plex.tv account, so it cannot be provisioned
 without a human logging into a cloud service - fatal to the zero-keys promise. Emby went closed-source.
-Everything else in the space is too thin to bet on. And video fails the rule for what SoundStorm owns:
+Everything else in the space is too thin to bet on. And video fails the rule for what EmberStorm owns:
 it is not self-describing and does need transcoding. The honest cost is API churn (Jellyfin 12 broke two
 documented auth methods) and a 2.5 GB image.</p>
 
 <h2 id="provisioning">Provisioning</h2>
 <p>Jellyfin's startup wizard is a plain REST API - <code>/Startup/Configuration</code>,
 <code>/Startup/User</code>, <code>/Startup/RemoteAccess</code>, <code>/Startup/Complete</code> - and it
-stops accepting calls once setup completes, which makes driving it safe. SoundStorm then signs in
+stops accepting calls once setup completes, which makes driving it safe. EmberStorm then signs in
 (<code>/Users/AuthenticateByName</code>) and creates two libraries with
 <code>/Library/VirtualFolders</code>: films on <code>/media/movies</code> and shows on
 <code>/media/tv</code>, both mounted read-only.</p>
 <p>Films and series are separate Jellyfin libraries with different collection types and scrapers, so
 one Jellyfin is registered as <strong>two sources sharing one token</strong>: <code>jellyfin</code>
 (Movie) and <code>jellyfin-tv</code> (Series, Episode). The house shares one Jellyfin account, which is
-why film and episode positions are kept by SoundStorm per person rather than in Jellyfin.</p>
+why film and episode positions are kept by EmberStorm per person rather than in Jellyfin.</p>
 <div class="note">Jellyfin accepts connections while it is still loading and answers 503. Provisioning
 treats that, like any 5xx or dial error, as "wait" - only a 401 or 403 means the credentials are
 wrong.</div>
 
-<h2 id="api">The calls SoundStorm makes</h2>
+<h2 id="api">The calls EmberStorm makes</h2>
 <table>
   <tr><th>Call</th><th>Used for</th></tr>
   <tr><td><code>/Items</code></td><td>Search and browse; <code>IncludeItemTypes=Series</code> to list shows; <code>SortBy=SortName</code> only when browsing</td></tr>
@@ -52,7 +52,7 @@ wrong.</div>
 
 <h2 id="playback">Playback is negotiated, never assumed</h2>
 <p>Whether a file needs transcoding depends on container, video codec, audio codec, profile and level.
-Jellyfin knows all five; SoundStorm knows none. So <code>StreamTarget</code> POSTs a device profile to
+Jellyfin knows all five; EmberStorm knows none. So <code>StreamTarget</code> POSTs a device profile to
 <code>PlaybackInfo</code> and follows the answer. The profile errs conservative on purpose - h264/aac in
 mp4, VPx/AV1 in webm - because claiming a codec the browser cannot decode is the silent failure: Jellyfin
 hands over the original and the video element shows nothing, with no error anywhere. Claiming too little
@@ -63,9 +63,9 @@ only costs an unnecessary transcode.</p>
   HLS is a VOD playlist listing every segment, which gives a real timeline.</li>
   <li><strong>Playlists reference their children relatively</strong>, so
   <code>/api/hls/{source}/{path...}</code> mirrors Jellyfin's own <code>/videos/</code> namespace and the
-  browser resolves every segment onto SoundStorm by itself, with no playlist rewriting.</li>
+  browser resolves every segment onto EmberStorm by itself, with no playlist rewriting.</li>
   <li><strong>Each play is its own conversion.</strong> Jellyfin names a conversion after the file, the
-  device and the play session - and SoundStorm is always one device - so the <code>playSessionId</code>
+  device and the play session - and EmberStorm is always one device - so the <code>playSessionId</code>
   from <code>PlaybackInfo</code> goes in the HLS query. Without it, a change of quality or language got
   the old conversion's pieces. A person's live conversions are capped at four.</li>
   <li><strong>Film quality is per device</strong>: under the bitrate cap Jellyfin copies the picture
@@ -113,9 +113,9 @@ empty, and <code>EnsurePlaceholders</code> writes them back before every scan. T
 
 <h2 id="version">Version</h2>
 <p>The image follows <code>latest</code>; everything above was checked against 12.1.0. Jellyfin's API has
-moved under SoundStorm before, so re-verify authentication and the HLS query keys when it changes.</p>
+moved under EmberStorm before, so re-verify authentication and the HLS query keys when it changes.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

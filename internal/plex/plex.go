@@ -1,9 +1,9 @@
 // Package plex brings somebody's playlists across from Plex - what Plexamp
-// plays from - so a household moving to SoundStorm keeps them.
+// plays from - so a household moving to EmberStorm keeps them.
 //
-// It signs in the way apps do on Plex: SoundStorm asks plex.tv for a PIN, the
-// person signs in on Plex's own page with it, and plex.tv hands SoundStorm a
-// token for that account. SoundStorm never sees a Plex password. With the
+// It signs in the way apps do on Plex: EmberStorm asks plex.tv for a PIN, the
+// person signs in on Plex's own page with it, and plex.tv hands EmberStorm a
+// token for that account. EmberStorm never sees a Plex password. With the
 // token it lists the account's servers (plex.tv knows every address each one
 // answers on), finds one that answers, and reads the audio playlists and their
 // songs. The token is held in memory for the import and then forgotten.
@@ -45,7 +45,7 @@ type Client struct {
 	// ClientID names this install to Plex, which lists it among the
 	// account's signed-in apps. It must stay the same across restarts.
 	ClientID string
-	// Version is SoundStorm's, shown beside that name.
+	// Version is EmberStorm's, shown beside that name.
 	Version string
 	HTTP    *http.Client
 	// AllowHost decides whether a server address plex.tv gave may be
@@ -117,7 +117,7 @@ func (c *Client) http() *http.Client {
 
 func (c *Client) headers(req *http.Request, token string) {
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Plex-Product", "SoundStorm")
+	req.Header.Set("X-Plex-Product", "EmberStorm")
 	req.Header.Set("X-Plex-Client-Identifier", c.ClientID)
 	if c.Version != "" {
 		req.Header.Set("X-Plex-Version", c.Version)
@@ -168,7 +168,7 @@ func (c *Client) AuthURL(pin Pin, forward string) string {
 	q := url.Values{}
 	q.Set("clientID", c.ClientID)
 	q.Set("code", pin.Code)
-	q.Set("context[device][product]", "SoundStorm")
+	q.Set("context[device][product]", "EmberStorm")
 	if forward != "" {
 		q.Set("forwardUrl", forward)
 	}
@@ -254,7 +254,7 @@ const maxCandidates = 8
 // network, where the media servers and their databases listen. Found by a
 // security review: the IP rule above let every private range through, the
 // compose network's included, and a member whose own Plex server listed an
-// internal address could send SoundStorm's requests there. A Plex server on
+// internal address could send EmberStorm's requests there. A Plex server on
 // the home network is on none of these and is still reached.
 func dialGuard(_, address string, _ syscall.RawConn) error {
 	host, _, err := net.SplitHostPort(address)
@@ -366,7 +366,7 @@ func (c *Client) candidates(srv Server) []string {
 // seconds, and answers a handle to it.
 func (c *Client) Open(ctx context.Context, srv Server) (*Conn, error) {
 	// A server's address is plex.tv's say-so, not ours: no redirects, so a
-	// server cannot send SoundStorm somewhere the rule above would refuse.
+	// server cannot send EmberStorm somewhere the rule above would refuse.
 	client := &http.Client{
 		Timeout:       60 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
@@ -434,7 +434,7 @@ func (s *Conn) Playlists(ctx context.Context) ([]Playlist, error) {
 	return out, nil
 }
 
-// maxTracks is as many as a SoundStorm playlist holds.
+// maxTracks is as many as a EmberStorm playlist holds.
 const maxTracks = 5000
 
 // Tracks lists a playlist's songs, in order.

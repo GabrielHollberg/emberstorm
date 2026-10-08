@@ -11,9 +11,9 @@ import java.net.UnknownHostException
 import javax.net.ssl.SSLException
 
 /**
- * The one SoundStorm server this app talks to. Every install is someone's
+ * The one EmberStorm server this app talks to. Every install is someone's
  * own, so the address is asked for on first launch rather than built in -
- * as the iPhone app does (ios/SoundStorm/ServerAddress.swift).
+ * as the iPhone app does (ios/EmberStorm/ServerAddress.swift).
  */
 object ServerAddress {
     private const val PREFS = "soundstorm"
@@ -78,11 +78,11 @@ object ServerAddress {
         })
     }
 
-    /** "SoundStorm abc123" for an install's own name, else the host. */
+    /** "EmberStorm abc123" for an install's own name, else the host. */
     fun defaultName(url: Uri): String {
         val host = url.host ?: return url.toString()
         for (suffix in listOf(".home.soundstorm.dev", ".net.soundstorm.dev")) {
-            if (host.endsWith(suffix)) return "SoundStorm " + host.removeSuffix(suffix)
+            if (host.endsWith(suffix)) return "EmberStorm " + host.removeSuffix(suffix)
         }
         return host
     }
@@ -134,7 +134,7 @@ object ServerAddress {
     class CheckFailed(message: String) : Exception(message)
 
     /**
-     * Asks the server's /healthz, which every SoundStorm answers with
+     * Asks the server's /healthz, which every EmberStorm answers with
      * {"status":"ok","sources":n}, so a typo that lands on some other web
      * server is caught here rather than as a strange page later. Blocking:
      * call it off the main thread.
@@ -158,18 +158,18 @@ object ServerAddress {
                 val json = JSONObject(body)
                 json.optString("status") == "ok" && json.has("sources")
             }.getOrDefault(false)
-            if (!ok) throw CheckFailed("Something answered at that address, but it isn't SoundStorm.")
+            if (!ok) throw CheckFailed("Something answered at that address, but it isn't EmberStorm.")
         } catch (e: CheckFailed) {
             throw e
         } catch (e: SSLException) {
             throw CheckFailed("$host has a certificate this phone doesn't trust. " +
-                "Use the soundstorm.dev address SoundStorm gave you.")
+                "Use the soundstorm.dev address EmberStorm gave you.")
         } catch (e: UnknownHostException) {
             throw CheckFailed("Couldn't find $host. Check the address.")
         } catch (e: SocketTimeoutException) {
-            throw CheckFailed("Couldn't reach $host. Is SoundStorm running, and is this phone on a network that can reach it?")
+            throw CheckFailed("Couldn't reach $host. Is EmberStorm running, and is this phone on a network that can reach it?")
         } catch (e: ConnectException) {
-            throw CheckFailed("Couldn't reach $host. Is SoundStorm running, and is this phone on a network that can reach it?")
+            throw CheckFailed("Couldn't reach $host. Is EmberStorm running, and is this phone on a network that can reach it?")
         } catch (e: Exception) {
             throw CheckFailed(e.message ?: "Couldn't reach $host.")
         } finally {
@@ -182,7 +182,7 @@ object ServerAddress {
      * iPhone and Apple TV apps try them (ServerAddress.candidates). Just the
      * install's code ("abc123", or "abc123.soundstorm.dev") is its home and
      * away names, with and without :8099; a soundstorm.dev name typed without
-     * its port is tried on SoundStorm's own port first (the away name is
+     * its port is tried on EmberStorm's own port first (the away name is
      * "<id>.net.soundstorm.dev:8099", and typed without the port it found
      * nothing). A phone prefers the away name, which works anywhere (the page
      * moves itself to the home name when it can); a TV, which stays put, the
@@ -205,7 +205,7 @@ object ServerAddress {
     }
 
     /**
-     * The best of the candidates that answers like SoundStorm. All are asked
+     * The best of the candidates that answers like EmberStorm. All are asked
      * at once, so a home name that cannot be reached from here costs no wait
      * beyond the slowest. Blocking: call it off the main thread.
      */
@@ -223,9 +223,9 @@ object ServerAddress {
                 if (runCatching { f.get() }.getOrDefault("") == null) return list[i]
             }
             if (list.size > 2 && !typed.contains('.')) {
-                throw CheckFailed("Couldn't reach a server with the code ${typed.trim()}, at home or away. Check the code - it is in SoundStorm's Settings, Use on your phone or TV - and, away from home, that remote access is on.")
+                throw CheckFailed("Couldn't reach a server with the code ${typed.trim()}, at home or away. Check the code - it is in EmberStorm's Settings, Use on your phone or TV - and, away from home, that remote access is on.")
             }
-            throw CheckFailed(runCatching { results.last().get() }.getOrNull() ?: "Something answered at that address, but it isn't SoundStorm.")
+            throw CheckFailed(runCatching { results.last().get() }.getOrNull() ?: "Something answered at that address, but it isn't EmberStorm.")
         } finally {
             pool.shutdownNow()
         }

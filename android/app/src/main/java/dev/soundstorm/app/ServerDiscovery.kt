@@ -11,13 +11,13 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Finding a SoundStorm server on the network the phone or TV is on, so
+ * Finding a EmberStorm server on the network the phone or TV is on, so
  * nobody setting one up has to type an address - as the iPhone and Apple TV
  * apps find one (ios/Shared/ServerDiscovery.swift).
  *
- * Not by mDNS: SoundStorm runs in Docker, which on Windows and macOS keeps a
+ * Not by mDNS: EmberStorm runs in Docker, which on Windows and macOS keeps a
  * container's announcements off the home network. Every address on the
- * device's own network is asked whether SoundStorm answers on its port
+ * device's own network is asked whether EmberStorm answers on its port
  * (/healthz says so) - a few hundred quick questions at once, a few seconds.
  * One that answers is asked its secure home name (/api/session's
  * secureName), which is kept instead of the bare address when it answers too.
@@ -28,7 +28,7 @@ object ServerDiscovery {
         val label: String get() = (url.host ?: url.toString()).removeSuffix(".home.soundstorm.dev")
     }
 
-    /** SoundStorm's own port; a server moved to another is typed in. */
+    /** EmberStorm's own port; a server moved to another is typed in. */
     private const val PORT = 8099
 
     /** The servers on this device's network, the best address of each. Blocking. */
@@ -38,7 +38,7 @@ object ServerDiscovery {
         val pool = Executors.newFixedThreadPool(128)
         try {
             val answering = pool.invokeAll(hosts.map { host ->
-                Callable { "http://$host:$PORT".takeIf { isSoundStorm(it, 1200) } }
+                Callable { "http://$host:$PORT".takeIf { isEmberStorm(it, 1200) } }
             }, 30, TimeUnit.SECONDS).mapNotNull { runCatching { it.get() }.getOrNull() }.sorted()
             return answering.map { plain -> Found(Uri.parse(secureName(plain) ?: "$plain/")) }
                 .distinctBy { it.url.toString() }.sortedBy { it.label }
@@ -60,7 +60,7 @@ object ServerDiscovery {
         }
     }.getOrNull()
 
-    private fun isSoundStorm(base: String, timeout: Int = 2000): Boolean {
+    private fun isEmberStorm(base: String, timeout: Int = 2000): Boolean {
         val body = get("$base/healthz", timeout) ?: return false
         return runCatching { JSONObject(body).let { it.optString("status") == "ok" && it.has("sources") } }.getOrDefault(false)
     }
@@ -71,7 +71,7 @@ object ServerDiscovery {
         val name = runCatching { JSONObject(body).optString("secureName") }.getOrNull()?.lowercase() ?: return null
         if (!Regex("^[a-z0-9][a-z0-9.-]*\\.soundstorm\\.dev$").matches(name)) return null
         val secure = "https://$name:$PORT"
-        return if (isSoundStorm(secure)) "$secure/" else null
+        return if (isEmberStorm(secure)) "$secure/" else null
     }
 
     /**

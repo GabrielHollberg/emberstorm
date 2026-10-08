@@ -1,13 +1,13 @@
-// Package names gives every SoundStorm install a real name, so it can have a
+// Package names gives every EmberStorm install a real name, so it can have a
 // real certificate.
 //
 // The problem is the one internal/servetls describes: browsers only trust a
 // certificate somebody on the internet vouches for, and a server at
 // 192.168.1.50 has no name on the internet to vouch for. Its own authority
 // works, and costs a full-page warning on every device - which reads like
-// being hacked to exactly the people SoundStorm is for.
+// being hacked to exactly the people EmberStorm is for.
 //
-// So SoundStorm owns a domain, and hands each install a name under it:
+// So EmberStorm owns a domain, and hands each install a name under it:
 //
 //	k3x9m2p7qa.home.soundstorm.dev  ->  192.168.1.50
 //

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Installing - SoundStorm</title>
+<title>Installing - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -52,9 +52,9 @@ host caches a branch address for five minutes and ignores any cache-busting quer
 <h3 id="window">A window, not a console</h3>
 <p>Numbered steps and coloured boxes made the console legible, but the black window itself put people
 off. So the setup shows a Windows Forms window: the four steps ticking off (Getting Docker ready,
-Preparing the SoundStorm folder, Downloading the media servers, Starting SoundStorm), a status line, a
+Preparing the EmberStorm folder, Downloading the media servers, Starting EmberStorm), a status line, a
 progress bar, callouts in a coloured panel, and at the end the setup code, the address for phones and
-an Open SoundStorm button. The console text survives under "Show details" and in a log file in the
+an Open EmberStorm button. The console text survives under "Show details" and in a log file in the
 temp folder.</p>
 <p>A few details of how that window works, because each was learned the hard way:</p>
 <ul>
@@ -65,7 +65,7 @@ temp folder.</p>
   window it shows, which turned out to be the setup's own window, not the console. The first full run
   sat on its error screen invisibly.</li>
   <li><strong>No message tells anybody to type a command.</strong> A failure offers a button that opens
-  the log file, with SoundStorm's own recent log lines appended and the setup code removed, so it can be
+  the log file, with EmberStorm's own recent log lines appended and the setup code removed, so it can be
   sent to whoever helps.</li>
 </ul>
 
@@ -159,7 +159,7 @@ always answers for its own name.</p>
 
 <h2 id="compose">Compose alone</h2>
 <p>Anybody can put the compose file in a folder and run <code>docker compose up -d</code>. Two
-differences from the installers: with no installer to generate a setup code, SoundStorm makes one up at
+differences from the installers: with no installer to generate a setup code, EmberStorm makes one up at
 each start and writes it to its log until an account exists; and https stays off by default, because
 without an installer nothing records the LAN address that the secure name would point at.</p>
 
@@ -187,10 +187,10 @@ stay put.</p>
 <code>music</code>, <code>movies</code>, <code>tv</code>, <code>audiobooks</code>, <code>ebooks</code>,
 <code>documents</code> and <code>pictures</code>, named for what people call things. To keep it on
 another drive, run the installer with <code>-Library</code> (Windows; or the Start menu's Move
-SoundStorm library) or <code>--library</code>. That writes <code>SOUNDSTORM_LIBRARY_PATH</code>, which
+EmberStorm library) or <code>--library</code>. That writes <code>SOUNDSTORM_LIBRARY_PATH</code>, which
 every mount in the compose file reads, so the shelves cannot drift apart.</p>
 <p>It is an installer option and not an app setting because which folders a container can see is fixed
-when it starts; changing it from inside would mean SoundStorm driving Docker. The installer never moves
+when it starts; changing it from inside would mean EmberStorm driving Docker. The installer never moves
 existing media - it says where the old files are.</p>
 <div class="warn">On Linux, mount an external library drive at boot. An unmounted drive leaves an empty
 folder that looks, to every media server, like a library somebody emptied. On Windows a missing drive
@@ -214,12 +214,12 @@ answer - does each kind of media work? - and the credits point people at LibriVo
 <h2 id="after">After installing</h2>
 <p>From another device, use the computer's address with the port, for example
 <code>http://192.168.1.50:8099</code>; Settings &rarr; Use on your phone or TV shows it with a Copy
-button. Within a minute the server also gets a secure <code>https://&lt;id&gt;.home.soundstorm.dev:8099</code>
+button. Within a minute the server also gets a secure <code>https://&lt;id&gt;.home.emberstorm.dev:8099</code>
 name with a real certificate, and pages move there by themselves once they have checked they can reach
 it. That is the address to install the app from on Android. See <a href="remote.html">Away from
 home</a> for how the name works.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

@@ -42,7 +42,7 @@ const noneFor = 30 * 24 * time.Hour
 // Song is what LRCLIB matches on. Duration matters: it is what picks the
 // album version over a live cut whose timings would be wrong.
 type Song struct {
-	Key      string // SoundStorm's own id for the song, for the cache
+	Key      string // EmberStorm's own id for the song, for the cache
 	Artist   string
 	Title    string
 	Album    string
@@ -114,7 +114,7 @@ func (f *Finder) ask(ctx context.Context, song Song) (source.Lyrics, bool, error
 		return source.Lyrics{}, false, err
 	}
 	// LRCLIB asks clients to say who they are.
-	req.Header.Set("User-Agent", "SoundStorm (https://github.com/GabrielHollberg/soundstorm)")
+	req.Header.Set("User-Agent", "EmberStorm (https://github.com/GabrielHollberg/soundstorm)")
 	resp, err := f.Client.Do(req)
 	if err != nil {
 		return source.Lyrics{}, false, fmt.Errorf("lrclib: %w", err)

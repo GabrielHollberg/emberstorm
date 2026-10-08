@@ -1,5 +1,5 @@
 #!/bin/sh
-# SoundStorm installer for macOS and Linux.
+# EmberStorm installer for macOS and Linux.
 #
 #   curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh
 #
@@ -80,7 +80,7 @@ format_code() {
 # die prints why it stopped and, more importantly, what to do about it. An
 # installer that says "error: 1" has failed twice.
 die() {
-	printf '\n%s%s%s\n\n%s\n\n' "$RED$BOLD" "${DIE_HEADING:-SoundStorm could not start.}" "$OFF" "$1" >&2
+	printf '\n%s%s%s\n\n%s\n\n' "$RED$BOLD" "${DIE_HEADING:-EmberStorm could not start.}" "$OFF" "$1" >&2
 	exit 1
 }
 
@@ -93,7 +93,7 @@ need_docker() {
 		Darwin) install_docker_mac ;;
 		*) die "Docker is not installed.
 
-Docker runs the media servers SoundStorm sits on top of. Install it from here,
+Docker runs the media servers EmberStorm sits on top of. Install it from here,
 then run this again:
 
   https://docs.docker.com/engine/install/" ;;
@@ -134,7 +134,7 @@ sudo to ask for them. Run this again as root, or install Docker from here:
 
 install_docker_linux() {
 	step "Installing Docker"
-	note "SoundStorm runs on Docker, which is set up now (free and open source)."
+	note "EmberStorm runs on Docker, which is set up now (free and open source)."
 	important "Your computer may ask for your password - type it and press Enter."
 	tmp=$(mktemp)
 	fetch https://get.docker.com "$tmp"
@@ -245,7 +245,7 @@ shell_quote() {
 
 install_docker_mac() {
 	step "Installing Docker Desktop"
-	note "SoundStorm runs inside Docker Desktop, which is set up now. There is"
+	note "EmberStorm runs inside Docker Desktop, which is set up now. There is"
 	note "nothing to click in it and no Docker account is needed."
 	note "Docker Desktop is free for personal use and small businesses; installing"
 	note "it accepts Docker's terms: docker.com/legal/docker-subscription-service-agreement"
@@ -429,7 +429,7 @@ installed_scheme() {
 }
 
 # secure_address waits briefly for auto mode's real https address, asking
-# SoundStorm over plain http on this machine, so no certificate is involved in
+# EmberStorm over plain http on this machine, so no certificate is involved in
 # the asking. Empty if it has not arrived by the deadline; http works meanwhile.
 secure_address() {
 	waited=0
@@ -454,7 +454,7 @@ secure_address() {
 # write_serve_config writes the file Tailscale proxies through.
 #
 # The scheme is the one thing that cannot be a constant. Tailscale talks to
-# SoundStorm over the internal compose network, where SoundStorm is speaking
+# EmberStorm over the internal compose network, where EmberStorm is speaking
 # either plain HTTP or its own self-signed HTTPS depending on --https. Point it
 # at the wrong one and the tailnet address answers 502 while everything else
 # looks fine. https+insecure is Tailscale's documented pseudo-scheme for a
@@ -591,7 +591,7 @@ refresh_gateway() {
 # secure name follows the new address, and the router the machine is behind
 # now is the one asked to open the port. Through the user's crontab, which
 # needs no administrator; uninstalling takes it out again. (On Windows the
-# start-up shortcut does the same; the SoundStorm box does it on every start.)
+# start-up shortcut does the same; the EmberStorm box does it on every start.)
 ADDRESS_TAG='# soundstorm-address'
 install_address_watch() {
 	command -v crontab >/dev/null 2>&1 || return 0
@@ -599,7 +599,7 @@ install_address_watch() {
 	docker_dir=$(dirname "$(command -v docker 2>/dev/null || echo /usr/local/bin/docker)")
 	{
 		printf '#!/bin/sh\n'
-		printf '# Points SoundStorm at this machine'"'"'s current network address when it has moved.\n'
+		printf '# Points EmberStorm at this machine'"'"'s current network address when it has moved.\n'
 		printf '# Run by cron (installed by install.sh); safe to run by hand.\n'
 		printf 'PATH="%s:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"\n' "$docker_dir"
 		printf 'cd "%s" || exit 0\n' "$DIR"
@@ -680,7 +680,7 @@ refresh_gateway() {
 changed=
 refresh_lan_address && changed=1
 refresh_gateway && changed=1
-# Compose sees the changed .env and starts SoundStorm again on it.
+# Compose sees the changed .env and starts EmberStorm again on it.
 [ -n "$changed" ] && $COMPOSE up -d >/dev/null 2>&1
 exit 0
 WATCH
@@ -807,7 +807,7 @@ save_backup() {
 
 uninstall() {
 	say ""
-	say "${BOLD}Removing SoundStorm${OFF}"
+	say "${BOLD}Removing EmberStorm${OFF}"
 	say ""
 
 	library=$(library_path)
@@ -822,14 +822,14 @@ uninstall() {
 			if save_backup "$DIR/soundstorm-backup.json"; then
 				note "saved to $DIR/soundstorm-backup.json"
 				note "keep it if you might reinstall - it is the only copy of the"
-				note "passwords SoundStorm made on the media servers"
+				note "passwords EmberStorm made on the media servers"
 			else
 				note "could not save a copy; carrying on with the uninstall"
 			fi
 
 			step "Stopping it and removing its data"
 			note "accounts and the servers own settings go; your media does not"
-			# down -v takes the named volumes with it - SoundStorm accounts,
+			# down -v takes the named volumes with it - EmberStorm accounts,
 			# and Jellyfin and Navidrome own databases. The library is a bind
 			# mount from the folder and is untouched by this.
 			$COMPOSE down -v >/dev/null 2>&1 || true
@@ -845,7 +845,7 @@ uninstall() {
 	fi
 
 	say ""
-	say "${GREEN}${BOLD}Done.${OFF} SoundStorm is gone."
+	say "${GREEN}${BOLD}Done.${OFF} EmberStorm is gone."
 	say ""
 	if [ -d "$library" ]; then
 		say "Your media has been left exactly where it was:"
@@ -862,7 +862,7 @@ uninstall() {
 
 # --- moving it to another computer ------------------------------------------
 
-# What a move carries, besides the library: SoundStorm's own state (accounts,
+# What a move carries, besides the library: EmberStorm's own state (accounts,
 # the passwords it made on every backend, favorites, playlists, positions, the
 # install's name) and each backend's own database. Left out on purpose:
 # jellyfin-cache, immich-models, storyteller-models and audiomuse-temp, which rebuild or
@@ -891,26 +891,26 @@ windows_name_problems() {
 	find "$1" -mindepth 1 2>/dev/null | awk '{ k = tolower($0); if (k in seen) print substr($0, length(root) + 2); seen[k] = 1 }' root="$1"
 }
 
-# export_move packs this install into a SoundStorm-move folder inside $1: the
+# export_move packs this install into a EmberStorm-move folder inside $1: the
 # data volumes as tar files, the settings that belong to the install, and
-# (unless NO_LIBRARY) a copy of the library. SoundStorm is stopped while its
+# (unless NO_LIBRARY) a copy of the library. EmberStorm is stopped while its
 # data is copied - a database copied while it is being written is a database
 # that may not open - and started again after, whatever happened.
 export_move() {
-	[ -f "$DIR/docker-compose.yml" ] || die "SoundStorm is not installed in $DIR, so there is nothing to move.
+	[ -f "$DIR/docker-compose.yml" ] || die "EmberStorm is not installed in $DIR, so there is nothing to move.
 
 If it is installed somewhere else, run this with SOUNDSTORM_DIR set to that folder."
 	[ -d "$1" ] || die "$1 does not exist. Give a folder that does - an external drive, say."
-	dest="$(cd "$1" && pwd)/SoundStorm-move"
+	dest="$(cd "$1" && pwd)/EmberStorm-move"
 	[ ! -e "$dest" ] || die "$dest is already there.
 
 Move or delete it first, so an older move is not mixed into this one."
 	cd "$DIR"
 	library=$(library_path)
-	DIE_HEADING='SoundStorm could not be packed up.'
+	DIE_HEADING='EmberStorm could not be packed up.'
 
 	say ""
-	say "${BOLD}Packing up SoundStorm to move to another computer${OFF}"
+	say "${BOLD}Packing up EmberStorm to move to another computer${OFF}"
 
 	step "Checking there is room"
 	need=0
@@ -950,7 +950,7 @@ yourself."
 		fi
 	fi
 
-	step "Stopping SoundStorm while its data is copied"
+	step "Stopping EmberStorm while its data is copied"
 	$COMPOSE stop >/dev/null 2>&1 || true
 	# Started again however this ends, a failure included.
 	trap '$COMPOSE start >/dev/null 2>&1 || true' EXIT
@@ -965,7 +965,7 @@ yourself."
 		# needs to read its own files on the other side.
 		docker run --rm -v "${PROJECT}_$v:/from:ro" -v "$dest/volumes:/to" "$MOVE_IMAGE" \
 			sh -c "umask 077; tar -cf /to/$v.tar -C /from . && chown $me /to/$v.tar && chmod 600 /to/$v.tar" ||
-			die "Could not copy $v. SoundStorm has been started again, unchanged."
+			die "Could not copy $v. EmberStorm has been started again, unchanged."
 	done
 	(umask 077; grep -Ev "$MOVE_LOCAL" .env > "$dest/settings.env")
 
@@ -993,7 +993,7 @@ yourself."
 		if [ -d "$dest/library" ]; then printf 'library=yes\n'; else printf 'library=no\n'; fi
 	} > "$dest/manifest.txt"
 
-	step "Starting SoundStorm again"
+	step "Starting EmberStorm again"
 	$COMPOSE start >/dev/null 2>&1 || true
 	trap - EXIT
 
@@ -1004,11 +1004,11 @@ yourself."
 	say ""
 	say "On the new computer:"
 	say "  Windows:        copy the folder over and double-click"
-	say "                  \"Install SoundStorm here.cmd\" inside it"
+	say "                  \"Install EmberStorm here.cmd\" inside it"
 	say "  Mac or Linux:   sh \"<the folder>/install-here.sh\""
 	say ""
 	note "Anything changed here from now on does not move. Once the new computer"
-	note "is working, uninstall SoundStorm here: sh install.sh --uninstall"
+	note "is working, uninstall EmberStorm here: sh install.sh --uninstall"
 	if [ ! -d "$dest/library" ]; then
 		say ""
 		important "Your media was not included. Copy it to the new computer yourself:"
@@ -1023,7 +1023,7 @@ yourself."
 write_move_launchers() {
 	cat > "$1/install-here.sh" <<'EOF'
 #!/bin/sh
-# Installs SoundStorm on this computer from the move folder this file is in.
+# Installs EmberStorm on this computer from the move folder this file is in.
 here=$(cd "$(dirname "$0")" && pwd)
 # A fresh private file, not a fixed /tmp name another user could plant first.
 t=$(mktemp) || exit 1
@@ -1035,34 +1035,34 @@ EOF
 	# A .cmd wants CRLF, or cmd.exe mishandles it.
 	printf '%s\r\n' \
 		'@echo off' \
-		'rem Installs SoundStorm on this computer from the move folder this file is in.' \
+		'rem Installs EmberStorm on this computer from the move folder this file is in.' \
 		'setlocal' \
 		'set "HERE=%~dp0"' \
 		'set "HERE=%HERE:~0,-1%"' \
 		'set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"' \
 		'set "SOUNDSTORM_SETUP_URL=https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.ps1"' \
-		'start "" /min "%PS%" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$ProgressPreference = '"'"'SilentlyContinue'"'"'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $f = Join-Path $env:TEMP '"'"'soundstorm-install.ps1'"'"'; try { Invoke-WebRequest -UseBasicParsing -Uri $env:SOUNDSTORM_SETUP_URL -OutFile $f } catch { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show('"'"'SoundStorm could not download its installer. Check the internet connection and try again.'"'"', '"'"'SoundStorm Setup'"'"'); exit 1 }; $env:SOUNDSTORM_WINDOW = '"'"'1'"'"'; $q = [char]34; Start-Process -FilePath (Join-Path $PSHOME '"'"'powershell.exe'"'"') -WindowStyle Hidden -ArgumentList ('"'"'-NoProfile -ExecutionPolicy Bypass -STA -File '"'"' + $q + $f + $q + '"'"' -Import '"'"' + $q + $env:HERE + $q)"' \
-		'exit /b 0' > "$1/Install SoundStorm here.cmd"
+		'start "" /min "%PS%" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$ProgressPreference = '"'"'SilentlyContinue'"'"'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $f = Join-Path $env:TEMP '"'"'soundstorm-install.ps1'"'"'; try { Invoke-WebRequest -UseBasicParsing -Uri $env:SOUNDSTORM_SETUP_URL -OutFile $f } catch { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show('"'"'EmberStorm could not download its installer. Check the internet connection and try again.'"'"', '"'"'EmberStorm Setup'"'"'); exit 1 }; $env:SOUNDSTORM_WINDOW = '"'"'1'"'"'; $q = [char]34; Start-Process -FilePath (Join-Path $PSHOME '"'"'powershell.exe'"'"') -WindowStyle Hidden -ArgumentList ('"'"'-NoProfile -ExecutionPolicy Bypass -STA -File '"'"' + $q + $f + $q + '"'"' -Import '"'"' + $q + $env:HERE + $q)"' \
+		'exit /b 0' > "$1/Install EmberStorm here.cmd"
 }
 
 # check_move_folder says whether $1 is a move folder this version can read.
 check_move_folder() {
-	DIE_HEADING='SoundStorm could not be moved here.'
-	[ -f "$1/manifest.txt" ] || die "$1 is not a SoundStorm move folder: it has no manifest.txt.
+	DIE_HEADING='EmberStorm could not be moved here.'
+	[ -f "$1/manifest.txt" ] || die "$1 is not a EmberStorm move folder: it has no manifest.txt.
 
-Point --import at the SoundStorm-move folder made by --export."
+Point --import at the EmberStorm-move folder made by --export."
 	# A move written on Windows may carry carriage returns; either is fine.
-	tr -d '\r' < "$1/manifest.txt" | grep -q '^format=1$' || die "$1 was made by a newer SoundStorm. Update this installer and try again."
+	tr -d '\r' < "$1/manifest.txt" | grep -q '^format=1$' || die "$1 was made by a newer EmberStorm. Update this installer and try again."
 }
 
 # import_volumes restores the data volumes from a move folder. Refused where
-# SoundStorm already has data: an import is for a computer it is new to, and
+# EmberStorm already has data: an import is for a computer it is new to, and
 # writing over accounts that exist here is not something to do by accident.
 import_volumes() {
 	if docker volume inspect "${PROJECT}_soundstorm-state" >/dev/null 2>&1; then
-		die "This computer already has SoundStorm data, so importing would write over it.
+		die "This computer already has EmberStorm data, so importing would write over it.
 
-Uninstall SoundStorm here first (sh install.sh --uninstall; your media is
+Uninstall EmberStorm here first (sh install.sh --uninstall; your media is
 kept), then import again."
 	fi
 	for tarfile in "$1"/volumes/*.tar; do
@@ -1159,12 +1159,12 @@ while [ $# -gt 0 ]; do
 		--import)
 			shift
 			IMPORT="${1:-}"
-			[ -n "$IMPORT" ] || die "--import needs the SoundStorm-move folder after it"
+			[ -n "$IMPORT" ] || die "--import needs the EmberStorm-move folder after it"
 			IMPORT=$(cd "$IMPORT" 2>/dev/null && pwd) || die "Could not open ${1:-that folder}."
 			check_move_folder "$IMPORT"
 			;;
 		--help|-h)
-			say "SoundStorm installer"
+			say "EmberStorm installer"
 			say ""
 			say "  (no arguments)   install, or update an existing install"
 			say "  --https          real https for a soundstorm.dev name (the default)"
@@ -1199,12 +1199,12 @@ fi
 
 
 say ""
-say "${BOLD}SoundStorm${OFF} - one login and one search box over your media library"
+say "${BOLD}EmberStorm${OFF} - one login and one search box over your media library"
 say ""
 # Said before anything happens: "is it still working?" is the question for the
 # next ten minutes, and the honest answer on a first install is "for a while".
 if [ -f "$DIR/docker-compose.yml" ]; then
-	say "Updating SoundStorm. Your library, accounts and settings are kept."
+	say "Updating EmberStorm. Your library, accounts and settings are kept."
 else
 	say "This sets everything up by itself. The first time takes about 10 to 30"
 	say "minutes, mostly downloading."
@@ -1216,7 +1216,7 @@ need_docker
 compose_cmd
 note "$(docker --version)"
 
-# existing_install prints where SoundStorm is already installed, if it is.
+# existing_install prints where EmberStorm is already installed, if it is.
 #
 # The compose project name is fixed, so a second install in a second folder
 # does not get its own stack - it adopts the first one, ends up pointing at a
@@ -1233,7 +1233,7 @@ step "Setting up $DIR"
 
 previous=$(existing_install)
 if [ -n "$previous" ] && [ "$previous" != "$DIR" ] && [ ! -f "$DIR/docker-compose.yml" ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ]; then
-	die "SoundStorm is already installed in another folder:
+	die "EmberStorm is already installed in another folder:
 
   $previous
 
@@ -1249,7 +1249,7 @@ mkdir -p "$DIR"
 cd "$DIR"
 
 if [ -n "$IMPORT" ] && [ -f docker-compose.yml ]; then
-	die "SoundStorm is already installed in $DIR, so importing would write over it.
+	die "EmberStorm is already installed in $DIR, so importing would write over it.
 
 Uninstall it first (sh install.sh --uninstall; your media is kept), then
 import again."
@@ -1310,7 +1310,7 @@ fi
 # This computer on another network than when it was installed - or given a new
 # address by its router: the secure name follows it.
 if [ "$UPGRADE" = "1" ] && refresh_lan_address; then
-	note "this computer's network address has changed; SoundStorm will use the new one"
+	note "this computer's network address has changed; EmberStorm will use the new one"
 fi
 
 # After the port, so that on a fresh install this amends the file just written
@@ -1424,7 +1424,7 @@ if [ -n "$LIBRARY" ]; then
 	if [ "$previous" != "$full" ] && [ -n "$(find "$previous" -type f ! -name README.txt 2>/dev/null | head -1)" ]; then
 		say ""
 		say "Your existing media is still in $previous."
-		note "To bring it across: stop SoundStorm ($COMPOSE down), move the folders"
+		note "To bring it across: stop EmberStorm ($COMPOSE down), move the folders"
 		note "inside it into $full, then start it again ($COMPOSE up -d)."
 		say ""
 	fi
@@ -1436,7 +1436,7 @@ LIBRARY_DIR=$(library_path)
 # leaves somebody unable to copy files into their own media folder.
 #
 # And they are opened to everyone (0777, the folder and its shelves only, not
-# what is in them): SoundStorm runs as its own user, 10001, so a folder made by
+# what is in them): EmberStorm runs as its own user, 10001, so a folder made by
 # whoever ran this, 0755, is one it cannot add to - every upload, the starter
 # library and a new shelf of its own all failed on Linux. Docker Desktop on a
 # Mac or Windows maps ownership away, which is why it never showed there.
@@ -1446,7 +1446,7 @@ LIBRARY_DIR=$(library_path)
 for shelf in music movies tv audiobooks ebooks documents pictures; do
 	mkdir -p "$LIBRARY_DIR/$shelf"
 	chmod 0777 "$LIBRARY_DIR/$shelf" 2>/dev/null ||
-		note "could not open $LIBRARY_DIR/$shelf to SoundStorm; adding files there may fail"
+		note "could not open $LIBRARY_DIR/$shelf to EmberStorm; adding files there may fail"
 done
 chmod 0777 "$LIBRARY_DIR" 2>/dev/null || true
 
@@ -1469,7 +1469,7 @@ if [ "$TAILSCALE" = "on" ]; then
 	[ -n "$key" ] || key=$(get_env SOUNDSTORM_TAILSCALE_AUTHKEY)
 	if [ -z "$key" ]; then
 		say ""
-		say "Reaching SoundStorm from outside the house needs a Tailscale account."
+		say "Reaching EmberStorm from outside the house needs a Tailscale account."
 		say "It is free for personal use and takes about two minutes."
 		say ""
 		say "  1. Sign up at https://tailscale.com"
@@ -1486,14 +1486,14 @@ if [ "$TAILSCALE" = "on" ]; then
 	if [ -z "$key" ]; then
 		die "No auth key, so there is nothing to connect with.
 
-SoundStorm is installed and working on this network either way. Run this again
+EmberStorm is installed and working on this network either way. Run this again
 with --tailscale when you have a key, or pass it directly:
 
   sh install.sh --tailscale --auth-key tskey-..."
 	fi
 	set_env SOUNDSTORM_TAILSCALE_AUTHKEY "$key"
 	write_serve_config
-	note "Tailscale will be started with SoundStorm"
+	note "Tailscale will be started with EmberStorm"
 elif [ "$TAILSCALE" = "off" ]; then
 	set_env SOUNDSTORM_TAILSCALE_AUTHKEY ""
 	note "turning off remote access"
@@ -1541,10 +1541,10 @@ Pick another one and run this again:
   cd $DIR && $COMPOSE logs"
 fi
 
-step "Waiting for SoundStorm to answer"
+step "Waiting for EmberStorm to answer"
 URL="$SCHEME://localhost:$PORT"
 waited=0
-note "Waiting for SoundStorm to answer - usually under a minute."
+note "Waiting for EmberStorm to answer - usually under a minute."
 until health_ok "$URL/healthz"; do
 	waited=$((waited + 2))
 	# Two minutes with nothing on screen is when somebody decides it has hung.
@@ -1552,7 +1552,7 @@ until health_ok "$URL/healthz"; do
 		note "still starting... (${waited}s). This is normal the first time."
 	fi
 	if [ "$waited" -gt 120 ]; then
-		die "SoundStorm started but never answered on $URL.
+		die "EmberStorm started but never answered on $URL.
 
   cd $DIR && $COMPOSE logs soundstorm"
 	fi
@@ -1561,7 +1561,7 @@ done
 
 say ""
 if [ "$UPGRADE" = "1" ]; then
-	say "${GREEN}${BOLD}Up to date.${OFF} SoundStorm is running at ${BOLD}$URL${OFF}."
+	say "${GREEN}${BOLD}Up to date.${OFF} EmberStorm is running at ${BOLD}$URL${OFF}."
 else
 	say "${GREEN}${BOLD}Ready.${OFF} Open ${BOLD}$URL$SETUP_QS${OFF} and create your account."
 fi
@@ -1605,7 +1605,7 @@ elif [ -n "$lan" ] || [ -n "$mdns" ]; then
 	say ""
 	note "Same account. Open the port on the firewall if nothing loads."
 	if [ "$TLS_MODE" = "auto" ]; then
-		note "SoundStorm is still getting its secure address, and moves there"
+		note "EmberStorm is still getting its secure address, and moves there"
 		note "by itself when it has one."
 	fi
 	say ""
@@ -1646,7 +1646,7 @@ say ""
 # a code this never showed them on its own.
 if [ -n "$SETUP_QS" ]; then
 	frame "NEXT: create your account" \
-		"Open SoundStorm and choose a username and password on the first" \
+		"Open EmberStorm and choose a username and password on the first" \
 		"screen - that is your account." \
 		"" \
 		"*    $URL" \

@@ -39,13 +39,13 @@ func (c *Client) SetAddress(ctx context.Context, reg Registration, ip string) er
 
 // Announce points the registration's name at ip, and says which port the
 // install serves and whether soundstorm.dev may find it from its own internet
-// connection ("Open my SoundStorm"; see find.go).
+// connection ("Open my EmberStorm"; see find.go).
 func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port int, findable bool) error {
 	return c.do(ctx, http.MethodPut, "/v1/address", reg.Credential(),
 		map[string]any{"ip": ip, "port": port, "find": findable}, nil)
 }
 
-// Here tells the service the install is still here, for Open my SoundStorm
+// Here tells the service the install is still here, for Open my EmberStorm
 // (the service keeps that in memory only, so a restart of it forgets until
 // told again). No DNS record changes.
 func (c *Client) Here(ctx context.Context, reg Registration, ip string, port int, findable, public bool) error {

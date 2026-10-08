@@ -209,7 +209,7 @@ func BuildEbook(title, author, folder string, chapters []BookChapter, words []Wo
 <dc:title>` + html.EscapeString(madeTitle) + `</dc:title>
 <dc:creator>` + html.EscapeString(author) + `</dc:creator>
 <dc:language>en</dc:language>
-<dc:description>Written down from the audiobook by SoundStorm, without the original's formatting.</dc:description>
+<dc:description>Written down from the audiobook by EmberStorm, without the original's formatting.</dc:description>
 <meta property="dcterms:modified">` + time.Now().UTC().Format("2006-01-02T15:04:05Z") + `</meta>
 ` + coverMeta + `</metadata>
 <manifest>

@@ -1,7 +1,7 @@
 // Package storyteller drives Storyteller, which lines an audiobook up with its
 // ebook sentence by sentence - the expensive part of read-along, done by
 // transcribing the recording and matching it to the text. It owns exactly
-// that; SoundStorm still plays the audiobook through its own player, and only
+// that; EmberStorm still plays the audiobook through its own player, and only
 // borrows Storyteller's timings to turn the page.
 //
 // Checked against Storyteller web-v2.14.21. Its API moves between versions,
@@ -34,14 +34,14 @@ import (
 )
 
 // Config says where Storyteller is, and how the folders it shares with
-// SoundStorm look from each side.
+// EmberStorm look from each side.
 type Config struct {
 	ID      string
 	BaseURL string
 	Token   string
 	Timeout time.Duration
 
-	// DataDir is Storyteller's /data as SoundStorm sees it, mounted read-only:
+	// DataDir is Storyteller's /data as EmberStorm sees it, mounted read-only:
 	// where the synced books are written.
 	DataDir string
 	// AudiobooksRemote is the audiobook shelf as Storyteller sees it, mounted
@@ -51,7 +51,7 @@ type Config struct {
 	AudiobooksRemote string
 }
 
-// Source is Storyteller as SoundStorm uses it. It is registered as an ebook
+// Source is Storyteller as EmberStorm uses it. It is registered as an ebook
 // source so the registry's access check covers it - an account that may not
 // read ebooks cannot open a synced one either - but it finds nothing in a
 // search: the books it holds are the ebook shelf's, synced.
@@ -94,7 +94,7 @@ func (s *Source) Health(ctx context.Context) error {
 	return resp.Err()
 }
 
-// Book is Storyteller's record of one book, as much of it as SoundStorm reads.
+// Book is Storyteller's record of one book, as much of it as EmberStorm reads.
 type Book struct {
 	UUID      string `json:"uuid"`
 	Title     string `json:"title"`
@@ -183,7 +183,7 @@ func (s *Source) forget() {
 }
 
 // ByFolder finds the book synced from an audiobook, by its folder on the
-// shelf. Nothing about read-along is stored in SoundStorm: Storyteller's own
+// shelf. Nothing about read-along is stored in EmberStorm: Storyteller's own
 // record of where the recording is, is the record.
 func (s *Source) ByFolder(ctx context.Context, folder string) (Book, bool, error) {
 	books, err := s.Books(ctx)
@@ -422,7 +422,7 @@ func (s *Source) process(ctx context.Context, uuid, restart string) error {
 	return resp.Err()
 }
 
-// readaloudPath is the synced book on SoundStorm's side of the shared volume.
+// readaloudPath is the synced book on EmberStorm's side of the shared volume.
 func (s *Source) readaloudPath(ctx context.Context, uuid string) (string, error) {
 	books, err := s.Books(ctx)
 	if err != nil {
@@ -680,7 +680,7 @@ func clock(v string) (float64, bool) {
 }
 
 // Moment is one sentence on the recording's own timeline: seconds from the
-// start of the whole book, which is where SoundStorm's player measures.
+// start of the whole book, which is where EmberStorm's player measures.
 type Moment struct {
 	Start float64 `json:"t"`
 	End   float64 `json:"e"`
@@ -691,7 +691,7 @@ type Moment struct {
 //
 // Storyteller numbers the audio files it read in name order, and cuts each at
 // its chapter marks (the extra cutting of long chapters is switched off when
-// SoundStorm provisions it). So piece p of file f starts where that file's
+// EmberStorm provisions it). So piece p of file f starts where that file's
 // p-th chapter does. The layout is Audiobookshelf's view of the same files and
 // chapters; if the two do not line up piece for piece, there is no timeline
 // rather than a wrong one - a page that follows the wrong sentence is worse

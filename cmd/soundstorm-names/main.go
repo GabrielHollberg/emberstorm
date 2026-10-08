@@ -1,4 +1,4 @@
-// Command soundstorm-names is the name service: it gives every SoundStorm
+// Command soundstorm-names is the name service: it gives every EmberStorm
 // install a name under soundstorm.dev, so each one can have a real certificate.
 // See internal/names for why it exists and what it will and will not do.
 //
@@ -65,7 +65,7 @@ func run(log *slog.Logger) error {
 		// The iPhone app (team LZA2K5LLDS); NAMES_APPLE_APPS replaces.
 		AppleApps: strings.Split(env("NAMES_APPLE_APPS", "LZA2K5LLDS.dev.soundstorm.app"), ","),
 		// The website, the only page that may ask which installs are on a
-		// visitor's connection ("Open my SoundStorm").
+		// visitor's connection ("Open my EmberStorm").
 		SiteOrigins: strings.Split(env("NAMES_SITE_ORIGINS", "https://soundstorm.dev,https://www.soundstorm.dev"), ","),
 		// Held names given out to family and friends, "name=code,name=code".
 		// Secret: set on the host, never in the repository.

@@ -38,7 +38,7 @@ type Config struct {
 	LibraryID string
 	Timeout   time.Duration
 
-	// TokenFor resolves a SoundStorm account to an Audiobookshelf one.
+	// TokenFor resolves a EmberStorm account to an Audiobookshelf one.
 	//
 	// Only listening position uses it. Searching, artwork and audio bytes all
 	// go through the shared account, because they are the same for everybody

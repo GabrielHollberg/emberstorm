@@ -62,7 +62,7 @@ var (
 	sidecarSource = regexp.MustCompile(`soundstorm:DateSource="([a-z]+)"`)
 )
 
-// ReadSidecar reads back a sidecar SoundStorm wrote: the date and where it
+// ReadSidecar reads back a sidecar EmberStorm wrote: the date and where it
 // came from, and the place. One written before sources were recorded is
 // taken as a download's, which is what they all were.
 func ReadSidecar(data []byte) (m Meta, src DateSource) {

@@ -12,7 +12,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
-// provisionAudiobookshelf creates SoundStorm's root account on a fresh
+// provisionAudiobookshelf creates EmberStorm's root account on a fresh
 // Audiobookshelf and points it at the audiobook folder.
 //
 // ABS is the most cooperative of the four backends: /status says outright
@@ -43,8 +43,8 @@ func provisionAudiobookshelf(ctx context.Context, c *httpx.Client, t Target, sec
 		// Already set up, with a password we do not hold. Same situation as the
 		// other backends: a human has to decide which volume to reset.
 		return state.Backend{}, fmt.Errorf(
-			"audiobookshelf is already initialized but SoundStorm has no stored credentials for it; " +
-				"either restore SoundStorm's state file or reset the audiobookshelf volume")
+			"audiobookshelf is already initialized but EmberStorm has no stored credentials for it; " +
+				"either restore EmberStorm's state file or reset the audiobookshelf volume")
 	}
 	if status.IsInit {
 		// Made by an earlier attempt that failed after it: sign in with the
@@ -99,9 +99,9 @@ func finishAudiobookshelf(ctx context.Context, c *httpx.Client, t Target, passwo
 // audiobookshelfLogin returns a token that does not expire.
 //
 // /login hands back two: user.accessToken, which carries an exp claim one hour
-// out, and user.token, a legacy JWT with no exp at all. SoundStorm stores the
+// out, and user.token, a legacy JWT with no exp at all. EmberStorm stores the
 // second deliberately - the first would strand every backend an hour after
-// provisioning unless SoundStorm also implemented the refresh dance. If a
+// provisioning unless EmberStorm also implemented the refresh dance. If a
 // future ABS release drops the legacy token, this is where the refresh flow
 // goes.
 func audiobookshelfLogin(ctx context.Context, c *httpx.Client, username, password string) (string, string, error) {

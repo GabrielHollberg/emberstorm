@@ -1,4 +1,4 @@
-/* soundstorm.dev: black, like the app, its blue as the accent. */
+/* emberstorm.app: black, like the app, its blue as the accent. */
 :root {
   --bg: #000;
   --surface: #11151c;
@@ -116,7 +116,7 @@ footer p { margin: 6px 0; }
   .screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Open my SoundStorm: the button in the top bar and its small window. */
+/* Open my EmberStorm: the button in the top bar and its small window. */
 .open-btn { padding: 8px 14px; font-size: 14px; white-space: nowrap; }
 .open-btn:hover { text-decoration: none; }
 .open-dialog { width: min(440px, calc(100vw - 32px)); padding: 26px 24px 22px; border: 1px solid #2a3039; border-radius: 18px; background: #0d1015; color: var(--text); }
@@ -134,7 +134,7 @@ footer p { margin: 6px 0; }
 .open-row { display: flex; gap: 8px; }
 .open-row input { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid #2a3039; background: #000; color: var(--text); font: inherit; }
 @media (max-width: 640px) { .top nav { display: none; } }
-/* A narrow phone: the logo and Open my SoundStorm side by side did not fit,
+/* A narrow phone: the logo and Open my EmberStorm side by side did not fit,
    and pushed the page sideways - the button may take two lines. */
 @media (max-width: 420px) {
   .top { gap: 10px; }

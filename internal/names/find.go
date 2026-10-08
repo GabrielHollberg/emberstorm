@@ -16,7 +16,7 @@ import (
 // address that starts with a random code is hard to get back to on a computer
 // with no bookmark).
 //
-// "Open my SoundStorm": an install that allows it says, as it announces its
+// "Open my EmberStorm": an install that allows it says, as it announces its
 // address, which port it serves; the service notes which internet connection
 // the announcement came from. A browser on soundstorm.dev then asks which
 // installs announced from its own connection (GET /v1/find) and is sent to
@@ -195,7 +195,7 @@ func (s *Server) siteOrigin(origin string) bool {
 	return false
 }
 
-// handleFind answers soundstorm.dev's "Open my SoundStorm": the home addresses
+// handleFind answers soundstorm.dev's "Open my EmberStorm": the home addresses
 // of the installs that announced from the caller's own connection. Only ever
 // the caller's own connection, never one it names - so it cannot be used to
 // look up somebody else's.
@@ -462,14 +462,14 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 	}
 	id, err := s.ownerOf(r.Context(), name)
 	if err != nil {
-		chosenPage(w, http.StatusBadGateway, "Try again in a moment", "SoundStorm could not look that name up just now.", nil)
+		chosenPage(w, http.StatusBadGateway, "Try again in a moment", "EmberStorm could not look that name up just now.", nil)
 		return
 	}
 	if id == "" {
 		// The same words whether nobody has the name or it is held back: a
 		// visitor is never told a name is free, or that it is kept (held.go).
-		chosenPage(w, http.StatusNotFound, "This SoundStorm is unavailable",
-			"Check the address and try again - or, at home, open soundstorm.dev and choose Open my SoundStorm.",
+		chosenPage(w, http.StatusNotFound, "This EmberStorm is unavailable",
+			"Check the address and try again - or, at home, open soundstorm.dev and choose Open my EmberStorm.",
 			[]link{{"Go to soundstorm.dev", "https://" + s.Zone + "/"}})
 		return
 	}
@@ -485,13 +485,13 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 	case known && e.public:
 		http.Redirect(w, r, s.remoteURL(id, port), http.StatusFound)
 	case known:
-		chosenPage(w, http.StatusOK, "This SoundStorm is at home only",
+		chosenPage(w, http.StatusOK, "This EmberStorm is at home only",
 			"You seem to be away from the house it is in, and it is not set up to be reached from outside. Open it from home - or ask its owner to turn on Reach it from anywhere in Settings.",
 			[]link{{"Try it anyway", s.homeURL(id, port)}})
 	default:
 		// Nothing known yet (the service restarted): let the visitor say.
 		chosenPage(w, http.StatusOK, "Where are you?",
-			"Choose where you are, and SoundStorm opens the right address.",
+			"Choose where you are, and EmberStorm opens the right address.",
 			[]link{{"At home, on its Wi-Fi", s.homeURL(id, port)}, {"Away from home", s.remoteURL(id, port)}})
 	}
 }
@@ -504,7 +504,7 @@ func chosenPage(w http.ResponseWriter, status int, title, text string, links []l
 	var b strings.Builder
 	b.WriteString(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>`)
 	b.WriteString(html.EscapeString(title))
-	b.WriteString(` - SoundStorm</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#000;color:#e8ebf0;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:420px;padding:32px 24px;text-align:center}h1{font-size:22px;margin:0 0 10px}p{color:#9aa3af;margin:0 0 22px}a{display:block;margin:10px 0;padding:12px 16px;border-radius:12px;background:#6aa8ff;color:#08131f;font-weight:700;text-decoration:none}a+a{background:#1f242d;color:#e8ebf0}</style></head><body><main><h1>`)
+	b.WriteString(` - EmberStorm</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#000;color:#e8ebf0;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:420px;padding:32px 24px;text-align:center}h1{font-size:22px;margin:0 0 10px}p{color:#9aa3af;margin:0 0 22px}a{display:block;margin:10px 0;padding:12px 16px;border-radius:12px;background:#6aa8ff;color:#08131f;font-weight:700;text-decoration:none}a+a{background:#1f242d;color:#e8ebf0}</style></head><body><main><h1>`)
 	b.WriteString(html.EscapeString(title))
 	b.WriteString(`</h1><p>`)
 	b.WriteString(html.EscapeString(text))

@@ -18,7 +18,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
-// Only the folders SoundStorm sorts photos into count as already kept: a
+// Only the folders EmberStorm sorts photos into count as already kept: a
 // photo in a folder somebody arranged themselves does not stop a copy being
 // filed by date.
 func TestOnlyDatedFoldersCountAsKept(t *testing.T) {

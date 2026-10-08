@@ -1,8 +1,8 @@
 # Remote access — design
 
-Reaching a SoundStorm install from the internet without Tailscale. This was
+Reaching an EmberStorm install from the internet without Tailscale. This was
 written as the design, built in stages; **stages 1 and 2 are built and live**
-(the Settings switch and `-Remote`/`--remote`, the `<id>.net.soundstorm.dev`
+(the Settings switch and `-Remote`/`--remote`, the `<id>.net.emberstorm.dev`
 name on the same certificate as the home name, the reachability probe, and
 port mapping by PCP, NAT-PMP and UPnP with carrier-grade and double NAT
 detected). Stage 3 is partly built, as its own section says.
@@ -10,7 +10,7 @@ detected). Stage 3 is partly built, as its own section says.
 ## Goal and non-goals
 
 **Goal.** A household can reach its own server from outside the house at a
-`soundstorm.dev` name with a browser-trusted certificate, with as little router
+`emberstorm.dev` name with a browser-trusted certificate, with as little router
 fiddling as the network allows.
 
 **Non-goals, and why.**
@@ -41,7 +41,7 @@ Most of #2 already exists and is indifferent to public vs private:
   address. One open point: the remote name is separate from the LAN name (see
   below), so the install needs a certificate for it too. Rather than a second
   certificate — which would double each install's draw on the shared
-  soundstorm.dev Let's Encrypt quota, the very pressure point the review
+  emberstorm.dev Let's Encrypt quota, the very pressure point the review
   flagged — it is built as **one certificate carrying both names as SANs**: one
   order, one renewal, two DNS-01 challenge records (one per name). This needs
   the ACME client to handle two authorizations in an order, and the name
@@ -66,7 +66,7 @@ connection is the sharp edge, so the rules are strict:
 - **That source IP must be a public address** (reject private, loopback,
   link-local, CGNAT, multicast, unspecified). If it is not public, remote
   access is not available on this network — use Tailscale.
-- **The probe proves it is a real SoundStorm install, not just "something
+- **The probe proves it is a real EmberStorm install, not just "something
   answers."** The service fetches a challenge endpoint at `source-IP:port` and
   expects `HMAC(install-token, nonce)`. Only the install holding its own token
   can produce it, so a co-located stranger cannot hijack the name.
@@ -82,13 +82,13 @@ is not.
 
 **Honest residual.** An attacker can still point *their own* random-id name at
 *their own* public server and get a valid certificate — but that is true of any
-domain plus Let's Encrypt, and `<id>.…soundstorm.dev` is not brandable, so the
+domain plus Let's Encrypt, and `<id>.…emberstorm.dev` is not brandable, so the
 phishing value is low. Named here rather than hidden.
 
 ## Two names, not one (the hairpin trap)
 
-Keep the existing private `<id>.home.soundstorm.dev` for the LAN, and add a
-*separate* public name for remote: `<id>.net.soundstorm.dev`.
+Keep the existing private `<id>.home.emberstorm.dev` for the LAN, and add a
+*separate* public name for remote: `<id>.net.emberstorm.dev`.
 Many routers cannot hairpin — loop a LAN client back in through the public IP —
 so a single public name would break home access on those routers. The client
 already probes reachability before switching to `secureName`, so it can prefer

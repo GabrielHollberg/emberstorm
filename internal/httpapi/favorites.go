@@ -14,7 +14,7 @@ import (
 )
 
 // Favorites and playlists, per person. See internal/collections for why they
-// are SoundStorm's rather than the backends'.
+// are EmberStorm's rather than the backends'.
 //
 // An item is always looked up on its backend before it is kept - the snapshot
 // is what the backend says, never what the browser sent - and through the

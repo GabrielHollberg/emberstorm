@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Audiobookshelf - SoundStorm</title>
+<title>Audiobookshelf - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -12,15 +12,15 @@
 <h1>Audiobookshelf</h1>
 <p class="lede">Audiobookshelf scans <code>library/audiobooks</code>, knows each book's files and
 chapters, and - most importantly - remembers each listener's place. It is the one backend where
-SoundStorm gives every person their own account, because that place is personal.</p>
+EmberStorm gives every person their own account, because that place is personal.</p>
 
 <h2 id="provisioning">Provisioning</h2>
-<p>SoundStorm creates the root user through <code>/init</code>, signs in at <code>/login</code>, creates
+<p>EmberStorm creates the root user through <code>/init</code>, signs in at <code>/login</code>, creates
 the library on <code>/audiobooks</code> with <code>/api/libraries</code> and starts its first scan. Two
 things were verified against 2.36.1 rather than read anywhere:</p>
 <ul>
   <li><strong><code>/login</code> returns two tokens.</strong> <code>user.accessToken</code> expires in an
-  hour; <code>user.token</code> is a legacy JWT with no expiry. SoundStorm stores the legacy one on
+  hour; <code>user.token</code> is a legacy JWT with no expiry. EmberStorm stores the legacy one on
   purpose - the other would strand the backend an hour after provisioning without a refresh flow. If a
   release drops it, that is where the refresh dance goes.</li>
   <li><strong><code>isActive</code> must be sent when creating a user.</strong> Without it the account is
@@ -36,10 +36,10 @@ when somebody joins, and first use is a retry that costs nothing to write. The c
 token, so there is no second login and no password to keep. The owner uses the shared administrator
 credential - they already have an account there, and a second would split their own history in two.</p>
 <p>Removing somebody deletes their Audiobookshelf account <strong>first</strong>, because deleting the
-SoundStorm account drops the record of which Audiobookshelf user was theirs. It is best effort: a backend
+EmberStorm account drops the record of which Audiobookshelf user was theirs. It is best effort: a backend
 that is down must not stop somebody being removed.</p>
 
-<h2 id="api">The calls SoundStorm makes</h2>
+<h2 id="api">The calls EmberStorm makes</h2>
 <table>
   <tr><th>Call</th><th>Used for</th></tr>
   <tr><td><code>/api/libraries/{id}/search</code></td><td>Search</td></tr>
@@ -58,7 +58,7 @@ not always local arithmetic.</p>
 search struct yields an empty list and looks like an empty library rather than a bug.</p>
 
 <h2 id="position">Position: sharp edges</h2>
-<p>Position is written to Audiobookshelf rather than kept by SoundStorm, so a chapter finished in its
+<p>Position is written to Audiobookshelf rather than kept by EmberStorm, so a chapter finished in its
 phone app is where the browser picks up. Its API needs care:</p>
 <ul>
   <li><strong><code>progress</code> is not derived from <code>currentTime</code>.</strong> Send one without
@@ -69,7 +69,7 @@ phone app is where the browser picks up. Its API needs care:</p>
   unfinished". Someone who reached the end and scrubbed back would lose their place, so the flag is only
   ever sent as <code>true</code>.</li>
   <li><strong>It stores whatever it is given.</strong> PATCHing the string <code>"x"</code> as
-  <code>currentTime</code> is accepted and read back. So nothing leaves SoundStorm that is not a finite
+  <code>currentTime</code> is accepted and read back. So nothing leaves EmberStorm that is not a finite
   time (<code>1e999</code> decodes to <code>+Inf</code>), and progress is decoded leniently so one junk
   record cannot become a permanent error for that book.</li>
 </ul>
@@ -97,7 +97,7 @@ tested separately.</p>
 <h2 id="version">Version</h2>
 <p>The image follows <code>latest</code>; everything above was checked against 2.36.1.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

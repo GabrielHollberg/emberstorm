@@ -1,4 +1,4 @@
-# SoundStorm for Android
+# EmberStorm for Android
 
 A native shell around the server's own web app - the Android counterpart of
 `ios/`, and the app for Google TV, Android TV and Fire TV as well. Why it is
@@ -45,7 +45,7 @@ The quickest way is the debug build, sideloaded:
    ./gradlew installDebug        # gradlew.bat on Windows
    ```
 
-4. Open SoundStorm and enter your server's address - the one you open in a
+4. Open EmberStorm and enter your server's address - the one you open in a
    browser.
 
 Or build `app/build/outputs/apk/debug/app-debug.apk` with `./gradlew
@@ -101,7 +101,7 @@ emulator -avd soundstorm-test -memory 4096 -no-audio
 
 Then open the app and enter `http://10.0.2.2:8099` - 10.0.2.2 is the computer
 the emulator runs on. (A launch extra that set the address was removed: any app
-on the phone could have used it to point SoundStorm at its own server.)
+on the phone could have used it to point EmberStorm at its own server.)
 
 The web view can be inspected at `chrome://inspect`, or driven by Playwright
 with `adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>` and

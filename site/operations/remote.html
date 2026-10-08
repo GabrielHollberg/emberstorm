@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Away from home - SoundStorm</title>
+<title>Away from home - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -20,17 +20,17 @@ what it sends to a phone away from home.</p>
 <table>
   <tr><th>Address</th><th>Where it works</th><th>Certificate</th></tr>
   <tr><td><code>http://192.168.1.50:8099</code></td><td>The home network</td><td>None (plain http)</td></tr>
-  <tr><td><code>https://&lt;id&gt;.home.soundstorm.dev:8099</code></td><td>The home network</td><td>Let's Encrypt, trusted everywhere</td></tr>
-  <tr><td><code>https://&lt;id&gt;.net.soundstorm.dev:8099</code></td><td>Anywhere, once remote access is on</td><td>The same certificate, carrying both names</td></tr>
+  <tr><td><code>https://&lt;id&gt;.home.emberstorm.dev:8099</code></td><td>The home network</td><td>Let's Encrypt, trusted everywhere</td></tr>
+  <tr><td><code>https://&lt;id&gt;.net.emberstorm.dev:8099</code></td><td>Anywhere, once remote access is on</td><td>The same certificate, carrying both names</td></tr>
 </table>
-<p>The id is random and per install. All three are served on the same port: SoundStorm's listener tells
+<p>The id is random and per install. All three are served on the same port: EmberStorm's listener tells
 a TLS connection from a plain HTTP request by its first byte (<code>servetls.Listener</code>), so the
 address people already have keeps working while the secure one is added.</p>
 
 <h2 id="home-name">The home name and its certificate</h2>
 <p>A trusted certificate needs a name on the internet, and a home server has neither a domain nor a
-route an ACME challenge can reach. So SoundStorm runs one small central service, the names service,
-which gives each install <code>&lt;id&gt;.home.soundstorm.dev</code>, points it at the install's
+route an ACME challenge can reach. So EmberStorm runs one small central service, the names service,
+which gives each install <code>&lt;id&gt;.home.emberstorm.dev</code>, points it at the install's
 <em>private</em> LAN address, and publishes the DNS-01 challenge that lets Let's Encrypt issue a
 certificate for a server nothing on the internet can reach. It is the same idea as Plex's
 <code>plex.direct</code>, without the account.</p>
@@ -101,13 +101,13 @@ name is now read back from the certificate on disk, and an unanswered check retr
 <h2 id="tailscale">Tailscale</h2>
 <p>Tailscale connects devices privately with nothing exposed to the internet and nothing to forward, on
 any connection - including behind carrier-grade NAT. <code>docker compose --profile tailscale up -d</code>
-runs a Tailscale sidecar that puts SoundStorm on a tailnet at
+runs a Tailscale sidecar that puts EmberStorm on a tailnet at
 <code>https://&lt;hostname&gt;.&lt;tailnet&gt;.ts.net</code>. On Windows a Start menu shortcut,
 <strong>Set up Tailscale</strong>, walks through it: a window with the steps, a button to Tailscale's key
 page, and a box that accepts only something shaped like a Tailscale auth key. On Mac and Linux it is
 <code>--tailscale --auth-key ...</code>.</p>
 <div class="why">It is opt-in for the same reason Plex was rejected as a backend: it needs an account, an
-auth key and an app on every device, none of which can be automated. SoundStorm works fully without it,
+auth key and an app on every device, none of which can be automated. EmberStorm works fully without it,
 and nobody is walked through a sign-up they did not ask for. Making it the default would make the
 "no accounts, no keys" claim untrue.</div>
 <p>Three things were learned by running it:</p>
@@ -116,9 +116,9 @@ and nobody is walked through a sign-up they did not ask for. Making it the defau
   which matters on Docker Desktop.</li>
   <li><strong>The proxy target must not be called <code>soundstorm</code>.</strong> The sidecar takes that as
   its own hostname, and Docker writes a container's own hostname into its hosts file, so the proxy looped
-  back to itself and answered 502 while every container reported healthy. SoundStorm has a second alias,
+  back to itself and answered 502 while every container reported healthy. EmberStorm has a second alias,
   <code>soundstorm-app</code>, and the serve config points there. A CI step guards it.</li>
-  <li><strong>The serve config's scheme must match</strong> how SoundStorm is serving -
+  <li><strong>The serve config's scheme must match</strong> how EmberStorm is serving -
   <code>https+insecure://</code> or <code>http://</code> - or it is another silent 502. And the file is
   written on every install, Tailscale or not, because Docker answers a missing bind-mount source by
   creating a <em>directory</em> with that name.</li>
@@ -138,7 +138,7 @@ Mbps. Several causes were found, one after another:</p>
   <li><strong>The pipe was full.</strong> The server handed each song to the network in full the moment it
   was asked, and over a slow link those megabytes queue in the connection, so the next song, a skip and the
   covers all wait behind bytes nobody plays. Audio to a device that came in by an away-from-home name
-  (<code>*.net.soundstorm.dev</code> or <code>*.ts.net</code>) is now <strong>paced</strong>
+  (<code>*.net.emberstorm.dev</code> or <code>*.ts.net</code>) is now <strong>paced</strong>
   (<code>internal/stream/pace.go</code>): the header plus eight seconds at once, then 1.5 times the song's
   own bitrate. At home nothing is paced, and neither are films, whose pieces are asked for one at a
   time.</li>
@@ -155,7 +155,7 @@ Mbps. Several causes were found, one after another:</p>
 original</strong> is a promise: no probe and no fallback. Films have their own setting; the default,
 <strong>smart</strong>, sends the original at home and caps at 20 Mbit from an away-from-home name.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

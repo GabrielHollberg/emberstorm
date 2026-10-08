@@ -13,7 +13,7 @@ import (
 )
 
 // newStateWithOwner writes a state file containing one account and hands it to
-// uid/gid, standing in for the volume a running SoundStorm owns.
+// uid/gid, standing in for the volume a running EmberStorm owns.
 func newStateWithOwner(t *testing.T, uid, gid int) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -73,7 +73,7 @@ func TestResetKeepsTheFileItsOwner(t *testing.T) {
 
 	gotUID, gotGID := ownerOf(t, path)
 	if gotUID != uid || gotGID != gid {
-		t.Errorf("state is now owned by %d:%d, want %d:%d - SoundStorm would not start",
+		t.Errorf("state is now owned by %d:%d, want %d:%d - EmberStorm would not start",
 			gotUID, gotGID, uid, gid)
 	}
 }

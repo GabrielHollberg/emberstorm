@@ -17,10 +17,10 @@ import (
 // the home screen can say "carry on where you left off" instead of opening on
 // the whole library.
 //
-// Two places know. A book's reading position is SoundStorm's own, in the state
+// Two places know. A book's reading position is EmberStorm's own, in the state
 // file; an audiobook's listening position is Audiobookshelf's, per person (see
 // "Accounts, and the one thing that is per person" in CLAUDE.md). A film's or
-// an episode's is SoundStorm's too, kept like a book's, because the house
+// an episode's is EmberStorm's too, kept like a book's, because the house
 // shares one Jellyfin account and a position there would be everybody's.
 
 const (
@@ -93,7 +93,7 @@ func (s *Server) handleContinue(w http.ResponseWriter, r *http.Request) {
 		}(src, lister)
 	}
 
-	// Books, from SoundStorm's own reading positions. Looked up through the
+	// Books, from EmberStorm's own reading positions. Looked up through the
 	// registry, which applies this account's access - a shelf somebody may no
 	// longer see drops out of the row with everything else.
 	prefix := user.ID + "/"

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gotchas - SoundStorm</title>
+<title>Gotchas - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -35,7 +35,7 @@ down.</p>
   playlist lists every segment up front.</li>
   <li><strong>Its playlists are relative</strong>, so <code>/api/hls/{source}/{path...}</code>
   mirrors Jellyfin's own <code>/videos/</code> namespace and the browser resolves every segment
-  onto SoundStorm by itself.</li>
+  onto EmberStorm by itself.</li>
   <li><strong>Subtitle URLs are built, not read.</strong> <code>DeliveryUrl</code> comes back empty;
   <code>/Videos/{item}/{source}/Subtitles/{index}/Stream.vtt</code> works for every text track.
   Picture subtitles (PGS, VOBSUB) are not offered - attached, they render nothing.</li>
@@ -54,7 +54,7 @@ down.</p>
 <h2 id="abs">Audiobookshelf</h2>
 <ul>
   <li><strong><code>/login</code> returns two tokens.</strong> <code>accessToken</code> expires in an
-  hour; the legacy <code>token</code> never does. SoundStorm stores the legacy one, or the backend
+  hour; the legacy <code>token</code> never does. EmberStorm stores the legacy one, or the backend
   would be stranded an hour after provisioning.</li>
   <li><strong><code>isActive</code> must be sent when creating a user.</strong> Without it the user
   is created inactive, the response is an ordinary 200 with a token, and that token answers
@@ -66,7 +66,7 @@ down.</p>
   <li><strong>Sending <code>isFinished: false</code> is destructive</strong>: for a finished book it
   resets the position to zero. It is only ever sent as true.</li>
   <li><strong>It stores progress unvalidated</strong> - the string "x" as a time is accepted. So
-  nothing leaves SoundStorm that is not a finite time, and progress is decoded leniently.</li>
+  nothing leaves EmberStorm that is not a finite time, and progress is decoded leniently.</li>
   <li><strong>Missing items keep being served</strong> from search and listing, with
   <code>isMissing</code> set. The adapter skips them; there is no "not missing" filter to ask for.</li>
 </ul>
@@ -77,11 +77,11 @@ down.</p>
   are ignored, so the wrong name looks fine while no periodic scan ever runs.</li>
   <li><strong>Navidrome's file paths were made up from tags</strong> unless
   <code>ND_SUBSONIC_DEFAULTREPORTREALPATH</code> is on - and that setting is read once per client
-  name, so SoundStorm introduced itself under a new name to get real paths.</li>
+  name, so EmberStorm introduced itself under a new name to get real paths.</li>
   <li><strong>Navidrome will not turn lossy into lossless</strong>: a lossy song asked for as FLAC
   comes back as Opus. The server's beat analysis uses a transcoding of its own name instead.</li>
   <li><strong>Immich is pinned to its major version.</strong> v3 broke endpoints "that affect only
-  third-party tools" - which is what SoundStorm is.</li>
+  third-party tools" - which is what EmberStorm is.</li>
   <li><strong>Storyteller's app token reads only the <code>st_token</code> cookie</strong>; a bearer
   token is sent to the login page.</li>
   <li><strong>Every backend handles a deleted file differently</strong>: Navidrome hides it,
@@ -233,7 +233,7 @@ down.</p>
   and the state path changed. Remember it if the project is ever renamed again.</li>
 </ul>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

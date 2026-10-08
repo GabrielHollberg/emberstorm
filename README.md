@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/social-preview.png" alt="SoundStorm: your music, films, TV, audiobooks, ebooks and photos. One app, in your own home.">
+  <img src="web/social-preview.png" alt="EmberStorm: your music, films, TV, audiobooks, ebooks and photos. One app, in your own home.">
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
   <a href="https://github.com/GabrielHollberg/soundstorm/releases">What's new</a>
 </p>
 
-<!-- The same screenshots as soundstorm.dev (web/shots), from test servers
+<!-- The same screenshots as emberstorm.app (web/shots), from test servers
      with made-up music and free stock photos. -->
 <p align="center">
   <img src="web/shots/home.png" width="190" alt="Home on a phone: shuffle all music, new music">
@@ -24,7 +24,7 @@
   <img src="web/shots/reader.png" width="190" alt="A book read one line at a time">
 </p>
 
-SoundStorm turns a computer at home into your own streaming service. Put your
+EmberStorm turns a computer at home into your own streaming service. Put your
 files in its folders, or drag them onto the window, and they appear, sorted,
 with covers, ready to play on every phone, tablet, TV and computer in the
 house. There are no subscriptions, no adverts and no accounts with anybody
@@ -36,9 +36,9 @@ but yourself, and nothing to set up by hand.
 - A proper music player: gapless playback, crossfade, even volume across songs,
   a sleep timer, and lock-screen and headphone controls.
 - Synced lyrics that light up line by line, and a dozen **visualizers** that
-  move with the song itself (SoundStorm listens to every track for its beats).
+  move with the song itself (EmberStorm listens to every track for its beats).
 - **Radio** that never runs out: from any song, album or artist, by **mood**
-  (Chill, Feel good, Focus, Party...) or by decade and genre. SoundStorm
+  (Chill, Feel good, Focus, Party...) or by decade and genre. EmberStorm
   listens to your music to learn how it sounds.
 - Mixes, favorites and playlists. **Import your playlists from Plex/Plexamp**,
   or from any player that saves M3U files.
@@ -106,7 +106,7 @@ but yourself, and nothing to set up by hand.
   switch between them.
 
 <p align="center">
-  <img src="web/shots/tv.png" width="780" alt="SoundStorm playing music on a TV, with a storm animation">
+  <img src="web/shots/tv.png" width="780" alt="EmberStorm playing music on a TV, with a storm animation">
 </p>
 
 ## What you need
@@ -115,10 +115,10 @@ but yourself, and nothing to set up by hand.
 | --- | --- |
 | **Computer** | Windows 10 or 11, a Mac, or Linux, left switched on while you use it |
 | **Memory** | 16 GB recommended; 8 GB works if you leave photos out (photo search alone wants several GB) |
-| **Disk** | About 20 GB for SoundStorm itself, plus room for your media |
+| **Disk** | About 20 GB for EmberStorm itself, plus room for your media |
 | **Internet** | For the first install (a large download); afterwards it runs at home |
 
-Phones, tablets and other computers need nothing installed: they use SoundStorm
+Phones, tablets and other computers need nothing installed: they use EmberStorm
 in their web browser, or add it to their home screen as an app. There is also
 an Android app (from the [releases page](https://github.com/GabrielHollberg/soundstorm/releases),
 the `android-` ones, which also run on Google TV, Android TV and Fire TV). The
@@ -136,7 +136,7 @@ then, an iPhone uses the web app.
 A setup window walks you through the rest. Expect **10 to 30 minutes**, mostly
 downloading, and keep the window open until it says it's finished. Along the way:
 
-- **Windows asks for permission** to install Docker (the engine SoundStorm runs
+- **Windows asks for permission** to install Docker (the engine EmberStorm runs
   on) and sometimes Windows Subsystem for Linux. Click **Yes**. The setup
   answers Docker's own first questions for you, so there is nothing to click in
   Docker and no Docker account. (If you already had Docker installed but never
@@ -145,9 +145,9 @@ downloading, and keep the window open until it says it's finished. Along the way
   one on another drive.
 - **"Windows Security Alert"** for Docker Desktop Backend: click **Allow access**.
   If it asks **"Is this your home network?"**, click **Yes** at home, so your
-  phone and TV can reach SoundStorm.
+  phone and TV can reach EmberStorm.
 
-When it's done, your browser opens SoundStorm and there's a SoundStorm icon on
+When it's done, your browser opens EmberStorm and there's an EmberStorm icon on
 your desktop.
 
 <details>
@@ -155,7 +155,7 @@ your desktop.
 
 Windows blocks *every* script downloaded from the internet ("An Application
 Control policy has blocked this file"). That is about the file type, not about
-SoundStorm, and ticking **Unblock** is how Windows lets you say you trust it.
+EmberStorm, and ticking **Unblock** is how Windows lets you say you trust it.
 Skipping it is the most common reason nothing happens when you double-click.
 
 </details>
@@ -178,7 +178,7 @@ Run this in a terminal:
 curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh
 ```
 
-It sets up Docker if the computer does not have it (the engine SoundStorm runs
+It sets up Docker if the computer does not have it (the engine EmberStorm runs
 on: plain Docker on Linux, Docker Desktop on a Mac, with nothing to click in it
 and no Docker account), downloads everything, sets it all up and prints the
 address to open. Your computer asks for your password once, to install Docker.
@@ -201,12 +201,12 @@ Open <http://localhost:8099>. The setup code for the first account is printed in
 
 **1. Create your account.** The first screen asks for a username and password
 (at least 12 characters, and not a common one); that account is the owner. If it asks for a **setup code**, it's shown at the end
-of the setup window and saved in the `.env` file in your SoundStorm folder. The
-code makes sure only the person who installed SoundStorm can claim it.
+of the setup window and saved in the `.env` file in your EmberStorm folder. The
+code makes sure only the person who installed EmberStorm can claim it.
 
 **2. Add your media.** Either way works:
 
-- **Drag files or whole folders onto the SoundStorm window.** SoundStorm works
+- **Drag files or whole folders onto the EmberStorm window.** EmberStorm works
   out what each file is and files it on the right shelf. If it can't tell (an
   MP3 could be a song or an audiobook chapter), it asks once. On a phone, use
   **Settings → Add media**.
@@ -236,7 +236,7 @@ which also backs up the phone's photos, or add the web app to your home screen
 (on an iPhone, for now, this is the way):
 - **iPhone:** Share → **Add to Home Screen**.
 - **Android:** Chrome menu → **Install app**. Use the secure address, the one
-  ending in `.home.soundstorm.dev`.
+  ending in `.home.emberstorm.dev`.
 
 **4. Add your family.** **Settings → People**: give each person a name and a
 password, tick which shelves they may see, and set their photo space if you
@@ -244,23 +244,23 @@ like (100 GB each unless you change it).
 
 **5. Bring your photos in.** **Settings → Your photos → Bring your photos in
 from anywhere** shows how to download your photos from Google, Apple, Facebook
-and the rest; drop the zips on the window and SoundStorm sorts them.
+and the rest; drop the zips on the window and EmberStorm sorts them.
 
 ### Coming from Plex or Plexamp?
 
 Your playlists can come with you. On **Music → Playlists**, tap **Import
 playlist** → **From Plex or Plexamp**, sign in on Plex's own page, and pick the
-playlists you want. Each song is matched to your SoundStorm library, and any
-that aren't in it are listed afterwards. SoundStorm never sees your Plex
+playlists you want. Each song is matched to your EmberStorm library, and any
+that aren't in it are listed afterwards. EmberStorm never sees your Plex
 password and doesn't keep the Plex sign-in once you're done. (Your Plex server
-must be switched on, and reachable from the SoundStorm computer.)
+must be switched on, and reachable from the EmberStorm computer.)
 
 ### Using it away from home
 
 At home it works straight away. To listen from anywhere:
 
 - **Remote access** (Settings → *Reach it from anywhere*) gives your server its own
-  secure web address. SoundStorm opens the port on your router itself where
+  secure web address. EmberStorm opens the port on your router itself where
   the router allows it, and tells you exactly what to do where it doesn't.
 - **[Tailscale](https://tailscale.com)** works on any internet connection, puts
   nothing on the internet, and needs the free Tailscale app on each device. On
@@ -272,16 +272,16 @@ Details are in the [user guide](docs/guide.md#away-from-home).
 
 | | Windows | Mac and Linux |
 | --- | --- | --- |
-| **Update** | Start menu → **Update SoundStorm** | Run the install command again |
+| **Update** | Start menu → **Update EmberStorm** | Run the install command again |
 | **Start / stop** | The desktop icon starts it; it also starts with Windows | `docker compose up -d` / `docker compose down` in the install folder |
-| **Move to a new computer** | Start menu → **Move SoundStorm to another computer** | `install.sh` with `--export` ([guide](docs/guide.md#moving-to-another-computer)) |
-| **Uninstall** | Settings → Apps → SoundStorm → Uninstall | `install.sh` with `--uninstall` |
+| **Move to a new computer** | Start menu → **Move EmberStorm to another computer** | `install.sh` with `--export` ([guide](docs/guide.md#moving-to-another-computer)) |
+| **Uninstall** | Settings → Apps → EmberStorm → Uninstall | `install.sh` with `--uninstall` |
 
 Updating keeps your library, accounts and settings. **Uninstalling never deletes
 your media**: the `library` folder is left where it is.
 
 **Back it up.** One small file holds every account and the passwords
-SoundStorm made for the media servers inside it. See
+EmberStorm made for the media servers inside it. See
 [Backing up](docs/guide.md#backing-it-up). The uninstaller saves one for you
 automatically.
 
@@ -296,16 +296,16 @@ automatically.
 virtualization switched on in your computer's BIOS/UEFI settings, usually called
 *Intel VT-x*, *AMD-V* or *SVM*. Turn it on, restart, and run the setup again.
 
-**My phone can't open SoundStorm.**
+**My phone can't open EmberStorm.**
 - Make sure the phone is on the same Wi-Fi as the computer, and not a *guest*
   network.
-- On Windows, run **Update SoundStorm** from the Start menu while on your home
+- On Windows, run **Update EmberStorm** from the Start menu while on your home
   network: it fixes the network and firewall settings.
 - Give the computer a fixed address in your router (a "DHCP reservation"), so
   the address never changes.
 
-**The secure `.home.soundstorm.dev` address doesn't load.** Some routers block
-it on purpose. SoundStorm then stays on the plain address, and everything still
+**The secure `.home.emberstorm.dev` address doesn't load.** Some routers block
+it on purpose. EmberStorm then stays on the plain address, and everything still
 works.
 
 **A new file doesn't show up.** Give it a minute, or use **Settings → Check for
@@ -318,11 +318,11 @@ file along with a description when you
 
 ## Privacy: what leaves your house
 
-Your media, searches and passwords stay on your computer. SoundStorm contacts
+Your media, searches and passwords stay on your computer. EmberStorm contacts
 the internet only for:
 
 - **Its secure address.** A small name service gives your server its
-  `….soundstorm.dev` name and certificate. It only knows your server's *home
+  `….emberstorm.dev` name and certificate. It only knows your server's *home
   network* address.
 - **Updates**, when you run them.
 - **Things you switch on**, all off by default: finding missing lyrics online
@@ -332,8 +332,8 @@ the internet only for:
 
 ## Built on
 
-SoundStorm is the app on top. The heavy lifting is done by excellent open-source
-servers, which SoundStorm installs, sets up and keeps out of your way:
+EmberStorm is the app on top. The heavy lifting is done by excellent open-source
+servers, which EmberStorm installs, sets up and keeps out of your way:
 
 | | | |
 | --- | --- | --- |
@@ -353,27 +353,27 @@ Each runs unmodified in its own container, under its own license.
 How it fits together, how to build it and how to add a backend:
 [docs/developers.md](docs/developers.md).
 
-**How SoundStorm works, in depth:** the [`site/`](site/index.html) folder is a
+**How EmberStorm works, in depth:** the [`site/`](site/index.html) folder is a
 small website explaining the whole project, from the overview down to each part
 and the decisions behind it. Open `site/index.html` in a browser.
 
 ## How it is made
 
-SoundStorm is designed and run by one person, and most of its code is written
+EmberStorm is designed and run by one person, and most of its code is written
 with an AI assistant ([Claude](https://www.anthropic.com/claude)), working to
 that person's decisions. Each change is checked on a running server before it
 ships, the code has had several rounds of security review, and the reasons
 behind each design choice are written down in [`site/`](site/index.html) and
 [`CLAUDE.md`](CLAUDE.md), so anyone can see why it is built the way it is.
 
-## Support SoundStorm
+## Support EmberStorm
 
-SoundStorm is free and made by one person. If it's useful to you, you can help
+EmberStorm is free and made by one person. If it's useful to you, you can help
 keep it going on [GitHub Sponsors](https://github.com/sponsors/GabrielHollberg).
 
 ## License
 
-SoundStorm is free software under the [GNU Affero General Public License,
+EmberStorm is free software under the [GNU Affero General Public License,
 version 3](LICENSE) (AGPL-3.0): you may use, study, change and share it, and
 anyone who offers a changed version to others - including over a network -
 must share their changes under the same license.

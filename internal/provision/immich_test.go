@@ -89,7 +89,7 @@ func TestImmichIsProvisionedWithNobodyLoggingIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("provision: %v", err)
 	}
-	// The API key, not the session token: a session expires, and SoundStorm
+	// The API key, not the session token: a session expires, and EmberStorm
 	// keeps no password to log in with again.
 	if token != "the-api-key" || library != "lib-1" || user != "u-1" {
 		t.Errorf("stored token=%q library=%q user=%q", token, library, user)
@@ -126,7 +126,7 @@ func TestImmichWatchingChangesOnlyTheOneSetting(t *testing.T) {
 	}
 }
 
-// An Immich that already has an admin, with credentials SoundStorm does not
+// An Immich that already has an admin, with credentials EmberStorm does not
 // hold, is a human decision - never something to retry into.
 func TestAnImmichSetUpByOthersIsRefused(t *testing.T) {
 	_, _, _, err := runImmichSetup(t, &fakeImmichSetup{initialized: true})

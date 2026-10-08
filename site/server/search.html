@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Search and browsing - SoundStorm</title>
+<title>Search and browsing - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -127,14 +127,14 @@ search's rule again. Each backend orders by its own record of arrival:</p>
   a new season brings it forward;</li>
   <li>Audiobookshelf by <code>sort=addedAt&amp;desc=1</code>;</li>
   <li>Immich by its own newest-first order;</li>
-  <li>the folders SoundStorm reads itself by the file's modification time.</li>
+  <li>the folders EmberStorm reads itself by the file's modification time.</li>
 </ul>
 
 <h2 id="continue">The Continue row</h2>
 <p><code>GET /api/continue</code> is what this person is part way through, newest first. Two
 places know, and neither is new:</p>
 <ul>
-  <li><strong>Books, films and episodes</strong> are SoundStorm's own <code>state.Progress</code>,
+  <li><strong>Books, films and episodes</strong> are EmberStorm's own <code>state.Progress</code>,
   keyed <code>userID/sourceID/itemID</code>. A video's location is its time
   (<code>t=1234.5</code>), so adding video did not change the state format.</li>
   <li><strong>Audiobooks</strong> belong to Audiobookshelf, per person, through the per-member
@@ -147,7 +147,7 @@ places know, and neither is new:</p>
 episode the top is 93%, because the credits are the end. <code>source.ItemGetter</code> turns a
 stored id back into a card, through the registry - so a shelf an account can no longer see drops
 out of the row.</p>
-<div class="why">Film positions are kept by SoundStorm, not Jellyfin, because the house shares
+<div class="why">Film positions are kept by EmberStorm, not Jellyfin, because the house shares
 one Jellyfin account: a position kept there would be everybody's - one person's half-watched
 film in another's row. Per-member Jellyfin accounts would fix that at the cost of a second
 provisioning path, and buy nothing, since nobody ever sees Jellyfin's own resume. To stop a
@@ -187,7 +187,7 @@ decision, not a fact about the media), and <strong>Pair with its audiobook</stro
 by hand (<code>manualPairs</code>). What happens to a pair next - syncing the text to the
 recording - is on the <a href="books.html">books page</a>.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

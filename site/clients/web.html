@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The web app - SoundStorm</title>
+<title>The web app - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -67,7 +67,7 @@ for an account that has music - <strong>Shuffle all music</strong>, Favorite son
 and New music - then runs in three groups: Continue and Recently played, then every "New" row
 (music first), then the favorites of each tab.</p>
 <p>The Continue row is what this person is part way through, newest first. Books and films are
-SoundStorm's own records (<code>state.Progress</code>); an audiobook's place belongs to
+EmberStorm's own records (<code>state.Progress</code>); an audiobook's place belongs to
 Audiobookshelf, so a book started in its phone app shows up here too. The New rows come from
 <code>GET /api/home</code>, which asks every source at once with a five-second limit each and
 leaves out a shelf that fails - the same rule the search follows, so one dead backend never
@@ -153,11 +153,11 @@ of a media server is worse than the problem it solves. It has three rules:</p>
   that looks exactly like a corrupt file.</li>
   <li><strong>Page loads are never answered.</strong> It used to serve a cached shell when loading
   failed - which hid the browser's certificate warning after a reinstall or renewal and left
-  "cannot reach SoundStorm" with no way past it. Now the browser fails the page itself, with the
+  "cannot reach EmberStorm" with no way past it. Now the browser fails the page itself, with the
   warning people know how to handle.</li>
 </ol>
 <p>The one exception to rule 3 is opening the app offline for downloads, and it applies only on
-the real <code>*.soundstorm.dev</code> names, only when the network actually failed. Those names
+the real <code>*.emberstorm.dev</code> names, only when the network actually failed. Those names
 carry trusted certificates that renew themselves, so the trap rule 3 exists for cannot happen
 there. On an IP address, localhost or a self-signed certificate, the rule holds exactly.</p>
 <p>What the worker does answer - the app's own <code>/static/</code> files - is network-first.
@@ -174,7 +174,7 @@ The manifest is likewise served by hand, because Go's MIME table has no
 <p>On an iPhone, Share &rarr; Add to Home Screen works from any address. On Android, Chrome's
 <strong>Install app</strong> only appears where a service worker can register - and Chrome refuses
 to register one on an origin with a certificate error, even after the warning was clicked
-through. So the app installs only from the secure <code>https://&lt;id&gt;.home.soundstorm.dev:8099</code>
+through. So the app installs only from the secure <code>https://&lt;id&gt;.home.emberstorm.dev:8099</code>
 name, which has a real Let's Encrypt certificate (see
 <a href="../server/tls.html">Certificates and names</a>).</p>
 <div class="warn">For a long time every installability test ran against <code>localhost</code> or
@@ -186,7 +186,7 @@ believed.</div>
 <h2 id="csp">The content security policy, and no inline scripts</h2>
 <p>The shell is served with a strict Content-Security-Policy, and it is load-bearing rather than
 hardening. Books can contain scripts, and the reader renders chapters in a <code>blob:</code>
-frame that shares SoundStorm's origin; <code>script-src 'self'</code> is part of what keeps a
+frame that shares EmberStorm's origin; <code>script-src 'self'</code> is part of what keeps a
 stranger's EPUB from running JavaScript with the session.</p>
 <p>The cost is that inline <code>&lt;script&gt;</code> is refused - silently, except in the
 console. The service-worker registration first shipped inline; the app worked, nothing looked
@@ -249,7 +249,7 @@ screen on every view - rather than by looking.</p>
   to whatever was last tapped.</li>
 </ul>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

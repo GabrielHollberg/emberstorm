@@ -12,7 +12,7 @@ import (
 )
 
 // Finding the server from soundstorm.dev (names/find.go): whether the website
-// may find it from the home's own internet connection ("Open my SoundStorm"),
+// may find it from the home's own internet connection ("Open my EmberStorm"),
 // and an address of the owner's choosing, hollberg.soundstorm.dev, held by the
 // name service. Owner only, both.
 
@@ -22,7 +22,7 @@ func (s *Server) webNamesAvailable() bool {
 	return s.claimWebName != nil && s.releaseWebName != nil && s.remoteStatus != nil && s.remoteStatus().Available
 }
 
-// handleSetFindable turns "Open my SoundStorm" on or off: PUT {"enabled": bool}.
+// handleSetFindable turns "Open my EmberStorm" on or off: PUT {"enabled": bool}.
 func (s *Server) handleSetFindable(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Enabled bool `json:"enabled"`
@@ -88,7 +88,7 @@ func (s *Server) handleSetWebName(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.log.Warn("claim a web address", "name", name, "err", err)
-		writeError(w, http.StatusBadGateway, "Could not reach SoundStorm's name service just now. Try again in a minute.")
+		writeError(w, http.StatusBadGateway, "Could not reach EmberStorm's name service just now. Try again in a minute.")
 		return
 	}
 	if err := s.store.SetWebName(name); err != nil {

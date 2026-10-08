@@ -30,7 +30,7 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 /**
- * Keeps SoundStorm playing with the screen off, and gives it its lock-screen,
+ * Keeps EmberStorm playing with the screen off, and gives it its lock-screen,
  * notification, headphone and Bluetooth controls.
  *
  * A foreground service of the media-playback kind is what Android requires
@@ -55,7 +55,7 @@ class PlaybackService : Service() {
             CHANNEL, getString(R.string.channel_playback), NotificationManager.IMPORTANCE_LOW,
         ).apply { setShowBadge(false) })
 
-        session = MediaSessionCompat(this, "SoundStorm").apply {
+        session = MediaSessionCompat(this, "EmberStorm").apply {
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() = MediaBridge.dispatch("play")
                 override fun onPause() = MediaBridge.dispatch("pause")

@@ -1,7 +1,7 @@
 // Package scrobble sends somebody's plays to their own ListenBrainz account.
 //
 // A scrobble is a record of a song played, kept by a service that turns a
-// lifetime of them into statistics and recommendations. SoundStorm already
+// lifetime of them into statistics and recommendations. EmberStorm already
 // keeps plays itself (internal/collections); this only repeats them to the
 // account a person connected, from the server, so every device counts and
 // the token never sits in a browser.
@@ -9,7 +9,7 @@
 // ListenBrainz because it asks nothing of the project: each person pastes
 // their own token, and there is no app key to register. Its rules, from its
 // API documentation and checked against the live service: a listen once
-// half the song or four minutes is heard (SoundStorm's own rule for a play),
+// half the song or four minutes is heard (EmberStorm's own rule for a play),
 // at most 1,000 per request, "single" for one and "import" for a batch, and
 // validate-token answers 200 with valid:false for a bad token.
 package scrobble
@@ -78,7 +78,7 @@ func (c *Client) do(ctx context.Context, method, path, token string, body any, o
 		return err
 	}
 	req.Header.Set("Authorization", "Token "+token)
-	req.Header.Set("User-Agent", "SoundStorm (https://github.com/GabrielHollberg/soundstorm)")
+	req.Header.Set("User-Agent", "EmberStorm (https://github.com/GabrielHollberg/soundstorm)")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -144,7 +144,7 @@ type listen struct {
 }
 
 func (c *Client) metadata(l collections.Listen) trackMetadata {
-	info := map[string]any{"submission_client": "SoundStorm", "media_player": "SoundStorm"}
+	info := map[string]any{"submission_client": "EmberStorm", "media_player": "EmberStorm"}
 	if c.Version != "" {
 		info["submission_client_version"] = c.Version
 	}

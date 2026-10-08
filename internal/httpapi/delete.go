@@ -74,7 +74,7 @@ func (s *Server) resolveItemFiles(w http.ResponseWriter, r *http.Request, refs [
 		}
 		lister, ok := src.(source.FileLister)
 		if !ok {
-			writeError(w, http.StatusBadRequest, title+" cannot be deleted or moved from SoundStorm")
+			writeError(w, http.StatusBadRequest, title+" cannot be deleted or moved from EmberStorm")
 			return nil, false
 		}
 		files, err := lister.ItemFiles(r.Context(), it.ID)
@@ -86,7 +86,7 @@ func (s *Server) resolveItemFiles(w http.ResponseWriter, r *http.Request, refs [
 		paths, err := s.library.Resolve(src.Kind(), files)
 		if err != nil {
 			s.log.Warn("delete: refused a path", "source", it.Source, "id", it.ID, "err", err)
-			writeError(w, http.StatusConflict, title+": its files are not where SoundStorm expected")
+			writeError(w, http.StatusConflict, title+": its files are not where EmberStorm expected")
 			return nil, false
 		}
 		items = append(items, library.BinItem{Title: title, Kind: src.Kind(), Paths: paths})

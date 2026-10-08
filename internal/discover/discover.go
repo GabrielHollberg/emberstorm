@@ -42,7 +42,7 @@ const (
 	foundFor   = 180 * 24 * time.Hour
 	noneFor    = 30 * 24 * time.Hour
 	maxSimilar = 50
-	userAgent  = "SoundStorm (https://github.com/GabrielHollberg/soundstorm)"
+	userAgent  = "EmberStorm (https://github.com/GabrielHollberg/soundstorm)"
 )
 
 // Artist is another artist, by name and MusicBrainz id.

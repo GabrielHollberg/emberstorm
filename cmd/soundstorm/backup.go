@@ -15,9 +15,9 @@ import (
 
 // Backup and restore, for the failure the app cannot detect and cannot undo.
 //
-// state.json holds the account and the credentials SoundStorm generated for
+// state.json holds the account and the credentials EmberStorm generated for
 // four backends. Those backends cannot be re-provisioned: each already has an
-// account SoundStorm created, and the password existed in exactly one file.
+// account EmberStorm created, and the password existed in exactly one file.
 // `docker compose down -v`, a wiped volume or a replaced machine leaves four
 // working servers that nobody can log into - the provisioners notice and say
 // so, and there is nothing they can do about it.
@@ -38,7 +38,7 @@ import (
 // anywhere by default. Inside the media folder would be the obvious place and
 // the wrong one - that folder gets synced.
 
-const backupUsage = `SoundStorm backup
+const backupUsage = `EmberStorm backup
 
   soundstorm backup [file | -]
   soundstorm restore <file | ->
@@ -48,7 +48,7 @@ playlists out of the state volume, and back in. Without a file, backup writes so
 state. A file of - means standard output for backup and standard input for
 restore.
 
-The state volume is the only copy of the passwords SoundStorm created on
+The state volume is the only copy of the passwords EmberStorm created on
 Navidrome, Jellyfin and Audiobookshelf. If it is lost, those servers keep
 running with accounts nobody can sign in to, and no amount of reinstalling
 gets them back.
@@ -94,7 +94,7 @@ func backupState(args []string) int {
 
 	path := statePath()
 	if _, err := os.Stat(path); err != nil {
-		fmt.Fprintf(os.Stderr, "No SoundStorm state at %s\n\n"+
+		fmt.Fprintf(os.Stderr, "No EmberStorm state at %s\n\n"+
 			"Run this inside the container, where the state volume is mounted.\n", path)
 		return 1
 	}
@@ -194,7 +194,7 @@ func restoreState(args []string) int {
 	// back to the directory, which Docker sets up for the image's user.
 	//
 	// Without this, a restore run as root leaves state.json owned by root and
-	// SoundStorm crash-loops on "read state: permission denied" at its next
+	// EmberStorm crash-loops on "read state: permission denied" at its next
 	// start. That has happened here once already, from the reset command.
 	owner, ownerErr := os.Stat(path)
 	if ownerErr != nil {
@@ -216,7 +216,7 @@ func restoreState(args []string) int {
 		case readErr != nil:
 			err = fmt.Errorf("read standard input: %w", readErr)
 		case len(raw) > maxBackupBytes:
-			err = fmt.Errorf("standard input is larger than any SoundStorm backup")
+			err = fmt.Errorf("standard input is larger than any EmberStorm backup")
 		default:
 			source = "standard input"
 		}
@@ -261,7 +261,7 @@ func restoreState(args []string) int {
 		if err := restoreOwner(path, owner); err != nil {
 			fmt.Fprintf(os.Stderr,
 				"\n  Warning: restored, but %s could not be given to the user\n"+
-					"  SoundStorm runs as: %v\n\n"+
+					"  EmberStorm runs as: %v\n\n"+
 					"  It may fail to start with a permission error.\n", path, err)
 		}
 	}
@@ -281,7 +281,7 @@ func restoreState(args []string) int {
 	}
 	fmt.Println()
 	fmt.Println("  The previous state is kept as state.json.bak.")
-	fmt.Println("  Start SoundStorm again:  docker compose up -d")
+	fmt.Println("  Start EmberStorm again:  docker compose up -d")
 	fmt.Println()
 	return 0
 }
@@ -293,7 +293,7 @@ func collectionsDir() string {
 // withCollections adds everybody's favorites and playlists to a state file,
 // as one more field, "collections", keyed by account id. A field rather than a
 // wrapper around the file, so the backup still is a state file: an older
-// SoundStorm, which refuses anything without the state's own version field,
+// EmberStorm, which refuses anything without the state's own version field,
 // restores the accounts from it and ignores the rest, and this one restores a
 // backup made before the field existed exactly as it always did.
 //

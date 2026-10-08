@@ -1,4 +1,4 @@
-# SoundStorm installer for Windows.
+# EmberStorm installer for Windows.
 #
 # Double-click SoundStorm-Setup.cmd, or from PowerShell:
 #
@@ -11,7 +11,7 @@
 # instruction, not an error code.
 #
 #   -Launch        start an existing install and open it (what the shortcut runs)
-#   -Uninstall     remove SoundStorm, keeping the media library
+#   -Uninstall     remove EmberStorm, keeping the media library
 #   -Https         real https for a soundstorm.dev name (the default already)
 #   -NoHttps       plain http only
 #   -Tailscale     also reach it away from home, over a tailnet
@@ -22,7 +22,7 @@
 #   -NoAutoStart   install, but do not start with Windows
 #   -Library PATH  keep the media library somewhere else - an external drive
 #   -ChooseLibrary ask, in a window, where the library should go (what the
-#                  "Move SoundStorm library" shortcut runs)
+#                  "Move EmberStorm library" shortcut runs)
 #   -Console       show progress in this console instead of a window
 #
 # Updating is the same as installing: run it again. It pulls newer images and
@@ -63,7 +63,7 @@ param(
     [string]$Library,
     [Alias('choose-library')][switch]$ChooseLibrary,
     # Moving to another computer: -Export packs this install into a
-    # SoundStorm-move folder in the path given (-Move asks where, for the
+    # EmberStorm-move folder in the path given (-Move asks where, for the
     # Start menu shortcut); -Import installs from one. -NoLibrary leaves the
     # media out of an export, for somebody copying it themselves.
     [string]$Export,
@@ -134,12 +134,17 @@ $ScriptUrl  = if ($env:SOUNDSTORM_SCRIPT_URL) { $env:SOUNDSTORM_SCRIPT_URL } els
 # Under the user's own folder rather than Program Files: the media library
 # lives beside the compose file, and it has to be somewhere they can drop a
 # hard drive of music into without a permission prompt.
-$Dir       = if ($env:SOUNDSTORM_DIR) { $env:SOUNDSTORM_DIR } else { Join-Path $env:USERPROFILE 'SoundStorm' }
+# The product was called SoundStorm before EmberStorm (2026-10-07): an install
+# made then lives in a folder of that name, and is found there, so updating it
+# carries on in place.
+$Dir       = if ($env:SOUNDSTORM_DIR) { $env:SOUNDSTORM_DIR }
+             elseif (Test-Path (Join-Path $env:USERPROFILE 'SoundStorm\docker-compose.yml')) { Join-Path $env:USERPROFILE 'SoundStorm' }
+             else { Join-Path $env:USERPROFILE 'EmberStorm' }
 $FirstPort = if ($env:SOUNDSTORM_PORT) { [int]$env:SOUNDSTORM_PORT } else { 8099 }
 
 # Updating runs the newest installer, not the one saved last time.
 #
-# "Update SoundStorm" runs the copy of this script saved beside the install,
+# "Update EmberStorm" runs the copy of this script saved beside the install,
 # and the setup file runs whatever it just downloaded - so each update used to
 # run the *previous* version's logic, and a fix to the installer itself only
 # took effect on the update after the one that fetched it. So a saved or
@@ -185,7 +190,7 @@ if (-not $Launch -and $env:SOUNDSTORM_FRESH -ne '1' -and
 # in it. So an interactive setup relaunches itself with its console hidden and
 # shows a window instead - the four steps ticking off, what it is doing now, a
 # progress bar, what to click in the windows Docker opens, and at the end the
-# setup code and an Open SoundStorm button. The console output is still all
+# setup code and an Open EmberStorm button. The console output is still all
 # there, under "Show details", and in a log file for whoever is helping.
 #
 # The window runs on the same thread as the setup, pumped from every place the
@@ -201,7 +206,7 @@ if (-not $Launch -and $env:SOUNDSTORM_FRESH -ne '1' -and
 # made from their code points at run time.
 
 $script:Gui = $null
-$script:SetupLog = Join-Path $env:TEMP 'SoundStorm-setup.log'
+$script:SetupLog = Join-Path $env:TEMP 'EmberStorm-setup.log'
 
 # Update-Gui lets the window repaint and answer clicks. A no-op without one.
 function Update-Gui {
@@ -266,7 +271,7 @@ function Wait-ProcessPumped($Process, [int]$TimeoutSeconds = 0) {
 
 # Read-Text asks for one line of text: in a box with the window up, since a
 # hidden console cannot be typed into, and on the console otherwise.
-function Read-Text([string]$Prompt, [string]$Title = 'SoundStorm Setup') {
+function Read-Text([string]$Prompt, [string]$Title = 'EmberStorm Setup') {
     if ($script:Gui) {
         Add-Type -AssemblyName Microsoft.VisualBasic
         return [Microsoft.VisualBasic.Interaction]::InputBox($Prompt, $Title, '')
@@ -293,7 +298,7 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
     }
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'SoundStorm Setup'
+    $form.Text = 'EmberStorm Setup'
     $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = 'FixedSingle'
     $form.MaximizeBox = $false
@@ -364,7 +369,7 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
     $g.Toggle = $toggle
 
     $open = New-Object System.Windows.Forms.Button
-    $open.Text = 'Open SoundStorm'
+    $open.Text = 'Open EmberStorm'
     $open.Location = New-Object System.Drawing.Point(344, 504)
     $open.Size = New-Object System.Drawing.Size(160, 34)
     $open.Visible = $false
@@ -421,8 +426,8 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
         param($sender, $e)
         if ($script:Gui.Running) {
             $answer = [System.Windows.Forms.MessageBox]::Show($sender,
-                "SoundStorm is still being set up.`r`n`r`nStop now? Anything already downloaded is kept, and running the setup again carries on from there.",
-                'SoundStorm Setup',
+                "EmberStorm is still being set up.`r`n`r`nStop now? Anything already downloaded is kept, and running the setup again carries on from there.",
+                'EmberStorm Setup',
                 [System.Windows.Forms.MessageBoxButtons]::YesNo,
                 [System.Windows.Forms.MessageBoxIcon]::Warning)
             if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) {
@@ -592,7 +597,7 @@ function Stop-Gui([string]$Text) {
     $w = $script:Gui
     $w.Running = $false
     Set-GuiStepMarks -Failed
-    $w.Title.Text = 'SoundStorm could not finish'
+    $w.Title.Text = 'EmberStorm could not finish'
     $w.Title.ForeColor = [System.Drawing.Color]::Firebrick
     $w.Sub.Text = 'Nothing is lost - running the setup again carries on from where it stopped.'
     $w.Status.Text = ''
@@ -656,7 +661,7 @@ if ($script:WindowWanted -and $env:SOUNDSTORM_WINDOW -ne '1' -and $PSCommandPath
             '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', "`"$copy`"") +
             (ConvertTo-ArgumentList $PSBoundParameters))
         Microsoft.PowerShell.Utility\Write-Host ""
-        Microsoft.PowerShell.Utility\Write-Host "  SoundStorm setup has opened in its own window." -ForegroundColor Green
+        Microsoft.PowerShell.Utility\Write-Host "  EmberStorm setup has opened in its own window." -ForegroundColor Green
         exit 99
     }
 }
@@ -723,7 +728,7 @@ function Show-DockerGuide([switch]$FirstRun) {
     if (-not $script:dockerInstalledNow -and -not $FirstRun) { return }
     if ($script:dockerInstalledNow) {
         Callout 'Docker Desktop' @(
-            'SoundStorm runs inside a free program called Docker Desktop.',
+            'EmberStorm runs inside a free program called Docker Desktop.',
             'Setup installs and starts it, and answers its first questions for',
             'you - there is nothing to click in Docker, and no Docker account',
             'is needed.',
@@ -771,7 +776,7 @@ function Test-DockerFirstRun {
 # "I understand". The window has no close button, so the only way on is to
 # have read it; the console fallback asks for Enter.
 function Confirm-DockerGuide {
-    $text = "SoundStorm runs inside a free program called Docker Desktop. It is already on this PC but has not been opened yet, so when setup starts it, Docker opens a window asking you to accept its terms:`r`n`r`n" +
+    $text = "EmberStorm runs inside a free program called Docker Desktop. It is already on this PC but has not been opened yet, so when setup starts it, Docker opens a window asking you to accept its terms:`r`n`r`n" +
         "    Subscription Service Agreement  ->  click Accept`r`n`r`n" +
         "That is the only thing to click: setup skips Docker's sign-in and questions for you, and no Docker account is needed.`r`n`r`n" +
         "Setup cannot finish until you click Accept. Stay at the computer until Docker's window appears, then come back to this setup - it carries on by itself."
@@ -785,7 +790,7 @@ function Confirm-DockerGuide {
     }
     Note "A window has opened: read it, then click I understand."
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'SoundStorm - Docker will ask one thing'
+    $form.Text = 'EmberStorm - Docker will ask one thing'
     $form.FormBorderStyle = 'FixedDialog'
     $form.ControlBox = $false
     $form.StartPosition = 'CenterScreen'
@@ -825,7 +830,7 @@ function Confirm-DockerGuide {
 # nothing at all.
 function Stop-With($text) {
     Write-Host ""
-    Write-Host "  SoundStorm could not finish." -ForegroundColor Red
+    Write-Host "  EmberStorm could not finish." -ForegroundColor Red
     Write-Host ""
     Write-Host $text
     Write-Host ""
@@ -834,23 +839,23 @@ function Stop-With($text) {
     exit 1
 }
 
-# Save-SoundStormLog puts SoundStorm's own recent log into the setup log, so
+# Save-EmberStormLog puts EmberStorm's own recent log into the setup log, so
 # that when it will not start, the one file somebody is asked to send already
 # has what whoever helps them needs. The alternative was printing
 # "cd <folder>; docker compose logs" at a person who has never opened a
 # terminal.
 #
-# SoundStorm's log only: the media servers' logs are not held to carrying no
+# EmberStorm's log only: the media servers' logs are not held to carrying no
 # credential - a Subsonic request carries its credential in the query string -
-# and this file is one people are told to send to somebody. SoundStorm's own
+# and this file is one people are told to send to somebody. EmberStorm's own
 # does carry one thing: until an account exists it logs the setup code, which
 # is exactly when a failed setup sends this file. So Protect-SetupLog takes it
 # out.
-function Save-SoundStormLog {
+function Save-EmberStormLog {
     try {
         $logs = Invoke-Docker @('compose', '--project-directory', $Dir, 'logs', '--no-color', '--tail', '200', 'soundstorm') -Capture
         [IO.File]::AppendAllText($script:SetupLog,
-            "`r`n----- SoundStorm's own log (last 200 lines) -----`r`n$($logs.Output)`r`n")
+            "`r`n----- EmberStorm's own log (last 200 lines) -----`r`n$($logs.Output)`r`n")
     } catch {
         # The setup log still says what the setup saw.
     }
@@ -858,7 +863,7 @@ function Save-SoundStormLog {
 }
 
 # Protect-SetupLog removes the setup code from the setup log, however it was
-# written: SoundStorm's "code=" and "?setup=", and the code shown in the
+# written: EmberStorm's "code=" and "?setup=", and the code shown in the
 # finished window in groups of four. Whoever has the code can create the
 # owner's account on a server that has none yet.
 function Protect-SetupLog {
@@ -882,7 +887,7 @@ function Protect-SetupLog {
     }
 }
 
-# Get-HelpAdvice is what to do when SoundStorm will not start, in words rather
+# Get-HelpAdvice is what to do when EmberStorm will not start, in words rather
 # than commands.
 function Get-HelpAdvice {
     Protect-SetupLog
@@ -891,7 +896,7 @@ function Get-HelpAdvice {
   Restart the PC and run this setup again - that fixes it more often than
   not, and nothing you have downloaded is lost.
 
-  If it happens again, send this file to whoever helps you with SoundStorm${open}:
+  If it happens again, send this file to whoever helps you with EmberStorm${open}:
 
     $script:SetupLog
 "@
@@ -903,7 +908,7 @@ function Show-Problem($text) {
         # 120 seconds rather than 0: at startup there may be nobody to click
         # it, and a modal box waiting forever would keep the process alive.
         # 48 is the warning icon.
-        $shell.Popup($text, 120, 'SoundStorm', 48) | Out-Null
+        $shell.Popup($text, 120, 'EmberStorm', 48) | Out-Null
     } catch {
         # A dialog is a nicety; failing to show one must not become the error.
     }
@@ -1093,7 +1098,7 @@ function Get-DockerDesktopPath {
 #
 # Only called immediately after installing it, so this sets a default on a
 # fresh install rather than overriding a choice somebody made. Nobody who
-# installs SoundStorm wants a Docker dashboard in their face at every login -
+# installs EmberStorm wants a Docker dashboard in their face at every login -
 # the whole premise is that they never learn Docker is there.
 #
 # Written without a byte order mark: PowerShell 5.1's Set-Content -Encoding
@@ -1275,7 +1280,7 @@ function Get-UpnpUrl([string]$Gateway = '') {
 
 # --- other devices on the network ---------------------------------------------
 #
-# Reaching SoundStorm from a phone was the one thing a laptop install could not
+# Reaching EmberStorm from a phone was the one thing a laptop install could not
 # do, and the installer only ever said "allow it through the firewall" in gray.
 # Two things stand in the way, and neither is visible from the PC itself:
 #
@@ -1287,13 +1292,14 @@ function Get-UpnpUrl([string]$Gateway = '') {
 #     whatever is unticked - or everything, if the dialog is dismissed - gets
 #     a Block rule, which beats any Allow.
 #
-# So after SoundStorm is running (and after that dialog has done whatever it
+# So after EmberStorm is running (and after that dialog has done whatever it
 # did), the installer checks both and puts them right, with the person's say-so
 # for anything that changes how Windows trusts a network. Only Private networks
 # are ever opened: a network somebody has told Windows is their home, where the
 # router already keeps the internet out unless they forward a port - which is
 # exactly the case remote access needs this rule for.
 
+# Named as it was before the rename, so an existing rule is found again.
 $script:LanRuleName = 'SoundStorm - other devices on your home network'
 
 # Get-LanProfile is the Windows network profile of the adapter holding Address:
@@ -1330,7 +1336,7 @@ function Get-DockerPrivateBlocks {
 }
 
 # Test-LanAccessReady says whether a Private network already lets other devices
-# in: SoundStorm's Allow rule is there for this port, and nothing blocks
+# in: EmberStorm's Allow rule is there for this port, and nothing blocks
 # Docker's listener on Private. Readable without administrator, which is what
 # keeps an update from asking for permission every time.
 function Test-LanAccessReady([int]$Port) {
@@ -1349,7 +1355,7 @@ function Test-LanAccessReady([int]$Port) {
 }
 
 # Enable-LanAccess makes the changes, in one elevated step: optionally mark the
-# network Private, add SoundStorm's Allow rule for Port on Private networks,
+# network Private, add EmberStorm's Allow rule for Port on Private networks,
 # and take Private out of any Docker Block rule (leaving it blocking on Public,
 # where it was). Returns the exit code, or $null when permission was refused.
 #
@@ -1363,7 +1369,7 @@ try {
     if ($makePrivateText) { Set-NetConnectionProfile -InterfaceIndex $InterfaceIndex -NetworkCategory Private }
     Get-NetFirewallRule -DisplayName '$($script:LanRuleName)' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
     New-NetFirewallRule -DisplayName '$($script:LanRuleName)' ``
-        -Description 'Lets phones, TVs and other computers on a network you have marked Private reach SoundStorm. Added by the SoundStorm setup.' ``
+        -Description 'Lets phones, TVs and other computers on a network you have marked Private reach EmberStorm. Added by the EmberStorm setup.' ``
         -Direction Inbound -Action Allow -Protocol TCP -LocalPort $Port -Profile Private | Out-Null
     `$blocks = Get-NetFirewallApplicationFilter | Where-Object { `$_.Program -like '*\com.docker.backend.exe' } |
         Get-NetFirewallRule | Where-Object {
@@ -1394,7 +1400,7 @@ function Set-LanAccess([string]$Address, [int]$Port) {
     if (-not $network) { return 'unknown' }
 
     if ($network.Category -eq 'DomainAuthenticated') {
-        Note "This PC is on a work network, so SoundStorm does not open itself to other"
+        Note "This PC is on a work network, so EmberStorm does not open itself to other"
         Note "devices on it - that is for whoever runs the network to decide."
         return 'domain'
     }
@@ -1407,11 +1413,11 @@ function Set-LanAccess([string]$Address, [int]$Port) {
         }
         $makePrivate = $true
     } elseif (Test-LanAccessReady $Port) {
-        Good "Other devices on your network can reach SoundStorm."
+        Good "Other devices on your network can reach EmberStorm."
         return 'ready'
     }
 
-    Note "Letting other devices on your home network reach SoundStorm."
+    Note "Letting other devices on your home network reach EmberStorm."
     if (-not (Test-Administrator)) { Important "Windows will ask for permission - click Yes." }
     $code = Enable-LanAccess $Port $network.InterfaceIndex $makePrivate
     if ($null -eq $code) {
@@ -1419,7 +1425,7 @@ function Set-LanAccess([string]$Address, [int]$Port) {
         return 'refused'
     }
     if ($code -eq 0 -and (Test-LanAccessReady $Port)) {
-        Good "Done - other devices on your network can reach SoundStorm."
+        Good "Done - other devices on your network can reach EmberStorm."
         return 'ready'
     }
     Important "Could not change the network settings (code $code)."
@@ -1451,7 +1457,7 @@ function Update-LanAddress {
     return $true
 }
 
-# Confirm-LanOnLaunch asks the setup's question again when SoundStorm starts
+# Confirm-LanOnLaunch asks the setup's question again when EmberStorm starts
 # on a network Windows treats as public - every new Wi-Fi network is, unless
 # somebody said otherwise - where phones and TVs cannot reach it and nothing
 # said why: a laptop taken to another house, or a new router. Yes makes it
@@ -1534,8 +1540,8 @@ function Show-LanAdvice([string]$State) {
             Write-Host ""
         }
         { $_ -in 'public', 'refused', 'failed' } {
-            Important "Other devices cannot reach SoundStorm yet."
-            Write-Host "  To fix it later, on your home network, run 'Update SoundStorm' from" -ForegroundColor Gray
+            Important "Other devices cannot reach EmberStorm yet."
+            Write-Host "  To fix it later, on your home network, run 'Update EmberStorm' from" -ForegroundColor Gray
             Write-Host "  the Start menu and answer Y - or in Windows Settings, open" -ForegroundColor Gray
             Write-Host "  Network & internet, your Wi-Fi, and set 'Network profile type' to" -ForegroundColor Gray
             Write-Host "  Private." -ForegroundColor Gray
@@ -1682,7 +1688,7 @@ function Install-WSL {
 function Install-Docker {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         Stop-With @"
-  SoundStorm needs Docker Desktop, and this PC does not have the installer
+  EmberStorm needs Docker Desktop, and this PC does not have the installer
   tool (winget) that would fetch it automatically.
 
   Install Docker Desktop from here, then run this again:
@@ -2026,7 +2032,7 @@ function Test-Healthz([string]$Url) {
     }
 }
 
-function Wait-ForSoundStorm([string]$Url) {
+function Wait-ForEmberStorm([string]$Url) {
     # Process-wide, because .NET Framework offers no per-request hook. Set for
     # the few seconds of the health check and put back afterwards; the requests
     # it covers go to a certificate this machine minted, on this machine.
@@ -2040,15 +2046,15 @@ function Wait-ForSoundStorm([string]$Url) {
     try {
         $waited = 0
         while (-not (Test-Healthz $Url)) {
-            if ($waited -eq 0) { Note "Waiting for SoundStorm to answer - usually under a minute." }
+            if ($waited -eq 0) { Note "Waiting for EmberStorm to answer - usually under a minute." }
             Start-Sleep -Seconds 2
             $waited += 2
             # Up to three minutes with nothing on screen is exactly when
             # somebody decides it has hung and closes the window.
             if ($waited % 20 -eq 0) { Note "still starting... ($waited seconds). This is normal the first time." }
             if ($waited -gt 180) {
-                Save-SoundStormLog
-                Stop-With "  SoundStorm started but never answered.`n`n$(Get-HelpAdvice)"
+                Save-EmberStormLog
+                Stop-With "  EmberStorm started but never answered.`n`n$(Get-HelpAdvice)"
             }
         }
     } finally {
@@ -2057,7 +2063,7 @@ function Wait-ForSoundStorm([string]$Url) {
 }
 
 # Takes the folder, because the one thing this has to read is sometimes
-# somebody else's install: when the setup refuses because SoundStorm is
+# somebody else's install: when the setup refuses because EmberStorm is
 # already installed elsewhere, the useful half of that message is the address
 # of the install it found.
 function Get-EnvSettingIn([string]$Folder, [string]$Name) {
@@ -2123,10 +2129,10 @@ function Resolve-LibraryChoice([string]$Picked) {
         }
     }
     if ($isNetwork) {
-        return @{ Path = $null; Problem = 'That is a network location, which SoundStorm cannot use. Choose a drive plugged into this PC.' }
+        return @{ Path = $null; Problem = 'That is a network location, which EmberStorm cannot use. Choose a drive plugged into this PC.' }
     }
-    if ([IO.Path]::GetFileName($Picked.TrimEnd('\')) -ne 'SoundStorm') {
-        $Picked = Join-Path $Picked 'SoundStorm'
+    if ([IO.Path]::GetFileName($Picked.TrimEnd('\')) -ne 'EmberStorm') {
+        $Picked = Join-Path $Picked 'EmberStorm'
     }
     return @{ Path = $Picked; Problem = '' }
 }
@@ -2171,7 +2177,7 @@ function Select-LibraryLocation([string]$Default, [string]$Intro = '') {
     Note "A window has opened asking where to keep your library."
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'SoundStorm - where should your library go?'
+    $form.Text = 'EmberStorm - where should your library go?'
     $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false
     $form.MinimizeBox = $false
@@ -2237,7 +2243,7 @@ function Select-LibraryLocation([string]$Default, [string]$Intro = '') {
 
     $choose.Add_Click({
         $browser = New-Object System.Windows.Forms.FolderBrowserDialog
-        $browser.Description = 'Choose where SoundStorm keeps your music, films and books. A folder called SoundStorm is made inside the one you pick.'
+        $browser.Description = 'Choose where EmberStorm keeps your music, films and books. A folder called EmberStorm is made inside the one you pick.'
         $browser.ShowNewFolderButton = $true
         $browser.RootFolder = [Environment+SpecialFolder]::MyComputer
         if ($browser.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -2308,7 +2314,7 @@ function Show-TailscaleDialog {
     [System.Windows.Forms.Application]::EnableVisualStyles()
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'SoundStorm - set up Tailscale'
+    $form.Text = 'EmberStorm - set up Tailscale'
     $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false
     $form.MinimizeBox = $false
@@ -2319,7 +2325,7 @@ function Show-TailscaleDialog {
     $form.ClientSize = New-Object System.Drawing.Size(560, 430)
 
     $intro = New-Object System.Windows.Forms.Label
-    $intro.Text = "Tailscale lets your own phones and computers reach SoundStorm from anywhere, privately. Nothing is opened on your router, and it works on every kind of internet connection.`r`n`r`nIt needs a free Tailscale account, and the Tailscale app on each phone or computer that should connect, signed in to that same account."
+    $intro.Text = "Tailscale lets your own phones and computers reach EmberStorm from anywhere, privately. Nothing is opened on your router, and it works on every kind of internet connection.`r`n`r`nIt needs a free Tailscale account, and the Tailscale app on each phone or computer that should connect, signed in to that same account."
     $intro.Location = New-Object System.Drawing.Point(20, 16)
     $intro.Size = New-Object System.Drawing.Size(520, 108)
     $form.Controls.Add($intro)
@@ -2397,7 +2403,7 @@ function Show-TailscaleDialog {
 # Confirm-HomeNetwork asks the network question in a Yes/No window, falling
 # back to the console only where no window can be shown. Returns $true for yes.
 function Confirm-HomeNetwork([string]$NetworkName) {
-    $text = "Windows is treating the network this PC is on (""$NetworkName"") as public - the setting for cafes and airports - so your phone, TV and other computers cannot reach SoundStorm.`r`n`r`nIs this your own home network?`r`n`r`nYes: SoundStorm marks it as private so your other devices can connect. Windows will ask for permission.`r`nNo: nothing is changed."
+    $text = "Windows is treating the network this PC is on (""$NetworkName"") as public - the setting for cafes and airports - so your phone, TV and other computers cannot reach EmberStorm.`r`n`r`nIs this your own home network?`r`n`r`nYes: EmberStorm marks it as private so your other devices can connect. Windows will ask for permission.`r`nNo: nothing is changed."
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
     } catch {
@@ -2412,7 +2418,7 @@ function Confirm-HomeNetwork([string]$NetworkName) {
     $owner = New-TopmostOwner
     try {
         $answer = [System.Windows.Forms.MessageBox]::Show($owner, $text,
-            'SoundStorm - is this your home network?',
+            'EmberStorm - is this your home network?',
             [System.Windows.Forms.MessageBoxButtons]::YesNo,
             [System.Windows.Forms.MessageBoxIcon]::Question)
     } finally {
@@ -2462,10 +2468,10 @@ function Set-EnvSetting([string]$Name, [string]$Value) {
 # Administrators, who can take ownership of anything anyway.
 #
 # .env holds the first sign-up's setup code and, with -Tailscale, a reusable
-# auth key; the uninstaller's backup holds the password SoundStorm made on every
+# auth key; the uninstaller's backup holds the password EmberStorm made on every
 # media server. Left alone, a file inherits its folder's permissions. Under the
 # user profile, the default, that already keeps other users out - but the
-# install can live anywhere (SOUNDSTORM_DIR), and a folder like C:\SoundStorm
+# install can live anywhere (SOUNDSTORM_DIR), and a folder like C:\EmberStorm
 # inherits "Users: read" from the drive. install.sh gets the same protection
 # from umask 077.
 #
@@ -2509,7 +2515,7 @@ function Protect-SecretFile([string]$Path) {
     # Not fatal: the folder's own permissions still apply, and under the user
     # profile those already keep other accounts out. Said once, plainly.
     Note "Could not tighten the permissions on $([IO.Path]::GetFileName($Path)) ($firstError)."
-    Note "It is still protected by the folder it is in; SoundStorm works normally."
+    Note "It is still protected by the folder it is in; EmberStorm works normally."
 }
 
 function Get-InstalledPort {
@@ -2521,7 +2527,7 @@ function Get-InstalledPort {
 # Write-ServeConfig writes the file Tailscale proxies through.
 #
 # The scheme matters and is the one thing that cannot be a constant: Tailscale
-# talks to SoundStorm over the internal compose network, and SoundStorm is
+# talks to EmberStorm over the internal compose network, and EmberStorm is
 # either speaking plain HTTP there or its own self-signed HTTPS depending on
 # what -Https did. Point the proxy at the wrong one and the tailnet address
 # answers 502 while everything else looks fine.
@@ -2580,7 +2586,7 @@ function Get-InstalledScheme {
 }
 
 # Get-SecureAddress waits briefly for auto mode's real https address, asking
-# SoundStorm itself over plain http on this machine - so no certificate is
+# EmberStorm itself over plain http on this machine - so no certificate is
 # involved in the asking. The name arrives within seconds of the certificate,
 # which usually takes ten or twenty; empty if it has not by the deadline, and
 # the http address works meanwhile.
@@ -2593,7 +2599,7 @@ function Get-HasAccount([string]$Url) {
     $bypassed = $false
     if ($Url -like 'https://*') {
         # A certificate this PC minted, on this PC; same reasoning as
-        # Wait-ForSoundStorm.
+        # Wait-ForEmberStorm.
         $priorCallback = [Net.ServicePointManager]::ServerCertificateValidationCallback
         [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
         $bypassed = $true
@@ -2661,59 +2667,63 @@ function Install-Shortcuts {
     # puts a console on the taskbar for the second it takes.
     $arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`" -Launch"
 
+    # Shortcuts from before the rename go, or both names would sit side by side.
+    Remove-Shortcuts -OldOnly
     $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-    New-Shortcut (Join-Path $startMenu 'SoundStorm.lnk') $powershell $arguments $Dir `
+    New-Shortcut (Join-Path $startMenu 'EmberStorm.lnk') $powershell $arguments $Dir `
         'Open your media library' $true
-    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'SoundStorm.lnk') `
+    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'EmberStorm.lnk') `
         $powershell $arguments $Dir 'Open your media library' $true
 
     # Somewhere to put files, one click away. The app takes a drag-and-drop
     # too, but a folder is what people reach for with a hard drive of music.
-    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'SoundStorm media.lnk') `
+    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'EmberStorm media.lnk') `
         (Get-LibraryPath) $null $null 'Put your music, films and books in here' $false
 
     # Updating is re-running the installer, so the shortcut is the installer.
-    New-Shortcut (Join-Path $startMenu 'Update SoundStorm.lnk') $powershell `
+    New-Shortcut (Join-Path $startMenu 'Update EmberStorm.lnk') $powershell `
         "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`"" $Dir `
-        'Get the newest version of SoundStorm' $true
+        'Get the newest version of EmberStorm' $true
 
     # Moving the library is the one change somebody may want long after
     # installing, and -Library is a command-line option. A shortcut that opens
     # the same window a first install shows means nobody has to type it.
-    New-Shortcut (Join-Path $startMenu 'Move SoundStorm library.lnk') $powershell `
+    New-Shortcut (Join-Path $startMenu 'Move EmberStorm library.lnk') $powershell `
         "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`" -ChooseLibrary" $Dir `
         'Keep your music, films and books in a different folder or drive' $true
 
     # Moving to a new computer, the same way: a window and a folder picker,
     # never a typed path.
-    New-Shortcut (Join-Path $startMenu 'Move SoundStorm to another computer.lnk') $powershell `
+    New-Shortcut (Join-Path $startMenu 'Move EmberStorm to another computer.lnk') $powershell `
         "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`" -Move" $Dir `
-        'Pack up SoundStorm, with your accounts and media, to move to a new computer' $true
+        'Pack up EmberStorm, with your accounts and media, to move to a new computer' $true
 
     # Tailscale is offered where it is needed - the account panel points here
     # when remote access cannot work on a connection - not asked about during
     # every install. This is the click-through way in; -Tailscale is the same.
     New-Shortcut (Join-Path $startMenu 'Set up Tailscale.lnk') $powershell `
         "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`" -Tailscale" $Dir `
-        'Reach SoundStorm privately from your own devices, from anywhere' $true
+        'Reach EmberStorm privately from your own devices, from anywhere' $true
 
     if (-not $NoAutoStart) {
         $startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
-        New-Shortcut (Join-Path $startup 'SoundStorm.lnk') $powershell `
+        New-Shortcut (Join-Path $startup 'EmberStorm.lnk') $powershell `
             "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`" -Launch -NoBrowser" $Dir `
-            'Start SoundStorm with Windows' $true
+            'Start EmberStorm with Windows' $true
     }
     Register-Uninstaller
-    Good "Added SoundStorm to the Start menu and the desktop."
+    Good "Added EmberStorm to the Start menu and the desktop."
 }
 
 # uninstallKey is where Windows looks for what can be removed.
 #
-# Under HKCU rather than HKLM because SoundStorm installs per-user, into the
+# Under HKCU rather than HKLM because EmberStorm installs per-user, into the
 # user's own folder, without administrator rights. It shows up in Settings,
 # Apps, where people actually go to remove something - a program that can only
 # be uninstalled by finding instructions on a web page is not really
 # uninstallable.
+# The key keeps the name it had as SoundStorm, so an install made then is
+# updated in place rather than listed twice; what Settings shows is DisplayName.
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SoundStorm'
 
 function Register-Uninstaller {
@@ -2727,9 +2737,9 @@ function Register-Uninstaller {
         # not take an `if` as an argument expression, and a tokenizer check
         # does not catch that.
         $strings = @{
-            DisplayName     = 'SoundStorm'
+            DisplayName     = 'EmberStorm'
             DisplayVersion  = '0.1'
-            Publisher       = 'SoundStorm'
+            Publisher       = 'EmberStorm'
             InstallLocation = $Dir
             URLInfoAbout    = 'https://github.com/GabrielHollberg/soundstorm'
             UninstallString = "`"$powershell`" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$localScript`" -Uninstall"
@@ -2748,19 +2758,27 @@ function Register-Uninstaller {
     }
 }
 
-function Remove-Shortcuts {
+# Remove-Shortcuts takes away the shortcuts under the product's names - its
+# own and the old SoundStorm ones, or only the old ones (-OldOnly, as an update
+# replaces them).
+function Remove-Shortcuts([switch]$OldOnly) {
     $desktop = [Environment]::GetFolderPath('Desktop')
     $programs = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-    foreach ($path in @(
-        (Join-Path $desktop 'SoundStorm.lnk'),
-        (Join-Path $desktop 'SoundStorm media.lnk'),
-        (Join-Path $programs 'SoundStorm.lnk'),
-        (Join-Path $programs 'Update SoundStorm.lnk'),
-        (Join-Path $programs 'Move SoundStorm library.lnk'),
-        (Join-Path $programs 'Move SoundStorm to another computer.lnk'),
-        (Join-Path $programs 'Set up Tailscale.lnk'),
-        (Join-Path $programs 'Startup\SoundStorm.lnk')
-    )) {
+    $names = if ($OldOnly) { @('SoundStorm') } else { @('EmberStorm', 'SoundStorm') }
+    $paths = @()
+    foreach ($n in $names) {
+        $paths += @(
+            (Join-Path $desktop "$n.lnk"),
+            (Join-Path $desktop "$n media.lnk"),
+            (Join-Path $programs "$n.lnk"),
+            (Join-Path $programs "Update $n.lnk"),
+            (Join-Path $programs "Move $n library.lnk"),
+            (Join-Path $programs "Move $n to another computer.lnk"),
+            (Join-Path $programs "Startup\$n.lnk")
+        )
+    }
+    if (-not $OldOnly) { $paths += (Join-Path $programs 'Set up Tailscale.lnk') }
+    foreach ($path in $paths) {
         Remove-Item $path -Force -ErrorAction SilentlyContinue
     }
 }
@@ -2769,7 +2787,7 @@ function Remove-Shortcuts {
 
 if ($Uninstall) {
     Write-Host ""
-    Write-Host "  Removing SoundStorm" -ForegroundColor White
+    Write-Host "  Removing EmberStorm" -ForegroundColor White
     Write-Host "  -----------------------------------------------------------"
 
     $library = Get-LibraryPath
@@ -2797,7 +2815,7 @@ if ($Uninstall) {
                 Protect-SecretFile $backup
                 Good "Saved to $backup"
                 Note "Keep it if you might reinstall - it is the only copy of the"
-                Note "passwords SoundStorm made on the media servers."
+                Note "passwords EmberStorm made on the media servers."
             } else {
                 # Not fatal: somebody uninstalling has asked to lose this, and
                 # refusing to uninstall because the backup failed is worse.
@@ -2806,7 +2824,7 @@ if ($Uninstall) {
 
             Step "Stopping it and removing its data"
             Note "Accounts and the servers' own settings go; your media does not."
-            # down -v takes the named volumes with it: SoundStorm's accounts,
+            # down -v takes the named volumes with it: EmberStorm's accounts,
             # and Jellyfin's and Navidrome's own databases. The library is a
             # bind mount from the folder and is not touched by this.
             Invoke-Docker @('compose', 'down', '-v') -Capture | Out-Null
@@ -2831,7 +2849,7 @@ if ($Uninstall) {
     Write-Host ""
     Write-Host "  -----------------------------------------------------------"
     Write-Host "  Done." -ForegroundColor Green -NoNewline
-    Write-Host " SoundStorm is gone."
+    Write-Host " EmberStorm is gone."
     Write-Host ""
     if ($hasLibrary) {
         Write-Host "  Your media has been left exactly where it was:"
@@ -2851,7 +2869,7 @@ if ($Uninstall) {
 
 # --- moving it to another computer ---------------------------------------------
 
-# What a move carries besides the library: SoundStorm's own state (accounts,
+# What a move carries besides the library: EmberStorm's own state (accounts,
 # the passwords it made on every backend, favorites, playlists, positions,
 # the install's name) and each backend's own database. Left out on purpose:
 # the caches and downloaded models, which rebuild themselves, and Tailscale's
@@ -2906,7 +2924,7 @@ function Copy-Folder([string]$From, [string]$To, [string]$ErrorLog) {
 function Write-MoveLaunchers([string]$Folder) {
     $sh = @(
         '#!/bin/sh',
-        '# Installs SoundStorm on this computer from the move folder this file is in.',
+        '# Installs EmberStorm on this computer from the move folder this file is in.',
         'here=$(cd "$(dirname "$0")" && pwd)',
         '# A fresh private file, not a fixed /tmp name another user could plant first.',
         't=$(mktemp) || exit 1',
@@ -2918,16 +2936,16 @@ function Write-MoveLaunchers([string]$Folder) {
     $q = "'"
     $cmd = @(
         '@echo off',
-        'rem Installs SoundStorm on this computer from the move folder this file is in.',
+        'rem Installs EmberStorm on this computer from the move folder this file is in.',
         'setlocal',
         'set "HERE=%~dp0"',
         'set "HERE=%HERE:~0,-1%"',
         'set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"',
         'set "SOUNDSTORM_SETUP_URL=https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.ps1"',
-        ('start "" /min "%PS%" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$ProgressPreference = ' + $q + 'SilentlyContinue' + $q + '; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $f = Join-Path $env:TEMP ' + $q + 'soundstorm-install.ps1' + $q + '; try { Invoke-WebRequest -UseBasicParsing -Uri $env:SOUNDSTORM_SETUP_URL -OutFile $f } catch { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show(' + $q + 'SoundStorm could not download its installer. Check the internet connection and try again.' + $q + ', ' + $q + 'SoundStorm Setup' + $q + '); exit 1 }; $env:SOUNDSTORM_WINDOW = ' + $q + '1' + $q + '; $q = [char]34; Start-Process -FilePath (Join-Path $PSHOME ' + $q + 'powershell.exe' + $q + ') -WindowStyle Hidden -ArgumentList (' + $q + '-NoProfile -ExecutionPolicy Bypass -STA -File ' + $q + ' + $q + $f + $q + ' + $q + ' -Import ' + $q + ' + $q + $env:HERE + $q)"'),
+        ('start "" /min "%PS%" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$ProgressPreference = ' + $q + 'SilentlyContinue' + $q + '; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $f = Join-Path $env:TEMP ' + $q + 'soundstorm-install.ps1' + $q + '; try { Invoke-WebRequest -UseBasicParsing -Uri $env:SOUNDSTORM_SETUP_URL -OutFile $f } catch { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show(' + $q + 'EmberStorm could not download its installer. Check the internet connection and try again.' + $q + ', ' + $q + 'EmberStorm Setup' + $q + '); exit 1 }; $env:SOUNDSTORM_WINDOW = ' + $q + '1' + $q + '; $q = [char]34; Start-Process -FilePath (Join-Path $PSHOME ' + $q + 'powershell.exe' + $q + ') -WindowStyle Hidden -ArgumentList (' + $q + '-NoProfile -ExecutionPolicy Bypass -STA -File ' + $q + ' + $q + $f + $q + ' + $q + ' -Import ' + $q + ' + $q + $env:HERE + $q)"'),
         'exit /b 0'
     ) -join "`r`n"
-    [IO.File]::WriteAllText((Join-Path $Folder 'Install SoundStorm here.cmd'), "$cmd`r`n", (New-Object Text.ASCIIEncoding))
+    [IO.File]::WriteAllText((Join-Path $Folder 'Install EmberStorm here.cmd'), "$cmd`r`n", (New-Object Text.ASCIIEncoding))
 }
 
 # Select-MoveDestination asks where to put the move - usually an external
@@ -2937,14 +2955,14 @@ function Select-MoveDestination([double]$LibraryBytes) {
     $owner = New-TopmostOwner
     try {
         $picker = New-Object System.Windows.Forms.FolderBrowserDialog
-        $picker.Description = 'Choose where to put SoundStorm for the move - an external drive, or a folder the new computer can reach. A folder called SoundStorm-move is made there.'
+        $picker.Description = 'Choose where to put EmberStorm for the move - an external drive, or a folder the new computer can reach. A folder called EmberStorm-move is made there.'
         $picker.ShowNewFolderButton = $true
         if ($picker.ShowDialog($owner) -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
         $withLibrary = $true
         if ($LibraryBytes -gt 0) {
             $answer = [System.Windows.Forms.MessageBox]::Show($owner,
                 "Copy your music, films, books and photos too? That is about $(Format-Size $LibraryBytes).`r`n`r`nChoose No if you are moving the media yourself - on the drive it is already on, say.",
-                'SoundStorm - move to another computer',
+                'EmberStorm - move to another computer',
                 [System.Windows.Forms.MessageBoxButtons]::YesNoCancel,
                 [System.Windows.Forms.MessageBoxIcon]::Question)
             if ($answer -eq [System.Windows.Forms.DialogResult]::Cancel) { return $null }
@@ -2956,18 +2974,18 @@ function Select-MoveDestination([double]$LibraryBytes) {
     }
 }
 
-# Export-Move packs this install into <Destination>\SoundStorm-move. SoundStorm
+# Export-Move packs this install into <Destination>\EmberStorm-move. EmberStorm
 # is stopped while its data is copied - a database copied while it is being
 # written may not open on the other side - and started again afterwards,
 # whatever happened.
 function Export-Move([string]$Destination, [bool]$WithLibrary) {
     if (-not (Test-Path (Join-Path $Dir 'docker-compose.yml'))) {
-        Stop-With "  SoundStorm is not installed in $Dir, so there is nothing to move."
+        Stop-With "  EmberStorm is not installed in $Dir, so there is nothing to move."
     }
     if (-not (Test-Path -LiteralPath $Destination)) {
         Stop-With "  $Destination does not exist. Choose a folder that does - an external drive, say."
     }
-    $dest = Join-Path ([IO.Path]::GetFullPath($Destination)) 'SoundStorm-move'
+    $dest = Join-Path ([IO.Path]::GetFullPath($Destination)) 'EmberStorm-move'
     if (Test-Path -LiteralPath $dest) {
         Stop-With "  $dest is already there.`n`n  Move or delete it first, so an older move is not mixed into this one."
     }
@@ -2987,7 +3005,7 @@ function Export-Move([string]$Destination, [bool]$WithLibrary) {
 
     New-Item -ItemType Directory -Force -Path (Join-Path $dest 'volumes') | Out-Null
     Step "Step 2 of 4 - Copying accounts, settings and the media servers' data"
-    Note "SoundStorm is stopped while its data is copied, and started again after."
+    Note "EmberStorm is stopped while its data is copied, and started again after."
     Invoke-Docker @('compose', 'stop') -Capture | Out-Null
     try {
         foreach ($v in $volumes) {
@@ -2998,7 +3016,7 @@ function Export-Move([string]$Destination, [bool]$WithLibrary) {
             $r = Invoke-Docker @('run', '--rm', '-v', "${Project}_${v}:/from:ro", '-v', "$(Join-Path $dest 'volumes'):/to",
                 $MoveImage, 'tar', '-cf', "/to/$v.tar", '-C', '/from', '.') -Capture
             if ($r.ExitCode -ne 0) {
-                Stop-With "  Could not copy $v. SoundStorm has been started again, unchanged.`n`n  $($r.Output)"
+                Stop-With "  Could not copy $v. EmberStorm has been started again, unchanged.`n`n  $($r.Output)"
             }
             # Every backend's admin password, the accounts' password hashes and
             # the certificate keys are in these: only this user, as settings.env
@@ -3028,7 +3046,7 @@ function Export-Move([string]$Destination, [bool]$WithLibrary) {
             "library=$(if (Test-Path (Join-Path $dest 'library')) { 'yes' } else { 'no' })")
         [IO.File]::WriteAllText((Join-Path $dest 'manifest.txt'), (($manifest -join "`n") + "`n"), (New-Object Text.ASCIIEncoding))
     } finally {
-        Step "Step 4 of 4 - Starting SoundStorm again"
+        Step "Step 4 of 4 - Starting EmberStorm again"
         Invoke-Docker @('compose', 'start') -Capture | Out-Null
     }
 
@@ -3037,18 +3055,18 @@ function Export-Move([string]$Destination, [bool]$WithLibrary) {
         "*  $dest",
         '',
         'On the new computer, copy the folder over, then:',
-        '  Windows: double-click "Install SoundStorm here.cmd" inside it.',
+        '  Windows: double-click "Install EmberStorm here.cmd" inside it.',
         '  Mac or Linux: sh install-here.sh, inside it.',
         '',
         'Anything changed here from now on does not move. Once the new computer is',
-        'working, uninstall SoundStorm here from Settings, Apps.'
+        'working, uninstall EmberStorm here from Settings, Apps.'
     )
     if (-not (Test-Path (Join-Path $dest 'library'))) {
         $lines += @('', 'Your media was not included. Copy it to the new computer yourself:', "*  $library")
     }
     Callout 'Packed up' $lines 'Green'
     Start-Process explorer.exe -ArgumentList "`"$dest`""
-    Complete-Gui 'SoundStorm is packed up' 'Copy the SoundStorm-move folder to the new computer and open it there.' ''
+    Complete-Gui 'EmberStorm is packed up' 'Copy the EmberStorm-move folder to the new computer and open it there.' ''
     exit 0
 }
 
@@ -3056,10 +3074,10 @@ function Export-Move([string]$Destination, [bool]$WithLibrary) {
 function Test-MoveFolder([string]$Path) {
     $manifest = Join-Path $Path 'manifest.txt'
     if (-not (Test-Path -LiteralPath $manifest)) {
-        Stop-With "  $Path is not a SoundStorm move folder: it has no manifest.txt.`n`n  Point -Import at the SoundStorm-move folder made by the move."
+        Stop-With "  $Path is not a EmberStorm move folder: it has no manifest.txt.`n`n  Point -Import at the EmberStorm-move folder made by the move."
     }
     if (-not (Select-String -LiteralPath $manifest -Pattern '^format=1$' -Quiet)) {
-        Stop-With "  That move was made by a newer SoundStorm. Get the newest setup and try again."
+        Stop-With "  That move was made by a newer EmberStorm. Get the newest setup and try again."
     }
 }
 
@@ -3078,11 +3096,11 @@ function Import-Settings([string]$Path) {
     }
 }
 
-# Import-Volumes restores the data volumes. Refused where SoundStorm already
+# Import-Volumes restores the data volumes. Refused where EmberStorm already
 # has data: an import is for a computer it is new to.
 function Import-Volumes([string]$Path) {
     if (Test-VolumeExists "${Project}_soundstorm-state") {
-        Stop-With "  This computer already has SoundStorm data, so importing would write over it.`n`n  Uninstall SoundStorm here first (Settings, Apps - your media is kept), then open the move again."
+        Stop-With "  This computer already has EmberStorm data, so importing would write over it.`n`n  Uninstall EmberStorm here first (Settings, Apps - your media is kept), then open the move again."
     }
     foreach ($tar in Get-ChildItem -LiteralPath (Join-Path $Path 'volumes') -Filter '*.tar' -ErrorAction SilentlyContinue) {
         $v = $tar.BaseName
@@ -3107,9 +3125,9 @@ if ($Export -or $Move) {
     }
     if ($env:SOUNDSTORM_WINDOW -eq '1' -and $script:WindowWanted) {
         try {
-            New-SetupWindow 'Moving SoundStorm to another computer' `
+            New-SetupWindow 'Moving EmberStorm to another computer' `
                 'Packing up your accounts, settings and media into one folder to take to the new computer.' `
-                @('Checking there is room', 'Copying accounts and settings', 'Copying your media', 'Starting SoundStorm again')
+                @('Checking there is room', 'Copying accounts and settings', 'Copying your media', 'Starting EmberStorm again')
         } catch {
             $script:Gui = $null
         }
@@ -3122,7 +3140,7 @@ if ($Export -or $Move) {
 
 if ($Launch) {
     if (-not (Test-Path (Join-Path $Dir 'docker-compose.yml'))) {
-        Stop-With "  SoundStorm is not installed in $Dir. Run the setup again."
+        Stop-With "  EmberStorm is not installed in $Dir. Run the setup again."
     }
     Set-Location $Dir
     Initialize-Docker
@@ -3132,12 +3150,12 @@ if ($Launch) {
     $null = Update-LanAddress
     $null = Update-RouterSettings -Quick
     if ((Invoke-DockerBounded @('compose', 'up', '-d')) -ne 0) {
-        Save-SoundStormLog
-        Stop-With "  SoundStorm would not start.`n`n$(Get-HelpAdvice)"
+        Save-EmberStormLog
+        Stop-With "  EmberStorm would not start.`n`n$(Get-HelpAdvice)"
     }
     $port = Get-InstalledPort
     $url = "$(Get-InstalledScheme)://localhost:$port"
-    Wait-ForSoundStorm $url
+    Wait-ForEmberStorm $url
     # On a network Windows treats as public, other devices are kept out: ask.
     Confirm-LanOnLaunch
     # At startup there is nobody watching yet, so the browser stays shut; the
@@ -3162,13 +3180,13 @@ try { [IO.File]::WriteAllText($script:SetupLog, '') } catch { }
 if ($env:SOUNDSTORM_WINDOW -eq '1' -and $script:WindowWanted) {
     try {
         if ($firstInstall) {
-            New-SetupWindow 'Setting up SoundStorm' `
+            New-SetupWindow 'Setting up EmberStorm' `
                 'This sets everything up by itself. The first time takes about 10 to 30 minutes, mostly downloading. You can use the computer while it works.' `
-                @('Getting Docker ready', 'Preparing the SoundStorm folder', 'Downloading the media servers', 'Starting SoundStorm')
+                @('Getting Docker ready', 'Preparing the EmberStorm folder', 'Downloading the media servers', 'Starting EmberStorm')
         } else {
-            New-SetupWindow 'Updating SoundStorm' `
+            New-SetupWindow 'Updating EmberStorm' `
                 'Your library, accounts and settings are kept.' `
-                @('Getting Docker ready', 'Preparing the SoundStorm folder', 'Checking for a newer version', 'Starting SoundStorm')
+                @('Getting Docker ready', 'Preparing the EmberStorm folder', 'Checking for a newer version', 'Starting EmberStorm')
         }
     } catch {
         # A window that cannot be built must not leave a hidden setup running
@@ -3183,7 +3201,7 @@ if ($env:SOUNDSTORM_WINDOW -eq '1' -and $script:WindowWanted) {
 }
 
 Write-Host ""
-Write-Host "  SoundStorm" -ForegroundColor White -NoNewline
+Write-Host "  EmberStorm" -ForegroundColor White -NoNewline
 Write-Host " - all your music, films, books and audiobooks in one place"
 Write-Host "  -----------------------------------------------------------"
 
@@ -3198,7 +3216,7 @@ if ($firstInstall) {
     Write-Host "  Keep this window open. It tells you when it is finished and exactly" -ForegroundColor Yellow
     Write-Host "  what to do next. You can use the computer while it works." -ForegroundColor Yellow
 } else {
-    Write-Host "  Updating SoundStorm. Your library, accounts and settings are kept." -ForegroundColor White
+    Write-Host "  Updating EmberStorm. Your library, accounts and settings are kept." -ForegroundColor White
     Write-Host "  Keep this window open until it says it is finished." -ForegroundColor Yellow
 }
 
@@ -3206,7 +3224,7 @@ Step "Step 1 of 4 - Getting Docker ready"
 Initialize-Docker
 Good "Docker is ready. ($((Invoke-Native 'docker' @('--version')).Output))"
 
-Step "Step 2 of 4 - Preparing the SoundStorm folder"
+Step "Step 2 of 4 - Preparing the EmberStorm folder"
 Note $Dir
 
 # The compose project name is fixed, so a second install in a second folder
@@ -3224,7 +3242,7 @@ if ($elsewhere -and $env:SOUNDSTORM_FORCE -ne '1') {
     # remember where it was.
     $existing = Get-InstalledURL $previous
     Stop-With @"
-  SoundStorm is already installed, in another folder:
+  EmberStorm is already installed, in another folder:
 
     $previous
 
@@ -3239,11 +3257,11 @@ if ($elsewhere -and $env:SOUNDSTORM_FORCE -ne '1') {
   To install it here instead, remove the other copy first:
 
     1. Open Settings, then Apps, then Installed apps.
-    2. Find SoundStorm and choose Uninstall. Your music, films and books
+    2. Find EmberStorm and choose Uninstall. Your music, films and books
        are never deleted - it only removes the app.
     3. Run this setup again.
 
-  If SoundStorm is not in that list, it was set up by hand - ask whoever
+  If EmberStorm is not in that list, it was set up by hand - ask whoever
   did that to remove it.
 "@
 }
@@ -3255,7 +3273,7 @@ if ($Import) {
     try { $Import = [IO.Path]::GetFullPath($Import) } catch { Stop-With "  Could not open $Import." }
     Test-MoveFolder $Import
     if (Test-Path 'docker-compose.yml') {
-        Stop-With "  SoundStorm is already installed in $Dir, so importing would write over it.`n`n  Uninstall it first (Settings, Apps - your media is kept), then open the move again."
+        Stop-With "  EmberStorm is already installed in $Dir, so importing would write over it.`n`n  Uninstall it first (Settings, Apps - your media is kept), then open the move again."
     }
 }
 
@@ -3269,7 +3287,7 @@ if ($upgrade) {
         Invoke-WebRequest -Uri $ComposeUrl -OutFile 'docker-compose.yml.new' -UseBasicParsing
         Move-Item -Force 'docker-compose.yml.new' 'docker-compose.yml'
     } catch {
-        Stop-With "  Could not download SoundStorm from`n`n    $ComposeUrl`n`n  Check the internet connection and try again."
+        Stop-With "  Could not download EmberStorm from`n`n    $ComposeUrl`n`n  Check the internet connection and try again."
     }
 }
 
@@ -3337,7 +3355,7 @@ if ($Https -or ($NoHttps -eq $false -and -not $tlsNow)) {
     Set-EnvSetting 'SOUNDSTORM_TLS' 'off'
     Note "Turning https off."
 }
-if (Update-LanAddress) { Note "This PC's network address has changed; SoundStorm will use the new one." }
+if (Update-LanAddress) { Note "This PC's network address has changed; EmberStorm will use the new one." }
 $tlsMode = Get-EnvSetting 'SOUNDSTORM_TLS'
 
 # Remote access is off unless -Remote is given, and it can be turned on later
@@ -3386,7 +3404,7 @@ if (-not $setupCode) {
 # installer again - which is how updating works - is what fixes it.
 Protect-SecretFile (Join-Path $Dir '.env')
 # And what runs: the saved script (run at every sign-in by the startup
-# shortcut) and the compose files. A folder at a drive root, C:\SoundStorm,
+# shortcut) and the compose files. A folder at a drive root, C:\EmberStorm,
 # lets every account on the PC change files in it, and a changed script or
 # compose file would run as this user, or as root in Docker (a security
 # review).
@@ -3411,7 +3429,7 @@ if (-not $Library -and $firstInstall -and -not (Get-EnvSetting 'SOUNDSTORM_LIBRA
     if ($choice) { $Library = $choice }
 } elseif (-not $Library -and $ChooseLibrary) {
     $choice = Select-LibraryLocation (Get-LibraryPath) `
-        'Choose where SoundStorm should keep your music, films and books from now on. Your files are not moved - you will be shown both folders at the end.'
+        'Choose where EmberStorm should keep your music, films and books from now on. Your files are not moved - you will be shown both folders at the end.'
     if ($choice) {
         $Library = $choice
     } else {
@@ -3478,29 +3496,29 @@ if ($Tailscale) {
             $key = Show-TailscaleDialog
         } catch {
             Write-Host ""
-            Write-Host "  Reaching SoundStorm from outside the house needs a Tailscale account."
+            Write-Host "  Reaching EmberStorm from outside the house needs a Tailscale account."
             Write-Host "  It is free for personal use and takes about two minutes."
             Write-Host ""
             Write-Host "    1. Sign up at https://tailscale.com"
             Write-Host "    2. Open the admin console, Settings, then Keys"
             Write-Host "    3. Generate an auth key and copy it"
             Write-Host ""
-            $key = "$(Read-Text 'Paste the Tailscale auth key here' 'SoundStorm - Tailscale')".Trim()
+            $key = "$(Read-Text 'Paste the Tailscale auth key here' 'EmberStorm - Tailscale')".Trim()
         }
     }
     if ($key) {
         Set-EnvSetting 'SOUNDSTORM_TAILSCALE_AUTHKEY' $key
         Write-ServeConfig
-        Note "Tailscale will be started with SoundStorm."
+        Note "Tailscale will be started with EmberStorm."
     } else {
-        # Not an error: SoundStorm works exactly as before without it, and
+        # Not an error: EmberStorm works exactly as before without it, and
         # stopping the whole update over a canceled window would be.
-        Note "Tailscale was not set up. SoundStorm works on your home network as before."
+        Note "Tailscale was not set up. EmberStorm works on your home network as before."
         Note "To set it up later, open Set up Tailscale from the Start menu."
     }
 } elseif ($NoTailscale) {
     Set-EnvSetting 'SOUNDSTORM_TAILSCALE_AUTHKEY' ''
-    Note "Turning off remote access. SoundStorm stays on this network."
+    Note "Turning off remote access. EmberStorm stays on this network."
 }
 
 # Whether the profile is wanted at all, which outlives this run: somebody who
@@ -3546,14 +3564,14 @@ if ($pull.ExitCode -ne 0 -and $upgrade) {
     # An update that cannot download is not a broken install: the version
     # already here still works, so start that rather than stopping.
     Important "Could not check for a newer version right now."
-    Note "Starting the version you already have. Run 'Update SoundStorm' again later."
+    Note "Starting the version you already have. Run 'Update EmberStorm' again later."
 } elseif ($pull.ExitCode -ne 0 -and $rateLimited) {
     Stop-With "  The download server is limiting how fast it hands out downloads.`n  Nothing is wrong with this PC or your internet connection.`n`n  Wait about half an hour and run the setup again - anything already`n  downloaded is kept."
 } elseif ($pull.ExitCode -ne 0) {
     Stop-With "  Could not download the media servers. That is almost always the`n  internet connection. Try again - anything already downloaded is kept."
 }
 
-Step "Step 4 of 4 - Starting SoundStorm"
+Step "Step 4 of 4 - Starting EmberStorm"
 if ($firstInstall) {
     # The dialog appears the moment the port is first published, i.e. during
     # the next command, and its default answer is the one that shuts phones
@@ -3562,7 +3580,7 @@ if ($firstInstall) {
         'A "Windows Security Alert" may appear for "Docker Desktop Backend".',
         '*Click "Allow access".',
         '',
-        'That is what lets your phone and TV reach SoundStorm. If you clicked',
+        'That is what lets your phone and TV reach EmberStorm. If you clicked',
         'Cancel by mistake, carry on - this setup checks it in a moment.'
     ) 'Cyan'
 }
@@ -3572,12 +3590,12 @@ if ($start.ExitCode -ne 0) {
     if ($start.Output -match 'already allocated|address already in use|forbidden by its access permissions') {
         Stop-With "  Port $port is already being used by another program on this PC.`n`n  Show this to whoever gave you the app."
     }
-    Save-SoundStormLog
-    Stop-With "  SoundStorm would not start.`n`n$(Get-HelpAdvice)"
+    Save-EmberStormLog
+    Stop-With "  EmberStorm would not start.`n`n$(Get-HelpAdvice)"
 }
 
 $url = "${scheme}://localhost:$port"
-Wait-ForSoundStorm $url
+Wait-ForEmberStorm $url
 
 if (-not $NoShortcuts) {
     Note "Adding shortcuts to the desktop and the Start menu."
@@ -3586,7 +3604,7 @@ if (-not $NoShortcuts) {
     } catch {
         # Not worth failing an otherwise finished install over.
         Note "Could not add shortcuts: $($_.Exception.Message)"
-        Note "SoundStorm still works at $url"
+        Note "EmberStorm still works at $url"
     }
 }
 
@@ -3605,15 +3623,15 @@ Write-Host ""
 Write-Host "  ======================================================================" -ForegroundColor Green
 if ($upgrade) {
     Write-Host "   UPDATED." -ForegroundColor Green -NoNewline
-    Write-Host " SoundStorm is up to date and running." -ForegroundColor White
+    Write-Host " EmberStorm is up to date and running." -ForegroundColor White
 } else {
     Write-Host "   FINISHED." -ForegroundColor Green -NoNewline
-    Write-Host " SoundStorm is installed and running." -ForegroundColor White
+    Write-Host " EmberStorm is installed and running." -ForegroundColor White
 }
 Write-Host "  ======================================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  To add music, films or books: drag them onto the SoundStorm window, or"
-Write-Host "  put them in the 'SoundStorm media' folder on your desktop."
+Write-Host "  To add music, films or books: drag them onto the EmberStorm window, or"
+Write-Host "  put them in the 'EmberStorm media' folder on your desktop."
 Write-Host ""
 if ($secure) {
     # The real certificate is in: this address works with no warning on any
@@ -3634,7 +3652,7 @@ if ($secure) {
     Write-Host "    ${scheme}://${lan}:$port" -ForegroundColor White
     Write-Host ""
     if ($tlsMode -eq 'auto') {
-        Write-Host "  SoundStorm is still getting its secure address, and moves there" -ForegroundColor Gray
+        Write-Host "  EmberStorm is still getting its secure address, and moves there" -ForegroundColor Gray
         Write-Host "  by itself when it has one." -ForegroundColor Gray
     }
     Write-Host "  Same account. Worth saving as a bookmark - and worth giving this" -ForegroundColor Gray
@@ -3688,7 +3706,7 @@ if ($tlsMode -eq 'self-signed') {
     Write-Host ""
 }
 if (-not $NoShortcuts) {
-    Write-Host "  Next time, click the SoundStorm icon on your desktop." -ForegroundColor Gray
+    Write-Host "  Next time, click the EmberStorm icon on your desktop." -ForegroundColor Gray
     if (-not $NoAutoStart) {
         Write-Host "  It also starts by itself when you turn the PC on." -ForegroundColor Gray
     }
@@ -3714,8 +3732,8 @@ if ($useTailscale -and $tailnet) {
 $openUrl = $url
 if ($hasAccount -ne $true -and $setupCode) {
     Callout 'NEXT: create your account' (@(
-        'Your web browser is opening SoundStorm now. On the first screen, choose',
-        'a username and password - that is your account for SoundStorm.',
+        'Your web browser is opening EmberStorm now. On the first screen, choose',
+        'a username and password - that is your account for EmberStorm.',
         '',
         'If the page asks for a SETUP CODE, type this one:',
         '',
@@ -3731,8 +3749,8 @@ if ($hasAccount -ne $true -and $setupCode) {
     Start-Process "$url/?setup=$setupCode"
     $openUrl = "$url/?setup=$setupCode"
 } else {
-    Callout 'NEXT: open SoundStorm' (@(
-        'Your web browser is opening SoundStorm now. Sign in as usual.',
+    Callout 'NEXT: open EmberStorm' (@(
+        'Your web browser is opening EmberStorm now. Sign in as usual.',
         '',
         "Browser did not open?  Go to:  $url"
     ) + $phoneLines) 'Green'
@@ -3753,8 +3771,8 @@ if ($movedFrom) {
         $owner = New-TopmostOwner
         try {
             [void][System.Windows.Forms.MessageBox]::Show($owner,
-                "SoundStorm now keeps your library in:`r`n    $libraryPath`r`n`r`nYour existing files are still in:`r`n    $movedFrom`r`n`r`nBoth folders are open. To bring your files across, select everything inside the old folder (Ctrl+A) and drag it into the new one. If Windows says the folders already exist, click Yes - it adds your files to them. SoundStorm picks them up as they arrive.",
-                'SoundStorm - move your files across',
+                "EmberStorm now keeps your library in:`r`n    $libraryPath`r`n`r`nYour existing files are still in:`r`n    $movedFrom`r`n`r`nBoth folders are open. To bring your files across, select everything inside the old folder (Ctrl+A) and drag it into the new one. If Windows says the folders already exist, click Yes - it adds your files to them. EmberStorm picks them up as they arrive.",
+                'EmberStorm - move your files across',
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Information)
         } finally {
@@ -3768,7 +3786,7 @@ if ($movedFrom) {
 # The window stays up with the result until it is closed: the setup code and
 # the address are in it, and closing it is the person's decision, not ours.
 if ($upgrade) {
-    Complete-Gui 'SoundStorm is up to date' 'It is running. Your library, accounts and settings are as they were.' $openUrl
+    Complete-Gui 'EmberStorm is up to date' 'It is running. Your library, accounts and settings are as they were.' $openUrl
 } else {
-    Complete-Gui 'SoundStorm is ready' 'It is installed and running, and starts by itself when you turn the PC on.' $openUrl
+    Complete-Gui 'EmberStorm is ready' 'It is installed and running, and starts by itself when you turn the PC on.' $openUrl
 }

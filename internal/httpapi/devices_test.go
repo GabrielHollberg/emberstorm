@@ -179,7 +179,7 @@ func TestTheServerHasAName(t *testing.T) {
 	}
 	h.signUp(t)
 	stranger := h.another(t)
-	if name, setUp := health(stranger); name != "gabe's SoundStorm" || !setUp {
+	if name, setUp := health(stranger); name != "gabe's EmberStorm" || !setUp {
 		t.Fatalf("after sign-up, to anybody: %q set up %v", name, setUp)
 	}
 	if resp, body := h.do(t, http.MethodPut, "/api/settings/server-name", `{"name":"  Hollberg   House "}`); resp.StatusCode != http.StatusOK {
@@ -201,7 +201,7 @@ func TestTheServerHasAName(t *testing.T) {
 		t.Fatalf("too long a name: %d", resp.StatusCode)
 	}
 	h.do(t, http.MethodPut, "/api/settings/server-name", `{"name":""}`)
-	if name, _ := health(stranger); name != "gabe's SoundStorm" {
+	if name, _ := health(stranger); name != "gabe's EmberStorm" {
 		t.Fatalf("emptied, back to the default: %q", name)
 	}
 }

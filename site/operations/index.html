@@ -3,28 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Running it - SoundStorm</title>
+<title>Running it - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="operations" data-root="..">
 <main>
 <h1>Running it</h1>
-<p class="lede">SoundStorm is meant to be installed by somebody who has never opened a terminal,
+<p class="lede">EmberStorm is meant to be installed by somebody who has never opened a terminal,
 and kept running by the same person. This section covers the whole life of an install: setting it
 up, updating it, moving it, reaching it away from home, and what to check when something is wrong.</p>
 
 <h2 id="shape">The shape of an install</h2>
 <p>An install is a folder holding a <code>docker-compose.yml</code>, a <code>.env</code> file of
-settings, and a <code>library/</code> folder with the media. Docker runs SoundStorm and its media
+settings, and a <code>library/</code> folder with the media. Docker runs EmberStorm and its media
 servers as containers; their own data (accounts, databases, credentials) lives in Docker volumes.
 Two rules follow from that layout and run through every page here:</p>
 <ul>
   <li><strong>Updating is installing again.</strong> There is no separate update path to break.</li>
-  <li><strong>Nothing ever touches <code>library/</code></strong> except SoundStorm placing files you
+  <li><strong>Nothing ever touches <code>library/</code></strong> except EmberStorm placing files you
   added. Uninstalling, moving and resetting all leave the media where it is.</li>
 </ul>
-<div class="why">SoundStorm has no access to Docker itself. That is deliberate: if SoundStorm were
+<div class="why">EmberStorm has no access to Docker itself. That is deliberate: if EmberStorm were
 compromised, it could not reach the host. The price is that anything which drives Docker - updating,
 moving the library to another drive, uninstalling - lives in the installer scripts, not in the
 app.</div>
@@ -46,7 +46,7 @@ docker compose down                 # stop (nothing is lost)
 docker compose up -d                # start
 docker compose pull &amp;&amp; docker compose up -d   # update by hand</code></pre>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

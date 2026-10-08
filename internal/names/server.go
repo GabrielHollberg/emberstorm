@@ -200,14 +200,14 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
-// handleOpen is "Open my SoundStorm" on a phone (2026-10-07, the owner's
+// handleOpen is "Open my EmberStorm" on a phone (2026-10-07, the owner's
 // asking): soundstorm.dev links here with ?to= the server it found, and the
-// phone's SoundStorm app, which claims this address (assetlinks.json and
+// phone's EmberStorm app, which claims this address (assetlinks.json and
 // apple-app-site-association), opens that server itself. Without the app
 // the browser arrives here, and is sent on to the server's web address. Only
 // ever an install's own name, on its home or away label: never anywhere else.
 func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
-	// No server named: "Open the SoundStorm app", from away from home, where
+	// No server named: "Open the EmberStorm app", from away from home, where
 	// nothing could be found - the app opens its own server. Without the app
 	// the browser goes back to soundstorm.dev, to say where to get it.
 	if r.URL.Query().Get("to") == "" {
@@ -227,7 +227,7 @@ func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
 		ok = validID(id) && (rest == s.Label+"."+s.Zone || (s.PublicLabel != "" && rest == s.PublicLabel+"."+s.Zone))
 	}
 	if !ok {
-		writeError(w, http.StatusBadRequest, "not a SoundStorm address")
+		writeError(w, http.StatusBadRequest, "not a EmberStorm address")
 		return
 	}
 	dest := url.URL{Scheme: "https", Host: strings.ToLower(to.Host), Path: "/"}
@@ -361,7 +361,7 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 }
 
 // handleHere is an install saying it is still here, every quarter hour, for
-// Open my SoundStorm alone: who may be found from which connection is kept
+// Open my EmberStorm alone: who may be found from which connection is kept
 // only in memory (find.go), and every restart of this service - each push
 // redeploys it - forgot every install until its next address announcement,
 // half a day later. It touches no DNS record, so it costs the provider

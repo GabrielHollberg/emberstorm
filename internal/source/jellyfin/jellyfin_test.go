@@ -399,9 +399,9 @@ func TestAnotherSourcesItemIsRefused(t *testing.T) {
 }
 
 // A member calling /api/hls by hand can put any query on it, and it reaches
-// Jellyfin with SoundStorm's admin token. SubtitleMethod=Hls makes Jellyfin
+// Jellyfin with EmberStorm's admin token. SubtitleMethod=Hls makes Jellyfin
 // embed that token in a subtitle playlist URL inside the master, which is
-// piped back to the member. SoundStorm never asks for HLS subtitles, so every
+// piped back to the member. EmberStorm never asks for HLS subtitles, so every
 // Subtitle* key is dropped before the request goes out.
 func TestHLSTargetStripsSubtitleKeys(t *testing.T) {
 	s, _ := fakeJellyfin(t, map[string]any{"Id": "ms-1"})

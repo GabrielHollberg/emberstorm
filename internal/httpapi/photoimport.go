@@ -426,7 +426,7 @@ func (s *Server) handleStartImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Size > importMaxSize {
-		writeError(w, http.StatusBadRequest, "that download is larger than SoundStorm takes in one piece")
+		writeError(w, http.StatusBadRequest, "that download is larger than EmberStorm takes in one piece")
 		return
 	}
 	im := &s.photoImports

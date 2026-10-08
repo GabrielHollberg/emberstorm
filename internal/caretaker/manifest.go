@@ -1,8 +1,8 @@
-// Package caretaker keeps a SoundStorm box up to date and looks after it. It
-// runs on the box itself, as root, beside SoundStorm and never inside it:
-// SoundStorm must not hold the Docker socket (see "Installing, updating,
+// Package caretaker keeps a EmberStorm box up to date and looks after it. It
+// runs on the box itself, as root, beside EmberStorm and never inside it:
+// EmberStorm must not hold the Docker socket (see "Installing, updating,
 // removing" in CLAUDE.md), so everything that drives Docker or the disks is
-// here, behind a narrow door SoundStorm can only ask through.
+// here, behind a narrow door EmberStorm can only ask through.
 //
 // An update is a manifest: the exact image, by digest, for every service,
 // signed with the project's release key. The box takes only a manifest whose
@@ -123,7 +123,7 @@ func ImagesFile(m *Manifest) []byte {
 	}
 	sort.Strings(svcs)
 	var b strings.Builder
-	fmt.Fprintf(&b, "# Written by the caretaker: SoundStorm %s (release %d).\nservices:\n", m.Version, m.Serial)
+	fmt.Fprintf(&b, "# Written by the caretaker: EmberStorm %s (release %d).\nservices:\n", m.Version, m.Serial)
 	for _, svc := range svcs {
 		fmt.Fprintf(&b, "  %s:\n    image: %s\n", svc, m.Images[svc])
 	}

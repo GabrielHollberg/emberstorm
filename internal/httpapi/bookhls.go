@@ -27,7 +27,7 @@ import (
 // of its own bytes, so the player fetches a little and plays. A file with a
 // small index - most books, and every MP3 - plays as it is.
 //
-// The fragments are SoundStorm's own files on the audiobook shelf, found
+// The fragments are EmberStorm's own files on the audiobook shelf, found
 // through the backend's description of the book (AudioLayout) and checked
 // against the shelf like every other path; access is the source's, as for
 // /api/stream.
@@ -66,7 +66,7 @@ const bookHLSOpen = 3
 // bookHLSMinIndex is the index size worth playing in pieces (a test lowers it).
 var bookHLSMinIndex int64 = mp4hls.MinIndex
 
-// bookPaths is a book's audio files on SoundStorm's side of the shelf, in
+// bookPaths is a book's audio files on EmberStorm's side of the shelf, in
 // playing order, or nil when they are not all there as plain files.
 func (s *Server) bookPaths(ctx context.Context, src source.Source, itemID string) []string {
 	key := src.ID() + "/" + itemID

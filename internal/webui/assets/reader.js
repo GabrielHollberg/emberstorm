@@ -1,4 +1,4 @@
-/* SoundStorm's ebook reader.
+/* EmberStorm's ebook reader.
  *
  * Rendering is foliate-js (MIT, vendored under vendor/foliate-js). We do not
  * render EPUB ourselves for the same reason we do not transcode video: the part
@@ -8,7 +8,7 @@
  * 13KB of somebody else's carefully debugged code.
  *
  * What IS ours, and what makes this feel like one product rather than a file
- * viewer: SoundStorm unzips the book server-side and remembers where you stopped.
+ * viewer: EmberStorm unzips the book server-side and remembers where you stopped.
  *
  * This is a module (foliate-js is ES modules) while app.js is a classic script,
  * so the two talk through window.soundstormReader rather than imports.
@@ -18,7 +18,7 @@
 import './vendor/foliate-js/view.js';
 import { EPUB } from './vendor/foliate-js/epub.js';
 
-if (window.top !== window.self) throw new Error('SoundStorm does not run inside a frame');
+if (window.top !== window.self) throw new Error('EmberStorm does not run inside a frame');
 
 // A book is somebody's upload, and its chapters render as documents with this
 // app's origin - where a script, even one naming our own files by absolute
@@ -120,7 +120,7 @@ function withoutScripts(book) {
 const $ = (id) => document.getElementById(id);
 
 // How often a reading position is written back. A page turn emits a location;
-// persisting every one of them would rewrite SoundStorm's state file on every tap.
+// persisting every one of them would rewrite EmberStorm's state file on every tap.
 const SAVE_INTERVAL_MS = 3000;
 
 const session = {
@@ -138,7 +138,7 @@ function bookParams(item) {
 
 /* ------------------------------------------------------------------ loading */
 
-// foliate-js asks for resources by path; SoundStorm has already unzipped the book,
+// foliate-js asks for resources by path; EmberStorm has already unzipped the book,
 // so the loader is three fetches rather than a zip implementation in the
 // browser. The Go side owns the only EPUB parser in the project.
 // A book downloaded to this device is read from there when the server does

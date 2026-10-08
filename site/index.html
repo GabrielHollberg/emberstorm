@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SoundStorm - how it works</title>
+<title>EmberStorm - how it works</title>
 <link rel="icon" href="assets/favicon.svg">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body data-page="index" data-root=".">
 <main>
-<h1>SoundStorm, from the top</h1>
+<h1>EmberStorm, from the top</h1>
 <p class="lede">One login, one search box and one player over a whole home media library -
 music, films and TV, audiobooks, ebooks, documents and photos - installed by double-clicking
 a file. This site explains how it is built, starting from the shape of the whole and going
 down, one level per click, to the decisions inside each part.</p>
 
 <h2 id="what">What it is</h2>
-<p>SoundStorm is a front end for a self-hosted media library. Somebody installs it on a
+<p>EmberStorm is a front end for a self-hosted media library. Somebody installs it on a
 computer at home, makes an account, and puts their media in five folders - or drags it onto
 the window. From then on everybody in the house uses one app, on a computer, a phone or a TV,
 with one sign-in, and never needs to know what runs behind it.</p>
@@ -25,10 +25,10 @@ movies, audiobooks, ebooks, music all together... easy for users to install and 
 login... and put their library into organized folders."</em></p>
 
 <h2 id="shape">The shape of the whole</h2>
-<p>Four layers. Everything a person touches is at the top; everything SoundStorm deliberately
+<p>Four layers. Everything a person touches is at the top; everything EmberStorm deliberately
 does not build itself is at the bottom. Each box links to the part of this site that explains it.</p>
 
-<div class="diagram" role="img" aria-label="Apps talk to the SoundStorm server, which talks to one backend per kind of media, each reading one folder of the library.">
+<div class="diagram" role="img" aria-label="Apps talk to the EmberStorm server, which talks to one backend per kind of media, each reading one folder of the library.">
   <div class="label">Apps</div>
   <div class="row">
     <a class="box" href="clients/web.html">Web app<small>any browser</small></a>
@@ -38,7 +38,7 @@ does not build itself is at the bottom. Each box links to the part of this site 
   </div>
   <div class="arrow">&#8595; one login, one API, every byte &#8595;</div>
   <div class="row">
-    <a class="box core" href="server/index.html">SoundStorm server<small>sign-in, search, playback, streaming, uploads, favorites, radio, photos, books</small></a>
+    <a class="box core" href="server/index.html">EmberStorm server<small>sign-in, search, playback, streaming, uploads, favorites, radio, photos, books</small></a>
   </div>
   <div class="arrow">&#8595; admin accounts it made itself &#8595;</div>
   <div class="label">Backends - one per kind of media</div>
@@ -47,7 +47,7 @@ does not build itself is at the bottom. Each box links to the part of this site 
     <a class="box" href="backends/jellyfin.html">Jellyfin<small>films, TV</small></a>
     <a class="box" href="backends/audiobookshelf.html">Audiobookshelf<small>audiobooks</small></a>
     <a class="box" href="backends/immich.html">Immich<small>photos</small></a>
-    <a class="box" href="backends/local.html">SoundStorm itself<small>ebooks, documents</small></a>
+    <a class="box" href="backends/local.html">EmberStorm itself<small>ebooks, documents</small></a>
   </div>
   <div class="row">
     <a class="box" href="backends/audiomuse.html">AudioMuse-AI<small>hears moods</small></a>
@@ -67,13 +67,13 @@ does not build itself is at the bottom. Each box links to the part of this site 
 <h2 id="decision">The decision that shapes everything</h2>
 <p>That request sounds like "build a media server". It is not, and the difference is the whole
 project. Scanning disks, identifying media, keeping metadata and artwork and transcoding video
-is years of work that mature projects already do well. So SoundStorm <strong>owns the layer
+is years of work that mature projects already do well. So EmberStorm <strong>owns the layer
 above</strong>: login, search, playback and the bytes. Each backend owns one kind of media and
 one folder; nothing scans the same folder twice. From the user's seat it is one server - they
 never learn Jellyfin exists - but Jellyfin still transcodes and Navidrome still scans the music.</p>
 <div class="why">If the seams leak, the whole thing is pointless. A result that sends somebody to a
 backend's own web page means a second login and a visibly different app - and at that point
-SoundStorm would be a bookmark folder. So the server sits in the data path: every song, film
+EmberStorm would be a bookmark folder. So the server sits in the data path: every song, film
 and photo passes through it, signed in as the person asking.</div>
 <p><a href="architecture/decisions.html">The decisions, and the two that were reversed &rarr;</a></p>
 
@@ -81,7 +81,7 @@ and photo passes through it, signed in as the person asking.</div>
 <div class="cards">
   <a class="card" href="architecture/index.html"><b>Architecture</b><span>The layers, a request end to end, what is kept where, the repository.</span></a>
   <a class="card" href="server/index.html"><b>The server</b><span>The Go program at the centre: its API, sign-in, streaming, the library, music, photos, books.</span></a>
-  <a class="card" href="backends/index.html"><b>Backends</b><span>Each media server SoundStorm sets up and drives, and what it learnt about each one's API.</span></a>
+  <a class="card" href="backends/index.html"><b>Backends</b><span>Each media server EmberStorm sets up and drives, and what it learnt about each one's API.</span></a>
   <a class="card" href="clients/index.html"><b>Apps</b><span>The web app, Now Playing and its visualizers, the reader, Android, iPhone and TVs.</span></a>
   <a class="card" href="security/index.html"><b>Security</b><span>Who it defends against, and ten review passes of what was found and fixed.</span></a>
   <a class="card" href="operations/index.html"><b>Running it</b><span>Installing, updating, moving computers, reaching it away from home, fixing problems.</span></a>
@@ -97,7 +97,7 @@ and photo passes through it, signed in as the person asking.</div>
   <tr><th>Outside services</th><td>None needed. A small name service gives each install a trusted certificate; lyrics, music discovery and scrobbling are opt-in.</td></tr>
 </table>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="assets/nav.js"></script>
 </body>
 </html>

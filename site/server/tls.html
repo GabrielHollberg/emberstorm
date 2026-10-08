@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Certificates and names - SoundStorm</title>
+<title>Certificates and names - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -14,7 +14,7 @@
 could reach it. Yet phones refuse to install an app from an address with a certificate warning,
 and a session cookie on shared Wi-Fi deserves encryption. <code>internal/servetls</code>,
 <code>internal/acme</code>, <code>internal/names</code> and <code>internal/portmap</code> are how
-SoundStorm gets a browser-trusted certificate with no account, no domain and no openssl.</p>
+EmberStorm gets a browser-trusted certificate with no account, no domain and no openssl.</p>
 
 <h2 id="modes">Four modes</h2>
 <p><code>SOUNDSTORM_TLS</code> picks one. An unknown value is fatal: quietly serving plain HTTP to
@@ -22,21 +22,21 @@ somebody who asked for encryption is the worst available way to be wrong.</p>
 <table>
   <tr><th>Mode</th><th>What it serves</th><th>For</th></tr>
   <tr><td><code>off</code></td><td>Plain HTTP</td><td>The compose file's own default: on localhost there is nothing on the wire to protect.</td></tr>
-  <tr><td><code>self-signed</code></td><td>Certificates from a local authority SoundStorm makes</td><td>Encryption without the internet, at the cost of trusting <code>/ca.crt</code> on each device.</td></tr>
+  <tr><td><code>self-signed</code></td><td>Certificates from a local authority EmberStorm makes</td><td>Encryption without the internet, at the cost of trusting <code>/ca.crt</code> on each device.</td></tr>
   <tr><td><code>file</code></td><td>A PEM pair given in <code>SOUNDSTORM_TLS_CERT</code> and <code>_KEY</code></td><td>Somebody with a real certificate of their own.</td></tr>
-  <tr><td><code>auto</code></td><td>Plain HTTP and the local authority at once, plus a real Let's Encrypt certificate for <code>&lt;id&gt;.home.soundstorm.dev</code> once it arrives</td><td>The installers' default since real certificates became free to get.</td></tr>
+  <tr><td><code>auto</code></td><td>Plain HTTP and the local authority at once, plus a real Let's Encrypt certificate for <code>&lt;id&gt;.home.emberstorm.dev</code> once it arrives</td><td>The installers' default since real certificates became free to get.</td></tr>
 </table>
 <div class="note">HTTPS was off by default for a long time, and that was argued for. The only
-certificate SoundStorm could make by itself was one no browser trusts, so turning it on meant a
+certificate EmberStorm could make by itself was one no browser trusts, so turning it on meant a
 full-page "your connection is not private" on every device, which reads like being hacked to
 somebody who has never seen one, against the threat of somebody on your own Wi-Fi reading your
-traffic. Real certificates under <code>soundstorm.dev</code> took the cost away, so both installers
+traffic. Real certificates under <code>emberstorm.dev</code> took the cost away, so both installers
 now write <code>SOUNDSTORM_TLS=auto</code> for new installs and for existing ones that never
 chose. A choice somebody made is left alone.</div>
 
 <h2 id="local-ca">The local authority</h2>
 <p>Self-signed mode (and auto mode's fallback) makes a local <em>authority</em> rather than a bare
-self-signed certificate. Install <code>/ca.crt</code> once on a device and everything SoundStorm
+self-signed certificate. Install <code>/ca.crt</code> once on a device and everything EmberStorm
 issues afterwards is trusted, including certificates for addresses it has never seen. A
 self-signed leaf would need re-trusting at every renewal and every new address.</p>
 <p>A hostname arrives in the TLS handshake (SNI), so certificates for names are minted on demand.
@@ -56,7 +56,7 @@ hostname to anybody who opened a connection.</p>
 carries critical name constraints: it may sign only <code>localhost</code>, <code>.local</code>,
 <code>.lan</code>, <code>.home</code>, <code>home.arpa</code> and configured names; loopback; and
 for each configured address its /16 (/48 for IPv6), or exactly itself if public. It used to permit
-all of <code>soundstorm.dev</code>, corporate-style names and every private range - and a laptop
+all of <code>emberstorm.dev</code>, corporate-style names and every private range - and a laptop
 that trusts it goes to the office, where <code>10.0.0.0/8</code> is somebody else's intranet.
 <code>loadOrMakeCA</code> replaces an authority whose constraints are not exactly the current
 policy, logs why, and reissues the server certificate if the current authority did not sign it.
@@ -88,7 +88,7 @@ https-only would have broken the <code>http://localhost</code> address the insta
 <h2 id="names">The name service</h2>
 <p>The only thing that removes the warning is a certificate somebody on the internet vouches for,
 which needs a name on the internet. <code>cmd/soundstorm-names</code> is a small service that gives
-each install <code>&lt;id&gt;.home.soundstorm.dev</code>, points it at the install's LAN address,
+each install <code>&lt;id&gt;.home.emberstorm.dev</code>, points it at the install's LAN address,
 and publishes the DNS-01 challenge that lets Let's Encrypt issue a certificate for a server
 nothing on the internet can reach. It is what Plex does with <code>plex.direct</code>, without the
 account. It is the first piece of central infrastructure the project has, and its shape is what
@@ -164,7 +164,7 @@ only while the real certificate is loaded (see the <a href="http-api.html">HTTP 
 
 <h2 id="remote">Remote access: the <code>*.net</code> name</h2>
 <p>Reaching the server away from home needs a public address, so remote access adds a second name,
-<code>&lt;id&gt;.net.soundstorm.dev</code>, which the owner switches on in Settings. Two names, not
+<code>&lt;id&gt;.net.emberstorm.dev</code>, which the owner switches on in Settings. Two names, not
 one, because many routers cannot "hairpin" - loop a LAN client back in through the public address -
 and a single public name would break access at home on those routers. Both names go on one
 certificate, one order and one renewal, so remote access does not double an install's draw on the
@@ -215,19 +215,19 @@ server on a tailnet at <code>https://&lt;hostname&gt;.&lt;tailnet&gt;.ts.net</co
 Tailscale's own certificate. It is for away from home, especially behind carrier-grade NAT where
 there is no port to forward, and for anybody who would rather not put a server on the internet.</p>
 <p>It is opt-in for the same reason Plex was rejected: it needs an account, an auth key and an app
-on every device, none of which can be automated. SoundStorm works fully without it, and nobody is
+on every device, none of which can be automated. EmberStorm works fully without it, and nobody is
 walked through a sign-up they did not ask for. It is offered where it is needed - when the WAN
 check says remote access cannot work - and set up from a Start menu shortcut that takes the key.</p>
 <p>Three things were learned by running it. Userspace networking is the default, so the sidecar
 needs no <code>NET_ADMIN</code> and no <code>/dev/net/tun</code>. The proxy target must not be
 called <code>soundstorm</code>, because that is the sidecar's own tailnet hostname, and Docker writes
 a container's hostname into its <code>/etc/hosts</code>: the proxy looped back to itself and
-answered 502 while every container reported healthy, so SoundStorm has a second network alias,
-<code>soundstorm-app</code>. And the scheme in the serve config must match what SoundStorm speaks on
+answered 502 while every container reported healthy, so EmberStorm has a second network alias,
+<code>soundstorm-app</code>. And the scheme in the serve config must match what EmberStorm speaks on
 the compose network - <code>http://</code> or <code>https+insecure://</code> - or it is another
 silent 502.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

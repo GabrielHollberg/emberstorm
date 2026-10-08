@@ -15,7 +15,7 @@ func testLog() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// The whole point of this package: installing SoundStorm should leave you with
+// The whole point of this package: installing EmberStorm should leave you with
 // folders to put media in, without reading anything first.
 func TestOpenCreatesTheFoldersFromNothing(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "library")
@@ -52,7 +52,7 @@ func TestOpenIsIdempotentAndKeepsContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Restarting SoundStorm must not disturb a library someone has filled in.
+	// Restarting EmberStorm must not disturb a library someone has filled in.
 	if _, err := Open(root, "", testLog()); err != nil {
 		t.Fatalf("second Open: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestEveryFolderIsDescribed(t *testing.T) {
 }
 
 // A fresh compose install crash-looped on this: Docker creates library/music
-// and library/movies as bind-mount points for the backends before SoundStorm
+// and library/movies as bind-mount points for the backends before EmberStorm
 // ever runs, so the folders already exist. Treating that as a failure to
 // create them took the whole server down, repeatedly, on the one path that
 // matters most - somebody installing it for the first time.
@@ -292,7 +292,7 @@ func TestAPlaceholderDoesNotCountAsMedia(t *testing.T) {
 	}
 }
 
-// SoundStorm's central claim is that a user never finds out which servers are
+// EmberStorm's central claim is that a user never finds out which servers are
 // behind it. A file dropped into their media folder is a poor place to break
 // that, however good the explanation would be.
 func TestThePlaceholderNamesNoBackend(t *testing.T) {

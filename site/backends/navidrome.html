@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Navidrome (music) - SoundStorm</title>
+<title>Navidrome (music) - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -11,7 +11,7 @@
 <main>
 <h1>Navidrome (music)</h1>
 <p class="lede">Navidrome scans <code>library/music</code>, keeps the music database and serves the
-songs. SoundStorm talks to it over the Subsonic API (with OpenSubsonic extensions) and builds albums,
+songs. EmberStorm talks to it over the Subsonic API (with OpenSubsonic extensions) and builds albums,
 radio, lyrics and beat analysis on top.</p>
 
 <h2 id="why">Why Navidrome</h2>
@@ -24,21 +24,21 @@ a media server would have meant rebuilding by hand. Its image is about 348 MB ag
 <h2 id="provisioning">Provisioning</h2>
 <p>Navidrome's first-run admin form posts to <code>/auth/createAdmin</code>, and that endpoint works
 only while no user exists - so driving it is safe: it can never take over a configured server.
-SoundStorm generates the password, creates the admin, and keeps the credentials in its state. The
+EmberStorm generates the password, creates the admin, and keeps the credentials in its state. The
 music folder is mounted read-only. Compose sets a few environment variables, and their names matter:</p>
 <table>
   <tr><th>Setting</th><th>Why</th></tr>
   <tr><td><code>ND_SCANINTERVAL: 1m</code></td><td>Not <code>ND_SCANSCHEDULE</code>. Navidrome ignores unknown keys silently, so the wrong name looked like it worked while no periodic scan ever ran. Check <code>--help</code> in the container before trusting any of these names.</td></tr>
   <tr><td><code>ND_SUBSONIC_DEFAULTREPORTREALPATH</code></td><td>Report real file paths rather than ones built from tags (below).</td></tr>
-  <tr><td><code>ND_ENABLETRANSCODINGCONFIG</code></td><td>Lets SoundStorm add its own listening transcoding for beat analysis; without it the API answers 405.</td></tr>
+  <tr><td><code>ND_ENABLETRANSCODINGCONFIG</code></td><td>Lets EmberStorm add its own listening transcoding for beat analysis; without it the API answers 405.</td></tr>
   <tr><td><code>ND_ENABLEEXTERNALSERVICES: false</code></td><td>Nothing leaves the house from Navidrome itself.</td></tr>
 </table>
-<p>The household shares this one account. Favorites, playlists and history are kept by SoundStorm per
+<p>The household shares this one account. Favorites, playlists and history are kept by EmberStorm per
 person, because anything stored in Navidrome would be everybody's at once. A second, non-admin account,
 <code>audiomuse</code>, is made through Navidrome's native <code>/api/user</code> for
 <a href="audiomuse.html">AudioMuse-AI</a>.</p>
 
-<h2 id="api">The calls SoundStorm makes</h2>
+<h2 id="api">The calls EmberStorm makes</h2>
 <p>Every request carries Subsonic token authentication: a fresh salt and the MD5 of password plus
 salt, in the query string. That is the protocol - and why transport errors are passed through
 <code>httpx.Redact</code> before anyone sees them, since the URL carries a credential.</p>
@@ -67,12 +67,12 @@ salt, in the query string. That is the protocol - and why transport errors are p
   that path. With the real-path setting on, paths are absolute in Navidrome's container and made relative
   to the music root; a path that is not real makes deletion refuse rather than guess.</li>
   <li><strong>The real-path setting is read once per client</strong>, when Navidrome first meets it. Its
-  record for the old client name kept sending made-up paths after the setting was on, so SoundStorm now
+  record for the old client name kept sending made-up paths after the setting was on, so EmberStorm now
   introduces itself as <code>soundstorm-app</code>, which every install meets fresh.</li>
   <li><strong>ReplayGain</strong> comes through as OpenSubsonic <code>replayGain</code> (checked on
   0.64.1), which the player levels with.</li>
   <li><strong>Lossy will not become lossless.</strong> Asked for a lossy song as "flac", Navidrome sends
-  Opus. SoundStorm therefore registers a transcoding under its own name, <code>sslisten</code>
+  Opus. EmberStorm therefore registers a transcoding under its own name, <code>sslisten</code>
   (<code>subsonic/listen.go</code>, <code>PrepareListening</code>), which converts to mono FLAC as asked,
   for the server's own beat analysis. A refusal is remembered for ten minutes, and phones then hear songs
   themselves. Navidrome caches each conversion (about 2.6 MB for four minutes) in its 100 MB cache.</li>
@@ -93,7 +93,7 @@ empty folder while answering search with none of them, which is exactly right.</
 <p>The image follows <code>latest</code>; behaviours above were checked against 0.64.0 and 0.64.1.
 Re-verify the environment names and the transcoding API if the version moves.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

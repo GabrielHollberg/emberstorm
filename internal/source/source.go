@@ -1,6 +1,6 @@
 // Package source defines the plug point for a backend.
 //
-// Adding a media server to SoundStorm means implementing Source here and a
+// Adding a media server to EmberStorm means implementing Source here and a
 // provisioner in internal/provision. Those are the two halves of a backend: how
 // to search it, and how to get credentials for it without a human typing any.
 package source
@@ -22,7 +22,7 @@ import (
 // Search on every source at once.
 type Source interface {
 	// ID is the backend's name ("navidrome", "jellyfin"). It appears in
-	// results and in setup status, and it is part of SoundStorm's stream URLs.
+	// results and in setup status, and it is part of EmberStorm's stream URLs.
 	ID() string
 
 	// Kind is what this source serves. A source serves exactly one kind.
@@ -38,7 +38,7 @@ type Source interface {
 
 // Target is an authenticated upstream location for media bytes.
 //
-// It is never given to the browser: SoundStorm fetches it server-side and pipes
+// It is never given to the browser: EmberStorm fetches it server-side and pipes
 // the bytes through, which is what lets the backends stay off any published
 // port.
 //
@@ -53,11 +53,11 @@ type Target struct {
 	URL     string
 	Headers map[string]string
 
-	// FilePath serves a file from SoundStorm's own disk. Used by sources that have
+	// FilePath serves a file from EmberStorm's own disk. Used by sources that have
 	// no backend at all - a folder of ebooks is just a folder.
 	FilePath string
 
-	// Bytes serves something SoundStorm produced in memory, such as a cover image
+	// Bytes serves something EmberStorm produced in memory, such as a cover image
 	// extracted from inside an EPUB.
 	Bytes []byte
 
@@ -108,7 +108,7 @@ type OpenBook interface {
 // internal structure, which is what an in-browser reader needs.
 //
 // Only a source that holds the file itself can do this. A remote OPDS catalog
-// hands over a whole book and nothing smaller, which is exactly why SoundStorm
+// hands over a whole book and nothing smaller, which is exactly why EmberStorm
 // reading the folder directly is what made a reader possible at all.
 type BookOpener interface {
 	OpenBook(ctx context.Context, itemID string) (OpenBook, error)
@@ -213,7 +213,7 @@ type Position struct {
 // PositionTracker is an optional interface for sources that remember how far
 // into an item somebody listened.
 //
-// Position belongs upstream rather than in SoundStorm's own state, and not only
+// Position belongs upstream rather than in EmberStorm's own state, and not only
 // to avoid a second store: Audiobookshelf keeps it per title and syncs it to
 // its own mobile apps, so writing it there means finishing a chapter in the car
 // and picking it up in a browser. Keeping our own copy would quietly fork from
@@ -322,7 +322,7 @@ type Starter interface {
 
 type userKey struct{}
 
-// WithUserID records which SoundStorm account a request belongs to.
+// WithUserID records which EmberStorm account a request belongs to.
 //
 // Almost nothing needs it. A search returns the same library to everybody, and
 // a film is the same bytes whoever asked. It exists for the one thing that
@@ -407,7 +407,7 @@ func (a Access) Permits(k media.Kind) bool {
 	return a.kinds == nil || a.kinds[k]
 }
 
-// Kinds returns the permitted kinds in SoundStorm's own order, or every kind
+// Kinds returns the permitted kinds in EmberStorm's own order, or every kind
 // when unrestricted. Useful for telling a client what it may ask for.
 func (a Access) Kinds() []media.Kind {
 	if a.kinds == nil {
@@ -443,7 +443,7 @@ func AccessFrom(ctx context.Context) Access {
 
 // Registry holds the live sources.
 //
-// Unlike the rest of SoundStorm this is mutable at runtime: sources appear as
+// Unlike the rest of EmberStorm this is mutable at runtime: sources appear as
 // their provisioners finish, which can be a minute or more after boot while a
 // backend starts up. Every method is safe for concurrent use.
 type Registry struct {
@@ -538,7 +538,7 @@ func (r *Registry) Len() int {
 }
 
 // FileLister is an optional interface for a source whose items are files in
-// SoundStorm's library, so that the owner can delete them.
+// EmberStorm's library, so that the owner can delete them.
 //
 // ItemFiles names the files and folders an item is made of, relative to the
 // shelf's own folder and slash-separated: "Artist/Album/01 Song.mp3", or

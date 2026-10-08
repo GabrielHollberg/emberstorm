@@ -12,7 +12,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
-// jellyfinAuthHeader identifies SoundStorm to Jellyfin before we hold a token.
+// jellyfinAuthHeader identifies EmberStorm to Jellyfin before we hold a token.
 // Jellyfin rejects authentication requests that carry no client identity.
 const jellyfinAuthHeader = `MediaBrowser Client="soundstorm", Device="soundstorm", DeviceId="soundstorm-gateway", Version="0.1.0"`
 
@@ -69,8 +69,8 @@ func provisionJellyfin(ctx context.Context, c *httpx.Client, t Target, sec secre
 		// The wizard already ran, so the account exists with a password we do
 		// not have. Nothing to do but say so clearly.
 		return state.Backend{}, fmt.Errorf(
-			"jellyfin setup is already complete but SoundStorm has no stored credentials for it; " +
-				"either restore SoundStorm's state file or reset the jellyfin volume")
+			"jellyfin setup is already complete but EmberStorm has no stored credentials for it; " +
+				"either restore EmberStorm's state file or reset the jellyfin volume")
 	}
 
 	token, userID, err := jellyfinLogin(ctx, c, accountName, password)

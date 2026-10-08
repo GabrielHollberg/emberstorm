@@ -28,10 +28,10 @@ var errWaitingForMusic = errors.New("waiting for the music library to be set up"
 // wizard, checked against 3.6.3: a second unauthenticated save is a 401 and a
 // made-up token is refused.
 //
-// SoundStorm gives it a non-admin Navidrome account of its own, generates its
+// EmberStorm gives it a non-admin Navidrome account of its own, generates its
 // API token and admin password, and turns off everything that would reach
 // outside the house (the third-party lyrics lookup) or cost hours for
-// nothing SoundStorm shows (transcribing lyrics). Then it schedules a nightly
+// nothing EmberStorm shows (transcribing lyrics). Then it schedules a nightly
 // look for new songs and starts the first listen.
 func provisionAudioMuse(ctx context.Context, c *httpx.Client, store *state.Store, sec secrets, log *slog.Logger) (state.Backend, error) {
 	resp, err := c.Do(ctx, httpx.Request{Path: "/api/health"})
@@ -57,8 +57,8 @@ func provisionAudioMuse(ctx context.Context, c *httpx.Client, store *state.Store
 	saved := resp.Status == http.StatusUnauthorized
 	if saved && !kept {
 		return state.Backend{}, fmt.Errorf(
-			"audiomuse is already set up but SoundStorm has no stored credentials for it; " +
-				"either restore SoundStorm's state file or reset the audiomuse volumes")
+			"audiomuse is already set up but EmberStorm has no stored credentials for it; " +
+				"either restore EmberStorm's state file or reset the audiomuse volumes")
 	}
 	if !saved {
 		if err := resp.Err(); err != nil {
@@ -104,7 +104,7 @@ func saveAudioMuseSetup(ctx context.Context, c *httpx.Client, store *state.Store
 			// Nothing leaves the house: the lyrics lookup asks a third party.
 			"LYRICS_API_ENABLE": "false",
 			// Transcribing every song's words would add hours to the first
-			// listen for a feature SoundStorm does not show.
+			// listen for a feature EmberStorm does not show.
 			"LYRICS_ENABLED":    "false",
 			"LYRICS_ASR_ENABLE": "false",
 		},
@@ -143,7 +143,7 @@ func finishAudioMuse(ctx context.Context, c *httpx.Client, token, adminPassword 
 	}
 
 	// A nightly look for new songs, and the first listen now. Neither
-	// failing undoes the setup: SoundStorm starts one again later.
+	// failing undoes the setup: EmberStorm starts one again later.
 	if resp, err := c.Do(ctx, httpx.Request{Method: http.MethodPost, Path: "/api/cron", Headers: authed, Body: map[string]any{
 		"name": "SoundStorm nightly listen", "task_type": "analysis", "cron_expr": "30 3 * * *", "enabled": true,
 	}}); err != nil || !resp.OK() {

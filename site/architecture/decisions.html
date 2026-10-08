@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The decisions - SoundStorm</title>
+<title>The decisions - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="architecture/decisions" data-root="..">
 <main>
 <h1>The decisions</h1>
-<p class="lede">The code can say what SoundStorm does; it cannot say what was weighed and turned
+<p class="lede">The code can say what EmberStorm does; it cannot say what was weighed and turned
 down. These are the choices that shape everything else - including two early instincts that
 looked right and were reversed.</p>
 
@@ -27,13 +27,13 @@ the whole project.</p>
   large C# codebase - in exchange for the ability to change internals that none of the
   requirements touch.</li>
 </ul>
-<p>What was chosen instead: <strong>SoundStorm owns login, search, playback and the bytes.</strong>
+<p>What was chosen instead: <strong>EmberStorm owns login, search, playback and the bytes.</strong>
 Each backend owns exactly one media type and one folder. From the user's seat it is
 indistinguishable from a single server - they never learn Jellyfin exists - but Jellyfin still
 transcodes, and Navidrome still scans the music.</p>
 <div class="warn"><strong>If the seams leak, the whole thing is pointless.</strong> A result that
 links out to a backend's web UI means a second login and a visibly different app, and at that
-point SoundStorm is a bookmark folder. Every later decision is checked against this.</div>
+point EmberStorm is a bookmark folder. Every later decision is checked against this.</div>
 
 <h2 id="navidrome">Why Navidrome for music</h2>
 <p>Jellyfin can play music, so why run a second server? Because its music support is
@@ -53,7 +53,7 @@ ReplayGain values through the same adapter.</p>
   <tr><th>Jellyfin</th><td>Open source, provisionable through its startup-wizard REST API, and - crucially - a transcoder.</td></tr>
 </table>
 <p>The honest cost is API churn (Jellyfin 12 broke two documented ways of authenticating) and a
-2.5&nbsp;GB image beside Navidrome's 348&nbsp;MB. It pays for itself because SoundStorm uses the
+2.5&nbsp;GB image beside Navidrome's 348&nbsp;MB. It pays for itself because EmberStorm uses the
 transcoding: video a browser cannot decode is converted on the fly and served as HLS, and the
 per-device film quality setting lets Jellyfin copy the picture untouched where it can.</p>
 <p>Films and series are separate Jellyfin libraries with different scrapers, so Jellyfin is
@@ -61,20 +61,20 @@ provisioned once and registered as two sources sharing one token: <code>jellyfin
 <code>jellyfin-tv</code>.</p>
 
 <h2 id="ownership">The ownership rule</h2>
-<p>There is one place SoundStorm reads a folder itself: ebooks, and later documents. That needed a
+<p>There is one place EmberStorm reads a folder itself: ebooks, and later documents. That needed a
 rule so it would not become a slippery slope back toward building a media server.</p>
-<div class="note"><strong>SoundStorm may own a media type only when it is self-describing and
+<div class="note"><strong>EmberStorm may own a media type only when it is self-describing and
 needs no transcoding.</strong></div>
 <table>
   <tr><th>Kind</th><th>Self-describing?</th><th>Transcoding?</th><th>Owner</th></tr>
-  <tr><td>EPUB</td><td>Yes - title, author, language and cover in documented XML inside the file</td><td>No</td><td>SoundStorm</td></tr>
-  <tr><td>PDF (books and documents)</td><td>Enough - an XMP packet or the file name</td><td>No</td><td>SoundStorm</td></tr>
+  <tr><td>EPUB</td><td>Yes - title, author, language and cover in documented XML inside the file</td><td>No</td><td>EmberStorm</td></tr>
+  <tr><td>PDF (books and documents)</td><td>Enough - an XMP packet or the file name</td><td>No</td><td>EmberStorm</td></tr>
   <tr><td>Video</td><td>No - <code>Dune.2021.mkv</code> says nothing about itself</td><td>Yes</td><td>Jellyfin</td></tr>
   <tr><td>Photos</td><td>Partly, but iPhones save HEIC, which Go's standard library cannot decode</td><td>Phone clips, yes</td><td>Immich</td></tr>
 </table>
 <p>The rule cuts both ways. It is what said <strong>drop Calibre-Web</strong> (which needed a
 database rather than a folder, had no setup API and could not rotate its password), and it is
-what kept photos delegated: without a HEIC decoder SoundStorm could not show a thumbnail of most
+what kept photos delegated: without a HEIC decoder EmberStorm could not show a thumbnail of most
 phone photos, and a photo library of any size is precisely the scanning-and-indexing job the
 project exists not to rebuild. Immich was then chosen over lighter options for search by what is
 in a picture, at the price of four containers and several gigabytes of RAM.</p>
@@ -90,13 +90,13 @@ were wrong for this product.</p>
 <p>The gateway returned absolute upstream URLs and let the browser fetch media straight from
 Jellyfin or Navidrome. But an upstream URL only works if the browser can reach the upstream, which
 means publishing each backend on its own port - and then their login screens are one URL away.</p>
-<div class="why">You cannot have "one login" and "never touch the bytes" at once. So SoundStorm is
+<div class="why">You cannot have "one login" and "never touch the bytes" at once. So EmberStorm is
 now in the data path (<code>internal/stream</code>). That turned out to buy far more than
 privacy: picture-free song headers for fast starts away from home, pacing on slow links, resized
 covers, guarded content types, and transcodes stopped when a player closes.</div>
 
 <h3>2. "Stateless, restartable, no config writes"</h3>
-<p>Zero-keys provisioning means SoundStorm generates the backends' credentials, so it must
+<p>Zero-keys provisioning means EmberStorm generates the backends' credentials, so it must
 remember them. One login means users and sessions. Both have to outlive a restart, so there is now
 <code>internal/state</code>.</p>
 <div class="note">What it holds is credentials, accounts, sessions and a handful of decisions (for
@@ -104,7 +104,7 @@ example, that the starter library has had its one chance to unpack). <strong>Nev
 the media itself.</strong> That is the line that matters, and the reason there is no index in
 there to go stale. See <a href="state.html">State and data</a>.</div>
 
-<h2 id="not">What SoundStorm deliberately does not do</h2>
+<h2 id="not">What EmberStorm deliberately does not do</h2>
 <p>Each of these has killed a project like this before:</p>
 <ul>
   <li><strong>Transcoding</strong> - Jellyfin owns it.</li>
@@ -116,18 +116,18 @@ there to go stale. See <a href="state.html">State and data</a>.</div>
   has no web view).</li>
   <li><strong>Rebuilding an app store</strong> - installation is solved and crowded.</li>
   <li><strong>Machine learning over audio</strong> - mood analysis and read-along alignment are
-  backends (AudioMuse-AI, Storyteller), run unmodified, not code SoundStorm owns.</li>
+  backends (AudioMuse-AI, Storyteller), run unmodified, not code EmberStorm owns.</li>
 </ul>
-<p>SoundStorm also cannot update itself and should never learn how: it has no access to the Docker
+<p>EmberStorm also cannot update itself and should never learn how: it has no access to the Docker
 socket, which is the whole reason a compromise of it cannot reach the host. Updating is running
 the installer again.</p>
 
 <h2 id="tailscale">Tailscale is opt-in</h2>
-<p>Reaching SoundStorm away from home can be done with a Tailscale sidecar
+<p>Reaching EmberStorm away from home can be done with a Tailscale sidecar
 (<code>docker compose --profile tailscale up -d</code>). It is never the default, and that is the
 Plex decision applied again: Tailscale needs an account, an auth key and an app on every device,
 none of which can be automated. The difference from Plex is that it is remote access, not a
-backend - SoundStorm works fully without it, and nobody is walked through a signup they did not
+backend - EmberStorm works fully without it, and nobody is walked through a signup they did not
 ask for.</p>
 <p>It is offered where it is needed: when the router's own WAN address shows carrier-grade NAT
 (<code>100.64.0.0/10</code>) or double NAT, where a port forward can never work, and as a standing
@@ -136,7 +136,7 @@ line for anybody who would rather not be on the internet.</p>
 <h2 id="names">The names service: the one central piece</h2>
 <p>A browser trusts only a certificate that somebody on the internet vouches for, and that needs a
 name on the internet. <code>cmd/soundstorm-names</code> is a small service that gives each install
-<code>&lt;id&gt;.home.soundstorm.dev</code>, points it at the install's LAN address, and publishes
+<code>&lt;id&gt;.home.emberstorm.dev</code>, points it at the install's LAN address, and publishes
 the DNS-01 challenge so Let's Encrypt can issue a certificate for a server nothing on the internet
 can reach. It is what Plex does with <code>plex.direct</code>, without the account.</p>
 <p>It is the first central infrastructure the project has, a real change made deliberately. Its
@@ -161,7 +161,7 @@ API is less clever and strictly more robust. The ACME client is the project's ow
 (<code>internal/acme</code>), to keep the zero-dependency rule, and is believed because it is
 rehearsed against Let's Encrypt's own test server in CI.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

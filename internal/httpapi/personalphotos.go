@@ -314,7 +314,7 @@ func (s *Server) datedPhotoKnown(u state.User, staged, dropped string, hint int6
 	} else if hint > 0 && time.UnixMilli(hint).Year() > 1990 && !library.IsStillImage(name) {
 		// The file's own date, for a video only (the owner's call,
 		// 2026-10-03): on a camera's card it is when a clip was filmed, and
-		// some camcorders' files hold no date SoundStorm reads. A still
+		// some camcorders' files hold no date EmberStorm reads. A still
 		// with no date inside it or in its name is one saved from a chat, an
 		// email or the web, or a scan, and its file date is when it was
 		// saved - filed by that, it sat in the wrong month unremarked, where
@@ -792,7 +792,7 @@ func (s *Server) photoFieldsFor(u state.User, out map[string]any) {
 	out["photoFolder"] = usage["folder"]
 }
 
-// datedFolder is a folder SoundStorm made by date (2019/07, or Undated) rather
+// datedFolder is a folder EmberStorm made by date (2019/07, or Undated) rather
 // than one somebody arranged and copied in.
 //
 // Only photos in these count as already kept (the owner's rule): a copy of a
@@ -883,7 +883,7 @@ func (s *Server) improvePhoto(u state.User, existing string, inc photoimport.Met
 }
 
 // managedPhoto reports whether a file in a person's folder is in one of the
-// folders SoundStorm sorts photos into, by date.
+// folders EmberStorm sorts photos into, by date.
 func managedPhoto(personal, file string) bool {
 	rel, err := filepath.Rel(personal, file)
 	if err != nil {

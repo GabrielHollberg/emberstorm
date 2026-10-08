@@ -307,7 +307,7 @@ func (a *autoCert) run(ctx context.Context) {
 }
 
 // keepFindable tells the name service every quarter hour that the install is
-// still here (names.Client.Here), so soundstorm.dev's Open my SoundStorm
+// still here (names.Client.Here), so soundstorm.dev's Open my EmberStorm
 // finds it again within minutes of the service restarting - it keeps that in
 // memory, and the address announcement comes only twice a day. Quiet about
 // failures: the next one tries again, and the announcement still comes.
@@ -347,7 +347,7 @@ func (a *autoCert) keepFindable(ctx context.Context) {
 // above it recovers a panic the way net/http does for a handler. step talks
 // to two things outside this process - Let's Encrypt's ACME endpoint and the
 // name service - through client code that parses their responses, and a
-// malformed one finding an edge case there would otherwise crash SoundStorm
+// malformed one finding an edge case there would otherwise crash EmberStorm
 // entirely rather than doing what every other failure in this loop already
 // does: log it, back off, and try again next time.
 func (a *autoCert) stepRecovered(ctx context.Context) (err error) {

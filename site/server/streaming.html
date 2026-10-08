@@ -3,32 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Streaming - SoundStorm</title>
+<title>Streaming - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="server/streaming" data-root="..">
 <main>
 <h1>Streaming</h1>
-<p class="lede">Every song, film, cover, page and photo reaches a device through SoundStorm.
+<p class="lede">Every song, film, cover, page and photo reaches a device through EmberStorm.
 <code>internal/stream</code> is the proxy that carries them - honoring ranges, taking the
 pictures out of song headers, pacing audio over slow links, shrinking covers, and making sure
-nothing it serves can run as a script on SoundStorm's origin.</p>
+nothing it serves can run as a script on EmberStorm's origin.</p>
 
-<h2 id="why">Why the bytes go through SoundStorm</h2>
+<h2 id="why">Why the bytes go through EmberStorm</h2>
 <p>The first design was an API-only gateway: "never proxy media bytes; results carry absolute
 upstream URLs". That was one of the two decisions later reversed. An upstream URL only works if
 the browser can reach the upstream, which means publishing Jellyfin and Navidrome on their own
 ports - which puts their login screens one URL away. <strong>You cannot have "one login" and
 "never touch the bytes" at once.</strong></p>
-<p>So SoundStorm is in the data path. The compose file publishes exactly one port, SoundStorm's;
+<p>So EmberStorm is in the data path. The compose file publishes exactly one port, EmberStorm's;
 the backends are reachable only on the internal Docker network. An adapter turns an item into a
 <code>source.Target</code> - a backend URL plus whatever credential headers it needs (Jellyfin
 12.1.0 accepts only an <code>Authorization: MediaBrowser ... Token="..."</code> header, which is
 why a target carries headers and not just a URL), or a local file path, or bytes in memory - and
 the proxy serves it to the person who asked, signed in as them.</p>
 <div class="why">The cost is CPU and a hop for every byte. The alternative is a second login and
-a visibly different app the moment somebody follows a link, and at that point SoundStorm would be
+a visibly different app the moment somebody follows a link, and at that point EmberStorm would be
 a bookmark folder. A home server's own network is rarely the bottleneck; the work that is
 expensive - transcoding - still happens in Jellyfin.</div>
 
@@ -93,7 +93,7 @@ and every request after them waits behind bytes nobody plays: the fallback copy,
 after a skip, the covers. A report from a phone showed a first byte arriving 67 seconds after
 play while the server sat idle.</p>
 <p>So audio sent to a device that reached the server by an away-from-home name
-(<code>*.net.soundstorm.dev</code> or a Tailscale <code>*.ts.net</code>) is paced
+(<code>*.net.emberstorm.dev</code> or a Tailscale <code>*.ts.net</code>) is paced
 (<code>internal/stream/pace.go</code>):</p>
 <ul>
   <li>a burst first - eight seconds of music when the song's bitrate is known, else 1MB, enough
@@ -120,7 +120,7 @@ in the device's settings turns all of that off.</div>
 <p>A fresh app on a slow link asked for dozens of full-size covers, 150-200KB of iTunes art each,
 ahead of the song. Now covers are <strong>card-sized unless asked</strong>: <code>?size=</code>,
 400px by default, <code>full</code> for the original. Navidrome, Audiobookshelf and Jellyfin
-resize their own through <code>source.ArtSize</code>; SoundStorm resizes a book's cover itself
+resize their own through <code>source.ArtSize</code>; EmberStorm resizes a book's cover itself
 with the standard library (<code>shrink.go</code>). Only Now Playing's big cover and its swipe
 neighbours (800px) and the lock screen (600px) ask for more.</p>
 <p>Shrinking is something a member can make the server do, so it is bounded: 12 megapixels at
@@ -152,7 +152,7 @@ length until it finishes, so a 20-second file reported 9.9s, growing, and seekin
 back to 3s. Jellyfin's HLS is a playlist listing every segment up front: the same file reports
 20.0s and seeks. <code>/api/hls/{source}/{path...}</code> mirrors Jellyfin's own
 <code>/videos/</code> namespace, so the playlists' relative references resolve back onto
-SoundStorm with no rewriting.</p>
+EmberStorm with no rewriting.</p>
 <p><strong>Quality is per device</strong> (<code>?vq=</code>, <code>filmquality.go</code>):</p>
 <table>
   <tr><th>Setting</th><th>What it asks for</th></tr>
@@ -165,7 +165,7 @@ SoundStorm with no rewriting.</p>
 frame of a picture any browser could play. Under the cap Jellyfin now copies the picture
 untouched and converts only sound a browser cannot play (TrueHD, DTS) to AAC with up to 5.1
 channels. Each play carries its own <code>playSessionId</code>: Jellyfin names a conversion's
-files after the file, the device and the play session, and SoundStorm is always one device, so
+files after the file, the device and the play session, and EmberStorm is always one device, so
 without it every play of a film shared one conversion - another quality or language could have
 got the old pieces. Each person may have four conversions going.</p>
 <p><strong>Another audio language</strong> is always Jellyfin's HLS with
@@ -174,14 +174,14 @@ audio track. <strong>Subtitles</strong> are built, not taken from PlaybackInfo (
 delivery URL empty): <code>/Videos/{item}/{source}/Subtitles/{index}/Stream.vtt</code> works for
 embedded and sidecar tracks and converts SRT on the fly. Only text subtitles are offered;
 Blu-ray's PGS are pictures and would render nothing.</p>
-<div class="warn">The HLS query reaches Jellyfin with SoundStorm's admin token, and several
+<div class="warn">The HLS query reaches Jellyfin with EmberStorm's admin token, and several
 Jellyfin options write URLs carrying that token into the playlist that is piped back - HLS
 subtitle playlists, subtitles in the manifest, trickplay tiles. So every key containing
 "subtitle" is stripped from the query and <code>enableTrickplay=false</code> is forced. An
 allowlist would be better and waits on a full list of the keys Jellyfin's own playlists use.</div>
 
 <h2 id="guards">Active-content guards</h2>
-<p>Everything the proxy serves comes from SoundStorm's own origin, where the session cookie
+<p>Everything the proxy serves comes from EmberStorm's own origin, where the session cookie
 lives. A book, a sidecar or a backend's upload can be HTML, XHTML or SVG with a script in it, and
 the reader renders EPUB chapters on that origin. Three guards, in <code>stream.go</code>, apply
 to every stream path:</p>
@@ -213,7 +213,7 @@ cannot is kept as the HLS stream it would play - the playlist and every piece - 
 quality unless the person chooses otherwise, since an original Blu-ray picture would be tens of
 gigabytes on a phone. More on the <a href="../clients/web.html">web app</a> page.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

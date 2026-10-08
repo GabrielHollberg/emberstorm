@@ -13,7 +13,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
-// provisionNavidrome creates SoundStorm's account on a fresh Navidrome.
+// provisionNavidrome creates EmberStorm's account on a fresh Navidrome.
 //
 // Navidrome has no "initial admin" environment variable: on first run its web
 // UI shows a create-admin form, which POSTs to /auth/createAdmin. We post the
@@ -55,7 +55,7 @@ func provisionNavidrome(ctx context.Context, c *httpx.Client, sec secrets, log *
 
 	if !resp.OK() {
 		// The most likely cause by far: this Navidrome already has users, but
-		// SoundStorm's state file was wiped or never saved. Say so precisely,
+		// EmberStorm's state file was wiped or never saved. Say so precisely,
 		// because the fix is a human decision (reset which volume?) and no
 		// amount of retrying will help.
 		if resp.Status == http.StatusForbidden || resp.Status == http.StatusConflict ||
@@ -67,8 +67,8 @@ func provisionNavidrome(ctx context.Context, c *httpx.Client, sec secrets, log *
 				return creds, nil
 			}
 			return state.Backend{}, fmt.Errorf(
-				"navidrome already has an admin account but SoundStorm has no stored credentials for it; " +
-					"either restore SoundStorm's state file or reset the navidrome volume")
+				"navidrome already has an admin account but EmberStorm has no stored credentials for it; " +
+					"either restore EmberStorm's state file or reset the navidrome volume")
 		}
 		return state.Backend{}, fmt.Errorf("navidrome createAdmin returned %d: %s",
 			resp.Status, httpx.Snippet(resp.Body))
@@ -78,7 +78,7 @@ func provisionNavidrome(ctx context.Context, c *httpx.Client, sec secrets, log *
 	return creds, nil
 }
 
-// navidromeAnswers reports whether Navidrome takes SoundStorm's account with
+// navidromeAnswers reports whether Navidrome takes EmberStorm's account with
 // this password (a Subsonic ping).
 func navidromeAnswers(ctx context.Context, c *httpx.Client, password string) bool {
 	resp, err := c.Do(ctx, httpx.Request{Path: "/rest/ping.view", Params: url.Values{

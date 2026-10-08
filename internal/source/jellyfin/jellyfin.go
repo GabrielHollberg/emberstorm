@@ -2,7 +2,7 @@
 //
 // Jellyfin is here for what it is genuinely best at: video,
 // hardware-accelerated transcoding and metadata for film and television.
-// SoundStorm does not use its music support - Navidrome is better at that - and
+// EmberStorm does not use its music support - Navidrome is better at that - and
 // never exposes its web UI, because that would be the second login this project
 // exists to remove.
 //
@@ -42,7 +42,7 @@ type Config struct {
 	ID      string
 	BaseURL string
 	Token   string // access token from provisioning
-	UserID  string // the account SoundStorm created for itself
+	UserID  string // the account EmberStorm created for itself
 	Timeout time.Duration
 
 	// Kind is what this source reports its results as. Defaults to video.
@@ -126,7 +126,7 @@ func (s *Source) searchParams(q media.Query) url.Values {
 		// Jellyfin can hold episodes that have no file: with a user's
 		// "display missing episodes" preference on, it manufactures one per gap
 		// from the series metadata. They look like ordinary results and there is
-		// nothing behind them to play. SoundStorm creates its own Jellyfin
+		// nothing behind them to play. EmberStorm creates its own Jellyfin
 		// account and never turns that on, so this is insurance rather than a
 		// fix - but it costs one parameter, and the two sibling backends both
 		// turned out to hand over items for deleted files.
@@ -220,7 +220,7 @@ func (s *Source) fetchPage(ctx context.Context, params url.Values) ([]media.Item
 	return items, nil
 }
 
-// toItem is one Jellyfin item as SoundStorm shows it.
+// toItem is one Jellyfin item as EmberStorm shows it.
 func (s *Source) toItem(it jfItem) media.Item {
 	item := media.Item{
 		ID:       it.ID,
@@ -664,7 +664,7 @@ func (s *Source) hlsParams(itemID, mediaSourceID string, q source.VideoQuality) 
 // right path and no playlist rewriting is needed.
 //
 // The path is matched against the handful of shapes Jellyfin's playlists
-// actually use, not merely checked for "..". It is forwarded with SoundStorm's
+// actually use, not merely checked for "..". It is forwarded with EmberStorm's
 // administrator token, so anything looser is a proxy onto the whole Jellyfin
 // API: "%2e%2e/System/Info" passed a ".." check, reached Jellyfin as a dot
 // segment, and answered 200. And the item has to be this source's, or a
@@ -679,7 +679,7 @@ func (s *Source) HLSTarget(ctx context.Context, path string, query url.Values) (
 		return source.Target{}, err
 	}
 	// The query is the client's, and it reaches Jellyfin with our
-	// administrator token. SoundStorm never asks for burned-in or delivered
+	// administrator token. EmberStorm never asks for burned-in or delivered
 	// subtitles over HLS - subtitles are a separate VTT endpoint - so a
 	// Subtitle* key here can only have been added by a member calling this
 	// endpoint by hand. Left in, SubtitleMethod=Hls makes Jellyfin write a
@@ -690,10 +690,10 @@ func (s *Source) HLSTarget(ctx context.Context, path string, query url.Values) (
 	query = withoutSubtitleKeys(query)
 	// Trickplay (seek-preview tiles) is the same leak by another door: with
 	// it on, which is Jellyfin's default, a master playlist for an item that
-	// has tiles names them with ApiKey=<our token>. SoundStorm shows no
+	// has tiles names them with ApiKey=<our token>. EmberStorm shows no
 	// tiles, so it is always off.
 	query = withTrickplayOff(query)
-	// And the device is always SoundStorm's: the client's choice of device
+	// And the device is always EmberStorm's: the client's choice of device
 	// could reach another person's conversion.
 	for k := range query {
 		if strings.EqualFold(k, "deviceId") {

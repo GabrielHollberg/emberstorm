@@ -3,23 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Favorites, playlists, history - SoundStorm</title>
+<title>Favorites, playlists, history - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body data-page="server/collections" data-root="..">
 <main>
 <h1>Favorites, playlists, history</h1>
-<p class="lede">Almost nothing in SoundStorm differs per person: a search returns the same results
+<p class="lede">Almost nothing in EmberStorm differs per person: a search returns the same results
 and a film is the same bytes whoever asks. The exceptions are what a person collects and does -
 favorites, playlists, what they played and when, their own covers, their preferences. Those live
 in <code>internal/collections</code>, one file per person.</p>
 
-<h2 id="why-ours">Why SoundStorm keeps them, not Navidrome</h2>
+<h2 id="why-ours">Why EmberStorm keeps them, not Navidrome</h2>
 <p>Navidrome has favorites and playlists built in. But the household shares one Navidrome
 account - an account each would be several times the provisioning for no visible gain - so
 anything stored there would be everybody's at once. The same reasoning keeps film positions in
-SoundStorm rather than Jellyfin. The notes had always said "revisit when favorites reach the UI";
+EmberStorm rather than Jellyfin. The notes had always said "revisit when favorites reach the UI";
 this is that moment, answered by keeping them above the backends rather than giving every person
 a backend account.</p>
 
@@ -82,7 +82,7 @@ minutes.</p>
 
 <h2 id="plex">Importing straight from Plex</h2>
 <p>Plexamp keeps playlists on the Plex server, which has no export button - so the M3U route meant
-a computer and a script. <code>internal/plex</code> lets a phone do it. SoundStorm asks plex.tv for
+a computer and a script. <code>internal/plex</code> lets a phone do it. EmberStorm asks plex.tv for
 a PIN, the person signs in on Plex's own page in a new tab, and the app polls
 <code>/api/plex/status</code> until plex.tv hands over the account token. The server then lists the
 account's servers, finds an address one answers on (home network first, Plex's relay last), reads
@@ -150,7 +150,7 @@ never null - otherwise "I added Genres back" would read as "defaults" and hide i
 keyed by account id, beside the state. A field rather than a wrapper, so the backup still is a state
 file:</p>
 <ul>
-  <li>An older SoundStorm restores the accounts from a new backup and ignores the lists.</li>
+  <li>An older EmberStorm restores the accounts from a new backup and ignores the lists.</li>
   <li>A backup from before the field restores exactly as it did and leaves current lists alone.</li>
   <li>With no lists at all, the backup is the state file byte for byte.</li>
 </ul>
@@ -158,7 +158,7 @@ file:</p>
 gives the list files the same owner as the state file. Own-cover pictures and listen logs are not in
 the backup; moving to another computer carries the whole state folder, so they go with it there.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

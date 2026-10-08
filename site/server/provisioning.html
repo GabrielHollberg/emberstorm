@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Provisioning - SoundStorm</title>
+<title>Provisioning - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -18,7 +18,7 @@ after every restart - without ever mistaking "not up yet" for "wrong password".<
 <h2 id="rule">A backend is two halves</h2>
 <p>The third rule the design rests on: <strong>a backend is search and provisioning, both, or it
 is not done.</strong> A backend a human must configure by hand defeats the point of the product -
-and would mean showing them its admin screens, which is exactly the seam SoundStorm hides. That
+and would mean showing them its admin screens, which is exactly the seam EmberStorm hides. That
 rule is also why Plex was rejected outright: it requires a plex.tv account, so it cannot be set up
 without a human logging into a cloud service.</p>
 <p>Compose decides the stack: a backend is managed if its URL is set
@@ -56,7 +56,7 @@ for exactly this reason. Jellyfin accepts its listening socket while still loadi
 <h3>Audiobookshelf</h3>
 <p><code>/status</code> says whether it is initialized; <code>POST /init</code> creates the root
 account; <code>/login</code> returns two tokens. <code>user.accessToken</code> expires in an hour;
-<code>user.token</code> is a legacy JWT with no expiry, and SoundStorm stores that one on purpose -
+<code>user.token</code> is a legacy JWT with no expiry, and EmberStorm stores that one on purpose -
 the other would strand the backend an hour after provisioning without a refresh flow. Then a
 library on the audiobooks folder, and a scan. Members get their own Audiobookshelf accounts later,
 on first use (<code>TokenFor</code>); creating one needs <code>isActive</code> sent explicitly, or
@@ -85,7 +85,7 @@ track length huge so chapters are the only cuts. Books are later uploaded to it 
 
 <h3>AudioMuse-AI (moods)</h3>
 <p>Its <code>/api/setup</code> answers without a login until the first save and never after - a
-second unauthenticated save is a 401 - the same shape as Jellyfin's wizard. SoundStorm generates
+second unauthenticated save is a 401 - the same shape as Jellyfin's wizard. EmberStorm generates
 its API token and admin password, switches off its third-party lyrics lookup and lyrics
 transcription, and gives it a <strong>non-admin Navidrome account of its own</strong>
 (<code>audiomuse</code>, made through Navidrome's <code>/api/user</code>), since it reads songs
@@ -94,7 +94,7 @@ through Navidrome and mounts no folder. A nightly analysis is scheduled through
 is reset rather than refused.</p>
 
 <h3>Ebooks and documents</h3>
-<p>No backend: SoundStorm reads those folders itself (<code>source/localbooks</code>), so
+<p>No backend: EmberStorm reads those folders itself (<code>source/localbooks</code>), so
 "provisioning" is the first scan, run synchronously, with a ticker for the rest.</p>
 
 <h2 id="credentials">What is kept</h2>
@@ -113,19 +113,19 @@ was refused as "already set up". Now every password, key and token a setup makes
 <em>before</em> the backend is told it, and the same one on every attempt. A retry that finds its own
 account already made signs in with the kept secret and carries on; <code>SetBackend</code> clears
 what was kept once the backend is saved. A backend that is already set up with <em>nothing</em> kept
-is still refused - carrying on is only for SoundStorm's own unfinished setup. Each person's own
+is still refused - carrying on is only for EmberStorm's own unfinished setup. Each person's own
 Audiobookshelf and Immich account works the same way, under its own name.</p>
 <div class="warn">Provisioning is not idempotent across a volume reset. If a backend's volume is
-wiped but SoundStorm's state survives, or the other way round, you get a backend with an account
+wiped but EmberStorm's state survives, or the other way round, you get a backend with an account
 whose password nobody holds. The provisioners detect it and say so precisely - "navidrome already
-has an admin account but SoundStorm has no stored credentials for it; either restore SoundStorm's
+has an admin account but EmberStorm has no stored credentials for it; either restore EmberStorm's
 state file or reset the navidrome volume" - rather than retrying for ever. The fix is a human
 decision. <code>soundstorm backup</code> and <code>restore</code> are that decision's tools, and the
 uninstaller takes a backup before <code>down -v</code>, the one moment the credentials would stop
 existing anywhere.</div>
 
 <h2 id="reconnect">Reconnecting is not provisioning</h2>
-<p>On a restart, SoundStorm is listening seconds after its container starts and Jellyfin is not.
+<p>On a restart, EmberStorm is listening seconds after its container starts and Jellyfin is not.
 A health check then fails with "connection refused" - which is emphatically not the same as "this
 token is wrong". Treating them alike meant throwing away good credentials and falling through to
 provisioning, which can never succeed on a backend that is already set up. <strong>One unlucky
@@ -147,7 +147,7 @@ retries until the backend answers. Only a definite answer from the backend - in 
 showing "waiting for jellyfin (attempt 6)" to the owner meanwhile - the setup box shows shelves,
 never server names, to everybody else. After ten minutes (<code>giveUpAfter</code>) a backend is
 marked failed: one can be genuinely absent - an image that failed to pull, a wrong URL - and
-SoundStorm must stay useful for the ones that worked. Calls made while somebody waits, like
+EmberStorm must stay useful for the ones that worked. Calls made while somebody waits, like
 creating a member's account, get twenty seconds; a search gets five.</p>
 
 <h2 id="panics">Recovering panics</h2>
@@ -156,7 +156,7 @@ creating a member's account, get twenty seconds; a search gets five.</p>
 software outside the process - and a localbooks scan parses EPUBs a member uploaded before the
 backend came up. An unrecovered panic would take the whole server down. So <code>run</code> is
 wrapped in <code>recover()</code>: a panic marks that one backend failed, with the panic in the
-log, and SoundStorm keeps serving the others. It was verified with a real panic (a nil state store
+log, and EmberStorm keeps serving the others. It was verified with a real panic (a nil state store
 inside provisioning), not a synthetic one.</p>
 
 <h2 id="rescans">Telling the backends to look</h2>
@@ -189,7 +189,7 @@ hand left every deleted film searchable for ever. The placeholder keeps the fold
 failed scan is logged and dropped: the upload already succeeded, and the backend's own timer will
 find the file regardless.</p>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

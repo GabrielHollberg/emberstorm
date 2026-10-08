@@ -1,4 +1,4 @@
-# SoundStorm user guide
+# EmberStorm user guide
 
 Everything beyond the [README](../README.md)'s getting-started steps.
 
@@ -46,7 +46,7 @@ player, a page) before it leaves it.
 
 ## Adding media
 
-**Drag files or folders onto the window**, anywhere. SoundStorm works out which
+**Drag files or folders onto the window**, anywhere. EmberStorm works out which
 shelf each belongs on and files it tidily:
 
 - Music is filed as `Artist/Album/song`, and audiobooks and ebooks as
@@ -62,7 +62,7 @@ shelf each belongs on and files it tidily:
   an audiobook chapter, whether a PDF is a book or a document, and whether a
   folder of unnumbered videos is a series.
 - **A song you already have isn't added twice**, even under another name,
-  because SoundStorm compares the recording itself. A clean and an explicit
+  because EmberStorm compares the recording itself. A clean and an explicit
   version, or a remaster, are both kept.
 - Anything it can't place is listed with the reason.
 
@@ -74,11 +74,11 @@ media. The layout is shown in the [README](../README.md#getting-started). Files
 added this way are found on the next sweep: every minute or two, or at once with
 **Settings → Check for new files**.
 
-An existing **Calibre library** can be the ebooks folder as it is: SoundStorm
+An existing **Calibre library** can be the ebooks folder as it is: EmberStorm
 reads Calibre's metadata, series and covers.
 
 If the drive gets low on space (under 25 GB), a line says how much is left.
-SoundStorm always keeps the last 1 GB free, so it never fills the disk.
+EmberStorm always keeps the last 1 GB free, so it never fills the disk.
 
 ## Music
 
@@ -92,7 +92,7 @@ longest streak, and more.
 travel, Discovery), a **mood** (Chill, Feel good, Melancholy, Intense, Party,
 Focus), or start one from any song, album or artist. **Build a station** to set
 how familiar, which decades and genres, and how energetic. Songs are spread out
-so no artist plays twice in a row. The first time, SoundStorm listens to your
+so no artist plays twice in a row. The first time, EmberStorm listens to your
 whole library in the background to learn how each song sounds; that takes a
 few hours for a big library, and moods fill in as it goes.
 
@@ -120,7 +120,7 @@ Playing a song opens **Now Playing**, with the lyrics lit up as they're sung
     cover's colours: **Orb**, **Spectrum**, **Warp**, **Waves**,
     **Kaleidoscope**, **Fireworks**, **Flow**, **Storm** (rain, clouds and
     lightning), **Synthwave**, **Galaxy**, **Aurora**, **Lava**, and
-    **Analysis**, which shows what SoundStorm heard in the song.
+    **Analysis**, which shows what EmberStorm heard in the song.
   - **Timing** in the same sheet nudges the visualizers earlier or later if
     they look out of step with the sound on this device.
 
@@ -162,7 +162,7 @@ work there.
 
 Lyrics show whenever a song has them: a `.lrc` file beside the song, or lyrics
 in its tags. For songs without any, the owner can turn on **Find missing lyrics
-online** in Settings. SoundStorm then asks [LRCLIB](https://lrclib.net) the first
+online** in Settings. EmberStorm then asks [LRCLIB](https://lrclib.net) the first
 time each song plays, sending only its artist, title, album and length.
 [LRCGET](https://github.com/tranxuanthang/lrcget) can fill a whole library with
 `.lrc` files at once.
@@ -309,8 +309,8 @@ photos from their menus. **Settings → Downloads** has **Download all** for a
 whole shelf, and manages what's on the device. Downloaded things always play
 from the device, and show a small green tick.
 
-Without a connection, SoundStorm keeps working and shows only what's downloaded.
-On the secure `….soundstorm.dev` address it even opens with no connection at
+Without a connection, EmberStorm keeps working and shows only what's downloaded.
+On the secure `….emberstorm.dev` address it even opens with no connection at
 all. Signing out removes downloads from that device.
 
 ## Deleting things
@@ -354,7 +354,7 @@ household default can be changed too).
   before is never held up by somebody else guessing.
 - **Ask everyone for a new password** (the owner's button, under **People**):
   everyone, the owner included, must choose a new password before they can do
-  anything else; each sees a screen for it the next time they open SoundStorm,
+  anything else; each sees a screen for it the next time they open EmberStorm,
   and their other devices are signed out once they have. Signing in with a
   password that no longer meets the rules asks for a new one the same way.
 - **New devices need approval** (the owner's switch, under **People**): when it's
@@ -372,7 +372,7 @@ household default can be changed too).
   a new password takes you off every device.
 - **Sign in a TV from your phone**: on a TV's sign-in screen choose **Sign in
   with your phone**. It shows a QR code and a code like `KXT-4PM`. Scan the QR
-  code with a phone signed in to SoundStorm, or open SoundStorm on the phone and
+  code with a phone signed in to EmberStorm, or open EmberStorm on the phone and
   enter the code under **Settings → Sign in a TV**. The phone says which device
   it is and that it will be signed in as you; allow it and the TV signs itself
   in. A code lasts ten minutes and works once. Works on the Apple TV app and on
@@ -384,8 +384,8 @@ Use the computer's address with port 8099, for example
 `http://192.168.1.50:8099`. **Settings → Use on your phone or TV** shows it with
 a Copy button.
 
-Within a minute of starting, SoundStorm also gets a secure address like
-`https://k3x9m2p7qa.home.soundstorm.dev:8099`, which it moves to by itself.
+Within a minute of starting, EmberStorm also gets a secure address like
+`https://k3x9m2p7qa.home.emberstorm.dev:8099`, which it moves to by itself.
 
 **The apps:**
 - **Android** (phones, and Google TV, Android TV and Fire TV): the newest
@@ -393,7 +393,7 @@ Within a minute of starting, SoundStorm also gets a secure address like
   Music plays like any music app's, with the lock screen, Bluetooth and car
   controls, and it can back up the phone's photos. On a TV it's driven by the
   remote: the arrows move, OK plays, Back goes back.
-- **iPhone** and **Apple TV**: SoundStorm apps (in testing). The iPhone app can
+- **iPhone** and **Apple TV**: EmberStorm apps (in testing). The iPhone app can
   back up the phone's photos. The Apple TV app plays music with every
   visualizer, radio and lyrics, films and TV with subtitles and audio
   languages, audiobooks by chapter, photos, ebooks and Read along.
@@ -412,22 +412,22 @@ so switching back asks for nothing.
 Worth doing:
 - **Give the computer a fixed address** in your router (a DHCP reservation).
 - **If a phone can't connect**, check it's on the same Wi-Fi and not a guest
-  network. On Windows, run **Update SoundStorm** while on your home network: it
-  marks the network private and opens SoundStorm's port in the firewall.
+  network. On Windows, run **Update EmberStorm** while on your home network: it
+  marks the network private and opens EmberStorm's port in the firewall.
 
 ## Away from home
 
-The secure `….home.soundstorm.dev` address only works on your own Wi-Fi, on
+The secure `….home.emberstorm.dev` address only works on your own Wi-Fi, on
 purpose. For everywhere else there are two ways.
 
 ### Remote access
 
 Turn it on under **Settings → Reach it from anywhere** (or install with
 `-Remote` on Windows, `--remote` on Mac and Linux). Your server gets a second
-address, `https://….net.soundstorm.dev:8099`, with a trusted certificate. Share
+address, `https://….net.emberstorm.dev:8099`, with a trusted certificate. Share
 the link and people reach your sign-in page, with no app to install.
 
-- **SoundStorm opens the port on your router itself** where the router allows
+- **EmberStorm opens the port on your router itself** where the router allows
   it (PCP, NAT-PMP or UPnP).
 - **Where it can't**, the panel says exactly which port to forward to which
   computer, and shows when it starts working.
@@ -452,7 +452,7 @@ free Tailscale account and the Tailscale app on each device.
   curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --tailscale --auth-key tskey-...
   ```
 
-SoundStorm then answers at `https://soundstorm.<your-tailnet>.ts.net`.
+EmberStorm then answers at `https://soundstorm.<your-tailnet>.ts.net`.
 `--no-tailscale` turns it off again.
 
 ## Keeping the library on another drive
@@ -461,9 +461,9 @@ Run the installer again with a library folder.
 
 **Windows:**
 ```powershell
-& "$env:USERPROFILE\SoundStorm\soundstorm.ps1" -Library "E:\Media"
+& "$env:USERPROFILE\EmberStorm\soundstorm.ps1" -Library "E:\Media"
 ```
-(or Start menu → **Move SoundStorm library**, which lets you pick the folder)
+(or Start menu → **Move EmberStorm library**, which lets you pick the folder)
 
 **Mac and Linux:**
 ```sh
@@ -471,13 +471,13 @@ curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/ins
 ```
 
 Files already in the old library stay where they are: move them across
-yourself while SoundStorm is stopped. Keep the drive connected. On Linux, mount
+yourself while EmberStorm is stopped. Keep the drive connected. On Linux, mount
 it at boot, because an unmounted drive looks to the media servers like an
 emptied library. Network drives can't be used on Windows.
 
 ## Updating
 
-- **Windows:** Start menu → **Update SoundStorm**.
+- **Windows:** Start menu → **Update EmberStorm**.
 - **Mac and Linux:** run the install command again.
 - **By hand:** `docker compose pull && docker compose up -d` in the install
   folder.
@@ -487,9 +487,9 @@ Your library, accounts and settings are kept.
 ## Backing it up
 
 One file holds every account, everyone's favorites and playlists, and the
-passwords SoundStorm made for the media servers. (It doesn't hold everyone's
+passwords EmberStorm made for the media servers. (It doesn't hold everyone's
 year-in-music listening log or the covers and playlist pictures people chose;
-those stay in SoundStorm's data and move with it to another computer.) **Those passwords exist
+those stay in EmberStorm's data and move with it to another computer.) **Those passwords exist
 nowhere else.** Keep a copy somewhere other than this computer, and treat it
 like a password.
 
@@ -513,7 +513,7 @@ docker compose run --rm -v "${PWD}:/backup" soundstorm restore /backup/soundstor
 docker compose up -d
 ```
 
-Restoring refuses anything that isn't a SoundStorm backup, and keeps what it
+Restoring refuses anything that isn't an EmberStorm backup, and keeps what it
 replaced as `state.json.bak`. The uninstaller saves a backup automatically before
 removing anything.
 
@@ -528,24 +528,24 @@ docker compose up -d
 ```
 
 It prints a new password. With more than one account, add the name:
-`reset-password alex`. Stopping first matters: a running SoundStorm would
+`reset-password alex`. Stopping first matters: a running EmberStorm would
 overwrite the reset. Nothing else changes.
 
 ## Moving to another computer
 
-SoundStorm packs everything (accounts, playlists, positions, the media servers'
+EmberStorm packs everything (accounts, playlists, positions, the media servers'
 data, and optionally your media) into one folder, to carry over on a USB drive
 or the network, between Windows, Mac and Linux in any direction.
 
-- **Windows:** Start menu → **Move SoundStorm to another computer**.
+- **Windows:** Start menu → **Move EmberStorm to another computer**.
 - **Mac and Linux:**
   ```sh
   curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --export /media/usb
   ```
   (add `--no-library` to leave the media out)
 
-On the new computer, open the `SoundStorm-move` folder and run
-**Install SoundStorm here.cmd** (Windows) or `sh install-here.sh` (Mac, Linux).
+On the new computer, open the `EmberStorm-move` folder and run
+**Install EmberStorm here.cmd** (Windows) or `sh install-here.sh` (Mac, Linux).
 Then uninstall it from the old computer. File names Windows can't hold are
 listed in `windows-name-problems.txt` so they can be renamed first.
 The whole of it, step by step, is on the website: Running it, **Moving to a new
@@ -553,25 +553,25 @@ computer** (`site/operations/move.html`).
 
 ## Uninstalling
 
-- **Windows:** Settings → Apps → **SoundStorm** → Uninstall.
+- **Windows:** Settings → Apps → **EmberStorm** → Uninstall.
 - **Mac and Linux:**
   ```sh
   curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/soundstorm/main/install.sh | sh -s -- --uninstall
   ```
 
-This removes SoundStorm and the media servers' data. **Your media is never
+This removes EmberStorm and the media servers' data. **Your media is never
 touched**: the `library` folder stays, and the uninstaller says where. Docker
 stays installed.
 
 ## Security and HTTPS
 
 **HTTPS is on by default, with nothing to do.** Each install gets its own
-`….home.soundstorm.dev` name and a certificate from Let's Encrypt, which every
+`….home.emberstorm.dev` name and a certificate from Let's Encrypt, which every
 browser trusts. The name service only knows your server's home network address.
 Your media, searches and passwords never go near it. If it's ever down,
-SoundStorm carries on with the certificate it has.
+EmberStorm carries on with the certificate it has.
 
-If your router refuses the name (some do), SoundStorm simply stays on the plain
+If your router refuses the name (some do), EmberStorm simply stays on the plain
 address.
 
 **Other choices**, set in the `.env` file in the install folder, then
@@ -587,7 +587,7 @@ address.
 If the server's address changes, update `SOUNDSTORM_TLS_HOSTS` in `.env` (the
 installer does this for you on Windows), or give the computer a fixed address.
 
-SoundStorm hasn't had an independent security audit. Its own security reviews
+EmberStorm hasn't had an independent security audit. Its own security reviews
 are recorded in the repository. Putting any home server on the internet is a
 decision worth making deliberately, which is why remote access is off until you
 turn it on.
@@ -606,7 +606,7 @@ it, run `docker compose up -d`.
 | `SOUNDSTORM_SETUP_CODE` | The code the first sign-up needs |
 | `SOUNDSTORM_REMOTE_ACCESS` | `on` to reach it from anywhere (also a switch in Settings) |
 | `SOUNDSTORM_TRUST_PROXY` | `true` behind your own reverse proxy that terminates HTTPS |
-| `SOUNDSTORM_IMAGE` | Which SoundStorm image to run, to hold a specific version |
+| `SOUNDSTORM_IMAGE` | Which EmberStorm image to run, to hold a specific version |
 
 Useful commands, in the install folder:
 
@@ -623,4 +623,4 @@ once) and starts it when it is stopped.
 Windows specifics: the setup installs Docker Desktop with `winget`, with its
 first questions answered (nothing to click in Docker, no account), starts it
 when needed, picks the next free port if 8099 is taken, and adds desktop, Start
-menu and start-up shortcuts. It keeps a log at `%TEMP%\SoundStorm-setup.log`.
+menu and start-up shortcuts. It keeps a log at `%TEMP%\EmberStorm-setup.log`.

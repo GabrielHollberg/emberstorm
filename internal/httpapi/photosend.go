@@ -322,7 +322,7 @@ func (s *Server) handlePhotoInbox(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/photos/inbox/{id}/{n}/thumb: a waiting photo's thumbnail, from
-// the sender's photo library (SoundStorm cannot draw a HEIC itself), for
+// the sender's photo library (EmberStorm cannot draw a HEIC itself), for
 // the person it was sent to only.
 func (s *Server) handlePhotoInboxThumb(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.requireUser(w, r)

@@ -86,7 +86,7 @@ func TestRestoreFromStandardInput(t *testing.T) {
 }
 
 // Whatever arrives on standard input is checked like a file would be: not a
-// SoundStorm backup, nothing is replaced.
+// EmberStorm backup, nothing is replaced.
 func TestRestoreFromStandardInputRefusesAnythingElse(t *testing.T) {
 	target := t.TempDir()
 	t.Setenv("SOUNDSTORM_STATE_DIR", target)

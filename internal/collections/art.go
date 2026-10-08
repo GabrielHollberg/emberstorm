@@ -29,7 +29,7 @@ const (
 	maxArtKey   = 400
 )
 
-// ErrBadArt is an upload that is not a picture SoundStorm will show.
+// ErrBadArt is an upload that is not a picture EmberStorm will show.
 var ErrBadArt = errors.New("that is not a JPEG, PNG or WebP picture")
 
 // artKey is what a key may look like: which kind, a source, and an id - or

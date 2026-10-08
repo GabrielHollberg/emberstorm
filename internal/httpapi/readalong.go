@@ -310,7 +310,7 @@ func errText(err error) string {
 	return err.Error()
 }
 
-// ebookFile is the EPUB behind an ebook, on SoundStorm's side of the library.
+// ebookFile is the EPUB behind an ebook, on EmberStorm's side of the library.
 func (s *Server) ebookFile(ctx context.Context, ref itemRef) (string, error) {
 	src, ok := s.reg.ByID(ctx, ref.SourceID)
 	if !ok || src.Kind() != media.KindEbook || ref.ID == "" {

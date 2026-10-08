@@ -20,7 +20,7 @@ import (
 
 // Accepting dropped files.
 //
-// The folders are the interface, so dragging something onto SoundStorm should
+// The folders are the interface, so dragging something onto EmberStorm should
 // do what dragging it onto the folder would have done - including working out
 // which folder that was. Two things make this more than a file copy.
 //
@@ -127,7 +127,7 @@ type Placement struct {
 	// UI shows: "movies/Arrival (2016)/Arrival (2016).mkv".
 	Dest string `json:"dest,omitempty"`
 
-	// Skipped and Reason explain a file SoundStorm will not take.
+	// Skipped and Reason explain a file EmberStorm will not take.
 	Skipped bool   `json:"skipped,omitempty"`
 	Reason  string `json:"reason,omitempty"`
 
@@ -136,7 +136,7 @@ type Placement struct {
 	Waiting bool `json:"waiting,omitempty"`
 }
 
-// Question is a group SoundStorm will not guess about.
+// Question is a group EmberStorm will not guess about.
 type Question struct {
 	Group string `json:"group"`
 
@@ -297,7 +297,7 @@ func (l *Library) Plan(paths []string, choices map[string]media.Kind) ([]Placeme
 					Path:    paths[i],
 					Group:   key,
 					Skipped: true,
-					Reason:  "SoundStorm does not know what " + ext + " files are",
+					Reason:  "EmberStorm does not know what " + ext + " files are",
 				}
 			case len(options) > 1:
 				out[i] = Placement{Path: paths[i], Group: key, Waiting: true}
@@ -338,7 +338,7 @@ const fileChoicePrefix = "file:"
 // FileChoice is the key a choice for one dropped file is made under.
 func FileChoice(path string) string { return fileChoicePrefix + path }
 
-// usable reports whether a file is something SoundStorm would ever store.
+// usable reports whether a file is something EmberStorm would ever store.
 func usable(rel string) bool {
 	ext := strings.ToLower(path.Ext(rel))
 	return knownExtension(ext) || companionExtensions[ext]
@@ -832,7 +832,7 @@ func cleanRelPath(raw string) (string, error) {
 		return "", fmt.Errorf("that is nested too deeply")
 	}
 	if path.Ext(segments[len(segments)-1]) == "" {
-		return "", fmt.Errorf("a file needs an extension for SoundStorm to place it")
+		return "", fmt.Errorf("a file needs an extension for EmberStorm to place it")
 	}
 	return strings.Join(segments, "/"), nil
 }
@@ -925,7 +925,7 @@ func (l *Library) SaveWith(kind media.Kind, rel string, r io.Reader, route Route
 	// without asking for a plan first, so without this it would take any
 	// file at all - a page with a script in it, say - onto a shelf.
 	if !usable(rel) {
-		return "", fmt.Errorf("%s is not a kind of file SoundStorm keeps", path.Base(rel))
+		return "", fmt.Errorf("%s is not a kind of file EmberStorm keeps", path.Base(rel))
 	}
 	folder := l.PathFor(kind)
 	if folder == "" {

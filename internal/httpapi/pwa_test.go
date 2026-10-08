@@ -94,7 +94,7 @@ func TestManifestIsInstallable(t *testing.T) {
 }
 
 // A service worker may only control paths at or below its own URL. Served from
-// /static/ it could never intercept "/", which is the only page SoundStorm has,
+// /static/ it could never intercept "/", which is the only page EmberStorm has,
 // and the install would appear to work while controlling nothing.
 func TestServiceWorkerIsServedFromTheRoot(t *testing.T) {
 	h := newHarness(t)
@@ -257,7 +257,7 @@ func TestShellHasNoInlineScript(t *testing.T) {
 }
 
 // The library screen names the one folder everything lives under, so the API
-// has to send it - and it has to be the hint, not the path SoundStorm sees.
+// has to send it - and it has to be the hint, not the path EmberStorm sees.
 // Inside a container the root is /library, which is a path that exists on
 // nobody's computer; the hint is "./library", which is where it actually is
 // from where they ran compose.

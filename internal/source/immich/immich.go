@@ -1,9 +1,9 @@
-// Package immich adapts Immich - the photo server - to SoundStorm's model.
+// Package immich adapts Immich - the photo server - to EmberStorm's model.
 //
 // Immich owns everything expensive about photos: reading EXIF, decoding HEIC
 // (which Go's standard library cannot), making thumbnails, transcoding phone
 // videos, and recognizing what is in a picture so "dog on a beach" finds one.
-// SoundStorm owns the login and the grid. Nobody sees Immich: its port is not
+// EmberStorm owns the login and the grid. Nobody sees Immich: its port is not
 // published and its phone apps have nothing to connect to.
 package immich
 
@@ -106,7 +106,7 @@ func (s *Source) getJSON(ctx context.Context, path string, params url.Values, ou
 }
 func (s *Source) Kind() media.Kind { return media.KindPicture }
 
-// asset is the part of Immich's AssetResponseDto SoundStorm uses.
+// asset is the part of Immich's AssetResponseDto EmberStorm uses.
 type asset struct {
 	ID               string `json:"id"`
 	Type             string `json:"type"` // IMAGE, VIDEO
@@ -388,9 +388,9 @@ func (s *Source) Health(ctx context.Context) error {
 }
 
 // ItemFiles is the photo or clip's original file. Only for an asset in the
-// external library SoundStorm made: anything uploaded to Immich some other
+// external library EmberStorm made: anything uploaded to Immich some other
 // way lives in Immich's own storage, which is not the pictures folder and not
-// SoundStorm's to delete.
+// EmberStorm's to delete.
 func (s *Source) ItemFiles(ctx context.Context, itemID string) ([]string, error) {
 	return s.itemFiles(ctx, itemID, true)
 }

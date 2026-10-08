@@ -12,7 +12,7 @@ import (
 )
 
 // A book, a sidecar or a backend's upload can be a page with a script in it,
-// and served from SoundStorm's origin that script runs with the session of
+// and served from EmberStorm's origin that script runs with the session of
 // whoever opened the link. Everything a browser would execute as a document is
 // sandboxed; media and PDFs are not, because Chrome will not render a PDF in a
 // sandboxed document and a video has nothing to run.

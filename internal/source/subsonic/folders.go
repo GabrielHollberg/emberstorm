@@ -19,7 +19,7 @@ import (
 //
 // Navidrome groups by tags: "Artist feat. Someone" becomes an artist of its
 // own, and an album whose tracks disagree about the album artist or the year
-// splits in two. SoundStorm already files every upload as Artist/Album/track,
+// splits in two. EmberStorm already files every upload as Artist/Album/track,
 // so the folders are the tidy version of the library - and the owner asked for
 // them to be what the app shows. Navidrome's own folder browsing does not help:
 // in 0.64 getIndexes and getMusicDirectory answer with its tag-based artists

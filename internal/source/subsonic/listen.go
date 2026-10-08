@@ -15,7 +15,7 @@ import (
 )
 
 // Songs are handed to the server's own hearing (internal/beats) through a
-// transcoding of SoundStorm's: mono, 44100 a second (the sharp highs are
+// transcoding of EmberStorm's: mono, 44100 a second (the sharp highs are
 // above 7kHz), as FLAC - small, and
 // the one format the server reads with the standard library. Navidrome's
 // own "flac audio" will not do: checked on 0.64, it refuses to turn a lossy

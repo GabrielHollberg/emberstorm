@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The review passes - SoundStorm</title>
+<title>The review passes - EmberStorm</title>
 <link rel="icon" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -27,7 +27,7 @@ films and TV let an id cross between them. It added the first-account setup code
 guess limits, origin-based CSRF checks, no-overwrite uploads, a disk reserve, hashed session keys and
 validated reading positions.</p>
 <p>The second, broader pass found little. The third found the largest thing in the whole series and it
-was architectural: <code>recover()</code> appeared nowhere, so a panic in any goroutine SoundStorm
+was architectural: <code>recover()</code> appeared nowhere, so a panic in any goroutine EmberStorm
 started - per-source search, the ebook scanner, provisioning, certificate renewal - took the whole
 process down. Every such loop now recovers.</p>
 
@@ -98,7 +98,7 @@ against "password1". Three things followed (see <a href="../server/accounts.html
   <li>The fail-open default deserves a test that walks every route - the access check has one.</li>
 </ul>
 </main>
-<footer class="site-footer">SoundStorm. This site is written from the code and its working notes.</footer>
+<footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>
 </body>
 </html>

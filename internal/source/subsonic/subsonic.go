@@ -1,10 +1,10 @@
-// Package subsonic adapts a Subsonic-API music server, which for SoundStorm
+// Package subsonic adapts a Subsonic-API music server, which for EmberStorm
 // means Navidrome.
 //
 // Navidrome is here rather than letting Jellyfin handle music because it is
 // simply better at it: multi-value artist tags, album-artist vs artist,
 // compilations, ReplayGain, smart playlists, and a scanner that handles a large
-// library without complaint. SoundStorm exists so you can have that without
+// library without complaint. EmberStorm exists so you can have that without
 // also having a second app to log into.
 //
 // Protocol notes: authentication is the salted-token scheme from Subsonic
@@ -32,7 +32,7 @@ import (
 
 const (
 	apiVersion = "1.16.1"
-	// clientName is how SoundStorm introduces itself to Navidrome, which
+	// clientName is how EmberStorm introduces itself to Navidrome, which
 	// keeps a "player" record per client name and sets its "report real
 	// path" switch once, when the record is created, from
 	// ND_SUBSONIC_DEFAULTREPORTREALPATH. Records made under the old name,
@@ -208,8 +208,8 @@ func (e *envelope) check() error {
 //
 // The whole matching set is fetched, not the first N, because search3 returns
 // songs in an order of its own - neither by title nor by any relevance
-// SoundStorm can reproduce - and merged paging needs the first N in
-// SoundStorm's order (see media.Less). Measured before this: of the first 50
+// EmberStorm can reproduce - and merged paging needs the first N in
+// EmberStorm's order (see media.Less). Measured before this: of the first 50
 // songs by title in a 4,413-song library, Navidrome's first 50 held none, so
 // every scroll repeated some songs and skipped others. A browse is then
 // ordered and cut here; a search is returned whole for the merge to rank.
@@ -300,7 +300,7 @@ func (s *Source) fetchSongsPage(ctx context.Context, text string, offset int) ([
 	return env.Response.SearchResult3.Song, nil
 }
 
-// songItem is one Navidrome song as SoundStorm shows it.
+// songItem is one Navidrome song as EmberStorm shows it.
 func (s *Source) songItem(sg song) media.Item {
 	item := media.Item{
 		ID:              sg.ID,
@@ -343,7 +343,7 @@ func (s *Source) songItem(sg song) media.Item {
 // StreamTarget builds an authenticated upstream target for a track.
 //
 // Subsonic carries credentials in the query string, which is how the protocol
-// works, so no headers are needed. They never reach the browser: SoundStorm
+// works, so no headers are needed. They never reach the browser: EmberStorm
 // fetches them itself and pipes the bytes through, so Navidrome needs no
 // published port.
 func (s *Source) StreamTarget(ctx context.Context, itemID string) (source.Target, error) {

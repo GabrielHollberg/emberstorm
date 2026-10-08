@@ -481,7 +481,7 @@ func TestUIShellIsServed(t *testing.T) {
 	}
 	// The brand is displayed, so it is spelled the way a person reads it.
 	// Identifiers elsewhere are lowercase; this one is not.
-	if !strings.Contains(string(body), "SoundStorm") {
+	if !strings.Contains(string(body), "EmberStorm") {
 		t.Error("shell does not look like the UI")
 	}
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {

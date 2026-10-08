@@ -12,13 +12,13 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
-// immichEmail is the account SoundStorm creates on Immich. Immich identifies
+// immichEmail is the account EmberStorm creates on Immich. Immich identifies
 // users by email and validates the shape, so the account needs one; nothing is
 // ever sent to it. .invalid is reserved by RFC 2606 for exactly this - a
 // domain guaranteed never to exist.
 const immichEmail = accountName + "@soundstorm.invalid"
 
-// provisionImmich creates SoundStorm's admin account on a fresh Immich, mints
+// provisionImmich creates EmberStorm's admin account on a fresh Immich, mints
 // an API key, and points an external library at the pictures folder.
 //
 // Every step is a documented API call, which is what makes Immich usable here
@@ -27,7 +27,7 @@ const immichEmail = accountName + "@soundstorm.invalid"
 //
 // The library is external - indexed in place, mounted read-only - rather than
 // Immich's own upload storage. That keeps "the folders are the interface"
-// true: a photo is a file in pictures/ whether it arrived through SoundStorm
+// true: a photo is a file in pictures/ whether it arrived through EmberStorm
 // or a file manager, and Immich can never move, rename or delete one.
 func provisionImmich(ctx context.Context, c *httpx.Client, t Target, sec secrets, log *slog.Logger) (state.Backend, error) {
 	var ping struct {
@@ -53,8 +53,8 @@ func provisionImmich(ctx context.Context, c *httpx.Client, t Target, sec secrets
 	}
 	if cfg.IsInitialized && !kept {
 		return state.Backend{}, fmt.Errorf(
-			"immich already has an admin account but SoundStorm has no stored credentials for it; " +
-				"either restore SoundStorm's state file or reset the immich volumes")
+			"immich already has an admin account but EmberStorm has no stored credentials for it; " +
+				"either restore EmberStorm's state file or reset the immich volumes")
 	}
 	if cfg.IsInitialized {
 		// Made by an earlier attempt that failed after it (signing in, the
@@ -95,7 +95,7 @@ func provisionImmich(ctx context.Context, c *httpx.Client, t Target, sec secrets
 	}
 
 	// An API key rather than the session token: a session expires, a key does
-	// not, and SoundStorm has no one to ask for the password again. The
+	// not, and EmberStorm has no one to ask for the password again. The
 	// password itself is not kept at all.
 	var key struct {
 		Secret string `json:"secret"`
@@ -183,7 +183,7 @@ func ensureImmichLibrary(ctx context.Context, c *httpx.Client, apiKey, ownerID, 
 	}
 
 	if err := enableImmichWatching(ctx, c, authed); err != nil {
-		// Not fatal: uploads through SoundStorm trigger a scan anyway, and
+		// Not fatal: uploads through EmberStorm trigger a scan anyway, and
 		// Immich scans every library once a day regardless. What watching
 		// adds is files copied in by hand appearing without either.
 		log.Warn("could not switch on immich folder watching", "err", err)

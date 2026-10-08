@@ -475,7 +475,7 @@ class BackupWorker(context: Context, params: WorkerParameters) : Worker(context,
             // sign-in that has ended, will not mend itself by trying again in
             // a minute: the next scheduled job tries.
             val message = when (e.code) {
-                401 -> "Sign in to SoundStorm again to carry on backing up."
+                401 -> "Sign in to EmberStorm again to carry on backing up."
                 403 -> e.message?.takeIf { it.isNotBlank() } ?: "This account does not have Pictures."
                 507 -> e.message ?: "There is no room left for photos."
                 else -> e.message ?: "The server refused a photo."
