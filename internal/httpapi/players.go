@@ -13,7 +13,7 @@ package httpapi
 // them on "Who's listening?" would; their phone, signed in, vouches for
 // them). Nobody's phone ever steers something acting as someone else.
 //
-// Taking over a TV somebody else is using asks on the TV first ("Nathan
+// Taking over a TV somebody else is using asks on the TV first ("Sam
 // wants to play something. Let him?"); no answer in 15 seconds is a yes,
 // since a TV playing to an empty room should not block anyone. A No holds
 // that person off for 5 minutes, a second for 30; a TV that has stopped
@@ -472,7 +472,7 @@ func (s *Server) handlePlayerCommand(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]any{"asking": a.ID})
 }
 
-// withFrom adds who sent a command, for the TV's "from Nathan's phone".
+// withFrom adds who sent a command, for the TV's "from Sam's phone".
 func withFrom(raw json.RawMessage, name string) json.RawMessage {
 	var m map[string]any
 	if json.Unmarshal(raw, &m) != nil {

@@ -16,7 +16,7 @@ func playerJSON(t *testing.T, body []byte) map[string]any {
 	return out
 }
 
-// Nathan's phone and the owner's TV: he may play on it only by taking it
+// Sam's phone and the owner's TV: he may play on it only by taking it
 // over; while it plays it asks first; a No holds him off; a free TV switches
 // to him and then plays what he sent.
 func TestPlayingOnSomebodyElsesTV(t *testing.T) {
@@ -95,8 +95,8 @@ func TestPlayingOnSomebodyElsesTV(t *testing.T) {
 	}
 	// The TV is nathan's now: his phone sees what it plays, and may pause it.
 	h.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+tv2+`","name":"Bedroom TV","tv":true}`)
-	h.do(t, http.MethodPost, "/api/players/"+tv2+"/state", `{"playing":true,"title":"Nathan's film"}`)
-	if _, body := phone.do(t, http.MethodGet, "/api/players/"+tv2, ""); !strings.Contains(string(body), "Nathan's film") || playerJSON(t, body)["mine"] != true {
+	h.do(t, http.MethodPost, "/api/players/"+tv2+"/state", `{"playing":true,"title":"Sam's film"}`)
+	if _, body := phone.do(t, http.MethodGet, "/api/players/"+tv2, ""); !strings.Contains(string(body), "Sam's film") || playerJSON(t, body)["mine"] != true {
 		t.Fatalf("nathan's TV now: %s", body)
 	}
 	if resp, _ := phone.do(t, http.MethodPost, "/api/players/"+tv2+"/command", `{"type":"control","action":"pause"}`); resp.StatusCode != http.StatusOK {
