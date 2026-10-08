@@ -465,41 +465,83 @@ class MainActivity : Activity() {
                     busy.visibility = View.GONE
                     if (screen != connectScreen) return@runOnUiThread
                     ServerAddress.remember(this, url)
+                    server.name?.let { ServerAddress.rename(this, url, it) }
                     hideKeyboard(field)
                     showWeb(url)
                 }
             }
         }
+        // A new box (no owner yet): the setup code from its sticker, scanned
+        // or typed, and the page opened with it, so its sign-up asks only a
+        // name and a password - as the iPhone app does.
+        fun setUp(box: ServerDiscovery.Found) {
+            if (checking) return
+            askSetupCode { code ->
+                if (screen != connectScreen) return@askSetupCode
+                ServerAddress.remember(this, box.url)
+                hideKeyboard(field)
+                showWeb(box.url.buildUpon().appendQueryParameter("setup", code).build())
+            }
+        }
+        fun foundButton(label: String, onTap: () -> Unit) = Button(this).apply {
+            text = label
+            isAllCaps = false
+            setTextColor(Color.BLACK)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTypeface(typeface, Typeface.BOLD)
+            background = android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
+                    cornerRadius = dp(14).toFloat(); setColor(accent); setStroke(dp(3), Color.WHITE)
+                })
+                addState(intArrayOf(), GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(accent) })
+            }
+            stateListAnimator = null
+            setOnClickListener { onTap() }
+        }
+        fun heading(words: String) = TextView(this).apply {
+            text = words
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        }
         fun showFound(found: List<ServerDiscovery.Found>) {
             nearby.removeAllViews()
             nearby.visibility = if (found.isEmpty()) View.GONE else View.VISIBLE
             if (found.isEmpty()) return
-            nearby.addView(TextView(this).apply {
-                text = if (found.size == 1) "We found EmberStorm on your network" else "We found EmberStorm on your network - which one?"
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-                gravity = Gravity.CENTER
-            }, fill(bottom = 10))
-            for (f in found) {
-                nearby.addView(Button(this).apply {
-                    text = if (found.size == 1) "Use it - ${f.label}" else f.label
-                    isAllCaps = false
-                    setTextColor(Color.BLACK)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                    setTypeface(typeface, Typeface.BOLD)
-                    background = android.graphics.drawable.StateListDrawable().apply {
-                        addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
-                            cornerRadius = dp(14).toFloat(); setColor(accent); setStroke(dp(3), Color.WHITE)
-                        })
-                        addState(intArrayOf(), GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(accent) })
-                    }
-                    stateListAnimator = null
-                    setOnClickListener { use(f) }
-                }, fill(height = 52, bottom = 8))
+            // Something to tap: the keyboard put up for typing an address goes.
+            if (field.text.isEmpty()) hideKeyboard(field)
+            val fresh = found.filter { !it.setUp }
+            val ready = found.filter { it.setUp }
+            if (fresh.isNotEmpty()) {
+                nearby.addView(heading(if (fresh.size == 1) "We found your new EmberStorm" else "We found new EmberStorms - which is yours?"), fill(bottom = 10))
+                if (isTv) {
+                    // A TV cannot read the sticker: the owner's phone sets it
+                    // up first, as on the Apple TV.
+                    nearby.addView(TextView(this).apply {
+                        text = "Set it up with the EmberStorm app on your phone first, then sign in here."
+                        setTextColor(Color.argb(0x99, 0xeb, 0xeb, 0xf5))
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                        gravity = Gravity.CENTER
+                    }, fill(bottom = 16))
+                } else {
+                    for (f in fresh) nearby.addView(foundButton(if (fresh.size == 1) "Set it up" else "Set up ${f.label}") { setUp(f) }, fill(height = 52, bottom = 8))
+                }
             }
-            // On a TV the remote lands on it first.
-            if (isTv && servers.isEmpty()) nearby.getChildAt(1)?.requestFocus()
+            if (ready.isNotEmpty()) {
+                val one = ready.size == 1
+                nearby.addView(heading(when {
+                    one && ready[0].name != null -> "We found ${ready[0].name} on your network"
+                    one -> "We found EmberStorm on your network"
+                    else -> "We found EmberStorm on your network - which one?"
+                }), fill(top = if (fresh.isEmpty()) 0 else 12, bottom = 10))
+                for (f in ready) {
+                    val label = if (!one) f.label else if (f.name != null) "Sign in" else "Use it - ${f.label}"
+                    nearby.addView(foundButton(label) { use(f) }, fill(height = 52, bottom = 8))
+                }
+            }
+            // On a TV the remote lands on the first button.
+            if (isTv && servers.isEmpty()) (0 until nearby.childCount).map { nearby.getChildAt(it) }.firstOrNull { it is Button }?.requestFocus()
         }
         fun search() {
             background.execute {
@@ -523,6 +565,61 @@ class MainActivity : Activity() {
             field.requestFocus()
             field.post { getSystemService(InputMethodManager::class.java).showSoftInput(field, 0) }
         }
+    }
+
+    /**
+     * Asks for a new box's setup code: scanned off its sticker with Google's
+     * scanner (the code alone, or an address carrying ?setup=), or typed.
+     * Capitals, spaces and dashes do not matter; the server checks it.
+     */
+    private fun askSetupCode(then: (String) -> Unit) {
+        val field = EditText(this).apply {
+            hint = "ABCD-EFGH-..."
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            isSingleLine = true
+        }
+        val pad = LinearLayout(this).apply {
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(field, LinearLayout.LayoutParams(MATCH, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Set up your EmberStorm")
+            .setMessage("Type the setup code printed on the sticker on the box, or scan its QR code.")
+            .setView(pad)
+            .setPositiveButton("Continue", null)
+            .setNeutralButton("Scan the sticker", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val code = setupCodeIn(field.text.toString())
+                if (code.isEmpty()) return@setOnClickListener
+                dialog.dismiss()
+                then(code)
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                val options = com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE)
+                    .build()
+                com.google.mlkit.vision.codescanner.GmsBarcodeScanning.getClient(this, options).startScan()
+                    .addOnSuccessListener { barcode ->
+                        val code = setupCodeIn(barcode.rawValue ?: "")
+                        if (code.isEmpty()) return@addOnSuccessListener
+                        dialog.dismiss()
+                        then(code)
+                    }
+                    .addOnFailureListener { Toast.makeText(this, "Could not scan - type the code instead.", Toast.LENGTH_LONG).show() }
+            }
+        }
+        dialog.show()
+    }
+
+    /** The setup code in what was typed or scanned: an address's ?setup=, or the text itself. */
+    private fun setupCodeIn(text: String): String {
+        val raw = text.trim()
+        val fromLink = runCatching { Uri.parse(raw) }.getOrNull()
+            ?.takeIf { it.isHierarchical && it.scheme != null }?.getQueryParameter("setup")
+        return (fromLink ?: raw).filter { it.isLetterOrDigit() || it == '-' }.take(64)
     }
 
     /** One saved server on the connect screen. */

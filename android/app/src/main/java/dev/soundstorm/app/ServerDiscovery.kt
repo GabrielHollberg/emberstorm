@@ -23,9 +23,14 @@ import java.util.concurrent.TimeUnit
  * secureName), which is kept instead of the bare address when it answers too.
  */
 object ServerDiscovery {
-    data class Found(val url: Uri) {
-        /** What to call it on screen: the code, for a home name. */
-        val label: String get() = ServerAddress.homeCode(url.host) ?: url.host ?: url.toString()
+    /**
+     * A server found: its best address, the name it goes by ("Gabriel's
+     * EmberStorm", none until it has an owner), and whether it has an owner
+     * yet - a new box has none, and is set up rather than signed in to.
+     */
+    data class Found(val url: Uri, val name: String? = null, val setUp: Boolean = true) {
+        /** What to call it on screen: its name, else the code of a home name. */
+        val label: String get() = name ?: ServerAddress.homeCode(url.host) ?: url.host ?: url.toString()
     }
 
     /** EmberStorm's own port; a server moved to another is typed in. */
@@ -38,10 +43,13 @@ object ServerDiscovery {
         val pool = Executors.newFixedThreadPool(128)
         try {
             val answering = pool.invokeAll(hosts.map { host ->
-                Callable { "http://$host:$PORT".takeIf { isEmberStorm(it, 1200) } }
-            }, 30, TimeUnit.SECONDS).mapNotNull { runCatching { it.get() }.getOrNull() }.sorted()
-            return answering.map { plain -> Found(Uri.parse(secureName(plain) ?: "$plain/")) }
-                .distinctBy { it.url.toString() }.sortedBy { it.label }
+                Callable { "http://$host:$PORT".let { base -> health(base, 1200)?.let { base to it } } }
+            }, 30, TimeUnit.SECONDS).mapNotNull { runCatching { it.get() }.getOrNull() }.sortedBy { it.first }
+            return answering.map { (plain, health) ->
+                Found(Uri.parse(secureName(plain) ?: "$plain/"),
+                    health.optString("name").trim().takeIf { it.isNotEmpty() }?.take(60),
+                    health.optBoolean("setUp", true))
+            }.distinctBy { it.url.toString() }.sortedBy { it.label }
         } finally {
             pool.shutdownNow()
         }
@@ -60,10 +68,13 @@ object ServerDiscovery {
         }
     }.getOrNull()
 
-    private fun isEmberStorm(base: String, timeout: Int = 2000): Boolean {
-        val body = get("$base/healthz", timeout) ?: return false
-        return runCatching { JSONObject(body).let { it.optString("status") == "ok" && it.has("sources") } }.getOrDefault(false)
+    /** What /healthz says, when [base] is an EmberStorm answering; else null. */
+    private fun health(base: String, timeout: Int = 2000): JSONObject? {
+        val body = get("$base/healthz", timeout) ?: return null
+        return runCatching { JSONObject(body).takeIf { it.optString("status") == "ok" && it.has("sources") } }.getOrNull()
     }
+
+    private fun isEmberStorm(base: String, timeout: Int = 2000): Boolean = health(base, timeout) != null
 
     /** The install's secure home name, if it has one and it answers from here. */
     private fun secureName(plain: String): String? {
