@@ -24,7 +24,7 @@
   <img src="web/shots/reader.png" width="190" alt="A book read one line at a time">
 </p>
 
-EmberStorm turns a computer at home into your own streaming service. Put your
+EmberStorm™ turns a computer at home into your own streaming service. Put your
 files in its folders, or drag them onto the window, and they appear, sorted,
 with covers, ready to play on every phone, tablet, TV and computer in the
 house. There are no subscriptions, no adverts and no accounts with anybody
