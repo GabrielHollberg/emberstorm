@@ -77,6 +77,8 @@ const maxProgressBody = 8 << 10
 
 // Server wires everything to HTTP handlers.
 type Server struct {
+	// invitesTaking holds the invitations being answered right now.
+	invitesTaking sync.Map
 	// moodCache keeps mood scores for the sound analysis they came from.
 	moodCache moodCache
 	setupCode string

@@ -119,6 +119,18 @@ func New(reg *source.Registry, log *slog.Logger) *Proxy {
 			// call. The transport bounds the part that can actually hang -
 			// waiting for the upstream to start responding.
 			Timeout: 0,
+			// A backend's own headers carry its keys (Immich's x-api-key),
+			// which Go would carry on to another host: a redirect is followed
+			// only on the same one, as the backend client does.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) > 0 && req.URL.Host != via[0].URL.Host {
+					return http.ErrUseLastResponse
+				}
+				if len(via) >= 10 {
+					return errors.New("too many redirects")
+				}
+				return nil
+			},
 			Transport: &http.Transport{
 				ResponseHeaderTimeout: 30 * time.Second,
 				IdleConnTimeout:       90 * time.Second,

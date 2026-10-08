@@ -498,6 +498,15 @@ class MainActivity : Activity() {
             stateListAnimator = null
             setOnClickListener { onTap() }
         }
+        // Under each server found, where it is: its name is only what it says
+        // of itself, and anything on the network can say "Gabriel's EmberStorm"
+        // (a security review).
+        fun whereItIs(f: ServerDiscovery.Found) = TextView(this).apply {
+            text = f.url.host ?: ""
+            setTextColor(Color.argb(0x99, 0xeb, 0xeb, 0xf5))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            gravity = Gravity.CENTER
+        }
         fun heading(words: String) = TextView(this).apply {
             text = words
             setTextColor(Color.WHITE)
@@ -525,7 +534,10 @@ class MainActivity : Activity() {
                         gravity = Gravity.CENTER
                     }, fill(bottom = 16))
                 } else {
-                    for (f in fresh) nearby.addView(foundButton(if (fresh.size == 1) "Set it up" else "Set up ${f.label}") { setUp(f) }, fill(height = 52, bottom = 8))
+                    for (f in fresh) {
+                        nearby.addView(foundButton(if (fresh.size == 1) "Set it up" else "Set up ${f.label}") { setUp(f) }, fill(height = 52, bottom = 2))
+                        nearby.addView(whereItIs(f), fill(bottom = 8))
+                    }
                 }
             }
             if (ready.isNotEmpty()) {
@@ -537,7 +549,8 @@ class MainActivity : Activity() {
                 }), fill(top = if (fresh.isEmpty()) 0 else 12, bottom = 10))
                 for (f in ready) {
                     val label = if (!one) f.label else if (f.name != null) "Sign in" else "Use it - ${f.label}"
-                    nearby.addView(foundButton(label) { use(f) }, fill(height = 52, bottom = 8))
+                    nearby.addView(foundButton(label) { use(f) }, fill(height = 52, bottom = 2))
+                    nearby.addView(whereItIs(f), fill(bottom = 8))
                 }
             }
             // On a TV the remote lands on the first button.
@@ -908,8 +921,33 @@ class MainActivity : Activity() {
                 ?: known.firstOrNull { installId(it) != null && installId(it) == installId(w) }
                 ?: ServerAddress.current?.let(ServerAddress::parse)?.takeIf { ServerAddress.origin(it) == ServerAddress.origin(w) }
         }
-        val server = match ?: ServerAddress.saved(this) ?: return null
+        val saved = ServerAddress.saved(this)
+        // A link naming a server this app does not know is not handed to its
+        // own: anybody could send one carrying a code of theirs, and one
+        // "Allow" would sign their TV in as this person (a security review).
+        // The install's chosen name is known only by where it leads: the
+        // same address as the server saved.
+        val server = match ?: when {
+            wanted == null -> saved
+            saved != null && sameAddress(wanted, saved) -> saved
+            else -> null
+        } ?: return null
         return server to code
+    }
+
+    /** Whether two addresses' names lead to one machine; asked off the main
+     *  thread, two seconds at most, as a link is being opened. */
+    private fun sameAddress(a: Uri, b: Uri): Boolean {
+        var same = false
+        val look = Thread {
+            same = runCatching {
+                val there = java.net.InetAddress.getAllByName(a.host).map { it.hostAddress }.toSet()
+                java.net.InetAddress.getAllByName(b.host).any { it.hostAddress in there }
+            }.getOrDefault(false)
+        }
+        look.start()
+        look.join(2000)
+        return same
     }
 
     /**
@@ -1196,11 +1234,17 @@ class MainActivity : Activity() {
                     // owner's design (2026-10-08) - is followed only when it
                     // and the address in use answer with one install id:
                     // anybody can get a name under the zone, and a page must
-                    // not be able to send the app to theirs.
+                    // not be able to send the app to theirs. An id is only
+                    // what a server says of itself, and anybody can say
+                    // another's (it is the first part of its name), so the two
+                    // names must also lead to one address: a chosen name is
+                    // pointed at its install's own (a security review).
                     Thread {
                         val same = runCatching {
                             val here = ServerAddress.installIdAt(current)
-                            here != null && here == ServerAddress.installIdAt(target)
+                            val there = java.net.InetAddress.getAllByName(target.host).map { it.hostAddress }.toSet()
+                            here != null && here == ServerAddress.installIdAt(target) &&
+                                java.net.InetAddress.getAllByName(currentHost).any { it.hostAddress in there }
                         }.getOrDefault(false)
                         if (same) content.post { if (server == current) showWeb(target) }
                     }.start()

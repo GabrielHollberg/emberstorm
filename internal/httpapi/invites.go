@@ -159,6 +159,17 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// One account an invitation: two answers sent together both found it
+	// waiting and each made one.
+	if _, busy := s.invitesTaking.LoadOrStore(hash, true); busy {
+		writeError(w, http.StatusConflict, "this invitation is being used")
+		return
+	}
+	defer s.invitesTaking.Delete(hash)
+	if _, still := s.store.InviteFor(hash); !still {
+		writeError(w, http.StatusGone, "this invitation has been used")
+		return
+	}
 	creds, err := decodeCredentials(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
