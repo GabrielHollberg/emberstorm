@@ -47,14 +47,14 @@ const (
 var playerIDPattern = regexp.MustCompile(`^[a-f0-9]{16,64}$`)
 
 type player struct {
-	ID       string
-	Name     string
-	UserID   string
-	TV       bool
+	ID     string
+	Name   string
+	UserID string
+	TV     bool
 	// KeyHash is the hash of the device's own secret (its profile cookie):
 	// a player id is only the page's word, and somebody else saying hello
 	// under it took the device over (a security review).
-	KeyHash string
+	KeyHash  string
 	Seen     time.Time
 	State    json.RawMessage
 	Playing  bool
@@ -428,13 +428,13 @@ func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	h.init()
 	type out struct {
-		ID     string          `json:"id"`
-		Name   string          `json:"name"`
-		TV     bool            `json:"tv"`
-		Mine   bool            `json:"mine"`
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		TV   bool   `json:"tv"`
+		Mine bool   `json:"mine"`
 		// Shared: anybody in the house may play on it. The owner is also
 		// shown TVs not yet shared, to share them.
-		Shared bool `json:"shared"`
+		Shared bool            `json:"shared"`
 		Person string          `json:"person,omitempty"`
 		Busy   bool            `json:"busy"`
 		State  json.RawMessage `json:"state,omitempty"`
