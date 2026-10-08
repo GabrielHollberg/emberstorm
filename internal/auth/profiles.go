@@ -38,12 +38,24 @@ var ErrBadPIN = errors.New("a PIN is 4 to 8 digits")
 
 // ProfileDevice is the hashed id of this device's profile cookie, or "" if
 // it has none.
+//
+// Over TLS only the __Host- cookie counts: a browser refuses that one from
+// any other site, and the plain one can be set for the whole zone by any
+// other install under it (the zone is not a public suffix). Taken, a
+// stranger's planted id was adopted by the next "keep me on this device",
+// and the person kept on it could then be switched to from anywhere with
+// that id (the blind security review).
 func (m *Manager) ProfileDevice(r *http.Request) string {
-	for _, name := range []string{SecureProfileCookieName, ProfileCookieName} {
-		if c, err := r.Cookie(name); err == nil && len(c.Value) == 32 {
-			if _, err := hex.DecodeString(c.Value); err == nil {
-				return state.HashDevice(c.Value)
-			}
+	name := ProfileCookieName
+	if m.OverTLS(r) {
+		name = SecureProfileCookieName
+	}
+	for _, c := range r.Cookies() {
+		if c.Name != name || len(c.Value) != 32 {
+			continue
+		}
+		if _, err := hex.DecodeString(c.Value); err == nil {
+			return state.HashDevice(c.Value)
 		}
 	}
 	return ""

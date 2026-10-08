@@ -286,3 +286,32 @@ func TestASweepLetsGoOfNamesNobodyHolds(t *testing.T) {
 		t.Errorf("result = %+v", res)
 	}
 }
+
+// The away-names pass judged chosen names by the installs it could see, the
+// ones with remote access, so an install without remote access lost its name
+// every day and anybody could claim it, with a certificate for it (the
+// blind security review). A chosen name stays while its install has a record
+// under any label.
+func TestTheAwayPassKeepsAHomeOnlyInstallsName(t *testing.T) {
+	z, p := newZone(t)
+	homeOnly, away := fakeID("o", 1), fakeID("w", 2)
+	z.add(homeOnly+".home", "A", "192.168.0.10", daysAgo(1))
+	z.add(away+".home", "A", "192.168.0.11", daysAgo(1))
+	z.add(away+".net", "A", "203.0.113.9", daysAgo(1))
+	z.add("smith.claim", "TXT", homeOnly, daysAgo(1))
+	z.add("smith.home", "CNAME", homeOnly+".home.soundstorm.dev", daysAgo(1))
+	z.add("jones.claim", "TXT", away, daysAgo(1))
+	z.add("jones.home", "CNAME", away+".home.soundstorm.dev", daysAgo(1))
+	z.add("jones.net", "CNAME", away+".net.soundstorm.dev", daysAgo(1))
+
+	for _, label := range []string{"home", "net"} {
+		if _, err := p.Sweep(context.Background(), label, halfYear); err != nil {
+			t.Fatalf("Sweep %s: %v", label, err)
+		}
+	}
+	for _, name := range []string{"smith.claim", "smith.home", "jones.claim", "jones.home", "jones.net"} {
+		if contains(z.deleted, name+".soundstorm.dev") {
+			t.Errorf("%s was swept, its install alive", name)
+		}
+	}
+}

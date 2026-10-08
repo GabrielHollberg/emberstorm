@@ -87,10 +87,16 @@ func (p *Porkbun) Sweep(ctx context.Context, label string, forgetAfter time.Dura
 	// id) and the home and away names pointed at the install's.
 	claimName := regexp.MustCompile(`^([a-z0-9-]{3,30})\.claim\.` + regexp.QuoteMeta(strings.ToLower(p.Domain)) + `$`)
 	pointedName := regexp.MustCompile(`^([a-z0-9-]{3,30})\.[a-z]+\.` + regexp.QuoteMeta(strings.ToLower(p.Domain)) + `$`)
+	// An install under any label: a chosen name is its install's while the
+	// install has a record anywhere. Judged by this pass's label alone, the
+	// away pass dropped the name of every install without remote access,
+	// every day, for anybody to claim (the blind security review).
+	anyInstall := regexp.MustCompile(`^[a-z2-7]{10}\.[a-z]+\.` + regexp.QuoteMeta(strings.ToLower(p.Domain)) + `$`)
 	now := p.now()
 
 	var forget, challenges, claims, pointed []porkbunRecord
-	installs := map[string]bool{}
+	// Records each install has, under every label; less what this pass forgets.
+	records := map[string]int{}
 	for _, r := range all.Records {
 		name := strings.ToLower(strings.TrimSuffix(r.Name, "."))
 		switch {
@@ -101,8 +107,8 @@ func (p *Porkbun) Sweep(ctx context.Context, label string, forgetAfter time.Dura
 			pointed = append(pointed, r)
 			continue
 		}
-		if (r.Type == "A" || r.Type == "AAAA") && installName.MatchString(name) {
-			installs[name[:10]] = true
+		if (r.Type == "A" || r.Type == "AAAA") && anyInstall.MatchString(name) {
+			records[name[:10]]++
 		}
 		switch {
 		case (r.Type == "A" || r.Type == "AAAA") && installName.MatchString(name):
@@ -129,7 +135,7 @@ func (p *Porkbun) Sweep(ctx context.Context, label string, forgetAfter time.Dura
 			len(forget), res.Installs, limit)
 	}
 	for _, r := range forget {
-		delete(installs, strings.ToLower(strings.TrimSuffix(r.Name, "."))[:10])
+		records[strings.ToLower(strings.TrimSuffix(r.Name, "."))[:10]]--
 	}
 
 	// An install holds one chosen name, and only while it is there: a name
@@ -141,7 +147,7 @@ func (p *Porkbun) Sweep(ctx context.Context, label string, forgetAfter time.Dura
 	for _, c := range claims {
 		id := strings.Trim(strings.ToLower(c.Content), `"`)
 		name := claimName.FindStringSubmatch(strings.ToLower(strings.TrimSuffix(c.Name, ".")))[1]
-		if !installs[id] {
+		if records[id] <= 0 {
 			dropNames[name] = true
 			continue
 		}

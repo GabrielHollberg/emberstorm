@@ -151,7 +151,8 @@ final class FileUploads: NSObject {
     /// its ends for naming a different one, a zip's table of contents, an
     /// import's piece. At most 16MB at once.
     func read(_ id: String, from: Int64, to: Int64) -> Data? {
-        guard let p = picked[id], to >= from, to - from <= 16 << 20,
+        // from at least 0, so to - from cannot overflow (it trapped).
+        guard let p = picked[id], from >= 0, to >= from, to - from <= 16 << 20,
               let handle = FileHandle(forReadingAtPath: p.file) else { return nil }
         defer { try? handle.close() }
         try? handle.seek(toOffset: UInt64(max(0, from)))

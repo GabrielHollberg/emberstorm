@@ -172,7 +172,7 @@ struct ShowView: View {
                     .font(.system(size: 30, weight: .bold))
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
-                let minutes = Int(((episode.durationSeconds ?? 0) / 60).rounded())
+                let minutes = Int((Player.sane(episode.durationSeconds ?? 0) / 60).rounded())
                 let meta = [minutes > 0 ? "\(minutes) min" : nil, done >= 0.93 ? "Watched" : nil].compactMap { $0 }
                 if !meta.isEmpty {
                     Text(meta.joined(separator: " \u{00B7} ")).font(.system(size: 26)).foregroundStyle(Theme.muted)

@@ -143,11 +143,34 @@ enum ServerAddress {
     /// the same id in both, given by the same names service. Servers took
     /// their new names on 2026-10-08 and stopped answering the old, so a
     /// device saved under one moves itself when the old does not answer.
+    ///
+    /// Only for an install's own code (ten letters and digits, which only that
+    /// install can hold, in either zone): a name someone chose is not kept
+    /// for them in the new zone, and someone else could hold it there (the
+    /// blind security review). The caller also checks the server there gives
+    /// this code as its id (`movesHere`).
     nonisolated static func inNewestZone(_ url: URL) -> URL? {
         guard let host = url.host(), let n = installName(host), n.zone != zones[0],
+              n.label.range(of: "^[a-z2-7]{10}$", options: .regularExpression) != nil,
               var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         parts.host = "\(n.label).\(n.level).\(zones[0])"
         return parts.url
+    }
+
+    /// A small answer, read to `limit` bytes and no further: whatever answers
+    /// on the network (a probed address, a server being checked) could send
+    /// an endless body and run the app out of memory (the blind security
+    /// review).
+    nonisolated static func smallData(_ request: URLRequest, session: URLSession = .shared,
+                                      limit: Int = 64 << 10) async throws -> (Data, URLResponse) {
+        let (bytes, response) = try await session.bytes(for: request)
+        if response.expectedContentLength > Int64(limit) { throw URLError(.dataLengthExceedsMaximum) }
+        var data = Data()
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > limit { throw URLError(.dataLengthExceedsMaximum) }
+        }
+        return (data, response)
     }
 
     /// The addresses a host resolves to (itself, for an address).
@@ -180,6 +203,13 @@ enum ServerAddress {
         return !(await x).isDisjoint(with: await y)
     }
 
+    /// Whether the server at an older zone's name may be moved to `newer`:
+    /// it answers there as the same install (its id is the code).
+    nonisolated static func movesHere(from old: URL, to newer: URL) async -> Bool {
+        guard let code = old.host().flatMap(installName)?.label else { return false }
+        return await healthID(newer) == code
+    }
+
     /// The install's id, as its /healthz says (servers since chosen names
     /// carry it): how two of an install's names are known to be one server.
     nonisolated static func healthID(_ server: URL) async -> String? {
@@ -187,7 +217,7 @@ enum ServerAddress {
         request.timeoutInterval = 8
         request.cachePolicy = .reloadIgnoringLocalCacheData
         struct Health: Decodable { let id: String? }
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
+        guard let (data, response) = try? await smallData(request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return (try? JSONDecoder().decode(Health.self, from: data))?.id
     }
@@ -311,7 +341,7 @@ enum ServerAddress {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await smallData(request)
         } catch let error as URLError {
             throw CheckError.unreachable(explain(error, server))
         }

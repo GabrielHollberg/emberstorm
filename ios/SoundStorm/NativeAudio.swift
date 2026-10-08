@@ -102,7 +102,8 @@ final class NativeAudio: NSObject {
         case "play", "pause", "stop", "unqueue": PlayerLog.add("page: \(cmd)")
         case "sleep":
             let at = (m["at"] as? NSNumber)?.doubleValue ?? 0
-            PlayerLog.add("page: sleep timer \(at > 0 ? "in \(Int(at / 1000 - Date().timeIntervalSince1970))s" : "off")")
+            let wait = at / 1000 - Date().timeIntervalSince1970
+            PlayerLog.add("page: sleep timer \(at > 0 && wait.isFinite ? "in \(Int(min(max(wait, -1e9), 1e9)))s" : "off")")
         default: break
         }
         switch cmd {
@@ -472,6 +473,14 @@ final class NativeAudio: NSObject {
         if !meta.art.isEmpty, artwork?.url != meta.art { loadArtwork(meta.art) }
     }
 
+    private nonisolated final class ArtNoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+        // The completion-handler form: Swift 6.3 crashes compiling the async one.
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
+    }
+
     private func loadArtwork(_ address: String) {
         guard let url = allowed(address) else { return }
         Task {
@@ -483,7 +492,8 @@ final class NativeAudio: NSObject {
             // thumbnail (ImageIO) - a server's picture could be any size, and
             // whole it was read in full and decoded at full size first (the
             // eleventh security pass).
-            guard let (bytes, response) = try? await URLSession.shared.bytes(for: request),
+            // No redirects: the Cookie header set here would go with one.
+            guard let (bytes, response) = try? await URLSession.shared.bytes(for: request, delegate: ArtNoRedirects()),
                   (response as? HTTPURLResponse)?.statusCode == 200,
                   response.expectedContentLength < 8 << 20 else { return }
             var data = Data()

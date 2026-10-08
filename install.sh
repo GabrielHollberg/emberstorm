@@ -1268,6 +1268,17 @@ fi
 if [ -f docker-compose.yml ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ]; then
 	note "already installed here - upgrading it instead"
 	UPGRADE=1
+	# The current compose file too: an update used to keep the one it was
+	# installed with, so containers added since and the hardening in it
+	# (private networks, pinned versions) never reached an install (the
+	# blind security review). A failed download keeps the one there.
+	if (fetch "$COMPOSE_URL" docker-compose.yml.new) 2>/dev/null && [ -s docker-compose.yml.new ]; then
+		mv docker-compose.yml.new docker-compose.yml
+		note "downloaded the current docker-compose.yml"
+	else
+		rm -f docker-compose.yml.new
+		note "could not download the current docker-compose.yml - keeping the one here"
+	fi
 else
 	UPGRADE=0
 	fetch "$COMPOSE_URL" docker-compose.yml.new

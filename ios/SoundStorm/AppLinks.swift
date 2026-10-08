@@ -27,18 +27,24 @@ enum TVLink {
 
     /// A link opening the app: the server it is for (only one this app
     /// already knows - a link must never point the app somewhere new) and
-    /// the code.
+    /// the code. A link for a server it does not know, or naming none, is
+    /// not handed to this app's own server any more: anybody could send one
+    /// with a code of theirs, and one Allow signed their device in (the
+    /// blind security review). Scanning the TV's code from inside the app
+    /// is unchanged.
     static func parse(_ url: URL) -> (server: URL?, code: String)? {
         let host = url.host()?.lowercased() ?? ""
         if url.scheme == "soundstorm", host == "link",
            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
            let code = items.first(where: { $0.name == "code" })?.value.flatMap(Self.code(in:)) {
             let wanted = items.first(where: { $0.name == "server" })?.value.flatMap(ServerAddress.parse)
-            return (known(wanted), code)
+            guard let server = known(wanted) else { return nil }
+            return (server, code)
         }
         if url.scheme == "https", ServerAddress.installName(host) != nil,
            let code = code(in: url.absoluteString) {
-            return (known(ServerAddress.parse(host)), code)
+            guard let server = known(ServerAddress.parse(host)) else { return nil }
+            return (server, code)
         }
         return nil
     }

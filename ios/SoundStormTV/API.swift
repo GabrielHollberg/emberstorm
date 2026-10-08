@@ -864,7 +864,15 @@ final class API {
 
     /// The cookies AVPlayer must send: it does not read the shared store by
     /// itself, and every stream and cover is refused without the session.
-    var cookies: [HTTPCookie] { HTTPCookieStorage.shared.cookies(for: server) ?? [] }
+    /// The server's own cookies only: one set for a parent domain
+    /// (.emberstorm.app) could come from another install there.
+    var cookies: [HTTPCookie] {
+        let host = server.host()?.lowercased() ?? ""
+        return (HTTPCookieStorage.shared.cookies(for: server) ?? []).filter {
+            let d = $0.domain.lowercased()
+            return d == host || d == "." + host
+        }
+    }
 
     // MARK: Plumbing
 

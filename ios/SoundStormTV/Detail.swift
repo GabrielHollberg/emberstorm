@@ -99,7 +99,7 @@ func songFacts(_ songs: [Item], year: Int? = nil) -> String {
     if let year { parts.append(String(year)) }
     parts.append("\(songs.count) song\(songs.count == 1 ? "" : "s")")
     if total > 0 {
-        let minutes = Int((total / 60).rounded())
+        let minutes = Int((Player.sane(total) / 60).rounded())
         parts.append(minutes < 60 ? "\(minutes) min" : "\(minutes / 60) hr \(minutes % 60) min")
     }
     return parts.joined(separator: " \u{00B7} ")

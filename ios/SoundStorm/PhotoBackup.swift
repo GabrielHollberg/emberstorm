@@ -110,6 +110,24 @@ final class PhotoBackup: NSObject {
         return parts.url
     }
 
+    /// Whether this page's server is where backup sends: the address saved
+    /// when it was turned on, or the address the app was opened with then -
+    /// or another name of the same install (the same label). A page from any
+    /// other server may not change backup at all (the blind security review:
+    /// any page the app showed could point backup at itself).
+    func isDestination(_ url: URL, typed: URL) -> Bool {
+        let saved = ["server", "typed"].compactMap { defaults.string(forKey: "backup." + $0) }.compactMap(URL.init(string:))
+        func same(_ a: URL, _ b: URL) -> Bool {
+            if a.scheme == b.scheme, a.host()?.lowercased() == b.host()?.lowercased(), a.port == b.port { return true }
+            guard let x = a.host().flatMap(ServerAddress.installName), let y = b.host().flatMap(ServerAddress.installName) else { return false }
+            return x.label == y.label
+        }
+        return saved.contains { same($0, url) || same($0, typed) }
+    }
+
+    /// Whether backup has a destination yet.
+    var hasDestination: Bool { defaults.string(forKey: "backup.typed") != nil }
+
     /// What the page asked: "status", or "set" with on or off and options -
     /// asking for the photo library first when it is turned on.
     func handle(_ command: String, options: [String: Any]) async {

@@ -166,7 +166,8 @@ final class AppModel {
             // Saved under soundstorm.dev, which servers stopped answering on
             // moving to emberstorm.app (2026-10-08): the same name there,
             // if it answers, the sign-in carried across.
-            if let newer = ServerAddress.inNewestZone(api.server), (try? await ServerAddress.check(newer)) != nil {
+            if let newer = ServerAddress.inNewestZone(api.server), await ServerAddress.movesHere(from: api.server, to: newer),
+               (try? await ServerAddress.check(newer)) != nil {
                 moveServer(from: api.server, to: newer)
                 return
             }

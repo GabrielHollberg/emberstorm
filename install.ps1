@@ -3280,6 +3280,20 @@ if ($Import) {
 $upgrade = (Test-Path 'docker-compose.yml') -and $env:SOUNDSTORM_FORCE -ne '1'
 if ($upgrade) {
     Note "Already installed here - updating it instead."
+    # The current compose file too: an update used to keep the one it was
+    # installed with, so containers added since and the hardening in it
+    # (private networks, pinned versions) never reached an install (the
+    # blind security review). A failed download keeps the one there.
+    try {
+        Invoke-WebRequest -Uri $ComposeUrl -OutFile 'docker-compose.yml.new' -UseBasicParsing
+        if ((Get-Item 'docker-compose.yml.new').Length -gt 0) {
+            Move-Item -Force 'docker-compose.yml.new' 'docker-compose.yml'
+            Note "Downloaded the current docker-compose.yml."
+        }
+    } catch {
+        Remove-Item -Force -ErrorAction SilentlyContinue 'docker-compose.yml.new'
+        Note "Could not download the current docker-compose.yml - keeping the one here."
+    }
 } else {
     try {
         # To a temporary name first, so a failed download cannot leave a

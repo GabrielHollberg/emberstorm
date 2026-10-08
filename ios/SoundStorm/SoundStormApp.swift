@@ -146,7 +146,19 @@ final class RootViewController: UIViewController {
         }
     }
 
+    /// The server last shown, so music from it stops on going to another.
+    private var shownServer: URL?
+
     private func showWeb(_ server: URL, link: String? = nil, invite: String? = nil) {
+        // Another server: the last one's music stops, and the new page is not
+        // told what the old one was playing (the blind security review).
+        // Moving to another name of the same install (its code) is not that.
+        if let last = shownServer, last != server,
+           last.host().flatMap(ServerAddress.installName)?.label == nil
+            || last.host().flatMap(ServerAddress.installName)?.label != server.host().flatMap(ServerAddress.installName)?.label {
+            NativeAudio.shared.handle(["cmd": "stop"])
+        }
+        shownServer = server
         let web = WebViewController(server: server, link: link, invite: invite)
         web.onChangeServer = { [weak self] in
             self?.showConnect(prefill: server)

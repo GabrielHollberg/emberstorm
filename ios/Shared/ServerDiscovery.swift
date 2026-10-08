@@ -93,7 +93,7 @@ nonisolated enum ServerDiscovery {
     struct Health: Decodable, Sendable { let status: String; let sources: Int; let name: String?; let setUp: Bool? }
 
     private static func health(_ url: URL, _ session: URLSession) async -> Health? {
-        guard let (data, response) = try? await session.data(from: url.appending(path: "healthz")),
+        guard let (data, response) = try? await ServerAddress.smallData(URLRequest(url: url.appending(path: "healthz")), session: session),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let h = try? JSONDecoder().decode(Health.self, from: data), h.status == "ok" else { return nil }
         return h
@@ -102,7 +102,7 @@ nonisolated enum ServerDiscovery {
     /// The install's secure home name, if it has one and it answers from here.
     private static func secureName(of plain: URL, _ session: URLSession) async -> URL? {
         struct Session: Decodable { let secureName: String? }
-        guard let (data, _) = try? await session.data(from: plain.appending(path: "api/session")),
+        guard let (data, _) = try? await ServerAddress.smallData(URLRequest(url: plain.appending(path: "api/session")), session: session),
               let name = (try? JSONDecoder().decode(Session.self, from: data))?.secureName,
               ServerAddress.installName(name) != nil,
               let secure = URL(string: "https://\(name):\(port)"),

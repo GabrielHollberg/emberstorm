@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/GabrielHollberg/soundstorm/internal/auth"
 	"github.com/GabrielHollberg/soundstorm/internal/library"
@@ -130,6 +131,18 @@ func (s *Server) handleUploadDescribe(w http.ResponseWriter, r *http.Request) {
 	if !ok || !source.AccessFrom(r.Context()).Permits(kind) {
 		writeError(w, http.StatusBadRequest, "not a shelf you can add to")
 		return
+	}
+	// A person's pictures only ever go into their own folder: a file
+	// anywhere else on the shelf is not looked at. It was, and its camera
+	// and when it was taken could be read off another member's photos one
+	// guess at a time (the blind security review).
+	if kind == media.KindPicture {
+		u, _ := auth.FromContext(r.Context())
+		own := "pictures/" + library.PersonalFolder(u.Name) + "/"
+		if dest := path.Clean(q.Get("dest")); !strings.HasPrefix(dest, own) {
+			writeJSON(w, http.StatusOK, map[string]any{"name": path.Base(dest)})
+			return
+		}
 	}
 	size, _ := strconv.ParseInt(q.Get("size"), 10, 64)
 	head, _ := strconv.ParseInt(q.Get("head"), 10, 64)

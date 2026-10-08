@@ -556,7 +556,7 @@ final class WebViewController: UIViewController {
             let old = server
             Task { [weak self] in
                 guard let self else { return }
-                if (try? await ServerAddress.check(moved)) != nil {
+                if await ServerAddress.movesHere(from: old, to: moved), (try? await ServerAddress.check(moved)) != nil {
                     await Self.copyCookies(from: old, to: moved)
                     ServerAddress.moved(old, to: moved)
                     self.onMoved?(moved)
@@ -673,12 +673,30 @@ final class WebViewController: UIViewController {
             }
             volumeKeys.set(body["on"] as? Bool ?? false, in: view.window)
         case "backup":
-            PhotoBackup.shared.rememberServer(current, typed: server)
             let command = body["cmd"] as? String ?? ""
-            let options = body["options"] as? [String: Any] ?? [:]
+            var options = body["options"] as? [String: Any] ?? [:]
+            let backup = PhotoBackup.shared
+            let ours = backup.isDestination(current, typed: server)
             Task {
-                await PhotoBackup.shared.handle(command, options: options)
-                reportBackup()
+                // Only a person's yes points backup at a server: a status
+                // message changes nothing, and a page from another server
+                // than backup's may only turn it on here, after the app has
+                // asked by name (the blind security review: any page shown
+                // could point backup at itself, and switch it on).
+                if command == "set" {
+                    if options["enabled"] as? Bool == true && (!ours || !backup.enabled) {
+                        if await askToBackUp(to: current) {
+                            backup.rememberServer(current, typed: server)
+                            await backup.handle(command, options: options)
+                        } else {
+                            options["enabled"] = false
+                            if ours { await backup.handle(command, options: options) }
+                        }
+                    } else if ours || !backup.hasDestination {
+                        await backup.handle(command, options: options)
+                    }
+                }
+                self.reportBackup()
                 // The page is up and signed in: a run that found no sign-in
                 // at launch can go now - but not one per message.
                 PhotoBackup.shared.pageAsked()
@@ -710,6 +728,21 @@ final class WebViewController: UIViewController {
     /// 0.46 checks. From a LAN address the id is not known, and any home name
     /// on the same port is accepted: home names only ever point at private
     /// addresses, and the page asking to go there is the server's own.
+    /// The app's own question before backup sends anywhere new: the page
+    /// cannot answer it.
+    private func askToBackUp(to url: URL) async -> Bool {
+        let host = url.host() ?? url.absoluteString
+        return await withCheckedContinuation { done in
+            let ask = UIAlertController(title: "Back up this iPhone's photos and videos to \(host)?",
+                                        message: "Your photos will be sent to this server, and kept there.", preferredStyle: .alert)
+            ask.addAction(UIAlertAction(title: "Don't Allow", style: .cancel) { _ in done.resume(returning: false) })
+            ask.addAction(UIAlertAction(title: "Back Up", style: .default) { _ in done.resume(returning: true) })
+            var top: UIViewController = self
+            while let shown = top.presentedViewController { top = shown }
+            top.present(ask, animated: true)
+        }
+    }
+
     /// The sign-in for one of the server's names, given to another: the
     /// web view keeps cookies per name.
     private static func copyCookies(from old: URL, to new: URL) async {
