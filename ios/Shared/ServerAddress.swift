@@ -104,13 +104,69 @@ enum ServerAddress {
         }
     }
 
+    /// The zones installs are named under: emberstorm.app since the rename
+    /// (2026-10-08), soundstorm.dev before it, kept a year so older addresses
+    /// still work. The first is the one tried first.
+    nonisolated static let zones = ["emberstorm.app", "soundstorm.dev"]
+
+    /// "<label>.home.<zone>" or "<label>.net.<zone>": the label (an install's
+    /// code, or a name its owner chose), the level and the zone; nil for any
+    /// other host.
+    nonisolated static func installName(_ host: String) -> (label: String, level: String, zone: String)? {
+        let host = host.lowercased()
+        for zone in zones where host.hasSuffix("." + zone) {
+            let parts = host.dropLast(zone.count + 1).split(separator: ".")
+            guard parts.count == 2, parts[1] == "home" || parts[1] == "net" else { return nil }
+            return (String(parts[0]), String(parts[1]), zone)
+        }
+        return nil
+    }
+
+    /// Whether a host is one of the zones' own (an install's name, or the
+    /// names service's).
+    nonisolated static func inZones(_ host: String) -> Bool {
+        let host = host.lowercased()
+        return zones.contains { host.hasSuffix("." + $0) }
+    }
+
+    /// The same install's name at the other level (home <-> net), keeping
+    /// the label, zone and port.
+    nonisolated static func twin(_ url: URL, level: String) -> URL? {
+        guard let host = url.host(), let n = installName(host), n.level != level,
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        parts.host = "\(n.label).\(level).\(n.zone)"
+        return parts.url
+    }
+
+    /// An install's name in the newest zone, when it is saved under an older
+    /// one (k3x9m2p7qa.net.soundstorm.dev -> k3x9m2p7qa.net.emberstorm.app):
+    /// the same id in both, given by the same names service. Servers took
+    /// their new names on 2026-10-08 and stopped answering the old, so a
+    /// device saved under one moves itself when the old does not answer.
+    nonisolated static func inNewestZone(_ url: URL) -> URL? {
+        guard let host = url.host(), let n = installName(host), n.zone != zones[0],
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        parts.host = "\(n.label).\(n.level).\(zones[0])"
+        return parts.url
+    }
+
+    /// The install's id, as its /healthz says (servers since chosen names
+    /// carry it): how two of an install's names are known to be one server.
+    nonisolated static func healthID(_ server: URL) async -> String? {
+        var request = URLRequest(url: server.appending(path: "healthz"))
+        request.timeoutInterval = 8
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        struct Health: Decodable { let id: String? }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return (try? JSONDecoder().decode(Health.self, from: data))?.id
+    }
+
     /// A first name for a server, until somebody gives it one: its address
     /// without the parts every install shares.
     static func defaultName(for url: URL) -> String {
         let host = url.host() ?? url.absoluteString
-        for suffix in [".home.soundstorm.dev", ".net.soundstorm.dev"] where host.hasSuffix(suffix) {
-            return "SoundStorm " + host.dropLast(suffix.count)
-        }
+        if let n = installName(host) { return "EmberStorm " + n.label }
         return host
     }
 
@@ -146,7 +202,7 @@ enum ServerAddress {
             case .notAnAddress:
                 "That doesn't look like a web address."
             case .notSoundStorm:
-                "Something answered at that address, but it isn't SoundStorm."
+                "Something answered at that address, but it isn't EmberStorm."
             case .unreachable(let why):
                 why
             }
@@ -165,16 +221,19 @@ enum ServerAddress {
     /// to the home name when it can; a TV, which stays put, the home name.
     static func candidates(_ text: String, preferAway: Bool) -> [URL]? {
         let typed = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let bare = typed.hasSuffix(".soundstorm.dev") ? String(typed.dropLast(".soundstorm.dev".count)) : typed
+        var bare = typed
+        for zone in zones where typed.hasSuffix("." + zone) { bare = String(typed.dropLast(zone.count + 1)) }
         if !typed.contains("://"), bare.range(of: "^[a-z0-9][a-z0-9-]{2,62}$", options: .regularExpression) != nil,
            bare != "localhost", !bare.allSatisfy(\.isNumber) {
             let levels = preferAway ? ["net", "home"] : ["home", "net"]
-            return levels.flatMap { level in
-                ["https://\(bare).\(level).soundstorm.dev:8099", "https://\(bare).\(level).soundstorm.dev"].compactMap(URL.init(string:))
+            return zones.flatMap { zone in
+                levels.flatMap { level in
+                    ["https://\(bare).\(level).\(zone):8099", "https://\(bare).\(level).\(zone)"].compactMap(URL.init(string:))
+                }
             }
         }
         guard let url = parse(text) else { return nil }
-        guard url.port == nil, url.scheme == "https", url.host()?.hasSuffix(".soundstorm.dev") == true,
+        guard url.port == nil, url.scheme == "https", url.host().map(inZones) == true,
               var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return [url] }
         parts.port = 8099
         return [parts.url, url].compactMap { $0 }
@@ -208,7 +267,7 @@ enum ServerAddress {
                 }
             }
             if list.count > 2, !text.contains(".") {
-                throw CheckError.unreachable("Couldn't reach a server with the code \(text.trimmingCharacters(in: .whitespacesAndNewlines)), at home or away. Check the code - it is in SoundStorm's Settings, Use on your phone or TV - and, away from home, that remote access is on.")
+                throw CheckError.unreachable("Couldn't reach a server with the code \(text.trimmingCharacters(in: .whitespacesAndNewlines)), at home or away. Check the code - it is in EmberStorm's Settings, Use on your phone or TV - and, away from home, that remote access is on.")
             }
             if case .failure(let error) = results[list.count - 1] { throw error }
             throw CheckError.notSoundStorm
@@ -241,7 +300,7 @@ enum ServerAddress {
              .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid,
              .secureConnectionFailed:
             return "\(host) has a certificate this iPhone doesn't trust. "
-                + "Use the soundstorm.dev address SoundStorm gave you, or install its certificate first."
+                + "Use the emberstorm.app address EmberStorm gave you, or install its certificate first."
         case .appTransportSecurityRequiresSecureConnection:
             return "iOS only allows plain http:// on your home network. Use the https:// address."
         case .cannotFindHost, .dnsLookupFailed:
@@ -249,7 +308,7 @@ enum ServerAddress {
         case .notConnectedToInternet:
             return "This iPhone is offline."
         case .timedOut, .cannotConnectToHost, .networkConnectionLost:
-            return "Couldn't reach \(host). Is SoundStorm running, and is this iPhone on a network that can reach it?"
+            return "Couldn't reach \(host). Is EmberStorm running, and is this iPhone on a network that can reach it?"
         default:
             return error.localizedDescription
         }

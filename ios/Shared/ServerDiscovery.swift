@@ -25,9 +25,9 @@ nonisolated enum ServerDiscovery {
         /// What to call it on screen.
         var label: String {
             if !name.isEmpty { return name }
-            if !setUp { return "New SoundStorm" }
+            if !setUp { return "New EmberStorm" }
             let host = url.host() ?? url.absoluteString
-            return host.hasSuffix(".home.soundstorm.dev") ? String(host.dropLast(".home.soundstorm.dev".count)) : host
+            return ServerAddress.installName(host)?.label ?? host
         }
         var id: String { url.absoluteString }
     }
@@ -47,14 +47,14 @@ nonisolated enum ServerDiscovery {
     /// nothing answering meanwhile, which looks exactly like "not there".
     static func nothingFound(tv: Bool) -> String {
         if !onHomeNetwork {
-            return tv ? "This TV isn't on a home network. Connect it to the Wi-Fi or a cable SoundStorm is on - it keeps looking."
-                : "This phone isn't on Wi-Fi. Join the Wi-Fi SoundStorm is on - not mobile data - and it keeps looking."
+            return tv ? "This TV isn't on a home network. Connect it to the Wi-Fi or a cable EmberStorm is on - it keeps looking."
+                : "This phone isn't on Wi-Fi. Join the Wi-Fi EmberStorm is on - not mobile data - and it keeps looking."
         }
         let device = tv ? "this TV" : "this phone"
-        var text = "No SoundStorm found yet - still looking. If it was just plugged in, it takes a few minutes to start the first time. "
-            + "Check \(device) is on the same Wi-Fi as SoundStorm, not a guest network."
+        var text = "No EmberStorm found yet - still looking. If it was just plugged in, it takes a few minutes to start the first time. "
+            + "Check \(device) is on the same Wi-Fi as EmberStorm, not a guest network."
         if !tv {
-            text += " If you tapped Don't Allow when asked about devices on your network, turn on Local Network for SoundStorm in the iPhone's Settings."
+            text += " If you tapped Don't Allow when asked about devices on your network, turn on Local Network for EmberStorm in the iPhone's Settings."
         }
         return text
     }
@@ -104,7 +104,7 @@ nonisolated enum ServerDiscovery {
         struct Session: Decodable { let secureName: String? }
         guard let (data, _) = try? await session.data(from: plain.appending(path: "api/session")),
               let name = (try? JSONDecoder().decode(Session.self, from: data))?.secureName,
-              name.hasSuffix(".soundstorm.dev"),
+              ServerAddress.installName(name) != nil,
               let secure = URL(string: "https://\(name):\(port)"),
               await health(secure, session) != nil else { return nil }
         return secure

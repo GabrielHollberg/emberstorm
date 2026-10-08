@@ -11,6 +11,10 @@
 		<string>applinks:*.net.soundstorm.dev</string>
 		<!-- Open my SoundStorm on soundstorm.dev: names.soundstorm.dev/open?to= -->
 		<string>applinks:names.soundstorm.dev</string>
+		<!-- The same on emberstorm.app, the addresses since the rename. -->
+		<string>applinks:*.home.emberstorm.app</string>
+		<string>applinks:*.net.emberstorm.app</string>
+		<string>applinks:names.emberstorm.app</string>
 	</array>
 </dict>
 </plist>

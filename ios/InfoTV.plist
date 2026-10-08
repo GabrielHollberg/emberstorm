@@ -19,6 +19,6 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>SoundStorm connects to your own server, which may be on your home network.</string>
+	<string>EmberStorm connects to your own server, which may be on your home network.</string>
 </dict>
 </plist>

@@ -22,7 +22,7 @@ struct ConnectView: View {
             // somebody who just plugged the server in gets started.
             if !nearby.isEmpty {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(nearby.count == 1 ? "We found \(nearby[0].label) on your network" : "We found SoundStorm on your network - which one?")
+                    Text(nearby.count == 1 ? "We found \(nearby[0].label) on your network" : "We found EmberStorm on your network - which one?")
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(Theme.text)
                     ForEach(nearby) { found in
@@ -31,7 +31,7 @@ struct ConnectView: View {
                                 ServerAddress.serverCalls(found.url, found.name)
                                 model.use(found.url)
                             } else {
-                                message = "That SoundStorm isn't set up yet. Set it up with the SoundStorm app on your phone first - then choose it here."
+                                message = "That EmberStorm isn't set up yet. Set it up with the EmberStorm app on your phone first - then choose it here."
                             }
                         } label: {
                             VStack {
@@ -44,7 +44,7 @@ struct ConnectView: View {
                         .buttonStyle(WebButton(primary: found.setUp))
                     }
                     if nearby.count == 1 && !nearby[0].setUp {
-                        Text("Set it up with the SoundStorm app on your phone first.")
+                        Text("Set it up with the EmberStorm app on your phone first.")
                             .font(.system(size: 26))
                             .foregroundStyle(Theme.muted)
                     }
@@ -57,7 +57,7 @@ struct ConnectView: View {
             } else if !searched && list.isEmpty {
                 HStack(spacing: 16) {
                     ProgressView()
-                    Text("Looking for SoundStorm on your network…").muted()
+                    Text("Looking for EmberStorm on your network…").muted()
                 }
             }
             if !list.isEmpty {
@@ -97,7 +97,7 @@ struct ConnectView: View {
                 }
             }
             Text(list.isEmpty && nearby.isEmpty
-                 ? "Enter your server's address, like abc123.home.soundstorm.dev at home or abc123.net.soundstorm.dev away - or just the abc123 at its start. It is in SoundStorm's Settings, under Use on your phone or TV."
+                 ? "Enter your server's address, like abc123.home.emberstorm.app at home or abc123.net.emberstorm.app away - or just the abc123 at its start. It is in EmberStorm's Settings, under Use on your phone or TV."
                  : list.isEmpty ? "Or type its address, or just the code at its start." : "Or add another - its address, or just the code at its start.")
                 .muted()
                 .fixedSize(horizontal: false, vertical: true)
@@ -177,7 +177,7 @@ struct SignInView: View {
             } else if linking {
                 LinkView(done: { linking = false })
             } else if hasAccount {
-                let name = ServerAddress.all.first(where: { $0.url == model.api?.server })?.name ?? "SoundStorm"
+                let name = ServerAddress.all.first(where: { $0.url == model.api?.server })?.name ?? "EmberStorm"
                 Text("Sign in to \(name).").muted()
                 WebField(label: "Username", text: $username)
                     .textContentType(.username)
@@ -196,7 +196,7 @@ struct SignInView: View {
             } else {
                 // Creating the owner needs the setup code, which is on the
                 // computer SoundStorm runs on: easier there than on a TV.
-                Text("This SoundStorm isn't set up yet. Set it up with the SoundStorm app on your phone, then sign in here.")
+                Text("This EmberStorm isn't set up yet. Set it up with the EmberStorm app on your phone, then sign in here.")
                     .muted()
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Try again") { Task { await model.refreshSession() } }
@@ -304,7 +304,7 @@ struct Logo: View {
     var body: some View {
         VStack(spacing: 16) {
             Image("Logo")
-            Text("SoundStorm")
+            Text("EmberStorm")
                 .font(.system(size: 64, weight: .heavy).italic())
         }
     }
@@ -416,7 +416,7 @@ struct LinkView: View {
 
     var body: some View {
         VStack(spacing: 30) {
-            Text("On a phone signed in to SoundStorm, scan this - or open SoundStorm on it and enter the code under Settings, Sign in a TV.")
+            Text("On a phone signed in to EmberStorm, scan this - or open EmberStorm on it and enter the code under Settings, Sign in a TV.")
                 .muted()
                 .fixedSize(horizontal: false, vertical: true)
             if let link, let api = model.api {
@@ -672,7 +672,7 @@ struct UnreachableView: View {
             Text("Can't reach \(host)")
                 .font(.system(size: 44, weight: .bold))
                 .foregroundStyle(Theme.text)
-            Text("Is the computer SoundStorm runs on switched on, and this TV on a network that reaches it? Trying again by itself.")
+            Text("Is the computer EmberStorm runs on switched on, and this TV on a network that reaches it? Trying again by itself.")
                 .muted()
                 .fixedSize(horizontal: false, vertical: true)
             Button("Try again") { Task { await model.refreshSession() } }

@@ -35,9 +35,9 @@
 		</dict>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>SoundStorm scans a TV's sign-in code, so you can sign the TV in from this phone.</string>
+	<string>EmberStorm scans a TV's sign-in code, so you can sign the TV in from this phone.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SoundStorm backs up your photos and videos to your own server, when you turn on photo backup in Settings.</string>
+	<string>EmberStorm backs up your photos and videos to your own server, when you turn on photo backup in Settings.</string>
 	<!-- Plain http only to the local network (IP addresses, .local names).
 	     Everywhere else iOS insists on https, as the web app already does. -->
 	<key>NSAppTransportSecurity</key>
@@ -50,6 +50,6 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>SoundStorm connects to your own server, which may be on your home network.</string>
+	<string>EmberStorm connects to your own server, which may be on your home network.</string>
 </dict>
 </plist>

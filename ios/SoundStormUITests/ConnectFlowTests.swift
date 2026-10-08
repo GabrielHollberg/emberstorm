@@ -48,7 +48,7 @@ final class ConnectFlowTests: XCTestCase {
         // Found, by itself: alone it is "Set it up"; beside others (the
         // developer's own server), "New SoundStorm".
         let setUp = app.buttons["Set it up"]
-        let new = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "New SoundStorm")).firstMatch
+        let new = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "New EmberStorm")).firstMatch
         XCTAssertTrue(setUp.waitForExistence(timeout: 20) || new.exists, "the new box was not found on the network")
         (setUp.exists ? setUp : new).tap()
 
@@ -71,7 +71,7 @@ final class ConnectFlowTests: XCTestCase {
         XCTAssertTrue(circle(web).waitForExistence(timeout: 20), "never got into the new server")
 
         let (after, _) = try await URLSession.shared.data(from: box)
-        XCTAssertEqual(try JSONDecoder().decode(Health.self, from: after).name, "tester's SoundStorm")
+        XCTAssertEqual(try JSONDecoder().decode(Health.self, from: after).name, "tester's EmberStorm")
     }
 
     func testWrongAddressSaysWhy() {

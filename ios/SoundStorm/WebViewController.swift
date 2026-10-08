@@ -145,6 +145,11 @@ final class WebViewController: UIViewController {
 
     /// The away twin has been tried since the last Try again.
     private var triedTwin = false
+    /// The server's name in the newest zone has been tried (`inNewestZone`).
+    private var triedZone = false
+    /// Saved under an older zone and found under the newest: the app opens
+    /// the server there (SoundStormApp).
+    var onMoved: ((URL) -> Void)?
 
     private func load() {
         failure.isHidden = true
@@ -542,21 +547,36 @@ final class WebViewController: UIViewController {
         // not a failure anybody needs to see.
         if error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled { return }
         if error.domain == WKError.errorDomain && error.code == 102 { return } // frame load interrupted
+        // Saved under soundstorm.dev, which servers stopped answering when
+        // they moved to emberstorm.app (2026-10-08): the same name there is
+        // tried, and if it answers it becomes the saved address, the sign-in
+        // carried across (a session is the server's, whatever its name).
+        if !triedZone, error.domain == NSURLErrorDomain, let moved = ServerAddress.inNewestZone(server) {
+            triedZone = true
+            let old = server
+            Task { [weak self] in
+                guard let self else { return }
+                if (try? await ServerAddress.check(moved)) != nil {
+                    await Self.copyCookies(from: old, to: moved)
+                    ServerAddress.moved(old, to: moved)
+                    self.onMoved?(moved)
+                } else {
+                    self.showFailure(error)
+                }
+            }
+            return
+        }
         // A home name is not reached away from home: its away twin is tried
         // once (followed, not saved), as the Android app does.
         if error.domain == NSURLErrorDomain,
            [NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost, NSURLErrorTimedOut,
             NSURLErrorDNSLookupFailed, NSURLErrorNetworkConnectionLost].contains(error.code),
            !triedTwin, let failed = (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? current as URL?,
-           let host = failed.host(), host.hasSuffix(".home.soundstorm.dev"),
-           var parts = URLComponents(url: failed, resolvingAgainstBaseURL: false) {
+           let twin = ServerAddress.twin(failed, level: "net"), ServerAddress.installName(failed.host() ?? "")?.level == "home" {
             triedTwin = true
-            parts.host = String(host.dropLast(".home.soundstorm.dev".count)) + ".net.soundstorm.dev"
-            if let twin = parts.url {
-                current = twin
-                webView.load(URLRequest(url: twin))
-                return
-            }
+            current = twin
+            webView.load(URLRequest(url: twin))
+            return
         }
         AppChrome.shared.statusBarHidden = false
         failure.show(host: server.host() ?? server.absoluteString, detail: error.localizedDescription)
@@ -681,29 +701,40 @@ final class WebViewController: UIViewController {
     /// home, or from a LAN address like http://192.168.0.50:8099. That is the
     /// same server, not a link out, and was being sent to Safari.
     ///
-    /// Only this install's names count. Anybody can get a *.net.soundstorm.dev
-    /// name for a server of their own, so from a soundstorm.dev address the id
-    /// must match. From a LAN address the id is not known, and any home name
+    /// Only this install's names count. Anybody can get a *.net name for a
+    /// server of their own, so from one of the zones' addresses the label
+    /// must match - in either zone (soundstorm.dev moved to emberstorm.app,
+    /// 2026-10-08, the same ids) - or, for a name its owner chose
+    /// (yourname.home.emberstorm.app) where the label is not the code, both
+    /// addresses' /healthz must answer with the same install id, as Android
+    /// 0.46 checks. From a LAN address the id is not known, and any home name
     /// on the same port is accepted: home names only ever point at private
     /// addresses, and the page asking to go there is the server's own.
-    private func sameInstall(_ url: URL) -> Bool {
-        guard url.scheme == "https", url.port == current.port,
-              let host = url.host()?.lowercased(),
-              let (id, level) = Self.installName(host), level == "home"
-        else { return false }
-        if let (currentID, _) = current.host().flatMap({ Self.installName($0.lowercased()) }) {
-            return id == currentID
+    /// The sign-in for one of the server's names, given to another: the
+    /// web view keeps cookies per name.
+    private static func copyCookies(from old: URL, to new: URL) async {
+        guard let oldHost = old.host()?.lowercased(), let newHost = new.host()?.lowercased() else { return }
+        let store = WKWebsiteDataStore.default().httpCookieStore
+        for cookie in await store.allCookies() where cookie.domain.lowercased() == oldHost {
+            var props = cookie.properties ?? [:]
+            props[.domain] = newHost
+            if let copy = HTTPCookie(properties: props) { await store.setCookie(copy) }
         }
-        return current.scheme == "http"
     }
 
-    /// "<id>.home.soundstorm.dev" -> (id, "home"); nil for anything else.
-    private static func installName(_ host: String) -> (String, String)? {
-        let parts = host.split(separator: ".")
-        guard parts.count == 4, parts[2] == "soundstorm", parts[3] == "dev",
-              parts[1] == "home" || parts[1] == "net"
-        else { return nil }
-        return (String(parts[0]), String(parts[1]))
+    private func sameInstall(_ url: URL) async -> Bool {
+        guard url.scheme == "https", url.port == current.port,
+              let host = url.host()?.lowercased(),
+              let name = ServerAddress.installName(host), name.level == "home"
+        else { return false }
+        if let mine = current.host().flatMap(ServerAddress.installName) {
+            if name.label == mine.label { return true }
+            async let theirs = ServerAddress.healthID(url)
+            async let ours = ServerAddress.healthID(current)
+            guard let a = await theirs, let b = await ours else { return false }
+            return a == b
+        }
+        return current.scheme == "http"
     }
 }
 
@@ -713,7 +744,7 @@ extension WebViewController: WKNavigationDelegate {
         // No target frame is a new window, which createWebViewWith decides
         // (only for a link somebody tapped) - not the page itself.
         let mainFrame = action.targetFrame?.isMainFrame ?? false
-        if mainFrame && sameInstall(url) {
+        if mainFrame, await sameInstall(url) {
             // Followed for now, never saved: the address typed stays the one
             // the app starts from. Saving a name reached from a plain-http
             // page let someone on the same Wi-Fi pin the app to a server of
@@ -926,7 +957,7 @@ private final class FailureView: UIView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     func show(host: String, detail text: String) {
-        title.text = "Can't reach SoundStorm at \(host)"
+        title.text = "Can't reach EmberStorm at \(host)"
         detail.text = text
         isHidden = false
     }

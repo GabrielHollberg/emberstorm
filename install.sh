@@ -243,6 +243,19 @@ shell_quote() {
 	done
 }
 
+# detach_dmg lets go of the Docker download's disk image. Straight after
+# Docker's own installer it can still be busy (hdiutil exits 16), and under
+# set -e that ended the whole setup with no word said - found on the first
+# real run on a Mac. Tried again, then forced; never fatal: Docker is
+# installed either way, and macOS lets go of it at the latest on restart.
+detach_dmg() {
+	for _ in 1 2 3; do
+		hdiutil detach -quiet "$1" 2>/dev/null && return 0
+		sleep 2
+	done
+	hdiutil detach -quiet -force "$1" 2>/dev/null || true
+}
+
 install_docker_mac() {
 	step "Installing Docker Desktop"
 	note "EmberStorm runs inside Docker Desktop, which is set up now. There is"
@@ -262,39 +275,36 @@ install_docker_mac() {
 	# Docker's own command-line install: its terms accepted, and set up for
 	# this user so its first start needs no password of its own.
 	if ! as_root "$tmp/mnt/Docker.app/Contents/MacOS/install" --accept-license --user="$(id -un)"; then
-		hdiutil detach -quiet "$tmp/mnt"
+		detach_dmg "$tmp/mnt"
 		rm -rf "$tmp"
 		die "Docker Desktop did not finish installing. Install it from here, then
 run this again:
 
   https://www.docker.com/products/docker-desktop/"
 	fi
-	hdiutil detach -quiet "$tmp/mnt"
+	detach_dmg "$tmp/mnt"
 	rm -rf "$tmp"
-	quiet_docker_mac
 	# Where its command lives, should the installer not have linked it into
 	# a folder on PATH yet.
 	PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"
 	note "Docker Desktop is installed."
 }
 
-# quiet_docker_mac: before Docker Desktop's first start, its sign-in and
-# survey marked done and its dashboard kept away - the keys Docker writes
-# itself (see install.ps1's Hide-DockerDashboard). Only when it has no
-# settings yet: a Docker somebody has used keeps what they chose.
-quiet_docker_mac() {
-	dir="$HOME/Library/Group Containers/group.com.docker"
-	[ -e "$dir/settings-store.json" ] || [ -e "$dir/settings.json" ] && return
-	mkdir -p "$dir" 2>/dev/null &&
-		printf '{"OpenUIOnStartupDisabled": true, "DisplayedOnboarding": true}\n' >"$dir/settings-store.json"
-}
+# Docker Desktop's settings are not written ahead on a Mac, as they are on
+# Windows (Hide-DockerDashboard): they live in its group container,
+# ~/Library/Group Containers/group.com.docker, which macOS guards - writing
+# there stopped the setup on "Terminal would like to access data from other
+# apps" (seen on the first real run on a Mac, 2026-10-08, and asked even with
+# Docker Desktop not installed), and "Don't Allow" then ended the setup with
+# no word said. Its terms are accepted by its own installer; what it may
+# still show on its first start - its sign-in and a survey - is said below.
 
 start_docker_mac() {
 	[ -d /Applications/Docker.app ] || die "Docker is installed but Docker Desktop is not in Applications.
 Open Docker Desktop, wait until it says Running, then run this again."
-	quiet_docker_mac
 	note "Starting Docker Desktop. This takes a minute or two."
-	note "(If a Docker window asks you to accept its terms, click Accept.)"
+	note "If a Docker window opens, you don't need a Docker account: click Skip"
+	note "(or Continue without signing in) on anything it asks, then close it."
 	open -g -a Docker
 	PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"
 	i=0
