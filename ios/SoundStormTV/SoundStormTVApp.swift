@@ -163,6 +163,13 @@ final class AppModel {
             // nothing about the server: taken for "unreachable", it put the
             // error back just after the server answered.
             if error is CancellationError || (error as? URLError)?.code == .cancelled { return }
+            // Saved under soundstorm.dev, which servers stopped answering on
+            // moving to emberstorm.app (2026-10-08): the same name there,
+            // if it answers, the sign-in carried across.
+            if let newer = ServerAddress.inNewestZone(api.server), (try? await ServerAddress.check(newer)) != nil {
+                moveServer(from: api.server, to: newer)
+                return
+            }
             // Not reachable now - the server restarting, the Wi-Fi: said, and
             // tried again, rather than dropping to the address as if it were
             // wrong.
@@ -173,7 +180,7 @@ final class AppModel {
     /// The secure name a server offers, if this is not already it and it
     /// answers from this TV.
     private func secureAddress(for server: URL, offered: String?) async -> URL? {
-        guard let name = offered?.lowercased(), name.hasSuffix(".soundstorm.dev"),
+        guard let name = offered?.lowercased(), ServerAddress.installName(name) != nil,
               server.host()?.lowercased() != name,
               var parts = URLComponents(url: server, resolvingAgainstBaseURL: false) else { return nil }
         parts.scheme = "https"

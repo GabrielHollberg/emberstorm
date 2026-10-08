@@ -128,7 +128,7 @@ struct WordMark: View {
                 .frame(width: size * 1.3, height: size * 1.1)
                 .foregroundStyle(Theme.text)
                 .offset(y: size * 0.1)
-            Text("SoundStorm")
+            Text("EmberStorm")
                 .font(.system(size: size, weight: .heavy).italic())
                 .foregroundStyle(Theme.text)
         }

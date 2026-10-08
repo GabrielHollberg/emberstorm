@@ -295,7 +295,7 @@ final class FileUploads: NSObject {
                 request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
                 do {
                     guard try await WebCookies.apply(to: &request) else {
-                        problem = "Signed out - open SoundStorm and sign in again."
+                        problem = "Signed out - open EmberStorm and sign in again."
                         return
                     }
                 } catch {
@@ -361,7 +361,7 @@ final class FileUploads: NSObject {
             finish(id, state: "skipped", dest: nil, error: message ?? "already there")
         case 401, 403:
             inFlight.remove(id)
-            problem = "Signed out - open SoundStorm and sign in again."
+            problem = "Signed out - open EmberStorm and sign in again."
         case 429, 500...:
             // Busy, or the disk full: tried again later.
             inFlight.remove(id)

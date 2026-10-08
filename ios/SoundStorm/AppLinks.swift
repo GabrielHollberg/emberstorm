@@ -36,7 +36,7 @@ enum TVLink {
             let wanted = items.first(where: { $0.name == "server" })?.value.flatMap(ServerAddress.parse)
             return (known(wanted), code)
         }
-        if url.scheme == "https", host.hasSuffix(".home.soundstorm.dev") || host.hasSuffix(".net.soundstorm.dev"),
+        if url.scheme == "https", ServerAddress.installName(host) != nil,
            let code = code(in: url.absoluteString) {
             return (known(ServerAddress.parse(host)), code)
         }
@@ -52,7 +52,7 @@ enum TVLink {
     static func invite(_ url: URL) -> (server: URL, token: String)? {
         let host = url.host()?.lowercased() ?? ""
         let parts = url.pathComponents
-        guard url.scheme == "https", host.hasSuffix(".home.soundstorm.dev") || host.hasSuffix(".net.soundstorm.dev"),
+        guard url.scheme == "https", ServerAddress.installName(host) != nil,
               parts.count == 3, parts[1] == "invite",
               parts[2].count == 22, parts[2].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }),
               let server = ServerAddress.parse(host + (url.port.map { ":\($0)" } ?? ""))
@@ -69,12 +69,13 @@ enum TVLink {
     /// With no server named (away from home, where there is nothing to
     /// find), it is this app's own saved server, as Android 0.44.
     static func open(_ url: URL) -> (server: URL, known: Bool)? {
-        guard url.scheme == "https", url.host()?.lowercased() == "names.soundstorm.dev", url.path() == "/open" else { return nil }
+        guard url.scheme == "https", ServerAddress.zones.contains(where: { url.host()?.lowercased() == "names." + $0 }),
+              url.path() == "/open" else { return nil }
         guard let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "to" })?.value,
               !raw.isEmpty
         else { return ServerAddress.saved.map { ($0, true) } }
         guard let to = ServerAddress.parse(raw), to.scheme == "https",
-              let host = to.host()?.lowercased(), host.hasSuffix(".home.soundstorm.dev") || host.hasSuffix(".net.soundstorm.dev")
+              let host = to.host()?.lowercased(), ServerAddress.installName(host) != nil
         else { return nil }
         if let saved = known(to) { return (saved, true) }
         return (to, false)
@@ -86,8 +87,7 @@ enum TVLink {
     private static func known(_ wanted: URL?) -> URL? {
         guard let wanted else { return nil }
         let installID = { (u: URL) -> String? in
-            guard let h = u.host(), h.hasSuffix(".soundstorm.dev") else { return nil }
-            return String(h.split(separator: ".").first ?? "")
+            u.host().flatMap(ServerAddress.installName)?.label
         }
         let list = ServerAddress.all.map(\.url)
         return list.first(where: { $0.host() == wanted.host() && $0.port == wanted.port })

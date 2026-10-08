@@ -446,7 +446,7 @@ final class PhotoBackup: NSObject {
     private func stopFor(_ e: Refused) {
         halted = true
         let problem = switch e.code {
-            case 401: "Sign in to SoundStorm again to carry on backing up."
+            case 401: "Sign in to EmberStorm again to carry on backing up."
             case 403: e.message.isEmpty ? "This account does not have Pictures." : e.message
             case 507: e.message.isEmpty ? "There is no room left for photos." : e.message
             default: e.message.isEmpty ? "The server refused a photo." : e.message
@@ -495,10 +495,8 @@ final class PhotoBackup: NSObject {
         var out: [URL] = []
         if let s = defaults.string(forKey: "backup.server"), let u = URL(string: s) {
             out.append(u)
-            if let host = u.host(), host.hasSuffix(".home.soundstorm.dev"),
-               var parts = URLComponents(url: u, resolvingAgainstBaseURL: false) {
-                parts.host = String(host.dropLast(".home.soundstorm.dev".count)) + ".net.soundstorm.dev"
-                if let twin = parts.url { out.append(twin) }
+            if ServerAddress.installName(u.host() ?? "")?.level == "home", let twin = ServerAddress.twin(u, level: "net") {
+                out.append(twin)
             }
         }
         for typed in [defaults.string(forKey: "backup.typed").flatMap(URL.init(string:)), ServerAddress.saved].compactMap({ $0 })

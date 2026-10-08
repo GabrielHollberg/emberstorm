@@ -138,6 +138,9 @@ final class RootViewController: UIViewController {
         web.onChangeServer = { [weak self] in
             self?.showConnect(prefill: server)
         }
+        web.onMoved = { [weak self] url in
+            self?.showWeb(url)
+        }
         show(web)
     }
 

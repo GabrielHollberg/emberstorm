@@ -52,7 +52,7 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
         logo.heightAnchor.constraint(equalToConstant: 80).isActive = true
 
         let title = UILabel()
-        title.text = "SoundStorm"
+        title.text = "EmberStorm"
         title.font = .systemFont(ofSize: 32, weight: .heavy).italic()
         title.textColor = .white
 
@@ -67,7 +67,7 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
         hint.numberOfLines = 0
         hint.textAlignment = .center
 
-        field.placeholder = "abc123.home.soundstorm.dev"
+        field.placeholder = "abc123.home.emberstorm.app"
         field.keyboardType = .URL
         field.textContentType = .URL
         if let offered { field.text = offered.absoluteString }
@@ -182,9 +182,9 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
         nearby.isHidden = found.isEmpty
         let fresh = found.count == 1 && !found[0].setUp
         nearbyTitle.text = explain ? ServerDiscovery.nothingFound(tv: false)
-            : fresh ? "We found your new SoundStorm"
+            : fresh ? "We found your new EmberStorm"
             : found.count == 1 ? "We found \(found[0].label) on your network"
-            : "We found SoundStorm on your network - which one?"
+            : "We found EmberStorm on your network - which one?"
         for server in found {
             var config = UIButton.Configuration.filled()
             config.baseBackgroundColor = Self.accent
@@ -213,7 +213,7 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
     /// page's sign-up for the owner's name and password (with the code
     /// already in, from the address).
     private func setUp(_ server: ServerDiscovery.Found) {
-        let ask = UIAlertController(title: "Set up your new SoundStorm",
+        let ask = UIAlertController(title: "Set up your new EmberStorm",
                                     message: "The setup code is on the sticker on the bottom of the box.",
                                     preferredStyle: .alert)
         ask.addAction(UIAlertAction(title: "Scan the code", style: .default) { [weak self] _ in
@@ -266,11 +266,13 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
         guard checking == nil else { return }
         let host = server.url.host() ?? ""
         ServerAddress.serverCalls(server.url, server.name)
-        guard host.hasSuffix(".home.soundstorm.dev") else { onConnected?(server.url); return }
+        guard ServerAddress.installName(host)?.level == "home", let away = ServerAddress.twin(server.url, level: "net") else {
+            onConnected?(server.url)
+            return
+        }
         setBusy(true)
         checking = Task { [weak self] in
-            let code = String(host.dropLast(".home.soundstorm.dev".count))
-            let url = (try? await ServerAddress.find(code, preferAway: true)) ?? server.url
+            let url = (try? await ServerAddress.check(away)) != nil ? away : server.url
             ServerAddress.serverCalls(url, server.name)
             self?.setBusy(false)
             self?.checking = nil
@@ -278,7 +280,7 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
         }
     }
 
-    private static let firstHint = "Enter your server's address, like abc123.home.soundstorm.dev at home or abc123.net.soundstorm.dev away - or just the abc123 at its start. It is in SoundStorm's Settings, under Use on your phone or TV."
+    private static let firstHint = "Enter your server's address, like abc123.home.emberstorm.app at home or abc123.net.emberstorm.app away - or just the abc123 at its start. It is in EmberStorm's Settings, under Use on your phone or TV."
 
     /// The list, as it is now: a button each, the one in use ticked; held,
     /// Rename and Remove.
