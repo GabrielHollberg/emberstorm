@@ -41,9 +41,10 @@ run the suite in a container instead, as CI does:
 docker run --rm -v "//h/dev/soundstorm:/src" -w /src golang:1.27-alpine go test ./...
 ```
 
-Releases are tags: pushing `vX.Y.Z` runs `.github/workflows/publish.yml`, which
-tests, builds multi-arch images (amd64 and arm64) to
-`ghcr.io/gabrielhollberg/soundstorm`, and attaches `EmberStorm-Setup.cmd` to the
+Every push to `main` runs `.github/workflows/publish.yml`, which tests and
+builds multi-arch images (amd64 and arm64) to
+`ghcr.io/gabrielhollberg/soundstorm` as `:latest`. Releases are tags: pushing
+`vX.Y.Z` also publishes that version and attaches `EmberStorm-Setup.cmd` to the
 GitHub release. The README's download link is
 `/releases/latest/download/EmberStorm-Setup.cmd`, so it always follows the newest
 release.
@@ -63,6 +64,10 @@ Navidrome   Jellyfin   Audiobookshelf    Immich     Storyteller   AudioMuse-AI  
                                                                                  (folders)
                  — no backend publishes a port; EmberStorm is the only door —
 ```
+
+Two more helpers sit behind it the same way: Kokoro (an AI voice, for making
+an audiobook from an ebook) and Whisper (speech to text, for making an ebook
+from an audiobook), both driven by `internal/voices`.
 
 Three rules hold it together:
 
@@ -115,7 +120,10 @@ internal/beats/        hearing every song for its beats, on the server
 internal/flac/         a FLAC decoder, for the beats
 internal/training/     the developer's tool for training the visualizers
 internal/httpx/        the hardened HTTP client every adapter uses
-internal/qr/           QR codes for signing a TV in from a phone, no dependency
+internal/qr/           QR codes for signing a TV in and inviting people, no dependency
+internal/voices/       making audiobooks (Kokoro) and ebooks (Whisper)
+internal/mp4hls/       long single-file audiobooks served in pieces (HLS)
+internal/caretaker/    the box's helper: updates, Start over, the power button
 internal/starter/      the starter library bundled into the binary
 android/               the Android app (phones and TVs); see android/README.md
 ios/                   the iPhone and Apple TV apps; see ios/README.md
@@ -148,7 +156,7 @@ The second half is the one people skip, and the one that matters.
 - **Fail loudly at startup, degrade gracefully at runtime.**
 - `gofmt` clean, `go vet` clean, tests pass.
 - Backend images are pinned where their APIs move (Immich by major version,
-  Storyteller and AudioMuse-AI by digest).
+  Storyteller, AudioMuse-AI, Kokoro and Whisper by digest).
 
 ## API
 
@@ -158,7 +166,9 @@ sign-up, sign-in and sign-out, `/api/session`, `/api/remote-reachable`,
 `/healthz`, `/ca.crt` and the static files, plus the few a device uses before
 anybody is signed in on it: waiting for a new device's approval
 (`/api/login/pending/{id}`), "Who's listening?" (`GET /api/profiles`,
-`POST /api/profiles/switch`) and signing a TV in from a phone (`/api/link`).
+`POST /api/profiles/switch`), signing a TV in from a phone (`/api/link`),
+accepting an invitation (`/api/invite/{token}`), and, on a box, the power
+button's password reset (`/api/reset/...`).
 Owner-only routes are mounted separately, and cross-site writes are refused.
 An account held to choosing a new password gets a 403 with `"mustRenew": true`
 from every guarded route but `/api/account/password`. A search always answers 200: check
@@ -166,7 +176,10 @@ from every guarded route but `/api/account/password`. A search always answers 20
 
 ## Notes
 
-- The module path is `github.com/GabrielHollberg/soundstorm`.
+- The module path is still `github.com/GabrielHollberg/soundstorm`, though the
+  repository is now `github.com/GabrielHollberg/emberstorm`: internal names
+  keep "soundstorm".
+- EmberStorm is licensed AGPL-3.0; versions before 2026-10-04 stay MIT.
 - The starter library (one ebook, one audiobook, one song; public domain or CC)
   is embedded in the binary and unpacked once. `scripts/fetch-starter-media.sh`
   records where each file comes from.

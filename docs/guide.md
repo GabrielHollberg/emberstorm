@@ -27,7 +27,9 @@ Everything beyond the [README](../README.md)'s getting-started steps.
 
 The tabs are along the bottom of a phone and down the side of a computer:
 **Home**, **Music**, **Watch** (films and TV), **Books** (audiobooks, ebooks,
-documents), **Photos** and **Settings**. A tab with nothing in it is hidden.
+documents) and **Photos**. A tab with nothing in it is hidden. **Settings** is
+in the menu under your picture (or initial) at the top right; on a TV it heads
+the side bar.
 
 **Home** starts with what you're part way through (**Continue**), then what you
 played recently, what's new on every shelf, and your favorites. Typing in the
@@ -155,8 +157,8 @@ its menu.
   while Now Playing is open (for watching the visualizers), or always while the
   app is open. Set on each device separately.
 
-iPhones don't let a web page set the volume, so crossfade and even volume don't
-work there.
+Safari on an iPhone doesn't let a web page set the volume, so crossfade and
+even volume don't work there. In the Android and iPhone apps, crossfade is off.
 
 ### Lyrics
 
@@ -216,6 +218,10 @@ and **Series** across both kinds of book.
   kept, and it's the same place the Audiobookshelf phone app uses.
 - **Ebooks** (EPUB and PDF) open in the reader. Swipe or tap the sides to turn
   pages. Your place is kept across devices. You can read while music plays.
+- **Make an audiobook** (an ebook's hold menu) reads it aloud with an AI
+  voice, and **Make an ebook** (an audiobook's) writes one from the recording,
+  both on your own server, in the background. The owner can do it, and anyone
+  given permission under **People**.
 - **Read along** lists every book you have both as an ebook and as an
   audiobook. Tap one: the audiobook plays and the book opens, turning the pages
   and highlighting the sentence being read. Each book is prepared once in the
@@ -232,13 +238,14 @@ and **Series** across both kinds of book.
   double-tap to zoom.
 - **Computer:** arrow keys, the mouse wheel to zoom, and Escape to close.
 
-**Download original** gives you the untouched file, and videos play in the
-player. You can name somebody the photo server found but couldn't name, from
+**Download original** gives you the untouched file, and videos play right in
+the viewer, among the photos. You can name somebody the photo server found but couldn't name, from
 their page.
 
 **Everyone has their own photos.** What each person adds goes into their own
 folder (`pictures/Personal/<name>/`), sorted by year and month taken, and they
-see only their own; the owner sees everybody's. **Settings → Your photos** says
+see only their own - the owner included, who sees their own photos and any
+shared ones outside `Personal/`, but not other people's. **Settings → Your photos** says
 how much space you've used. The owner sets each person's space under
 **Settings → People** (100 GB unless changed); the owner's own has no limit.
 
@@ -272,9 +279,9 @@ drive; they appear as they are and are left alone.
 menu: favorite, add to playlist, play next, add to queue, download, info and more.
 A menu can be used without lifting your finger: slide onto an option and let go.
 
-**Selecting several:** in a list, holding an item selects it. Keep your finger
-down and slide across others to select them too, or lift and tap more. Then
-**hold any selected item** for the menu for all of them.
+**Selecting several:** hold an item and choose **Select** in its menu; then
+tap others to add them, or hold one that isn't ticked and slide across more.
+**Hold any selected item** for the menu for all of them.
 
 **Your own covers.** Don't like a cover? Hold a song and choose **Change
 cover**, then **For this song** or **For the whole album**, and pick a picture.
@@ -286,7 +293,7 @@ house sees it. **Use the original cover** in the same menu puts it back.
 Favorites category, and Home has a row for each.
 
 **Playlists** are for songs, on **Music → Playlists**:
-- Tap the shuffle button on a playlist's cover to play it shuffled.
+- A playlist's page has **Play** and **Shuffle**.
 - Each playlist has its own **Sort**: A to Z, Artist, Recently added, or Custom
   order, where you drag songs into place.
 - A song is only ever in a playlist once.
@@ -329,17 +336,20 @@ book folder. A song goes on its own, unless it was the last in its album.
 
 ## People and permissions
 
-The first account is the **owner**. **Settings → People** adds everyone else
-with a name and a password. There's no open sign-up and no invite links: a
-stranger can't create an account.
+The first account is the **owner**. **Settings → People** adds everyone else:
+**Invite someone** makes a QR code and link, good once for seven days, with
+which the person chooses their own password; or add them with a name and a
+password you choose. There's no open sign-up: a stranger can't create an
+account.
 
 **Tick which shelves each person can see**: untick Films for a child and the
 tab disappears, search stops finding films, and the files can't be reached
 directly either. The unit is a whole shelf ("no films"), not individual titles.
 
 Everyone has their own favorites, playlists, history, recap, and place in every
-film and book - and their own **photos**, which only they and the owner can
-see. The owner sets each person's photo space here (100 GB unless changed; the
+film and book - and their own **photos**, which only they can see in the app
+(the files sit in their folder on the server's drive, where the owner can
+reach them). The owner sets each person's photo space here (100 GB unless changed; the
 household default can be changed too).
 
 **Passwords:**
@@ -365,8 +375,8 @@ household default can be changed too).
 - **Who's listening?** (profiles): a device can keep several people. Tick
   **Keep me on this device** when signing in (ticked already on a TV), and
   next time pick yourself instead of typing a password. A TV asks every time
-  it opens; elsewhere it's **Settings → On this device → Switch person**. Set
-  a PIN there and switching to you asks for it - without one, anybody at a
+  it opens; elsewhere, tap your picture at the top right, or **Settings → On
+  this device → Switch person**. Set a PIN there and switching to you asks for it - without one, anybody at a
   device you're kept on can switch to you. The owner always needs their PIN,
   or their password if they have none. **Sign out** takes you off that device;
   a new password takes you off every device.
@@ -386,6 +396,8 @@ a Copy button.
 
 Within a minute of starting, EmberStorm also gets a secure address like
 `https://k3x9m2p7qa.home.emberstorm.app:8099`, which it moves to by itself.
+The owner can choose an easier one under **Settings → Your web address**
+(`yourname.home.emberstorm.app`).
 
 **The apps:**
 - **Android** (phones, and Google TV, Android TV and Fire TV): the newest
@@ -393,7 +405,8 @@ Within a minute of starting, EmberStorm also gets a secure address like
   Music plays like any music app's, with the lock screen, Bluetooth and car
   controls, and it can back up the phone's photos. On a TV it's driven by the
   remote: the arrows move, OK plays, Back goes back.
-- **iPhone** and **Apple TV**: EmberStorm apps (in testing). The iPhone app can
+- **iPhone** and **Apple TV**: EmberStorm apps, in testing on TestFlight (not
+  in the App Store yet). The iPhone app can
   back up the phone's photos. The Apple TV app plays music with every
   visualizer, radio and lyrics, films and TV with subtitles and audio
   languages, audiobooks by chapter, photos, ebooks and Read along.
@@ -434,7 +447,8 @@ the link and people reach your sign-in page, with no app to install.
 - **Where forwarding is impossible**, because your provider shares one address
   between many homes (carrier-grade NAT), it says so and points you to
   Tailscale.
-- **Over IPv6** there is nothing to forward.
+- **Over IPv6** there would be nothing to forward, but that path is not
+  switched on yet: today it is the IPv4 port above.
 
 It's **off by default**, because once it's on your sign-in page faces the
 internet. Guessing passwords there is slow by design. Include the `:8099` when
@@ -482,7 +496,8 @@ emptied library. Network drives can't be used on Windows.
 - **By hand:** `docker compose pull && docker compose up -d` in the install
   folder.
 
-Your library, accounts and settings are kept.
+Your library, accounts and settings are kept. EmberStorm doesn't check for
+updates by itself: an update is whenever you run one of these.
 
 ## Backing it up
 
@@ -567,9 +582,20 @@ stays installed.
 
 **HTTPS is on by default, with nothing to do.** Each install gets its own
 `….home.emberstorm.app` name and a certificate from Let's Encrypt, which every
-browser trusts. The name service only knows your server's home network address.
-Your media, searches and passwords never go near it. If it's ever down,
-EmberStorm carries on with the certificate it has.
+browser trusts. The name service (`names.emberstorm.app`) only knows your
+server's home network address (and its public one, if you turn on remote
+access). Your media, searches and passwords never go near it. If it's ever
+down, EmberStorm carries on with the certificate it has.
+
+**What goes online.** EmberStorm sends no usage data, and switches off the
+music server's. Beyond the name service and Let's Encrypt, it only goes out for
+what the owner turns on (online lyrics, music discovery, scrobbling, a Plex
+import when you run one). The media servers behind it do go online by
+themselves: the film server fetches posters and details, the photo server
+downloads its recognition models and checks for new versions, and the
+read-along and transcription helpers fetch their models or changelog.
+Installing and updating download the programs from GitHub's and Docker's
+registries.
 
 If your router refuses the name (some do), EmberStorm simply stays on the plain
 address.
@@ -618,9 +644,10 @@ docker compose up -d                # start
 
 Mac and Linux specifics: the setup installs Docker if it is missing (plain
 Docker on Linux, Docker Desktop on a Mac, asking for the computer's password
-once) and starts it when it is stopped.
+once) and starts it when it is stopped. On a Mac a Docker window may open the
+first time: click Skip, no account is needed.
 
-Windows specifics: the setup installs Docker Desktop with `winget`, with its
-first questions answered (nothing to click in Docker, no account), starts it
-when needed, picks the next free port if 8099 is taken, and adds desktop, Start
+Windows specifics: the setup installs Docker Desktop with `winget` and tries
+to answer its first questions for you (no account is needed; if a Docker window
+does ask something, Accept its terms and Skip the rest), starts it when needed, picks the next free port if 8099 is taken, and adds desktop, Start
 menu and start-up shortcuts. It keeps a log at `%TEMP%\EmberStorm-setup.log`.

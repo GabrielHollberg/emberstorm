@@ -18,9 +18,10 @@ container (Railway here), and about fifteen minutes.
    Put both halves straight into Railway (next step), not into a file, a chat
    or a commit.
 
-Nothing else changes at Porkbun. The domain keeps its nameservers, and any
-website or mail on it is untouched: installs live under `home.emberstorm.app`,
-and, with remote access on, `net.emberstorm.app` (see `docs/remote-access.md`).
+Beyond the CNAMEs added in section 2, nothing else changes at Porkbun. The domain keeps
+its nameservers, and the website and any mail on it are untouched: installs
+live under `home.emberstorm.app`, and, with remote access on,
+`net.emberstorm.app` (see `docs/remote-access.md`).
 
 ## 2. Railway
 
@@ -36,13 +37,19 @@ and, with remote access on, `net.emberstorm.app` (see `docs/remote-access.md`).
    | `PORKBUN_API_KEY` | the `pk1_...` half |
    | `PORKBUN_SECRET_API_KEY` | the `sk1_...` half |
    | `NAMES_CLIENT_IP_HEADER` | `X-Real-IP` - the header Railway's proxy puts the caller's address in, used for rate limiting. Measured, not assumed: see below. |
+   | `NAMES_ZONE` | `emberstorm.app` - the code's default is still the old `soundstorm.dev`. |
+   | `NAMES_SITE_ORIGINS` | `https://emberstorm.app,https://www.emberstorm.app` - the website, the only page allowed to ask which installs are on a visitor's connection ("Open my EmberStorm"). |
+   | `NAMES_HELD_CODES` | Optional, secret: `name=code,name=code`, for giving out a held name (a single first or last name) to somebody. |
 
 3. **Settings → Deploy → Healthcheck path:** `/healthz`, if the setting is
    there. Optional; it lets Railway tell a working deploy from a broken one.
 4. **Settings → Networking → Custom domain:** `names.emberstorm.app`. Railway
    shows a CNAME target; add that record at Porkbun (**DNS** for
    `emberstorm.app`, type CNAME, host `names`). Railway issues the
-   certificate for it by itself.
+   certificate for it by itself. Do the same for `home.emberstorm.app` and
+   `net.emberstorm.app` (where the phone apps check their app-link files) and
+   `*.emberstorm.app` (the names owners choose, such as
+   `yourname.emberstorm.app`).
 
 Check it: `https://names.emberstorm.app/healthz` answers `{"status":"ok"}`,
 and `https://names.emberstorm.app/v1/whoami` answers with *your* public
@@ -107,18 +114,23 @@ the router is refusing to resolve a public name that points at a home address
 ## Limits worth knowing before there are many installs
 
 - **Let's Encrypt allows about fifty new certificates a week per registered
-  domain,** and every install is under `emberstorm.app`. Renewals do not
-  count. The fix is the Public Suffix List (publicsuffix.org), which makes each
-  install its own domain to Let's Encrypt; apply well before it matters, as
-  review takes weeks.
+  domain,** and every install is under `emberstorm.app`. Installs renew with
+  ACME Renewal Information (saying which certificate a renewal replaces), and
+  those renewals do not count; only new installs do. Past about forty new
+  installs a week, ask Let's Encrypt for a rate limit adjustment (it takes
+  weeks). The Public Suffix List (publicsuffix.org) is for later, once there
+  are thousands of installs: it does not accept entries made only to get
+  round rate limits.
 - **Porkbun allows 2,500 DNS records per domain** (`ZONE_RECORD_LIMIT` in its
   OpenAPI spec, `https://porkbun.com/api/json/v3/spec`, read 2026-09-23). Every
-  install keeps one record while it is in use, so this is the real ceiling -
+  install keeps one record while it is in use (and a chosen name three more: its claim and its home and away names),
+  so this is the real ceiling -
   roughly 2,400 installs running at once - and it is lower than Let's
   Encrypt's. Abandoned installs are swept (next section), so the ceiling is on
-  installs in use, not installs ever made. Past about 2,000 of those: more
-  than one zone, or install names on a DNS server of our own (which Railway
-  cannot host - it has no UDP - but Fly.io can).
+  installs in use, not installs ever made. At around 1,500 of those, move the
+  zone's DNS (not the registration) to a host that allows more records, or to
+  a DNS server of our own (which Railway cannot host - it has no UDP - but
+  Fly.io can).
 - **Porkbun's general request budget is 20 per 2 seconds per API key**, from
   the same spec - and "not being enforced yet": responses carry
   `X-RateLimit-Mode: observe`, and enforcement is to be announced before it
@@ -127,9 +139,9 @@ the router is refusing to resolve a public name that points at a home address
   a 429 with `Retry-After`; the service passes it on as a 502 and the install
   retries in five minutes.
 - **The service limits everything that costs a shared budget**, in memory, so
-  a restart forgets them (`internal/names/server.go`). Challenges: 10 a day per
-  install, 20 per client network, 40 per IPv4 /24 or IPv6 /48, 300 a day in
-  all. Registrations: 10 an hour per network, 30 a day per /24 (/48), 300 a day
+  a restart forgets them (`internal/names/server.go`). Challenges: 20 a day per
+  install (a certificate can carry up to four names), 40 per client network, 80
+  per IPv4 /24 or IPv6 /48, 600 a day in all. Registrations: 10 an hour per network, 30 a day per /24 (/48), 300 a day
   in all - each can hold a record, and the zone holds 2,500. Addresses 20 an
   hour per install; the remote-access probe (`/v1/public`, which first reaches
   the install from outside to prove it is really there) 20 an hour; clearing

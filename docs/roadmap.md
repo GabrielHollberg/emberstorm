@@ -40,8 +40,8 @@ virtual machine; a test unit is next. See [`box/README.md`](../box/README.md).
   password reset (pressed five times), Start over and Erase everything, and
   bringing media in from a USB drive.
 - **Setting up from the sticker:** a setup code made when the box is prepared
-  and printed on it, and the Android app's "We found your new EmberStorm - Set
-  it up" (the iPhone app has it).
+  and printed on it. (The phone apps' "We found your new EmberStorm - Set it
+  up" is built, on Android and iPhone.)
 - **Backups to a USB drive:** nightly once one is plugged in, with the app
   saying plainly when there is no backup or one has not run.
 - **Updates in Settings**, and the box's helper updating itself.

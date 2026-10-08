@@ -38,8 +38,10 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
    - Each Windows permission prompt (Docker, WSL), and whether a **restart**
      was asked for. If it was, did setup carry on afterwards by itself, or did
      you have to start it again?
-   - **Docker Desktop's first-run window**: was the "I understand" guide shown
-     before it, and was it clear what to click?
+   - **Docker Desktop's first start**: the setup installs Docker with its
+     terms accepted and tries to skip its sign-in and survey. Did any Docker
+     window appear anyway, and what did it ask? (This has not yet been seen on
+     a PC that never had Docker.)
    - The library folder question.
    - The Windows Security Alert and "Is this your home network?".
    - Any moment the window looked stuck for more than a minute, and what it
@@ -53,9 +55,11 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
 
 ## Mac or Linux
 
-1. Install Docker as the README says, then paste the README's one command.
-2. Note how long it took, every question it asked, and whether it printed an
-   address you could open.
+1. Paste the README's one command, with Docker not installed: the setup
+   installs it (plain Docker on Linux, Docker Desktop on a Mac).
+2. Note how long it took, every question it asked (the computer's password
+   should be asked once), any Docker window that opened on a Mac, and whether
+   it printed an address you could open.
 3. On Linux, check that adding files works afterwards (folder permissions
    were wrong there once).
 
