@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // fake answers the way 3.6.3 did, two pages of the analysis.
@@ -68,5 +69,27 @@ func TestSimilarLeavesOutTheSeedAndTreatsUnheardAsNone(t *testing.T) {
 	ids, err = s.Similar(context.Background(), "unheard", 10)
 	if err != nil || ids != nil {
 		t.Errorf("a song not yet analyzed = %v, %v; want nothing and no error", ids, err)
+	}
+}
+
+// An old copy is answered at once while AudioMuse hangs, not after the read
+// gives up.
+func TestAnOldCopyIsAnsweredWhileAudioMuseHangs(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	defer srv.Close()
+	defer close(release)
+	s, err := New(Config{ID: "audiomuse", BaseURL: srv.URL, Token: "tok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.features = map[string]Features{"song": {}}
+	s.fetched = time.Now().Add(-time.Hour)
+	start := time.Now()
+	f, err := s.Features(context.Background())
+	if err != nil || len(f) != 1 || time.Since(start) > time.Second {
+		t.Fatalf("got %d, %v after %v: want the old copy at once", len(f), err, time.Since(start))
 	}
 }

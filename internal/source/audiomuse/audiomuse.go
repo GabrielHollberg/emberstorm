@@ -144,7 +144,10 @@ func scores(list string) map[string]float64 {
 }
 
 // Features is everything analyzed so far, by song id - read whole, page by
-// page, and kept for half an hour. Concurrent callers share one read.
+// page, and kept for half an hour. Concurrent callers share one read. With a
+// copy in hand, that copy is answered at once and a fresh read runs behind
+// it: every request waited on the read, up to its three minutes when
+// AudioMuse hung (a review, 2026-10-09). Only a caller with nothing waits.
 func (s *Source) Features(ctx context.Context) (map[string]Features, error) {
 	s.mu.Lock()
 	if s.features != nil && time.Since(s.fetched) < featuresFor {
@@ -152,51 +155,56 @@ func (s *Source) Features(ctx context.Context) (map[string]Features, error) {
 		s.mu.Unlock()
 		return f, nil
 	}
-	if wait := s.loading; wait != nil {
-		s.mu.Unlock()
-		select {
-		case <-wait:
-		case <-ctx.Done():
-			return nil, ctx.Err()
+	if stale := s.features; stale != nil {
+		// Shortly after a failed read, not again: with AudioMuse down every
+		// request began a read of its own.
+		if s.loading == nil && time.Since(s.failedAt) >= time.Minute {
+			s.loading = make(chan struct{})
+			go s.read(s.loading)
 		}
-		s.mu.Lock()
-		f := s.features
 		s.mu.Unlock()
-		if f == nil {
+		return stale, nil
+	}
+	wait := s.loading
+	if wait == nil {
+		if time.Since(s.failedAt) < time.Minute {
+			s.mu.Unlock()
 			return nil, errors.New("audiomuse: analysis could not be read")
 		}
-		return f, nil
+		wait = make(chan struct{})
+		s.loading = wait
+		go s.read(wait)
 	}
-	// Shortly after a failed read, not again: with AudioMuse down every radio
-	// request began a whole read of its own.
-	// And with an old copy in hand, that copy at once: every request waited
-	// for a fresh read to fail first (a review, 2026-10-09).
-	if time.Since(s.failedAt) < time.Minute {
-		f := s.features
-		s.mu.Unlock()
-		if f != nil {
-			return f, nil
-		}
+	s.mu.Unlock()
+	select {
+	case <-wait:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	s.mu.Lock()
+	f := s.features
+	s.mu.Unlock()
+	if f == nil {
 		return nil, errors.New("audiomuse: analysis could not be read")
 	}
-	done := make(chan struct{})
-	s.loading = done
-	s.mu.Unlock()
+	return f, nil
+}
 
-	// Read for everybody waiting, so not on this request's context (one that
-	// went away failed them all), and a panic is that read's error rather
-	// than leaving everyone after it waiting for good (a review).
+// read reads the analysis for everybody waiting on done: not on any request's
+// context (one that went away failed them all), and a panic is that read's
+// error rather than leaving everyone after it waiting for good (a review). A
+// read that fails keeps the last good copy.
+func (s *Source) read(done chan struct{}) {
 	f, err := func() (f map[string]Features, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("audiomuse: reading the analysis: %v", r)
 			}
 		}()
-		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Minute)
+		rctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 		return s.readAll(rctx)
 	}()
-
 	s.mu.Lock()
 	if err == nil {
 		s.features, s.fetched = f, time.Now()
@@ -205,13 +213,7 @@ func (s *Source) Features(ctx context.Context) (map[string]Features, error) {
 	}
 	s.loading = nil
 	close(done)
-	stale := s.features
 	s.mu.Unlock()
-	if err != nil && stale != nil {
-		// A read that failed keeps the last good one rather than losing moods.
-		return stale, nil
-	}
-	return f, err
 }
 
 // maxPages bounds a read: 500 songs a page, so 200,000 songs.

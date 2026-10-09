@@ -1296,16 +1296,31 @@ func (s *Store) SetBackend(id string, b Backend) error {
 	s.d.Backends[id] = b
 	// Set up: what the setup was holding on to is now in b, or not needed.
 	delete(s.d.SetupSecrets, id)
-	// Set up afresh (its data reset, so the old login was refused): the
-	// accounts made on it for each person went with that data, and kept they
-	// failed for good - every member's photos or places refused (a review,
-	// 2026-10-09). Forgotten, each is made again the next time it is needed.
-	for _, ids := range s.d.Identities {
+	// Set up again: its data may have been reset, taking the accounts made on
+	// it for each person, which kept failed for good (a review, 2026-10-09) -
+	// or it only turned its key down, and they are all still there. So each
+	// person's account is made again the next time it is needed, with the
+	// password it had, kept as an unfinished setup's is: still there, it is
+	// signed in to; gone, it is made afresh. Forgetting the passwords too
+	// left every member refused for good on a backend that had kept them.
+	for userID, ids := range s.d.Identities {
+		identity, ok := ids[id]
+		if !ok {
+			continue
+		}
 		delete(ids, id)
-	}
-	for key := range s.d.SetupSecrets {
-		if strings.HasPrefix(key, id+"/member/") {
-			delete(s.d.SetupSecrets, key)
+		if identity.Password == "" {
+			continue
+		}
+		key := id + "/member/" + userID
+		if s.d.SetupSecrets == nil {
+			s.d.SetupSecrets = map[string]map[string]string{}
+		}
+		if s.d.SetupSecrets[key] == nil {
+			s.d.SetupSecrets[key] = map[string]string{}
+		}
+		if s.d.SetupSecrets[key]["password"] == "" {
+			s.d.SetupSecrets[key]["password"] = identity.Password
 		}
 	}
 	return s.save()
@@ -1487,6 +1502,20 @@ func (s *Store) RenewSession(token string, ttl time.Duration) (time.Time, bool) 
 	session.Expires = now.Add(ttl)
 	s.d.Sessions[key] = session
 	if err := s.save(); err != nil {
+		return time.Time{}, false
+	}
+	return session.Expires, true
+}
+
+// SessionExpiry is when a live session ends.
+func (s *Store) SessionExpiry(token string) (time.Time, bool) {
+	if token == "" {
+		return time.Time{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.d.Sessions[hashSessionToken(token)]
+	if !ok || !time.Now().Before(session.Expires) {
 		return time.Time{}, false
 	}
 	return session.Expires, true

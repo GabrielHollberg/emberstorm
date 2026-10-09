@@ -775,8 +775,23 @@ function followWithinSentence(follow, t) {
   }
 }
 
+let closing = false;
+
 export async function close() {
+  // Once at a time: turning to the pages may wait on a chapter, and a second
+  // tap meanwhile turned twice (a review).
+  if (closing) return;
+  closing = true;
+  try {
+    await closeBook();
+  } finally {
+    closing = false;
+  }
+}
+
+async function closeBook() {
   opening++;
+  const closingItem = session.item;
   // Reading in the moving line or a word at a time, on its own: the pages
   // did not move, so nothing was saved - turned to where the reading got to
   // first, which saves it (a review, 2026-10-09).
@@ -788,6 +803,8 @@ export async function close() {
     stopFree();
   }
   await flushProgress();
+  // Another book opened while that waited: it is not closed with this one.
+  if (session.item !== closingItem) return;
 
   const frame = $('reader-pdf');
   frame.removeAttribute('src');

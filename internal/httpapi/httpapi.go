@@ -832,6 +832,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		answer["setupCodeRequired"] = true
 	}
 	if user, ok := s.auth.UserFor(r); ok {
+		s.auth.RefreshCookie(w, r)
 		answer["signedIn"] = true
 		answer["user"] = s.withPicture(publicUser(user), user.ID)
 		// Remote-access state, for the account panel: whether it can be offered

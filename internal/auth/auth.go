@@ -711,6 +711,23 @@ func (m *Manager) Renew(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// RefreshCookie sends the session's cookie again with the session's own end,
+// renewing it first if due. Renew sends the cookie only on the one request
+// that renews, and that request may be one whose answer drops cookies - an
+// app's player or background job - leaving the browser's cookie to end on its
+// old day while the session lives on (a review, 2026-10-09). The page asks for
+// its session every time it opens, so its cookie is put right then.
+func (m *Manager) RefreshCookie(w http.ResponseWriter, r *http.Request) {
+	token, _, ok := m.liveSession(r)
+	if !ok {
+		return
+	}
+	m.store.RenewSession(token, sessionTTL)
+	if expiry, ok := m.store.SessionExpiry(token); ok {
+		m.SetCookie(w, r, token, expiry)
+	}
+}
+
 // Authenticated reports whether the request carries a live session.
 func (m *Manager) Authenticated(r *http.Request) bool {
 	_, ok := m.UserFor(r)

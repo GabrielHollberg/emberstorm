@@ -18,7 +18,7 @@ func TestFilmNamesAreTidied(t *testing.T) {
 		// A plain "Part N" is the film's own title, not half of one.
 		"The Lantern Keeper Part 1.mkv": "The Lantern Keeper Part 1/The Lantern Keeper Part 1.mkv",
 		"The Lantern Keeper Part 2.mkv": "The Lantern Keeper Part 2/The Lantern Keeper Part 2.mkv",
-		"Night Ferry Part 2_t00.mkv":    "Night Ferry/Night Ferry - part2.mkv",
+		"Night Ferry Part 2_t00.mkv":    "Night Ferry Part 2/Night Ferry Part 2.mkv",
 		"_t00.mkv":                      "_t00.mkv",
 	} {
 		if got := tidyFilm(in); got != want {

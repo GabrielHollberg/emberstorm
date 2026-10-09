@@ -382,6 +382,15 @@ object NativeAudio {
         // handlers were asked and nothing happened (a review, 2026-10-09).
         if (webView.get() == null) {
             val p = player ?: return
+            // A book has no songs queued: thirty seconds on or back, as the
+            // page's buttons do. "Previous" sent a book back to its start, and
+            // that start was then saved as its place everywhere (a review).
+            if (place != null) {
+                val to = p.currentPosition + if (next) 30_000 else -30_000
+                val end = p.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                p.seekTo(to.coerceIn(0, end))
+                return
+            }
             if (next) {
                 if (p.hasNextMediaItem()) p.seekToNextMediaItem()
             } else if (p.currentPosition > 3000 || !p.hasPreviousMediaItem()) {
