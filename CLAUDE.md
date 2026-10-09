@@ -90,9 +90,31 @@ Web changes for the phone apps always go to main, never into an app's folder.
 - Ask before experiments on the live server, before writing to their real
   backends (Immich and the rest) for a test, and before deleting media. Their
   media may be read for analysis, never changed or copied.
-- The repository is public. In these notes, comments and tests, never the
-  owner's real install code, chosen address, public address or family's
-  names: use made-up ones (`k3x9m2p7qa`, `yourname.home.emberstorm.app`).
+- **Nothing private goes anywhere public - a strict rule** (the owner's,
+  2026-10-09, after two history rewrites to take things out). Public means
+  everything in this repository - code, comments, tests, notes, README, docs,
+  `site/`, `web/` (the website) - and commit messages, release notes, issue
+  and pull request text, and anything else posted on GitHub or the web.
+  Private means:
+  - the owner's personal email addresses, and their personal accounts;
+  - their server's real install code, chosen web address and public address;
+  - their family's names;
+  - where they live: town, county, state, time zone named as a place (say "a
+    time zone west of UTC"), photo places from their library;
+  - their home network: this PC's address, the projector's, the routers';
+  - titles from their own library (films, shows, songs, books) and what they
+    rip or download - use made-up titles, keeping sizes and lengths;
+  - the business: the company, its state and number, prices, costs and
+    margins, suppliers and orders, the trademark search and lawyer,
+    certificate-limit requests, bank, cards and anything financial.
+  Those go in the private repo `GabrielHollberg/emberstorm-private` (clone
+  it beside this one), never here. Use made-up stand-ins in public text
+  (`k3x9m2p7qa`, `yourname.home.emberstorm.app`, 192.168.0.50). **A commit is
+  refused** that adds any of the private repo's `private-words.txt`
+  (`scripts/private-check.sh`, installed as this clone's pre-commit and
+  commit-msg hooks by `sh scripts/private-check.sh install`; each machine
+  installs it once). Never get past it with `--no-verify`: if it stops a
+  commit, take the private thing out, or ask the owner.
 - Commits carry GitHub's private address, never a personal email: on each
   machine `git config user.email "96497567+GabrielHollberg@users.noreply.github.com"`
   in this repo (done on the PC 2026-10-08; **the Mac: do it before your next
