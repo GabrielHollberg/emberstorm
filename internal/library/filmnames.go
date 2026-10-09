@@ -1,7 +1,9 @@
 package library
 
 import (
+	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -137,6 +139,47 @@ func discTitles(out []Placement, sizes []int64) {
 			p.Upload = strings.TrimPrefix(p.Dest, folderName(media.KindVideo)+"/")
 		}
 	}
+}
+
+// titleBeside is where a ripper's numbered title goes when its film's tidy
+// name (rel, within the films shelf at folder) is already another file's:
+// extras dropped after their film, in a drop of their own, which the plan
+// cannot see together with it. Much smaller than what is there, it is an
+// extra; as large or larger, a second version; exactly its size, or of a size
+// not known, it is left alone, for the copy check to judge. dropped is the
+// name it arrived with, size its size. ok false leaves rel as it was.
+func titleBeside(folder, rel, dropped string, size int64) (string, bool) {
+	d, err := cleanRelPath(dropped)
+	if err != nil {
+		return rel, false
+	}
+	base := path.Base(d)
+	ext := path.Ext(base)
+	stem := strings.TrimSuffix(base, ext)
+	tail := companionTail.FindString(stem)
+	m := titleNumber.FindStringSubmatch(strings.TrimSuffix(stem, tail))
+	if m == nil {
+		return rel, false
+	}
+	there, err := os.Lstat(filepath.Join(folder, filepath.FromSlash(rel)))
+	if err != nil || !there.Mode().IsRegular() {
+		return rel, false
+	}
+	video := !companionExtensions[strings.ToLower(ext)]
+	if video && (size <= 0 || size == there.Size()) {
+		return rel, false
+	}
+	dir, file := path.Split(rel)
+	fext := path.Ext(file)
+	name := strings.TrimSuffix(strings.TrimSuffix(file, fext), tail) + " - t" + m[1] + tail + fext
+	if !video || size*2 < there.Size() {
+		dir += "extras/"
+	}
+	out := dir + name
+	if _, err := os.Lstat(filepath.Join(folder, filepath.FromSlash(out))); err == nil {
+		return rel, false
+	}
+	return out, true
 }
 
 // tidyFilm is a film's place on its shelf (rel within it) with the ripper's

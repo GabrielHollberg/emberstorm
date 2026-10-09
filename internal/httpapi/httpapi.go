@@ -123,6 +123,7 @@ type Server struct {
 	// checks of what is already there (each can read gigabytes), and things
 	// that start work (imports, ebooks, voices, read-along, taking a send)
 	checkAsks   allowance
+	pieceStarts allowance
 	photoChecks allowance
 	startAsks   allowance
 	// playback reports sent from the app (diagnostics.go)
@@ -192,6 +193,8 @@ type Server struct {
 	// uploads counts each account's in-flight uploads; see takeUploadSlot.
 	uploadsMu sync.Mutex
 	uploads   map[string]int
+	// pieces are big files sent in pieces (pieces.go).
+	pieces pieceUploads
 
 	// rescans coalesces "look at your folder now" requests, keyed by kind,
 	// and lastRescan is when one last actually fired - see scheduleRescan.
@@ -468,6 +471,10 @@ func (s *Server) Routes() http.Handler {
 	guarded.HandleFunc("POST /api/upload/check", s.limited(&s.checkAsks, 20, 3*time.Second, s.handleUploadCheck))
 	guarded.HandleFunc("POST /api/upload/describe", s.handleUploadDescribe)
 	guarded.HandleFunc("PUT /api/upload", s.handleUpload)
+	guarded.HandleFunc("POST /api/upload/pieces", s.limited(&s.pieceStarts, 60, time.Second, s.handlePiecesStart))
+	guarded.HandleFunc("PUT /api/upload/pieces/{id}", s.handlePiece)
+	guarded.HandleFunc("GET /api/upload/pieces/{id}", s.handlePiecesStatus)
+	guarded.HandleFunc("DELETE /api/upload/pieces/{id}", s.handlePiecesCancel)
 	guarded.HandleFunc("GET /api/search", s.handleSearch)
 	// {id...} rather than {id}: an OPDS acquisition reference is a path with
 	// slashes in it ("opds/download/1/epub/"), and that is the id the adapter
@@ -2750,7 +2757,8 @@ func bodyDeadline(next http.Handler) http.Handler {
 		// a phone's photo or video, a piece of a photo download. A video on a
 		// slow uplink takes minutes, and was cut off at thirty seconds.
 		long := r.URL.Path == "/api/upload" || r.URL.Path == "/api/photos/backup" ||
-			strings.HasPrefix(r.URL.Path, "/api/photos/import/")
+			strings.HasPrefix(r.URL.Path, "/api/photos/import/") ||
+			(r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/api/upload/pieces/"))
 		if r.Body != nil && r.Body != http.NoBody && !long {
 			rc := http.NewResponseController(w)
 			_ = rc.SetReadDeadline(time.Now().Add(bodyTimeout))

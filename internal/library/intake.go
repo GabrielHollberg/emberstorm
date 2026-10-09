@@ -161,6 +161,23 @@ type Question struct {
 func (l *Library) PlanSized(paths []string, sizes []int64, choices map[string]media.Kind) ([]Placement, []Question) {
 	out, questions := l.Plan(paths, choices)
 	discTitles(out, sizes)
+	// Extras dropped after their film: its name is taken already.
+	if folder := l.PathFor(media.KindVideo); folder != "" {
+		prefix := folderName(media.KindVideo) + "/"
+		for i := range out {
+			p := &out[i]
+			if p.Kind != media.KindVideo || p.Dest == "" || p.Upload != "" {
+				continue
+			}
+			var size int64
+			if i < len(sizes) {
+				size = sizes[i]
+			}
+			if beside, ok := titleBeside(folder, strings.TrimPrefix(p.Dest, prefix), p.Path, size); ok {
+				p.Dest, p.Upload = prefix+beside, beside
+			}
+		}
+	}
 	return out, questions
 }
 
@@ -945,27 +962,41 @@ func (l *Library) SaveWith(kind media.Kind, rel string, r io.Reader, route Route
 		return "", fmt.Errorf("there is no %s library", kind)
 	}
 
+	dropped := rel
+
 	staging := filepath.Join(l.root, ".uploads")
 	if err := os.MkdirAll(staging, 0o777); err != nil {
 		return "", fmt.Errorf("prepare upload: %w", err)
 	}
-	tmp, err := os.CreateTemp(staging, "part-*")
-	if err != nil {
-		return "", fmt.Errorf("prepare upload: %w", err)
-	}
-	tmpName := tmp.Name()
-	// Nothing below leaves a stray part file behind, including the paths that
-	// return early.
-	defer func() {
-		tmp.Close()
-		os.Remove(tmpName)
-	}()
+	var tmpName string
+	if st, ok := r.(*Staged); ok {
+		// Sent in pieces, and all of them are here already: filed as it is,
+		// not copied again (27GB twice, for a film). Only a file of staging's
+		// own.
+		if st == nil || filepath.Dir(st.Path) != staging || !strings.HasPrefix(filepath.Base(st.Path), "piece-") {
+			return "", fmt.Errorf("that upload is not one of the library's")
+		}
+		tmpName = st.Path
+		defer os.Remove(tmpName)
+	} else {
+		tmp, err := os.CreateTemp(staging, "part-*")
+		if err != nil {
+			return "", fmt.Errorf("prepare upload: %w", err)
+		}
+		tmpName = tmp.Name()
+		// Nothing below leaves a stray part file behind, including the paths
+		// that return early.
+		defer func() {
+			tmp.Close()
+			os.Remove(tmpName)
+		}()
 
-	if _, err := io.Copy(&reserveWriter{w: tmp, dir: staging}, r); err != nil {
-		return "", receiveError(staging, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return "", receiveError(staging, err)
+		if _, err := io.Copy(&reserveWriter{w: tmp, dir: staging}, r); err != nil {
+			return "", receiveError(staging, err)
+		}
+		if err := tmp.Close(); err != nil {
+			return "", receiveError(staging, err)
+		}
 	}
 
 	// Where it goes is decided now rather than before the bytes arrived,
@@ -1001,6 +1032,18 @@ func (l *Library) SaveWith(kind media.Kind, rel string, r io.Reader, route Route
 	// than a write outside the library.
 	if !within(folder, dest) {
 		return "", fmt.Errorf("that path does not stay inside the library")
+	}
+	// A disc's extra arriving after its film, by itself: the film has the
+	// name, so it goes beside it rather than being refused (filmnames.go).
+	if kind == media.KindVideo && decided == "" && opts.Conflict == ConflictRefuse {
+		if fi, err := os.Stat(tmpName); err == nil {
+			if beside, ok := titleBeside(folder, rel, dropped, fi.Size()); ok {
+				rel, dest = beside, filepath.Join(folder, filepath.FromSlash(beside))
+				if !within(folder, dest) {
+					return "", fmt.Errorf("that path does not stay inside the library")
+				}
+			}
+		}
 	}
 	if _, err := os.Lstat(dest); err == nil {
 		// An exact copy is already there whatever was decided; a different
@@ -1197,7 +1240,10 @@ func (l *Library) ClearStaging() {
 		return
 	}
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "part-") {
+		// A piece-by-piece upload's file too: what it was is kept only in
+		// memory, so after a restart nothing can finish it (the page starts
+		// it again).
+		if strings.HasPrefix(e.Name(), "part-") || strings.HasPrefix(e.Name(), "piece-") {
 			_ = os.Remove(filepath.Join(staging, e.Name()))
 		}
 	}

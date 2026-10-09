@@ -5707,6 +5707,12 @@ function summary(added, skipped, failed, stopped = 0) {
 // fetch cannot report upload progress, and a four gigabyte film with no
 // progress bar looks like a hang.
 function uploadOne(item, onProgress) {
+  // A big file goes in pieces (pieces.go): one request for a 27GB film is all
+  // lost when anything drops it, and Firefox 157 dropped every large one part
+  // way. A small one is one request, as it always was.
+  if (item.file && item.file.size > PIECES_FROM && typeof item.file.slice === 'function') {
+    return uploadInPieces(item, onProgress);
+  }
   return new Promise((resolve) => {
     const params = new URLSearchParams({ path: item.upload || item.path, kind: item.kind });
     // A taken name, as the person chose: keep both, or replace.
@@ -5751,6 +5757,94 @@ function uploadOne(item, onProgress) {
     request.addEventListener('abort', () => resolve({ ok: false, error: 'canceled' }));
     request.send(item.file);
   });
+}
+
+const PIECES_FROM = 64 * 1024 * 1024;
+
+// sendPiece sends one piece as a PUT, with its progress: XMLHttpRequest, for
+// the same reason as uploadOne. Resolves {status, body} - status 0 when the
+// connection was lost, -1 when stopped.
+function sendPiece(url, blob, onProgress) {
+  return new Promise((resolve) => {
+    const request = new XMLHttpRequest();
+    INTAKE.xhr = request;
+    request.open('PUT', url);
+    request.withCredentials = true;
+    request.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress(event.loaded);
+    });
+    request.addEventListener('load', () => {
+      let body = null;
+      try { body = JSON.parse(request.responseText); } catch { /* a status will do */ }
+      resolve({ status: request.status, body });
+    });
+    request.addEventListener('error', () => resolve({ status: 0, body: null }));
+    request.addEventListener('abort', () => resolve({ status: -1, body: null }));
+    request.send(blob);
+  });
+}
+
+// uploadInPieces sends a big file 8MB at a time. A piece that fails is sent
+// again (after 2, 4, 8 ... up to 30 seconds, for about five minutes), and the
+// server says where it got to if a piece went astray, so a dropped connection
+// costs one piece, not the film.
+async function uploadInPieces(item, onProgress) {
+  const file = item.file;
+  const start = {
+    path: item.upload || item.path, kind: item.kind, size: file.size,
+    conflict: item.conflict === 'keep' || item.conflict === 'replace' ? item.conflict : '',
+    as: item.conflict === 'keep' && item.asName ? item.asName : '',
+    taken: (item.kind === 'picture' || item.kind === 'video') && file.lastModified ? file.lastModified : 0,
+  };
+  const begun = await api('/api/upload/pieces', { method: 'POST', body: JSON.stringify(start) });
+  if (!begun.ok || !begun.body || !begun.body.id) {
+    return { ok: false, error: (begun.body && begun.body.error) || 'could not start the upload' };
+  }
+  const id = begun.body.id;
+  const size = Math.max(1, begun.body.pieceSize || 8 * 1024 * 1024);
+  const base = `/api/upload/pieces/${encodeURIComponent(id)}`;
+  let offset = 0;
+  let tries = 0;
+  const giveUp = (error) => {
+    api(base, { method: 'DELETE' });
+    return { ok: false, error };
+  };
+  while (offset < file.size) {
+    if (INTAKE.stop) return giveUp('canceled');
+    const end = Math.min(file.size, offset + size);
+    const { status, body } = await sendPiece(`${base}?offset=${offset}`, file.slice(offset, end), (loaded) => onProgress(offset + loaded));
+    if (status === -1) return giveUp('canceled');
+    if (status === 200 && body) {
+      tries = 0;
+      if (body.dest !== undefined) return { ok: true, dest: body.dest || '' };
+      offset = typeof body.received === 'number' ? body.received : end;
+      onProgress(offset);
+      continue;
+    }
+    // The server declining the file on purpose, or saying it cannot take it.
+    if (status === 409 && body && typeof body.received !== 'number') {
+      return { ok: false, skipped: true, error: body.error || 'already in your library' };
+    }
+    if (status === 404) return { ok: false, error: (body && body.error) || 'the upload was lost; add it again' };
+    if (status === 507 || status === 403 || status === 413) return giveUp((body && body.error) || `failed (${status})`);
+    if (status === 409 && body && typeof body.received === 'number') {
+      offset = body.received; // out of step: carry on from where it is
+      continue;
+    }
+    if (status === 400 && body && typeof body.received !== 'number') {
+      return giveUp(body.error || 'failed (400)');
+    }
+    // Lost, or the server busy: wait, ask where it got to, try again.
+    tries += 1;
+    if (tries > 12) return giveUp('connection lost');
+    $('intake-title').textContent = `Connection lost - trying again… (${item.file.name})`;
+    await new Promise((done) => setTimeout(done, Math.min(30000, 1000 * 2 ** tries)));
+    if (INTAKE.stop) return giveUp('canceled');
+    const where = await api(base);
+    if (where.ok && where.body && typeof where.body.received === 'number') offset = where.body.received;
+    else if (where.status === 404) return { ok: false, error: 'the upload was lost; add it again' };
+  }
+  return { ok: false, error: 'the upload ended early' };
 }
 
 function setIntakeProgress(fraction) {
