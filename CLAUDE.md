@@ -3476,6 +3476,45 @@ starts at 25s and then at 10s in the same file landed there. **Not checked:
 the projector itself**, nor which hole it fell into - its player keeps no
 system log; the owner's next read-along on it is the test.
 
+## An audiobook's place, wherever it was listened to (2026-10-09)
+
+The owner's report: a book sometimes started over, or from an older spot,
+moving between devices. The place is Audiobookshelf's, per person (see "The
+Continue row"), saved by the page every ten seconds, on pause, on close and
+at the end; every way into a book resumes from it. Three fixes:
+
+- **The phone apps save it themselves.** In the Android and iPhone apps the
+  app's own player plays a book with the screen off, while the phone sleeps
+  the page - and the page did the saving, so an hour listened with the
+  screen off was an hour back on the next device. The page now tells the app
+  where the book's place is saved and where each of its files begins on the
+  book's timeline (`tellNativePlace`, `soundstormApp.place`; null for a song,
+  a downloaded book or a book on a TV), and Android's `NativeAudio` sends it
+  every ten seconds while playing and once whenever it stops, ends, is
+  stopped or the player closes (`savePlace`; `finished` at the end of the
+  last file). Android 0.54. **For the Mac:** the iPhone's `NativeAudio`
+  wants the same - take `soundstormApp.place` in `pageScript` (an "audio"
+  message, cmd `place`, with `path`, `duration` and `files` of `url` and
+  `offset`), match the playing item's URL path to a file, and PUT
+  `{seconds, duration, finished}` to the server's `path` with the session
+  cookies every ten seconds while playing and on pause, end and stop; it
+  runs while background audio keeps the app awake.
+- **The newest listening wins.** A downloaded book listened to offline kept
+  its place on the device as "not sent", and that always won on the next
+  open - even when the book had been listened to further elsewhere since,
+  which pulled the place back. The place now carries when Audiobookshelf
+  last recorded it (`source.Position.UpdatedAt`, its `lastUpdate`), and the
+  device's own is used, and sent, only when it is newer; otherwise the
+  server's is taken and the device's dropped.
+- **Play from the beginning** in an audiobook's hold menu: the one way into a
+  book that does not resume (`audio.fromStart`).
+
+Checked: the adapter reads `lastUpdate` (`TestPositionIsRead`), the page
+loads with no error (the after-deploy check), the app builds. Not tried:
+playing a book with the phone's screen off and opening it on another device,
+and an offline download coming back online - the test server has no
+audiobook server, and the owner's books are theirs to try it on.
+
 ## Read Along keeps the screen on
 
 While a book follows its audiobook, nobody touches the phone, so it used to

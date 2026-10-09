@@ -36,6 +36,10 @@ object PageScript {
   // the player itself: with the screen off Android sleeps the page, timers
   // and all, and the music played on for hours (NativeAudio "sleep").
   window.soundstormApp.sleepAt = (at) => post({ type: 'audio', cmd: 'sleep', at: at || 0 });
+  // Where an audiobook's place is saved and where its files begin, so the
+  // player saves it itself while the screen is off (NativeAudio "place");
+  // null for anything else.
+  window.soundstormApp.place = (place) => post({ type: 'audio', cmd: 'place', place: place || null });
   // Phone photo backup (PhotoBackup), on a phone only: Settings turns it on
   // and shows how it is going, answered through window.__soundstormBackup.
   window.soundstormApp.photoBackup = !/SoundStormTV/.test(navigator.userAgent);

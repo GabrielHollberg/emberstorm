@@ -15,6 +15,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.lang.ref.WeakReference
 
 /**
@@ -53,6 +55,73 @@ object NativeAudio {
      * and "play" on an empty player picks up from there.
      */
     private data class Resume(val items: List<MediaItem>, val positionMs: Long)
+
+    // An audiobook's place, saved by the player itself (the owner's report,
+    // 2026-10-09: an hour listened with the screen off was an hour back on the
+    // next device - Android sleeps the page, and the page did the saving). The
+    // page says where the place is saved and where each of the book's files
+    // begins on its timeline (window.soundstormApp.place); while the book
+    // plays, the place is sent every ten seconds, and once more whenever it
+    // stops. The page still saves too while it is awake.
+    private data class Place(val url: String, val duration: Double, val files: List<Pair<String, Double>>)
+    private var place: Place? = null
+    private var placeSavedAt = 0L
+    private var placeLast = -1.0
+
+    private fun setPlace(context: Context, o: JSONObject?) {
+        if (o == null) {
+            place = null
+            return
+        }
+        val files = mutableListOf<Pair<String, Double>>()
+        val list = o.optJSONArray("files")
+        for (i in 0 until (list?.length() ?: 0)) {
+            val f = list!!.optJSONObject(i) ?: continue
+            val url = f.optString("url")
+            if (!ServerAddress.isServer(context, url)) continue
+            files += url to f.optDouble("offset", 0.0)
+        }
+        val path = o.optString("path")
+        val first = files.firstOrNull()?.first ?: return
+        if (!path.startsWith("/api/playback/")) return
+        val origin = Uri.parse(first).let { "${it.scheme}://${it.encodedAuthority}" }
+        place = Place(origin + path, o.optDouble("duration", 0.0), files)
+        placeSavedAt = 0
+        placeLast = -1.0
+    }
+
+    /** Sends the book's place if it is due: every ten seconds while playing,
+     *  and at once when it stops (force). */
+    private fun savePlace(force: Boolean) {
+        val pl = place ?: return
+        val p = player ?: return
+        val uri = p.currentMediaItem?.localConfiguration?.uri ?: return
+        val file = pl.files.indexOfFirst { Uri.parse(it.first).path == uri.path }
+        if (file < 0) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!force && now - placeSavedAt < 10_000) return
+        val finished = p.playbackState == Player.STATE_ENDED && file == pl.files.lastIndex
+        val seconds = pl.files[file].second + p.currentPosition.coerceAtLeast(0) / 1000.0
+        if (!finished && kotlin.math.abs(seconds - placeLast) < 0.5) return
+        placeSavedAt = now
+        placeLast = seconds
+        val body = JSONObject().put("seconds", seconds).put("duration", pl.duration).put("finished", finished).toString()
+        Thread {
+            runCatching {
+                WebCookies.install()
+                val conn = URL(pl.url).openConnection() as HttpURLConnection
+                conn.requestMethod = "PUT"
+                conn.instanceFollowRedirects = false
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 15_000
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.outputStream.use { it.write(body.toByteArray()) }
+                conn.responseCode
+                conn.disconnect()
+            }.onFailure { PlayerLog.add("place not saved: ${it.javaClass.simpleName}") }
+        }.start()
+    }
     private var resume: Resume? = null
 
     // The sleep timer, kept here rather than in the page: Android sleeps a
@@ -112,6 +181,7 @@ object NativeAudio {
     }
 
     fun detach() {
+        savePlace(force = true)
         player?.let { p ->
             if (p.mediaItemCount > 0) {
                 val from = p.currentMediaItemIndex.coerceAtLeast(0)
@@ -142,6 +212,11 @@ object NativeAudio {
     /** An "audio" message from the page. */
     fun handle(context: Context, message: JSONObject) {
         app = context.applicationContext
+        if (message.optString("cmd") == "place") {
+            // Kept whether or not the player is there yet; it starts nothing.
+            main.post { setPlace(context.applicationContext, message.optJSONObject("place")) }
+            return
+        }
         if (player == null) {
             // The service makes the player when it starts; until then, kept.
             if (message.optString("cmd") == "stop") {
@@ -267,6 +342,8 @@ object NativeAudio {
             "volume" -> p.volume = m.optDouble("v", 1.0).toFloat().coerceIn(0f, 1f)
             "rate" -> p.playbackParameters = PlaybackParameters(m.optDouble("r", 1.0).toFloat().coerceIn(0.25f, 4f))
             "stop" -> {
+                savePlace(force = true)
+                place = null
                 // Paused too, or the next song loaded played before the page
                 // asked it to (a review).
                 p.pause()
@@ -372,6 +449,7 @@ object NativeAudio {
         val s = state()
         if (s.optBoolean("seeked")) seeking = false
         send(s)
+        player?.let { savePlace(force = !it.isPlaying) }
         // While playing, the position every half second: the page runs its
         // own clock between, from the moment each report was made.
         if (player?.isPlaying == true) main.postDelayed(tick, 500)
