@@ -218,7 +218,7 @@ func TestAPhotoTakesOnlyItsSideFiles(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o777); err != nil {
 		t.Fatal(err)
 	}
-	for _, n := range []string{"IMG_0001.jpg", "IMG_0001-edited.jpg", "IMG_0001.JPG.png", "IMG_0001.jpg.xmp", "IMG_0001.AAE", "IMG_0002.jpg"} {
+	for _, n := range []string{"IMG_0001.jpg", "IMG_0001-edited.jpg", "IMG_0001.JPG.png", "IMG_0001.jpg.xmp", "IMG_0001.AAE", "IMG_0002.jpg", "IMG_0001-edited.jpg.xmp", "IMG_0001.heic.xmp"} {
 		if err := os.WriteFile(filepath.Join(dir, n), []byte(n), 0o666); err != nil {
 			t.Fatal(err)
 		}

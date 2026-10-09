@@ -172,7 +172,13 @@ func withCompanions(file string, kind media.Kind) []string {
 		}
 		ext := strings.ToLower(filepath.Ext(name))
 		if kind == media.KindPicture {
-			if photoSidecars[ext] {
+			// Its own only: "IMG_0001.HEIC.xmp", "IMG_0001.xmp", or a
+			// download's "IMG_0001.HEIC.<anything>.json" - not another
+			// photo's, "IMG_0001.JPG.xmp" or "IMG_0001-edited.jpg.xmp", which
+			// went with it and left that photo undated (a review).
+			own := strings.EqualFold(name, base+ext) || strings.EqualFold(name, stem+ext) ||
+				(ext == ".json" && strings.HasPrefix(name, base+"."))
+			if photoSidecars[ext] && own {
 				out = append(out, filepath.Join(dir, name))
 			}
 			continue
@@ -346,6 +352,9 @@ func (l *Library) Restore(id string) (entry BinEntry, restored int, blocked []st
 				blocked = append(blocked, rel)
 				continue
 			}
+			// Copied across drives, the bin's copy is left behind: gone now,
+			// or a second undo (another file blocked) put it back twice.
+			_ = os.Remove(from)
 			restored++
 		}
 	}

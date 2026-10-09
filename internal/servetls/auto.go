@@ -446,9 +446,15 @@ func (a *autoCert) step(ctx context.Context) error {
 			// beyond repair by putting the secret back (a review, 2026-10-09).
 			// So only after three days of refusals, and the old registration
 			// is kept aside, not deleted.
+			// Kept on disk: in memory, a computer restarted more often than
+			// every three days never let go (a review, 2026-10-09).
 			a.mu.Lock()
 			if a.refusedSince.IsZero() {
+				a.refusedSince = a.readRefusedSince()
+			}
+			if a.refusedSince.IsZero() {
 				a.refusedSince = time.Now()
+				a.writeRefusedSince(a.refusedSince)
 			}
 			long := time.Since(a.refusedSince) > 72*time.Hour
 			a.mu.Unlock()
@@ -464,6 +470,7 @@ func (a *autoCert) step(ctx context.Context) error {
 	a.mu.Lock()
 	a.refusedSince = time.Time{}
 	a.mu.Unlock()
+	a.clearRefusedSince()
 	// The service moved to another zone (soundstorm.dev to emberstorm.app,
 	// 2026-10-07): the same id under the new zone becomes this install's name,
 	// kept, and the certificate below is made again for it.
@@ -750,11 +757,35 @@ func verdict(err error) bool {
 	return errors.As(err, &se) && se.Status == http.StatusFailedDependency
 }
 
+// refusedFile keeps when the name service first refused this install's name.
+const refusedFile = "name-refused.txt"
+
+func (a *autoCert) readRefusedSince() time.Time {
+	b, err := os.ReadFile(filepath.Join(a.dir, refusedFile))
+	if err != nil {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, strings.TrimSpace(string(b)))
+	if err != nil || t.After(time.Now()) {
+		return time.Time{}
+	}
+	return t
+}
+
+func (a *autoCert) writeRefusedSince(t time.Time) {
+	_ = os.WriteFile(filepath.Join(a.dir, refusedFile), []byte(t.UTC().Format(time.RFC3339)+"\n"), 0o600)
+}
+
+func (a *autoCert) clearRefusedSince() {
+	_ = os.Remove(filepath.Join(a.dir, refusedFile))
+}
+
 func (a *autoCert) forget() {
 	a.mu.Lock()
 	a.reg, a.cert = names.Registration{}, nil
 	a.refusedSince = time.Time{}
 	a.mu.Unlock()
+	a.clearRefusedSince()
 	// Kept aside rather than deleted: a name given up wrongly can be put back.
 	file := filepath.Join(a.dir, registrationFile)
 	_ = os.Rename(file, file+".old")

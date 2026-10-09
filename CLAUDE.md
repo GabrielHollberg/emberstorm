@@ -6469,6 +6469,43 @@ changing. Fixed:
   custom install folder found by its saved script; a library folder whose
   name Docker's settings would cut refused.
 
+**Then every fix checked again** (the owner's asking, the same day: four
+fresh reviewers, each fix asked whether it closed its bug and what it broke).
+What that found, and was put right:
+- **The worst came from a fix**: a backend set up again forgot every member's
+  account on it - right for one whose data was reset, wrong for one that only
+  refused its key once (an upgrade's 404 counts), when the accounts were still
+  there and could never be made again (name taken, password forgotten).
+  `SetBackend` now keeps each member's password as an unfinished setup's, so
+  the account is signed in to if still there and made again if not, and a
+  photo account signed in to again keeps its library (`existingImmichLibrary`;
+  a second one had doubled every face). `TestAPhotoAccountSignedInAgainKeepsItsLibrary`.
+- The installer's "setup code after an interrupted install" never matched:
+  the server indents its JSON (`"hasAccount": false`); it asks the address the
+  health check asks now.
+- Ripped "Part 1"/"Part 2" films were still joined: a plain "Part N" never
+  stacks now, ripped or not (PT., CD, Disc still do).
+- A renewed sign-in could still end on its old day in the apps (the renewal's
+  cookie answered to a player that drops it): `/api/session` sends the cookie
+  again every time (`RefreshCookie`).
+- The name service's three days of refusals restarted at every restart: kept
+  on disk (`name-refused.txt`).
+- A photo took another photo's date file with it (`IMG_0001.JPG.xmp` beside
+  `IMG_0001.HEIC`): only its own now.
+- AudioMuse made everybody wait on a fresh read with an old copy in hand: the
+  old copy is answered and the read runs behind.
+- Putting back across drives left the bin's copy.
+- Web: the add-files screen's close cancels a review while earlier files go up,
+  and a drop closed while still being planned; the audio picker cleared at
+  every film (Up next and downloaded episodes kept the last one's); the
+  chapter sleep timer worked out again on a seek, a new book or speed, and the
+  phone app told the moment again (and nothing while paused); late refreshes
+  not run behind Settings; the reader closed once at a time, never a book
+  opened meanwhile.
+- **Android 0.56**: "previous" with Android's page gone sent a book to its
+  start (and saved that as its place) - thirty seconds now; a new photo
+  arriving during a long backup left nothing watching for the next one.
+
 **Left from this review** (smaller or wanting a decision): keep-both
 subtitles not following the renamed video; a late second version's
 subtitles going to extras; Replace binning the old file before the new one

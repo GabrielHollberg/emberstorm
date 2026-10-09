@@ -417,26 +417,32 @@ func TestABackendSetUpAgainForgetsItsMembersAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetIdentity("u1", "immich", Identity{Token: "old-key"}); err != nil {
+	// u1 has an account on it, with its password; u2 a half-made one.
+	if err := s.SetIdentity("u1", "immich", Identity{Token: "old-key", Password: "u1-pass"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetIdentity("u1", "audiobookshelf", Identity{Token: "kept"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetSetupSecret("immich/member/u1", "password", "half-made"); err != nil {
+	if err := s.SetSetupSecret("immich/member/u2", "password", "half-made"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetBackend("immich", Backend{Type: "immich", Token: "new-admin"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := s.Identity("u1", "immich"); ok {
-		t.Error("the member's old account on the reset backend was kept")
+		t.Error("the member's old account was kept as it was, never made again")
+	}
+	// Its password kept as an unfinished setup's: signed in to if it is
+	// still there, made with it if not.
+	if v, ok := s.SetupSecret("immich/member/u1", "password"); !ok || v != "u1-pass" {
+		t.Errorf("the member's password was not kept for signing in again: %q", v)
+	}
+	if v, ok := s.SetupSecret("immich/member/u2", "password"); !ok || v != "half-made" {
+		t.Error("a half-made account's password was forgotten")
 	}
 	if id, ok := s.Identity("u1", "audiobookshelf"); !ok || id.Token != "kept" {
 		t.Error("another backend's account was forgotten too")
-	}
-	if _, ok := s.SetupSecret("immich/member/u1", "password"); ok {
-		t.Error("the member's half-made setup secret was kept")
 	}
 }
 

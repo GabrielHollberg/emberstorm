@@ -1625,14 +1625,15 @@ done
 # 2026-10-09). The server says whether anybody has.
 if [ "$UPGRADE" = "1" ] && [ -z "$SETUP_QS" ] && [ -z "$IMPORT" ]; then
 	if command -v curl >/dev/null 2>&1; then
-		session=$(curl -fsS "http://localhost:$PORT/api/session" 2>/dev/null) || session=''
+		session=$(curl -fsSk "$URL/api/session" 2>/dev/null) || session=''
 	elif command -v wget >/dev/null 2>&1; then
-		session=$(wget -q -O - "http://localhost:$PORT/api/session" 2>/dev/null) || session=''
+		session=$(wget -q --no-check-certificate -O - "$URL/api/session" 2>/dev/null) || session=''
 	else
 		session=''
 	fi
+	# The server indents its JSON ("hasAccount": false).
 	case "$session" in
-	*'"hasAccount":false'*) SETUP_QS="/?setup=$SETUP_CODE" ;;
+	*'"hasAccount": false'* | *'"hasAccount":false'*) SETUP_QS="/?setup=$SETUP_CODE" ;;
 	esac
 fi
 

@@ -293,14 +293,15 @@ func tidyFilm(rel string) string {
 	tail := companionTail.FindString(stem)
 	stem = strings.TrimSuffix(stem, tail)
 
-	ripped := rippedTitle.MatchString(stem)
 	name := rippedTitle.ReplaceAllString(stem, "")
 	part := ""
-	// "Part 1" is often a film's own title - Deathly Hallows Part 1 and Part
-	// 2 were filed as two halves of one film (a review, 2026-10-09). So the
-	// ripper's forms (PT. 1, CD1, Disc 2) always stack, and a plain "Part N"
-	// only on a file that also carried a ripper's title number.
-	if m := filmPart.FindStringSubmatch(name); m != nil && (ripped || !strings.EqualFold(m[1], "part")) {
+	// "Part 1" is often a film's own title - two films called Part 1 and
+	// Part 2 were filed as two halves of one film (a review, 2026-10-09),
+	// ripped from their discs or not. So only the ripper's forms (PT. 1,
+	// CD1, Disc 2) stack; a plain "Part N" stays in the name. A film really
+	// in two halves named so shows as two, which Find the right film mends,
+	// where a sequel hidden inside its first film could not be found at all.
+	if m := filmPart.FindStringSubmatch(name); m != nil && !strings.EqualFold(m[1], "part") {
 		part = " - part" + strings.TrimLeft(m[2], "0")
 		if part == " - part" {
 			part = " - part0"

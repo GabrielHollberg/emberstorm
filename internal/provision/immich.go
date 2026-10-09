@@ -242,6 +242,34 @@ func enableImmichWatching(ctx context.Context, c *httpx.Client, authed map[strin
 // owned by the member, overlapping the administrator's library of the whole
 // folder; signing in as the member is the only way to mint their API key.
 // The password is generated, used once and kept, like Audiobookshelf's.
+// existingImmichLibrary is the library a person's account already has on
+// their folder, or "".
+func existingImmichLibrary(ctx context.Context, c *httpx.Client, admin map[string]string, ownerID, folder string) string {
+	resp, err := c.Do(ctx, httpx.Request{Method: http.MethodGet, Path: "/api/libraries", Headers: admin})
+	if err != nil || resp.Err() != nil {
+		return ""
+	}
+	var libs []struct {
+		ID          string   `json:"id"`
+		OwnerID     string   `json:"ownerId"`
+		ImportPaths []string `json:"importPaths"`
+	}
+	if resp.JSON(&libs) != nil {
+		return ""
+	}
+	for _, l := range libs {
+		if l.OwnerID != ownerID {
+			continue
+		}
+		for _, p := range l.ImportPaths {
+			if p == folder {
+				return l.ID
+			}
+		}
+	}
+	return ""
+}
+
 func createImmichMember(ctx context.Context, c *httpx.Client, sec secrets, adminKey, username, name, folder string) (state.Identity, error) {
 	admin := map[string]string{"x-api-key": adminKey}
 	email := username + "@soundstorm.invalid"
@@ -316,6 +344,20 @@ func createImmichMember(ctx context.Context, c *httpx.Client, sec secrets, admin
 		return state.Identity{}, fmt.Errorf("photo account key: no secret")
 	}
 
+	// An account signed in to again (set up before) already has its library:
+	// a second one had every photo processed twice and the faces doubled.
+	if kept {
+		if id := existingImmichLibrary(ctx, c, admin, user.ID, folder); id != "" {
+			return state.Identity{
+				Username:  email,
+				Password:  password,
+				Token:     key.Secret,
+				RemoteID:  user.ID,
+				LibraryID: id,
+				CreatedAt: time.Now().UTC(),
+			}, nil
+		}
+	}
 	resp, err = c.Do(ctx, httpx.Request{
 		Method:  http.MethodPost,
 		Path:    "/api/libraries",

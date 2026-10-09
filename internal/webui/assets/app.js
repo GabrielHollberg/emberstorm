@@ -3455,6 +3455,11 @@ async function playVideo(item, options = {}) {
   stopAudio();
   detachHls();
   hideUpNext();
+  // The last film's audio languages go until this one's are known: Up next
+  // plays the next episode without closing the player, and a downloaded one
+  // never sets its own - choosing a language played the last one again.
+  show($('audio-picker'), false);
+  $('audio-select').onchange = null;
   // Which play this is: closing the film, or starting another, while this
   // one waits on the server makes its answer stale - it used to start the
   // film playing behind a closed player, or the older of two (a review).
@@ -3633,7 +3638,7 @@ function closeVideo() {
   // And the last film's audio languages: left showing, choosing one started
   // that film again over the next (a review, 2026-10-09).
   show($('audio-picker'), false);
-  $('audio-picker').onchange = null;
+  $('audio-select').onchange = null;
   show($('video-overlay'), false);
 }
 
@@ -4349,8 +4354,12 @@ $('audio-player').addEventListener('pause', () => {
 
 // "End of this chapter" in a book whose chapters are marks in its files: the
 // moment the next chapter starts (setSleep).
+for (const ev of ['seeking', 'seeked', 'playing', 'pause', 'ratechange']) {
+  $('audio-player').addEventListener(ev, syncChapterSleep);
+}
 $('audio-player').addEventListener('timeupdate', () => {
   if (!sleep.atSongEnd || sleep.chapterEnd == null || !audio.item || audio.item.kind !== 'audiobook') return;
+  if ($('audio-player').seeking) return;
   if (elapsed() < sleep.chapterEnd - 0.3) return;
   savePosition();
   $('audio-player').pause();
@@ -4578,6 +4587,7 @@ async function intake(dataTransfer) {
 }
 
 async function runIntake(dataTransfer) {
+  INTAKE.closed = false;
   show($('intake'), true);
   show($('intake-bar'), false);
   $('intake-list').replaceChildren();
@@ -4587,6 +4597,7 @@ async function runIntake(dataTransfer) {
   $('intake-title').textContent = 'Reading what you dropped…';
 
   let dropped = await collectFiles(dataTransfer);
+  if (INTAKE.closed) return;
   if (!dropped.length) {
     $('intake-title').textContent = 'Nothing usable was dropped.';
     return;
@@ -4631,6 +4642,7 @@ async function runIntake(dataTransfer) {
       // alike): the largest is the film, the small ones its extras.
       body: JSON.stringify({ paths, sizes: dropped.map((d) => (d.file && d.file.size) || 0), choices }),
     });
+    if (INTAKE.closed) return;
     if (!ok || !body) {
       $('intake-title').textContent = (body && body.error) || 'EmberStorm could not take those.';
       return;
@@ -4651,6 +4663,7 @@ async function runIntake(dataTransfer) {
     const files = body.files || [];
     $('intake-title').textContent = 'Checking what is already there\u2026';
     await checkTaken(files, dropped);
+    if (INTAKE.closed) return;
     for (const p of files) {
       const kept = review.memo.get(p.path);
       if (kept && p.conflict) Object.assign(p, kept);
@@ -6044,6 +6057,16 @@ function markIntakeRow(path, result) {
 
 $('intake-close').addEventListener('click', () => {
   show($('intake'), false);
+  // A drop still being planned stops where it is; one under review is
+  // cancelled - even while earlier files go up in the background, when this
+  // used to only hide it, its review waiting for ever and every later drop
+  // queued behind it (a review, 2026-10-09).
+  INTAKE.closed = true;
+  if (INTAKE.reviewDone) {
+    $('intake-questions').replaceChildren();
+    $('intake-review').replaceChildren();
+    INTAKE.reviewDone(null);
+  }
   // While files go up this is Hide: they carry on, and a chip says how far.
   if (INTAKE.sending) {
     intakeChip($('intake-chip').textContent || 'Adding files\u2026');
@@ -11433,10 +11456,6 @@ function setSleep(choice) {
   sleep.chapterEnd = null;
   if (choice === 'song') {
     sleep.atSongEnd = true;
-    // A book's chapter is often a mark inside one file (an m4b), not a file of
-    // its own: "end of this chapter" waited for the file to end, hours on (a
-    // review, 2026-10-09). It stops where the next chapter starts.
-    if (audio.item && audio.item.kind === 'audiobook') sleep.chapterEnd = nextChapterStart();
     // In the Android app the native player holds the next songs and moves
     // into them by itself: they are taken back, or "after this song" played
     // on into the next (a review).
@@ -11453,9 +11472,8 @@ function setSleep(choice) {
   // half-hour timer ran for hours until the phone was woken (the owner's
   // report, 2026-10-07). The page's own timer still runs while it is awake.
   try {
-    const rate = $('audio-player').playbackRate || 1;
-    const chapterAt = sleep.chapterEnd != null ? Date.now() + Math.max(0, sleep.chapterEnd - elapsed()) * 1000 / rate : 0;
-    if (NATIVE_AUDIO && window.soundstormApp.sleepAt) window.soundstormApp.sleepAt(sleep.until || chapterAt);
+    if (sleep.atSongEnd) syncChapterSleep();
+    else if (NATIVE_AUDIO && window.soundstormApp.sleepAt) window.soundstormApp.sleepAt(sleep.until || 0);
   } catch { /* an app without it */ }
   // Turned off before the song ended: the next songs are handed over again.
   if (NATIVE_AUDIO && wasAtSongEnd && !sleep.atSongEnd) {
@@ -11463,6 +11481,28 @@ function setSleep(choice) {
     preloadNext();
   }
   renderSleep();
+}
+
+// "End of this chapter" in a book: a chapter is often a mark inside one file
+// (an m4b), not a file of its own, and the timer waited for the file to end,
+// hours on (a review, 2026-10-09). It stops where the next chapter starts -
+// worked out again whenever the place, the book or the speed changes - and
+// the phone app's player, which stops the book with the screen off, is told
+// the moment again then, and nothing while paused.
+function syncChapterSleep() {
+  if (!sleep.atSongEnd) return;
+  const book = audio.item && audio.item.kind === 'audiobook';
+  sleep.chapterEnd = book ? nextChapterStart() : null;
+  if (!NATIVE_AUDIO || !window.soundstormApp.sleepAt || sleep.until) return;
+  try {
+    const el = $('audio-player');
+    if (sleep.chapterEnd == null || el.paused || audio.pendingSeek) {
+      window.soundstormApp.sleepAt(0);
+      return;
+    }
+    const rate = el.playbackRate || 1;
+    window.soundstormApp.sleepAt(Date.now() + Math.max(0, sleep.chapterEnd - elapsed()) * 1000 / rate);
+  } catch { /* an app without it */ }
 }
 
 function sleepTick() {
@@ -15612,7 +15652,7 @@ function refreshWatchLater(waits) {
   const show = state.openShow && state.openShowSeq === seq ? state.openShow : null;
   for (const wait of waits) {
     setTimeout(() => {
-      if (state.searchSeq !== seq) return;
+      if (state.searchSeq !== seq || state.tab === 'settings' || $('app').classList.contains('viewing-account')) return;
       if (show) showShow(show);
       else if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch();
       else return;
