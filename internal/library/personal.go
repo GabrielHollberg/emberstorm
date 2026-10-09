@@ -1,6 +1,8 @@
 package library
 
 import (
+	"fmt"
+	"hash/fnv"
 	"io/fs"
 	"os"
 	"path"
@@ -68,6 +70,36 @@ func (l *Library) PersonalUsage(name string) int64 {
 		return nil
 	})
 	return total
+}
+
+// PersonalMarker is a short summary of a person's photo folder that changes
+// whenever a photo or video in it is added, removed, renamed or replaced: how
+// a phone knows it need only check its newest photos with the server, and
+// when it must check them all again (a photo deleted here, the folder
+// restored, files moved by hand). Date files written beside photos are left
+// out - the server writes those itself, and they say nothing about what a
+// phone has sent. Each file adds a hash of its place and size, so the order
+// the folder is read in does not matter.
+func (l *Library) PersonalMarker(name string) string {
+	dir := filepath.Join(l.PathFor(media.KindPicture), filepath.FromSlash(PersonalFolder(name)))
+	var sum uint64
+	var count int
+	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || !d.Type().IsRegular() || strings.EqualFold(filepath.Ext(p), ".xmp") {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(dir, p)
+		h := fnv.New64a()
+		fmt.Fprintf(h, "%s\x00%d", filepath.ToSlash(rel), info.Size())
+		sum += h.Sum64()
+		count++
+		return nil
+	})
+	return fmt.Sprintf("%d-%016x", count, sum)
 }
 
 // PersonalHas reports whether a file of this size is already at rel in a
