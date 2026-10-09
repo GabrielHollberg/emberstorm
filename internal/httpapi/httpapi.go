@@ -120,6 +120,11 @@ type Server struct {
 	otherWrites allowance
 	// photos sent to somebody: each holds up to 500 photos for them
 	sendAsks allowance
+	// checks of what is already there (each can read gigabytes), and things
+	// that start work (imports, ebooks, voices, read-along, taking a send)
+	checkAsks   allowance
+	photoChecks allowance
+	startAsks   allowance
 	// playback reports sent from the app (diagnostics.go)
 	reports allowance
 	// "keep me on this device" (profiles): each rewrites state.json
@@ -460,7 +465,7 @@ func (s *Server) Routes() http.Handler {
 	// starts moving, and it is also what keeps a subtitle with its film: the
 	// grouping needs to see the whole list, which a streamed upload does not.
 	guarded.HandleFunc("POST /api/upload/plan", s.handleUploadPlan)
-	guarded.HandleFunc("POST /api/upload/check", s.handleUploadCheck)
+	guarded.HandleFunc("POST /api/upload/check", s.limited(&s.checkAsks, 20, 3*time.Second, s.handleUploadCheck))
 	guarded.HandleFunc("POST /api/upload/describe", s.handleUploadDescribe)
 	guarded.HandleFunc("PUT /api/upload", s.handleUpload)
 	guarded.HandleFunc("GET /api/search", s.handleSearch)
@@ -482,9 +487,9 @@ func (s *Server) Routes() http.Handler {
 	guarded.HandleFunc("GET /api/bookhls/{source}/{id}/{track}/{file}", s.handleBookHLS)
 	// Making an audiobook from an ebook (voices.go).
 	guarded.HandleFunc("GET /api/voices", s.handleVoices)
-	guarded.HandleFunc("GET /api/voices/sample", s.handleVoiceSample)
+	guarded.HandleFunc("GET /api/voices/sample", s.limited(&s.startAsks, 20, 10*time.Second, s.handleVoiceSample))
 	guarded.HandleFunc("POST /api/voices/make", s.handleMakeAudiobook)
-	guarded.HandleFunc("POST /api/voices/make-ebook", s.handleMakeEbook)
+	guarded.HandleFunc("POST /api/voices/make-ebook", s.limited(&s.startAsks, 20, 10*time.Second, s.handleMakeEbook))
 	guarded.HandleFunc("GET /api/voices/jobs", s.handleVoiceJobs)
 	guarded.HandleFunc("DELETE /api/voices/jobs/{id}", s.handleCancelVoiceJob)
 	guarded.HandleFunc("POST /api/voices/jobs/{id}/retry", s.handleRetryVoiceJob)
@@ -542,7 +547,7 @@ func (s *Server) Routes() http.Handler {
 	guarded.HandleFunc("GET /api/photos/month", s.handlePhotoMonth)
 	// Everyone's own photos: their space, and their phone's backup.
 	guarded.HandleFunc("GET /api/photos/usage", s.handlePhotoUsage)
-	guarded.HandleFunc("POST /api/photos/backup/check", s.handleBackupCheck)
+	guarded.HandleFunc("POST /api/photos/backup/check", s.limited(&s.photoChecks, 60, time.Second, s.handleBackupCheck))
 	guarded.HandleFunc("GET /api/photos/albums", s.handlePhotoAlbums)
 	guarded.HandleFunc("POST /api/photos/albums", s.limited(&s.listWrites, 60, time.Second, s.handleCreatePhotoAlbum))
 	guarded.HandleFunc("POST /api/photos/albums/{id}/add", s.limited(&s.listWrites, 60, time.Second, s.handlePhotoAlbumItems(true)))
@@ -560,17 +565,17 @@ func (s *Server) Routes() http.Handler {
 	guarded.HandleFunc("POST /api/photos/send", s.limited(&s.sendAsks, 10, 30*time.Second, s.handleSendPhotos))
 	guarded.HandleFunc("GET /api/photos/inbox", s.handlePhotoInbox)
 	guarded.HandleFunc("GET /api/photos/inbox/{id}/{n}/thumb", s.handlePhotoInboxThumb)
-	guarded.HandleFunc("POST /api/photos/inbox/{id}/accept", s.handlePhotoInboxAccept)
+	guarded.HandleFunc("POST /api/photos/inbox/{id}/accept", s.limited(&s.startAsks, 20, 10*time.Second, s.handlePhotoInboxAccept))
 	guarded.HandleFunc("POST /api/photos/inbox/{id}/decline", s.handlePhotoInboxDecline)
 	guarded.HandleFunc("PUT /api/photos/backup", s.handleBackup)
 	// Bringing a photo library in: a Google or Apple download, in pieces.
 	guarded.HandleFunc("GET /api/photos/import", s.handleImports)
-	guarded.HandleFunc("POST /api/photos/import", s.handleStartImport)
+	guarded.HandleFunc("POST /api/photos/import", s.limited(&s.startAsks, 20, 10*time.Second, s.handleStartImport))
 	guarded.HandleFunc("PUT /api/photos/import/{id}", s.handleImportChunk)
 	guarded.HandleFunc("DELETE /api/photos/import/{id}", s.handleCancelImport)
 	guarded.HandleFunc("GET /api/prefs", s.handleGetPrefs)
 	guarded.HandleFunc("PATCH /api/prefs", s.limited(&s.listWrites, 60, time.Second, s.handlePatchPrefs))
-	guarded.HandleFunc("POST /api/readalong", s.handleStartReadAlong)
+	guarded.HandleFunc("POST /api/readalong", s.limited(&s.startAsks, 20, 10*time.Second, s.handleStartReadAlong))
 	guarded.HandleFunc("POST /api/readalong/next", s.limited(&s.otherWrites, 10, 10*time.Second, s.handleReadAlongNext))
 	guarded.HandleFunc("GET /api/readalong", s.handleReadAlong)
 	guarded.HandleFunc("GET /api/music/mixes/{id}", s.handleMix)
@@ -2343,7 +2348,12 @@ func (s *Server) handleHLS(w http.ResponseWriter, r *http.Request) {
 	// asking with new session ids could start any number of them (a
 	// security review). Real playback is one at a time, a few when the
 	// quality or language changes.
-	if !s.hlsSessions.allow(user.ID, queryValue(query, "playSessionId"), time.Now()) {
+	// Counted by the video as well as the session: the session id is the
+	// client's own word, and one reused (or none) across many videos started
+	// a conversion for each, all counted as one (the thirteenth security
+	// pass).
+	item, _, _ := strings.Cut(r.PathValue("path"), "/")
+	if !s.hlsSessions.allow(user.ID, queryValue(query, "playSessionId")+"|"+item, time.Now()) {
 		http.Error(w, "too many videos playing at once", http.StatusTooManyRequests)
 		return
 	}

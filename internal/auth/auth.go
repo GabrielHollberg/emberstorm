@@ -674,7 +674,16 @@ func (m *Manager) UserFor(r *http.Request) (state.User, bool) {
 // out on every request. The __Host- cookies go first, since nothing but this
 // host can have set them.
 func (m *Manager) liveSession(r *http.Request) (string, state.User, bool) {
-	for _, name := range []string{SecureCookieName, CookieName} {
+	// Over TLS only the __Host- cookie: the plain one can be set for the
+	// whole zone by any other install under it (the thirteenth security
+	// pass), as the profile cookie already is. Over plain HTTP - a LAN
+	// address, which no install's cookie reaches, or behind a proxy that
+	// ends TLS - both.
+	names := []string{SecureCookieName, CookieName}
+	if m.OverTLS(r) {
+		names = []string{SecureCookieName}
+	}
+	for _, name := range names {
 		for _, c := range r.Cookies() {
 			if c.Name != name || c.Value == "" {
 				continue

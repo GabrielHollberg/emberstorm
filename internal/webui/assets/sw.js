@@ -91,7 +91,9 @@ function handles(request, url) {
   // The app's own files, network first: the reader is several modules, and a
   // book downloaded for offline reading needs all of them there with no
   // server. Media never comes from /static/.
-  return SHELL.includes(url.pathname) || url.pathname.startsWith('/static/');
+  // Never one with a query: a book could fill the cache with /static/app.js?n=1,
+  // ?n=2... (the thirteenth security pass).
+  return !url.search && (SHELL.includes(url.pathname) || url.pathname.startsWith('/static/'));
 }
 
 const OFFLINE_SHELL = 'soundstorm-offline-shell-v1';

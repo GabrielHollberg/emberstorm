@@ -591,3 +591,20 @@ func TestOwnerCannotResetOwnPasswordThroughAdminPath(t *testing.T) {
 		t.Errorf("the refused reset changed the password anyway: %v", err)
 	}
 }
+
+// Over TLS a plain session cookie - which another install under the zone
+// can set - signs nobody in.
+func TestAPlainSessionCookieIsNotTakenOverTLS(t *testing.T) {
+	m := newManager(t)
+	m.Signup("gabe", "correct horse")
+	token, _, _, err := m.Login("gabe", "correct horse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodGet, "https://x.home.emberstorm.app/api/session", nil)
+	r.TLS = &tls.ConnectionState{}
+	r.AddCookie(&http.Cookie{Name: CookieName, Value: token})
+	if _, ok := m.UserFor(r); ok {
+		t.Fatal("a plain session cookie was taken over TLS")
+	}
+}

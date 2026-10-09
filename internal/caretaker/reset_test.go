@@ -2,6 +2,8 @@ package caretaker
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,5 +126,40 @@ func TestThePowerButtonIsFound(t *testing.T) {
 		"I: Bus=0003\nN: Name=\"Keyboard\"\nH: Handlers=sysrq kbd event3\n"
 	if got := powerButton(devices); got != "/dev/input/event2" {
 		t.Fatalf("found %q", got)
+	}
+}
+
+// The button's code goes to the box's own screen, never to the socket the
+// app's container shares, and is gone once the window closes.
+func TestTheButtonCodeIsOnlyOnTheBoxsScreen(t *testing.T) {
+	b := newBox(t)
+	b.u.Pressed(context.Background(), 5)
+	data, err := os.ReadFile(filepath.Join(b.u.cfg.StateDir, ButtonCodeFile))
+	code := strings.Fields(string(data))
+	if err != nil || len(code) != 2 || code[0] != b.u.buttonCode() {
+		t.Fatalf("the screen's file: %q %v", data, err)
+	}
+	rec := httptest.NewRecorder()
+	b.u.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/button", nil))
+	if strings.Contains(rec.Body.String(), code[0]) || strings.Contains(rec.Body.String(), "code") {
+		t.Fatalf("the socket gave the code away: %s", rec.Body.String())
+	}
+	b.u.claimButton(code[0])
+	if _, err := os.Stat(filepath.Join(b.u.cfg.StateDir, ButtonCodeFile)); err == nil {
+		t.Fatal("the code stayed on the screen after it was used")
+	}
+}
+
+// A version reporting more sources than the box ever saw cannot hold every
+// update to a number no new version reaches.
+func TestAnInflatedHealthIsNotTheBaseline(t *testing.T) {
+	b := newBox(t)
+	b.u.saveBaseline(9)
+	if got := b.u.baseline(); got != 9 {
+		t.Fatalf("baseline %d", got)
+	}
+	b.u.saveBaseline(5000)
+	if got := b.u.baseline(); got != maxBaseline {
+		t.Fatalf("baseline %d", got)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Held names: names nobody can choose for a web address unless they were given
@@ -72,6 +73,9 @@ const notAvailable = "That name isn't available. Try another."
 // (NAMES_HELD_CODES). Capitals, spaces and dashes do not count, as with the
 // setup code: a phone keyboard capitalising the first letter must not refuse it.
 func (s *Server) heldCodeOK(name, code string) bool {
+	if s.limits.spent("held-code:"+name, heldCodeRate) {
+		return false
+	}
 	want, ok := s.HeldCodes[name]
 	want, code = plainCode(want), plainCode(code)
 	if !ok || want == "" || code == "" {
@@ -79,6 +83,20 @@ func (s *Server) heldCodeOK(name, code string) bool {
 	}
 	return subtle.ConstantTimeCompare([]byte(code), []byte(want)) == 1
 }
+
+// heldCodeTry is heldCodeOK counting wrong tries: ten a day for a name,
+// from anywhere, as the codes are what the owner types and may be short.
+func (s *Server) heldCodeTry(name, code string) bool {
+	if s.heldCodeOK(name, code) {
+		return true
+	}
+	if code != "" {
+		s.limits.allow("held-code:"+name, heldCodeRate)
+	}
+	return false
+}
+
+var heldCodeRate = rate{n: 10, window: 24 * time.Hour}
 
 // plainCode is a code with its capitals, spaces and dashes set aside.
 func plainCode(code string) string {

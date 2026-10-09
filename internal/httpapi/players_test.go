@@ -254,3 +254,52 @@ func TestAPretendTVTakesNobodyOver(t *testing.T) {
 		t.Fatalf("a member shared a TV: %d", resp.StatusCode)
 	}
 }
+
+// Somebody a shared TV switched to cannot read its commands from their own
+// phone - the switch code meant for the TV among them - and sign in as the
+// owner with it.
+func TestATVsCommandsAreOnlyTheTVs(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t) // gabe, the owner
+	if resp, body := h.do(t, http.MethodPost, "/api/users", `{"username":"mallory","password":"violet tractor glacier"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("adding mallory: %d %s", resp.StatusCode, body)
+	}
+	tvDevice := h.another(t)
+	if code, _ := signInAs(t, tvDevice, "gabe", "correct horse"); code != http.StatusOK {
+		t.Fatalf("the TV signs in: %d", code)
+	}
+	tv := "ffffffffffffffff6666"
+	tvDevice.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+tv+`","name":"Living room TV","tv":true}`)
+	phone := h.another(t)
+	signInAs(t, phone, "mallory", "violet tractor glacier")
+	// Free, the TV switches to mallory.
+	if resp, body := phone.do(t, http.MethodPost, "/api/players/"+tv+"/command", `{"type":"claim"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("mallory claims the TV: %d %s", resp.StatusCode, body)
+	}
+	_, body := tvDevice.do(t, http.MethodGet, "/api/players/"+tv+"/next", "")
+	var next struct {
+		Commands []map[string]any `json:"commands"`
+	}
+	_ = json.Unmarshal(body, &next)
+	code := next.Commands[0]["code"].(string)
+	if resp, _ := tvDevice.do(t, http.MethodPost, "/api/players/switch", `{"code":"`+code+`","id":"`+tv+`"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("the TV switches to mallory: %d", resp.StatusCode)
+	}
+	// The owner sends something: a switch code back to gabe waits for the TV.
+	h.do(t, http.MethodPost, "/api/players/"+tv+"/command", `{"type":"claim"}`)
+	// Mallory's phone, signed in as the TV's person now, polls for it.
+	if resp, body := phone.do(t, http.MethodGet, "/api/players/"+tv+"/next", ""); resp.StatusCode != http.StatusNotFound || strings.Contains(string(body), "code") {
+		t.Fatalf("mallory's phone read the TV's commands: %d %s", resp.StatusCode, body)
+	}
+	// And a code taken any other way is refused from her phone.
+	_, body = tvDevice.do(t, http.MethodGet, "/api/players/"+tv+"/next", "")
+	next.Commands = nil
+	_ = json.Unmarshal(body, &next)
+	if len(next.Commands) == 0 || next.Commands[0]["type"] != "switch" {
+		t.Fatalf("the TV should be told to switch back: %s", body)
+	}
+	code = next.Commands[0]["code"].(string)
+	if resp, _ := phone.do(t, http.MethodPost, "/api/players/switch", `{"code":"`+code+`","id":"`+tv+`"}`); resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("mallory's phone used the TV's switch code: %d", resp.StatusCode)
+	}
+}

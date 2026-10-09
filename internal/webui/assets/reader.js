@@ -34,7 +34,11 @@ if (window.top !== window.self) throw new Error('EmberStorm does not run inside 
 // SVG animation can set an href to javascript: where no attribute shows it,
 // and a link other than a stylesheet can tell an outside party the book was
 // opened (DNS prefetch is outside the CSP) - both found by a review.
-const DROP = 'script, iframe, frame, object, embed, meta[http-equiv], base, set, animate, animateMotion, animateTransform';
+// template and noscript too: the frame reads them differently from the
+// DOMParser this cleans with (a declarative shadow root inside a template;
+// noscript parsed as text with scripting on), so what was inside them came
+// to life without being cleaned (the thirteenth security pass).
+const DROP = 'script, iframe, frame, object, embed, meta[http-equiv], base, set, animate, animateMotion, animateTransform, template, noscript, slot, [shadowrootmode], [shadowroot]';
 // What a book may point at: its own files, which are relative. A reference to
 // the server itself (root-relative, or this address) would be fetched with the
 // reader's sign-in - a cover's <img> starting film conversions as whoever opens
@@ -84,7 +88,82 @@ function cleanCSS(css) {
     });
     if (words(plain) > words(out)) out = '';
   }
-  return out;
+  // And then read as a browser reads it: the patterns above are quick, and
+  // a string holding a ")" inside image-set(), an @import with no space or
+  // a comment before its string, or a quoted url() holding the other quote
+  // went past them (the thirteenth security pass). Anything still pointing
+  // outside the book drops the whole stylesheet.
+  return cssReferences(out).every(ownReference) ? out : '';
+}
+
+// cssReferences lists every reference a stylesheet makes, read as a browser
+// tokenises it: url() (quoted or not), the string or url() after @import,
+// and every string inside image-set(). Comments are skipped; strings are
+// read with their escapes.
+function cssReferences(css) {
+  const refs = [];
+  const s = String(css);
+  let i = 0;
+  let imageSetDepth = 0;
+  let depth = 0;
+  let afterImport = false;
+  const readString = () => {
+    const q = s[i++];
+    let v = '';
+    while (i < s.length && s[i] !== q) {
+      if (s[i] === '\\' && i + 1 < s.length) { v += s[i + 1]; i += 2; continue; }
+      if (s[i] === '\n') break;
+      v += s[i++];
+    }
+    i++;
+    return v;
+  };
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '/' && s[i + 1] === '*') {
+      const end = s.indexOf('*/', i + 2);
+      i = end < 0 ? s.length : end + 2;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      const v = readString();
+      if (imageSetDepth > 0 || afterImport) refs.push(v);
+      afterImport = false;
+      continue;
+    }
+    const rest = s.slice(i, i + 12).toLowerCase();
+    if (rest.startsWith('url(')) {
+      i += 4;
+      while (/\s/.test(s[i] || '')) i++;
+      if (s[i] === '"' || s[i] === "'") {
+        refs.push(readString());
+        while (i < s.length && s[i] !== ')') i++;
+      } else {
+        let v = '';
+        while (i < s.length && s[i] !== ')') v += s[i++];
+        refs.push(v.trim());
+      }
+      i++;
+      afterImport = false;
+      continue;
+    }
+    if (rest.startsWith('@import')) { afterImport = true; i += 7; continue; }
+    if (rest.startsWith('image-set(') || rest.startsWith('-webkit-image')) {
+      const open = s.indexOf('(', i);
+      i = open < 0 ? s.length : open + 1;
+      depth++;
+      imageSetDepth = depth;
+      continue;
+    }
+    if (c === '(') depth++;
+    if (c === ')') {
+      if (depth === imageSetDepth) imageSetDepth = 0;
+      depth = Math.max(0, depth - 1);
+    }
+    if (c === ';' || c === '{' || c === '}') afterImport = false;
+    i++;
+  }
+  return refs;
 }
 // What a part that is not a page may be: anything else is given as text,
 // which a frame can only ever show as text (text/xsl and unknown/unknown
@@ -156,7 +235,7 @@ function withoutScripts(book) {
         for (const attr of [...el.attributes]) {
           const name = attr.name.toLowerCase();
           const value = attr.value.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
-          if (name.startsWith('on') || ((name === 'href' || name.endsWith(':href') || name === 'src' || name === 'action' || name === 'formaction')
+          if (name.startsWith('on') || name === 'ping' || ((name === 'href' || name.endsWith(':href') || name === 'src' || name === 'action' || name === 'formaction')
               && (value.startsWith('javascript:') || value.startsWith('vbscript:')))) {
             el.removeAttribute(attr.name);
             changed = true;
@@ -169,7 +248,11 @@ function withoutScripts(book) {
           }
         }
       }
-      return changed ? new XMLSerializer().serializeToString(doc) : data;
+      // Always what was cleaned, never the bytes as they came: the frame
+      // must render the document this read, not a second reading of the
+      // original (the thirteenth security pass).
+      void changed;
+      return new XMLSerializer().serializeToString(doc);
     });
   });
 }

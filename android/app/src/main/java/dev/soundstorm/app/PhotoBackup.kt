@@ -96,12 +96,9 @@ object PhotoBackup {
                 ).build()
             }
         }
-        // The typed address only when it is a secure one: photos and the
-        // sign-in never cross the Wi-Fi in the clear (the twelfth security
-        // pass).
-        ServerAddress.saved(c)?.takeIf { it.scheme == "https" }?.let { s ->
-            if (out.none { ServerAddress.origin(it) == ServerAddress.origin(s) }) out += s
-        }
+        // Only the server the person said yes to, and its away name: the
+        // server in use now may be another one in the list (a parent's), which
+        // was never asked about (the thirteenth security pass).
         return out
     }
 

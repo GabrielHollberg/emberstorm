@@ -12,7 +12,10 @@ set -u
 
 env=/opt/soundstorm/.env
 port=8099
-caretaker=/run/soundstorm-caretaker/caretaker.sock
+# The power button's code, from the caretaker's own folder (root only):
+# "<code> <until>". Never asked of its socket, which the app's container
+# shares.
+buttoncode=/var/lib/soundstorm-caretaker/button-code
 
 # Big letters, where the font is there (console-setup-linux), and no kernel
 # messages written over the screen.
@@ -89,8 +92,12 @@ draw() {
 		fi
 		# The power button pressed five times: the code a new password
 		# needs, shown here only - somebody at the box is who may set it.
-		button=$(curl -fsS -m 3 --unix-socket "$caretaker" http://caretaker/button 2>/dev/null || true)
-		bcode=$(field "$button" code)
+		bcode=
+		if [ -r "$buttoncode" ]; then
+			read -r c until <"$buttoncode" || true
+			case "$c" in [0-9][0-9][0-9][0-9][0-9][0-9]) ;; *) c= ;; esac
+			[ -n "$c" ] && [ "${until:-0}" -gt "$(date +%s)" ] 2>/dev/null && bcode=$c
+		fi
 		if [ -n "$bcode" ]; then
 			printf '\n   The power button was pressed. To choose a new password,\n'
 			printf '   open the sign-in screen and type this code:\n\n'

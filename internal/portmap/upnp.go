@@ -99,10 +99,12 @@ func upnpClient() *http.Client {
 // onGateway reports whether a URL is on the gateway's own address. When the
 // gateway is known, the device to ask is that one: SSDP is answered by anything
 // on the LAN, and the router that actually forwards the traffic is the default
-// route's next hop. An unknown gateway allows any host.
+// route's next hop. With the gateway unknown, nothing is: any device on the
+// LAN can answer a search, and its address would have been followed (the
+// thirteenth security pass).
 func onGateway(rawURL string, gateway netip.Addr) bool {
 	if !gateway.IsValid() {
-		return true
+		return false
 	}
 	u, err := url.Parse(rawURL)
 	if err != nil {

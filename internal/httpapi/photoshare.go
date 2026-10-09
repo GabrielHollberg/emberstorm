@@ -522,10 +522,12 @@ func (s *Server) handleSavePhotos(w http.ResponseWriter, r *http.Request) {
 				total += st.Size()
 			}
 		}
-		if err := s.photoRoom(u, total); err != nil {
+		release, err := s.holdPhotoRoom(u, total)
+		if err != nil {
 			writeError(w, http.StatusInsufficientStorage, err.Error())
 			return
 		}
+		defer release()
 	}
 	if _, err := s.library.EnsurePersonalFolder(u.Name); err != nil {
 		writeError(w, http.StatusInternalServerError, desensitizeFSError(err))

@@ -39,6 +39,10 @@ import (
 const (
 	maxSendItems   = 500
 	maxPendingTo   = 100 // waiting sends one person may have
+	// maxPendingFrom is how many sends one person may have waiting for
+	// others: on a drive where a link cannot be made each is a whole copy,
+	// counted against nobody's photo space (the thirteenth security pass).
+	maxPendingFrom = 20
 	sendKeep       = 30 * 24 * time.Hour
 	photoInboxDir  = ".photo-inbox" // in the library root: no backend mounts it
 	sendsStateFile = "photo-sends.json"
@@ -245,15 +249,22 @@ func (s *Server) handleSendPhotos(w http.ResponseWriter, r *http.Request) {
 	p := &s.photoSendsRec
 	p.mu.Lock()
 	s.loadSendsLocked()
-	waiting := 0
+	waiting, sent := 0, 0
 	for _, sd := range p.sends {
 		if sd.To == to.ID {
 			waiting++
+		}
+		if sd.From == u.ID {
+			sent++
 		}
 	}
 	p.mu.Unlock()
 	if waiting >= maxPendingTo {
 		writeError(w, http.StatusTooManyRequests, to.Name+" has too many photos waiting to be looked at; try again once they have")
+		return
+	}
+	if sent >= maxPendingFrom {
+		writeError(w, http.StatusTooManyRequests, "you have sent a lot of photos nobody has looked at yet; try again once they have")
 		return
 	}
 
@@ -385,12 +396,16 @@ func (s *Server) handlePhotoInboxAccept(w http.ResponseWriter, r *http.Request) 
 				total += st.Size()
 			}
 		}
-		if err := s.photoRoom(u, total); err != nil {
+		// Held, not only checked: two taken at once passed on one figure
+		// (the thirteenth security pass).
+		release, err := s.holdPhotoRoom(u, total)
+		if err != nil {
 			keep = true
 			s.restoreSend(sd)
 			writeError(w, http.StatusInsufficientStorage, err.Error())
 			return
 		}
+		defer release()
 	}
 	if _, err := s.library.EnsurePersonalFolder(u.Name); err != nil {
 		keep = true

@@ -48,14 +48,13 @@ gw=$(printf '%s\n' "$route" | sed -n 's/.* via \([0-9.]*\).*/\1/p' | head -1)
 EOF
 chmod 644 tailscale-serve.json
 
-# What a monitor plugged into the box shows at its login prompt: where to go,
-# and the setup code until somebody has used it.
-code=$(get_env SOUNDSTORM_SETUP_CODE)
+# What a monitor plugged into the box shows at its login prompt: where to go.
+# Never the setup code - it approves new devices after setup too, and the
+# box's own screen (screen.sh) shows it while it is still needed.
 port=$(get_env SOUNDSTORM_PORT)
 mkdir -p /etc/issue.d
 {
 	echo "SoundStorm"
 	[ -n "$lan" ] && echo "  Open http://$lan:${port:-8099} on a phone or computer on this network."
-	echo "  Setup code: $code"
 	echo
 } > /etc/issue.d/soundstorm.issue

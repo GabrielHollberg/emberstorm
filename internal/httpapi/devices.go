@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/GabrielHollberg/soundstorm/internal/auth"
+	"github.com/GabrielHollberg/soundstorm/internal/names"
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 )
 
@@ -114,7 +115,11 @@ func (s *Server) handlePendingSignIn(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body)
 		given := NormalizeSetupCode(body.SetupCode)
-		if s.approvalCode == "" || given == "" || subtle.ConstantTimeCompare([]byte(given), []byte(s.approvalCode)) != 1 {
+		// Only at home: the code is on the box's sticker, and anybody who
+		// once saw it, with a password, would otherwise get past approval
+		// from anywhere (the thirteenth security pass).
+		home := !names.IsAwayName(requestHostname(r)) && fromHomeNetwork(r)
+		if !home || s.approvalCode == "" || given == "" || subtle.ConstantTimeCompare([]byte(given), []byte(s.approvalCode)) != 1 {
 			p.mu.Unlock()
 			writeError(w, http.StatusForbidden, "that is not the setup code")
 			return

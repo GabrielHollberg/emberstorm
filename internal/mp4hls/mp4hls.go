@@ -370,6 +370,25 @@ func track(mvhd, tkhd []byte, mdia []box, fileSize int64) (*Book, error) {
 	if sample < uint64(b.samples) {
 		return nil, errors.New("mp4: chunks hold too few samples")
 	}
+	// Every chunk's samples lie inside the file, and all of them together
+	// are no bigger than it: sizes are the file's word, and false ones made
+	// one fragment many times the file, the same bytes sent over and over
+	// (the thirteenth security pass).
+	var all uint64
+	for c := range b.chunkOffset {
+		end := uint64(b.samples)
+		if c+1 < len(b.chunkFirst) {
+			end = uint64(b.chunkFirst[c+1])
+		}
+		var bytes uint64
+		for smp := uint64(b.chunkFirst[c]); smp < end && smp < uint64(b.samples); smp++ {
+			bytes += uint64(b.size(uint32(smp)))
+		}
+		all += bytes
+		if b.chunkOffset[c] > uint64(fileSize) || bytes > uint64(fileSize)-b.chunkOffset[c] || all > uint64(fileSize) {
+			return nil, errors.New("mp4: samples past the end of the file")
+		}
+	}
 
 	// Segments: about SegmentSeconds each, cut between samples.
 	target := uint64(SegmentSeconds) * uint64(b.timescale)
@@ -393,6 +412,9 @@ func track(mvhd, tkhd []byte, mdia []box, fileSize int64) (*Book, error) {
 	}
 	b.segSample = append(b.segSample, b.samples)
 	b.segTime = append(b.segTime, t)
+	if t == 0 {
+		return nil, errors.New("mp4: no time passes")
+	}
 
 	b.init = initSegment(mvhd, minfData, stsd, mdia, tkhd, b.trackID)
 	return b, nil

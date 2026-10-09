@@ -300,17 +300,17 @@ func (s *Server) PublicNameFor(id string) string { return id + "." + s.PublicLab
 func (s *Server) publicRelative(id string) string { return id + "." + s.PublicLabel }
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
-	// Widest first: a request refused by the day's cap or its network's
-	// leaves no entry for its own address behind, so refused requests cannot
-	// fill the table that installs' renewals are counted in (a security
-	// review).
-	if !s.limits.allow("register:*", globalRegisterRate) {
-		writeError(w, http.StatusTooManyRequests, "too many registrations today; try again later")
-		return
-	}
+	// The networks' limits first, in the table of their own, and the day's
+	// for everybody last: counted first, one client's refused requests used
+	// up the day's sign-ups for every new install (the thirteenth security
+	// pass).
 	if !s.open.allow("register-wide:"+s.clientWide(r), registerWideRate) ||
 		!s.open.allow("register:"+s.clientNet(r), registerRate) {
 		writeError(w, http.StatusTooManyRequests, "too many registrations from this address; try again later")
+		return
+	}
+	if !s.limits.allow("register:*", globalRegisterRate) {
+		writeError(w, http.StatusTooManyRequests, "too many registrations today; try again later")
 		return
 	}
 	id, err := newID()
@@ -670,6 +670,9 @@ func (s *Server) ownChosen(ctx context.Context, id, name string) (string, bool) 
 	if !nameShape.MatchString(name) || reservedNames[name] {
 		return "", false
 	}
+	if !s.lookupAllowed(ctx, id) {
+		return "", false
+	}
 	owner, err := s.ownerOf(ctx, name)
 	return name, err == nil && owner == id
 }
@@ -770,6 +773,14 @@ const maxBuckets = 100_000
 // pruneEvery bounds how often a full table is scanned for expired entries, so a
 // flood of new keys against a full table cannot make every request walk it.
 const pruneEvery = time.Second
+
+// spent is whether key has used up its allowance, counting nothing.
+func (l *limits) spent(key string, r rate) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	b, ok := l.buckets[key]
+	return ok && !l.now().After(b.reset) && b.count >= r.n
+}
 
 func newLimits() *limits { return &limits{buckets: map[string]*bucket{}, now: time.Now} }
 

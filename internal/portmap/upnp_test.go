@@ -227,7 +227,7 @@ func TestUPnPMapSendsTheMappingAndReadsTheWANIP(t *testing.T) {
 	f := newFakeIGD(t)
 	client := netip.MustParseAddr("192.168.1.50")
 
-	m, err := upnpMap(context.Background(), netip.Addr{}, f.location, client, TCP, 8080, 8099, 2*time.Hour)
+	m, err := upnpMap(context.Background(), netip.MustParseAddr("127.0.0.1"), f.location, client, TCP, 8080, 8099, 2*time.Hour)
 	if err != nil {
 		t.Fatalf("upnpMap: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestUPnPRetriesWithPermanentLease(t *testing.T) {
 	f.permanentOnly = true
 	client := netip.MustParseAddr("192.168.1.50")
 
-	m, err := upnpMap(context.Background(), netip.Addr{}, f.location, client, TCP, 8080, 8099, time.Hour)
+	m, err := upnpMap(context.Background(), netip.MustParseAddr("127.0.0.1"), f.location, client, TCP, 8080, 8099, time.Hour)
 	if err != nil {
 		t.Fatalf("upnpMap: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestUPnPMapNeedsAnInternalClient(t *testing.T) {
 func TestUPnPDeleteRemovesTheMapping(t *testing.T) {
 	f := newFakeIGD(t)
 	client := netip.MustParseAddr("192.168.1.50")
-	m, err := upnpMap(context.Background(), netip.Addr{}, f.location, client, TCP, 8080, 8099, time.Hour)
+	m, err := upnpMap(context.Background(), netip.MustParseAddr("127.0.0.1"), f.location, client, TCP, 8080, 8099, time.Hour)
 	if err != nil {
 		t.Fatalf("upnpMap: %v", err)
 	}
@@ -301,11 +301,12 @@ func TestUPnPDeleteRemovesTheMapping(t *testing.T) {
 	}
 }
 
-// With no gateway but a UPnP location and internal client, mapTarget falls all
+// With a UPnP location and internal client, mapTarget falls all
 // the way through to UPnP - the fallback-of-last-resort path.
 func TestMapTargetFallsThroughToUPnP(t *testing.T) {
 	f := newFakeIGD(t)
 	t2 := target{
+		gateway:        netip.MustParseAddrPort("127.0.0.1:9"),
 		internalClient: netip.MustParseAddr("192.168.1.50"),
 		upnpLocation:   f.location,
 	}

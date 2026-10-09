@@ -444,7 +444,9 @@ func (a *autoCert) step(ctx context.Context) error {
 	// The service moved to another zone (soundstorm.dev to emberstorm.app,
 	// 2026-10-07): the same id under the new zone becomes this install's name,
 	// kept, and the certificate below is made again for it.
-	if given != "" && !strings.EqualFold(given, reg.Name) && strings.HasPrefix(strings.ToLower(given), reg.ID+".") {
+	// Only <id>.home.<a zone this build knows>: a names service answering
+	// anything else is not moved to (the thirteenth security pass).
+	if given != "" && !strings.EqualFold(given, reg.Name) && homeNameFor(reg.ID, given) {
 		moved := reg
 		moved.Name = strings.ToLower(given)
 		raw, _ := json.MarshalIndent(moved, "", "  ")
@@ -875,4 +877,15 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// homeNameFor is whether name is id's home name in one of the zones.
+func homeNameFor(id, name string) bool {
+	name = strings.ToLower(name)
+	for _, z := range names.Zones {
+		if name == id+".home."+z {
+			return true
+		}
+	}
+	return false
 }

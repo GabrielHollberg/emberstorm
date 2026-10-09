@@ -114,6 +114,8 @@ type denial struct {
 type switchCode struct {
 	player, user string
 	until        time.Time
+	// keyHash is the device the TV said hello from: only it may use the code.
+	keyHash string
 }
 
 type playerHub struct {
@@ -319,13 +321,23 @@ func (s *Server) handleShareTV(w http.ResponseWriter, r *http.Request) {
 }
 
 // ownPlayer is a player acting as this person, or nil after writing why not.
+// Being the person is not enough: it must also be the device that said hello
+// as the player. Otherwise somebody the TV had switched to could read its
+// commands from their own phone - the switch codes meant for the TV among
+// them - and sign in as whoever sent the next thing to it (the thirteenth
+// security pass).
 func (s *Server) ownPlayer(w http.ResponseWriter, r *http.Request, user state.User) *player {
 	p, ok := s.players.m[r.PathValue("id")]
-	if !ok || p.UserID != user.ID {
+	if !ok || p.UserID != user.ID || !s.playerDevice(r, p) {
 		writeError(w, http.StatusNotFound, "that device is not open")
 		return nil
 	}
 	return p
+}
+
+// playerDevice is whether r comes from the device that said hello as p.
+func (s *Server) playerDevice(r *http.Request, p *player) bool {
+	return p.KeyHash == "" || s.auth.ProfileDevice(r) == p.KeyHash
 }
 
 // GET /api/players/{id}/next: the commands waiting for this player, waiting
@@ -584,7 +596,7 @@ func withFrom(raw json.RawMessage, name string) json.RawMessage {
 func (s *Server) switchPlayerLocked(p *player, user state.User, cmd json.RawMessage) {
 	h := &s.players
 	code := randomHex(16)
-	h.codes[code] = switchCode{player: p.ID, user: user.ID, until: time.Now().Add(switchCodeLife)}
+	h.codes[code] = switchCode{player: p.ID, user: user.ID, until: time.Now().Add(switchCodeLife), keyHash: p.KeyHash}
 	sw, _ := json.Marshal(map[string]any{"type": "switch", "code": code, "from": user.Name})
 	p.queue = nil
 	p.enqueueLocked(sw)
@@ -618,8 +630,8 @@ func (s *Server) handlePlayerAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
-		// The TV's person answers.
-		if p.UserID != user.ID {
+		// The TV's person answers, on the TV itself.
+		if p.UserID != user.ID || !s.playerDevice(r, p) {
 			writeError(w, http.StatusForbidden, "only the TV answers")
 			return
 		}
@@ -688,7 +700,8 @@ func (s *Server) handlePlayerSwitch(w http.ResponseWriter, r *http.Request) {
 		delete(h.codes, body.Code)
 	}
 	h.mu.Unlock()
-	if !ok || c.player != body.ID || time.Now().After(c.until) {
+	if !ok || c.player != body.ID || time.Now().After(c.until) ||
+		(c.keyHash != "" && s.auth.ProfileDevice(r) != c.keyHash) {
 		writeError(w, http.StatusForbidden, "that switch has run out")
 		return
 	}

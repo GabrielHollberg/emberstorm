@@ -194,11 +194,26 @@ func (s *Server) noteFind(r *http.Request, id string, allow bool, port int, lan,
 	if name != "" {
 		if !nameShape.MatchString(name) {
 			name = ""
+		} else if !s.lookupAllowed(r.Context(), id) {
+			name = ""
 		} else if owner, err := s.ownerOf(r.Context(), name); err != nil || owner != id {
 			name = ""
 		}
 	}
 	s.find.note(s.findConn(r), id, port, lan, name, time.Now())
+}
+
+// lookupRate is how often one install may have a chosen name looked up at
+// the DNS provider by announcing or clearing: each new name is a request to
+// the provider, whose one budget every install's renewals share (the
+// thirteenth security pass). An install announcing as it should asks a few
+// times an hour, the answers cached.
+var lookupRate = rate{n: 20, window: time.Hour}
+
+// lookupAllowed is whether id may have a name looked up now; one already
+// cached costs nothing and is always allowed.
+func (s *Server) lookupAllowed(_ context.Context, id string) bool {
+	return s.limits.allow("lookup:"+id, lookupRate)
 }
 
 // siteHost is the website's host (emberstorm.app), from the first of
@@ -487,7 +502,10 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, id string) 
 	// A held name needs its code to be taken - not to be claimed again by the
 	// install already holding it (which is how it puts its home and away
 	// names back).
-	if owner == "" && held(name) && !s.heldCodeOK(name, body.Code) {
+	// A name given out with a code is held whether or not the lists have it
+	// (the thirteenth security pass: one that only had a code could be taken
+	// with none), and its code tried at most ten times a day.
+	if owner == "" && (held(name) || s.HeldCodes[name] != "") && !s.heldCodeTry(name, body.Code) {
 		writeError(w, http.StatusConflict, notAvailable)
 		return
 	}

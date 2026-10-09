@@ -112,7 +112,13 @@ func (c *Client) http() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
-	return &http.Client{Timeout: 20 * time.Second}
+	// No redirects: plex.tv's requests carry the account's token in a header
+	// of Plex's own, which Go sends on to wherever a redirect points (the
+	// thirteenth security pass).
+	return &http.Client{
+		Timeout:       20 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 }
 
 func (c *Client) headers(req *http.Request, token string) {

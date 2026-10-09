@@ -214,7 +214,10 @@ func fromXMP(raw []byte) (Metadata, bool) {
 // --- Info dictionary ---------------------------------------------------------
 
 var (
-	infoRef  = regexp.MustCompile(`/Info\s+(\d+)\s+(\d+)\s+R`)
+	// Object numbers of ten digits at most: an Info reference of millions of
+	// digits was compiled into a pattern of its own, hundreds of megabytes
+	// (the thirteenth security pass).
+	infoRef  = regexp.MustCompile(`/Info\s+(\d{1,10})\s+(\d{1,10})\s+R`)
 	infoDate = regexp.MustCompile(`/CreationDate\s*\(D:(\d{4})`)
 )
 
@@ -257,22 +260,37 @@ func fromInfoDict(raw []byte) (Metadata, bool) {
 func infoObject(raw []byte) ([]byte, bool) {
 	// The last reference wins: an incremental update appends a new trailer,
 	// and with it, often, a new Info.
-	refs := infoRef.FindAllSubmatch(raw, -1)
-	if len(refs) == 0 {
+	// Only the last match is kept, never a list of millions.
+	at := lastMatch(infoRef, raw)
+	if at == nil {
 		return nil, false
 	}
-	ref := refs[len(refs)-1]
+	ref := infoRef.FindSubmatch(raw[at[0]:at[1]])
 	obj := regexp.MustCompile(`(?:^|[^0-9])` + string(ref[1]) + `\s+` + string(ref[2]) + `\s+obj\b`)
-	starts := obj.FindAllIndex(raw, -1)
-	if len(starts) == 0 {
+	start := lastMatch(obj, raw)
+	if start == nil {
 		return []byte{}, true
 	}
 	// Likewise the last definition of the object is the current one.
-	body := raw[starts[len(starts)-1][1]:]
+	body := raw[start[1]:]
 	if end := bytes.Index(body, []byte("endobj")); end >= 0 {
 		body = body[:end]
 	}
 	return body, true
+}
+
+// lastMatch is where re last matches in raw, or nil.
+func lastMatch(re *regexp.Regexp, raw []byte) []int {
+	var last []int
+	for off := 0; off < len(raw); {
+		m := re.FindIndex(raw[off:])
+		if m == nil {
+			break
+		}
+		last = []int{off + m[0], off + m[1]}
+		off += max(m[1], m[0]+1)
+	}
+	return last
 }
 
 // dictString finds /key in a dictionary and reads the string after it, as a

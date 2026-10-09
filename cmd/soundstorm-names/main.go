@@ -6,7 +6,7 @@
 // where it was first deployed. Configuration is the environment:
 //
 //	NAMES_SECRET             at least 32 random bytes; keys every install's token
-//	NAMES_ZONE               the domain at the provider (default soundstorm.dev; set emberstorm.app on Railway for the move)
+//	NAMES_ZONE               the domain at the provider (default emberstorm.app)
 //	NAMES_LABEL              the level installs sit beneath (default home)
 //	PORKBUN_API_KEY          Porkbun credentials, with API access switched on
 //	PORKBUN_SECRET_API_KEY   for NAMES_ZONE only
@@ -49,7 +49,7 @@ func run(log *slog.Logger) error {
 	if len(secret) < 32 {
 		return errors.New("NAMES_SECRET must be at least 32 characters; generate one with: openssl rand -base64 48")
 	}
-	zone := env("NAMES_ZONE", "soundstorm.dev")
+	zone := env("NAMES_ZONE", "emberstorm.app")
 
 	s := &names.Server{
 		Secret:         []byte(secret),
@@ -66,7 +66,7 @@ func run(log *slog.Logger) error {
 		AppleApps: strings.Split(env("NAMES_APPLE_APPS", "LZA2K5LLDS.dev.soundstorm.app"), ","),
 		// The website, the only page that may ask which installs are on a
 		// visitor's connection ("Open my EmberStorm").
-		SiteOrigins: strings.Split(env("NAMES_SITE_ORIGINS", "https://soundstorm.dev,https://www.soundstorm.dev"), ","),
+		SiteOrigins: strings.Split(env("NAMES_SITE_ORIGINS", "https://emberstorm.app,https://www.emberstorm.app"), ","),
 		// Held names given out to family and friends, "name=code,name=code".
 		// Secret: set on the host, never in the repository.
 		HeldCodes: names.ParseHeldCodes(os.Getenv("NAMES_HELD_CODES")),

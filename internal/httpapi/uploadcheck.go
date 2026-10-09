@@ -25,6 +25,9 @@ import (
 // A photo is never asked about - a different photo with the name is kept
 // beside it (savePhoto) - but an exact copy anywhere in the person's dated
 // folders is reported, by the Samples of the files that size there.
+// maxCheckSamples is how many files one check compares by their contents.
+const maxCheckSamples = 100
+
 func (s *Server) handleUploadCheck(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Files []struct {
@@ -51,6 +54,11 @@ func (s *Server) handleUploadCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]answer, len(body.Files))
 	var photos *photoIndex
+	// Each sample reads three megabytes of the file already there: a request
+	// naming thousands of files of the sizes on the shelf read gigabytes
+	// (the thirteenth security pass). Past maxSamples a taken name says only
+	// that it is taken, and the person is asked as for a different file.
+	sampled := 0
 	for i, f := range body.Files {
 		kind, ok := media.ParseKind(f.Kind)
 		if !ok || !access.Permits(kind) || f.Size < 0 {
@@ -67,9 +75,16 @@ func (s *Server) handleUploadCheck(w http.ResponseWriter, r *http.Request) {
 			out[i].Taken = len(out[i].Samples) > 0
 			continue
 		}
-		st, err := s.library.CheckDest(kind, f.Dest, f.Size)
+		size := f.Size
+		if sampled >= maxCheckSamples {
+			size = -1
+		}
+		st, err := s.library.CheckDest(kind, f.Dest, size)
 		if err != nil {
 			continue
+		}
+		if st.Sample != "" {
+			sampled++
 		}
 		out[i] = answer{Taken: st.Taken, Size: st.Size, Sample: st.Sample}
 	}

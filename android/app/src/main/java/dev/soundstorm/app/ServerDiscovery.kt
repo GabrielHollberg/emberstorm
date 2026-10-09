@@ -57,6 +57,7 @@ object ServerDiscovery {
 
     private fun get(url: String, timeout: Int): String? = runCatching {
         val conn = URL(url).openConnection() as HttpURLConnection
+        conn.setRequestProperty(WebCookies.NO_COOKIES, "1")
         conn.connectTimeout = timeout
         conn.readTimeout = timeout
         conn.instanceFollowRedirects = false

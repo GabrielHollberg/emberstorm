@@ -175,6 +175,23 @@ func (u *Updater) buttonOpen() (bool, time.Time) {
 	return time.Now().Before(u.button.until), u.button.until
 }
 
+// ButtonCodeFile is where the code is put for the box's screen (screen.sh,
+// root): "<code> <until, unix seconds>", in the caretaker's own folder,
+// which nothing else can read. Gone when the window closes.
+const ButtonCodeFile = "button-code"
+
+func (u *Updater) showButtonCode(code string, until time.Time) {
+	path := filepath.Join(u.cfg.StateDir, ButtonCodeFile)
+	if code == "" {
+		_ = os.Remove(path)
+		return
+	}
+	if err := os.MkdirAll(u.cfg.StateDir, 0o700); err != nil {
+		return
+	}
+	_ = os.WriteFile(path, []byte(fmt.Sprintf("%s %d\n", code, until.Unix())), 0o600)
+}
+
 // buttonCode is the code to show on the box's screen, while the window is open.
 func (u *Updater) buttonCode() string {
 	u.button.mu.Lock()
@@ -198,16 +215,19 @@ func (u *Updater) claimButton(code string) bool {
 		u.button.wrong++
 		if u.button.wrong >= maxWrongCodes {
 			u.button.until, u.button.code = time.Time{}, ""
+			u.showButtonCode("", time.Time{})
 		}
 		return false
 	}
 	u.button.until, u.button.code = time.Time{}, ""
+	u.showButtonCode("", time.Time{})
 	return true
 }
 
 func (u *Updater) closeButton() {
 	u.button.mu.Lock()
 	u.button.until, u.button.code = time.Time{}, ""
+	u.showButtonCode("", time.Time{})
 	u.button.mu.Unlock()
 }
 
@@ -227,6 +247,7 @@ func (u *Updater) Pressed(ctx context.Context, n int) {
 		u.button.mu.Lock()
 		u.button.until = time.Now().Add(ButtonWindow)
 		u.button.code, u.button.wrong = sixDigits(), 0
+		u.showButtonCode(u.button.code, u.button.until)
 		u.button.mu.Unlock()
 		u.log.Warn("the power button was pressed five times: the owner's password can be set for 15 minutes")
 	case n == 1:

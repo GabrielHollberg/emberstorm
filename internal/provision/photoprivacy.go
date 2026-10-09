@@ -68,11 +68,16 @@ func (m *Manager) SyncPhotoPrivacy(ctx context.Context) {
 		if t.Type != "immich" || t.MediaPath == "" {
 			continue
 		}
+		// A photo library configured but not set up yet is not "none": its
+		// library is made over the whole pictures folder and scanned at
+		// once, so until it is told what to leave out, nothing is known to
+		// be private (the thirteenth security pass).
+		anyLib = true
 		creds, ok := m.store.Backend(t.ID)
 		if !ok || creds.LibraryID == "" {
+			allDone = false
 			continue
 		}
-		anyLib = true
 		var want []string
 		for f := range others {
 			want = append(want, path.Join(t.MediaPath, globEscape(f))+"/**")

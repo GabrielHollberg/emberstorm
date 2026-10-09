@@ -18,6 +18,11 @@ const keep = [
   'p{background:image-set("a.png" 1x, "b.png" 2x)}',
 ];
 const drop = [
+  'a{b:image-set("/api/x?)" 1x)}',
+  '@import"/api/x";',
+  '@import/**/"/api/x";',
+  'p{background:url("/api/x?q=)")}',
+  "p{background:url('/api/x?\")')}",
   'p{background:url("/api/hls/x")}',
   'p{background:url(https://evil.example/x)}',
   '@import "/api/users";',

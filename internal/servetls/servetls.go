@@ -541,7 +541,14 @@ func (s *Server) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, e
 	}
 	// A hostname nobody configured. SNI is trustworthy enough to answer for,
 	// and minting keeps a name somebody set up in their router working without
-	// it also having to be listed here.
+	// it also having to be listed here - but only a name the authority may
+	// sign for: anything else would be refused by every client anyway, and a
+	// stranger opening handshakes for made-up names had the server make a key
+	// and sign a certificate for each (the thirteenth security pass).
+	if s.caLeaf != nil && len(s.caLeaf.PermittedDNSDomains) > 0 &&
+		!coveredBy(strings.ToLower(strings.TrimSuffix(name, ".")), s.caLeaf.PermittedDNSDomains) {
+		return s.currentFallback(), nil
+	}
 	return s.certFor(name, []string{name})
 }
 

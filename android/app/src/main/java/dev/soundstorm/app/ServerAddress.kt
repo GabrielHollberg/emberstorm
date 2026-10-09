@@ -71,6 +71,7 @@ object ServerAddress {
     fun installIdAt(base: Uri): String? {
         val conn = java.net.URL(base.buildUpon().path("/healthz").clearQuery().fragment(null).build().toString())
             .openConnection() as java.net.HttpURLConnection
+        conn.setRequestProperty(WebCookies.NO_COOKIES, "1")
         conn.connectTimeout = 5000
         conn.readTimeout = 5000
         return try {
@@ -209,6 +210,7 @@ object ServerAddress {
         val host = server.host ?: server.toString()
         val conn = try {
             (URL(origin(server) + "/healthz").openConnection() as HttpURLConnection).apply {
+                setRequestProperty(WebCookies.NO_COOKIES, "1")
                 connectTimeout = 10_000
                 readTimeout = 10_000
                 useCaches = false

@@ -287,6 +287,22 @@ func (p *Proxy) pipe(w http.ResponseWriter, r *http.Request, target source.Targe
 	// different content type than the one it declared.
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	GuardActiveContent(w.Header())
+	// What is behind a sign-in is never anybody's to keep: a backend's own
+	// "public" would let a shared cache hold it (the thirteenth security
+	// pass).
+	if cc := w.Header().Get("Cache-Control"); cc != "" {
+		parts := strings.Split(cc, ",")
+		for i, p := range parts {
+			if strings.EqualFold(strings.TrimSpace(p), "public") {
+				parts[i] = "private"
+			}
+		}
+		cc = strings.Join(parts, ",")
+		if !strings.Contains(strings.ToLower(cc), "private") && !strings.Contains(strings.ToLower(cc), "no-store") {
+			cc = "private, " + cc
+		}
+		w.Header().Set("Cache-Control", cc)
+	}
 	// Audio is never written to the browser's cache (audioNoStore).
 	if strings.HasPrefix(strings.ToLower(resp.Header.Get("Content-Type")), "audio/") {
 		w.Header().Set("Cache-Control", audioNoStore)

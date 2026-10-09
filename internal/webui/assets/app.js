@@ -413,7 +413,10 @@ function subtitleFor(item) {
 // Ids are escaped per path segment, not as a whole: an OPDS acquisition
 // reference legitimately contains slashes, and the stream route matches them
 // with a trailing wildcard.
-const escapeId = (id) => String(id).split('/').map(encodeURIComponent).join('/');
+// A segment of dots is escaped too: an id of "../../x" from a backend would
+// otherwise be taken back up the server's own routes (the thirteenth
+// security pass).
+const escapeId = (id) => String(id).split('/').map((seg) => (/^\.+$/.test(seg) ? seg.replace(/\./g, '%2E') : encodeURIComponent(seg))).join('/');
 
 // The TV app (android/, on Google TV, Android TV and Fire TV) is this same
 // page, told by its user agent (SoundStormTV/). A TV has no touch and no
@@ -10979,6 +10982,12 @@ async function clearDownloads() {
     // And which TV this phone was playing on, which the next person here
     // is not (the literal: this runs before CONTROL_KEY may be set).
     localStorage.removeItem('soundstorm-control');
+    // And this device's player id and the radio tuned here: the server keeps
+    // state by player id, which must not carry on to the next person (the
+    // thirteenth security pass). A new id is taken when the page next says
+    // hello.
+    localStorage.removeItem('soundstorm-player-id');
+    localStorage.removeItem('soundstorm-tuner');
   } catch {
     // nothing to clear
   }

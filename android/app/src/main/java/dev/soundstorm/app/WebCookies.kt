@@ -19,9 +19,17 @@ object WebCookies : CookieHandler() {
         if (getDefault() !== this) setDefault(this)
     }
 
+    /**
+     * Set on a request that must carry no cookies: the network search and
+     * address checks, which ask whatever answers at an address - another
+     * device may hold the server's old one (the thirteenth security pass).
+     */
+    const val NO_COOKIES = "X-EmberStorm-No-Cookies"
+
     override fun get(uri: URI, requestHeaders: MutableMap<String, MutableList<String>>): MutableMap<String, MutableList<String>> {
         val scheme = uri.scheme?.lowercase()
         if (scheme != "http" && scheme != "https") return mutableMapOf()
+        if (requestHeaders.keys.any { it.equals(NO_COOKIES, ignoreCase = true) }) return mutableMapOf()
         val cookie = runCatching { CookieManager.getInstance().getCookie(uri.toString()) }.getOrNull()
         return if (cookie.isNullOrEmpty()) mutableMapOf() else mutableMapOf("Cookie" to mutableListOf(cookie))
     }

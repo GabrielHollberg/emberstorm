@@ -20,6 +20,14 @@ const PieceSeconds = 600
 // maxWhole is the largest file sent whole when it cannot be cut.
 const maxWhole = 200 << 20
 
+// maxPiece is the most one piece may hold: ten minutes of any real book is
+// a fraction of it. A book whose own tables, or whose bytes between frames,
+// would make one larger is refused rather than gathered into memory (the
+// thirteenth security pass).
+const maxPiece = 64 << 20
+
+var errPieceTooBig = errors.New("this audiobook is not laid out as an audiobook is, and cannot be cut into pieces")
+
 // EachPiece cuts an audio file into pieces of about PieceSeconds, without
 // re-encoding anything: an MP4 (m4b, m4a) as fragments of its own samples
 // (mp4hls, the remux long books play by), an MP3 at frame boundaries. Any
@@ -58,6 +66,9 @@ func mp4Pieces(b *mp4hls.Book, f func(float64, []byte, string) error) error {
 		for j < n && (j == i || b.SegmentStart(j)-start < PieceSeconds) {
 			if err := b.WriteSegment(&buf, j); err != nil {
 				return err
+			}
+			if buf.Len() > maxPiece {
+				return errPieceTooBig
 			}
 			j++
 		}
@@ -101,6 +112,9 @@ func mp3Pieces(path string, f func(float64, []byte, string) error) error {
 			// Not a frame: look for the next sync a byte on.
 			b, _ := br.ReadByte()
 			piece = append(piece, b)
+			if len(piece) > maxPiece {
+				return errPieceTooBig
+			}
 			continue
 		}
 		if t-pieceStart >= PieceSeconds {
@@ -115,6 +129,9 @@ func mp3Pieces(path string, f func(float64, []byte, string) error) error {
 		piece = piece[:at+n]
 		if err != nil {
 			break
+		}
+		if len(piece) > maxPiece {
+			return errPieceTooBig
 		}
 		t += secs
 	}

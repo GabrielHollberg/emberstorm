@@ -122,3 +122,14 @@ func TestAnMP3IsCutAtItsFrames(t *testing.T) {
 		t.Errorf("pieces at %v, %d bytes of %d", starts, total, n*417)
 	}
 }
+
+// A "book" of bytes that are not frames is not gathered whole into memory.
+func TestAFileOfNoFramesIsNotGatheredWhole(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "junk.mp3")
+	if err := os.WriteFile(path, bytes.Repeat([]byte{0x11}, maxPiece+1024), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EachPiece(path, func(float64, []byte, string) error { return nil }); err != errPieceTooBig {
+		t.Fatalf("EachPiece = %v", err)
+	}
+}

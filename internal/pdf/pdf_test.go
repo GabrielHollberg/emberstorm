@@ -251,3 +251,12 @@ func TestUnclosedTitlesDoNotTakeHours(t *testing.T) {
 		t.Fatal("still reading after 5 seconds")
 	}
 }
+
+// An Info reference of millions of digits is not compiled into a pattern.
+func TestAHugeInfoReferenceIsNotAPattern(t *testing.T) {
+	raw := append([]byte("%PDF-1.4\ntrailer << /Info "), bytes.Repeat([]byte("9"), 4<<20)...)
+	raw = append(raw, []byte(" 0 R >>\n%%EOF")...)
+	if _, found := infoObject(raw); found {
+		t.Fatal("a reference of millions of digits was followed")
+	}
+}

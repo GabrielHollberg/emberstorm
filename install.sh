@@ -325,9 +325,11 @@ permission). Once it says Running, run this again."
 # package.
 compose_cmd() {
 	if docker compose version >/dev/null 2>&1; then
-		COMPOSE="docker compose"
+		# The file named: left to itself, compose also reads an override or a
+		# compose.yaml left in the folder (the thirteenth security pass).
+		COMPOSE="docker compose -f docker-compose.yml"
 	elif command -v docker-compose >/dev/null 2>&1; then
-		COMPOSE="docker-compose"
+		COMPOSE="docker-compose -f docker-compose.yml"
 	else
 		die "Docker is running but Docker Compose is missing.
 
@@ -614,10 +616,16 @@ install_address_watch() {
 		printf '#!/bin/sh\n'
 		printf '# Points EmberStorm at this machine'"'"'s current network address when it has moved.\n'
 		printf '# Run by cron (installed by install.sh); safe to run by hand.\n'
-		printf 'PATH="%s:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"\n' "$docker_dir"
-		printf 'cd "%s" || exit 0\n' "$DIR"
+		# Quoted as sh reads them: the folder is the person's to name, and a
+		# quote or $( in it would have run in this script every ten minutes
+		# (the thirteenth security pass).
+		qdocker=$(shell_quote "$docker_dir")
+		qdir=$(shell_quote "$DIR")
+		qcompose=$(shell_quote "$COMPOSE")
+		printf 'PATH=%s":/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"\n' "${qdocker% }"
+		printf 'cd %s || exit 0\n' "${qdir% }"
 		printf '[ -f .env ] && [ -f docker-compose.yml ] || exit 0\n'
-		printf 'COMPOSE="%s"\n' "$COMPOSE"
+		printf 'COMPOSE=%s\n' "${qcompose% }"
 		# Its own copies of the installer's helpers: the installer usually
 		# arrives through a pipe (curl | sh), with no file to copy them from.
 		cat <<'WATCH'

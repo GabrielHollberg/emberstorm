@@ -280,7 +280,9 @@ func mp4Picture(r io.ReaderAt, size int64) (w, h int, seconds float64) {
 // mp4Box is the first top-level box of a type, read whole (up to 8MB), or nil.
 func mp4Box(r io.ReaderAt, from, size int64, want string) []byte {
 	var hdr [16]byte
-	for off := from; off+8 <= size; {
+	// A few thousand boxes at most: a file of 8-byte boxes walked to its end
+	// was a read per box (the thirteenth security pass).
+	for off, boxes := from, 0; off+8 <= size && boxes < 4096; boxes++ {
 		if _, err := r.ReadAt(hdr[:8], off); err != nil {
 			return nil
 		}

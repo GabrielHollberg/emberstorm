@@ -284,6 +284,12 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 	u.set(func(s *Status) { s.State = "updating"; s.Message = "Downloading EmberStorm " + m.Version })
 
 	before, _ := u.health(ctx)
+	// What the running version says of itself is not believed past what
+	// the box last saw installed healthy: a compromised version could
+	// claim more sources than any new one has, and so have every update -
+	// the one that fixes it included - rolled back for ever (the thirteenth
+	// security pass).
+	before.Sources = min(before.Sources, u.baseline())
 
 	for svc, ref := range m.Images {
 		if err := u.run(ctx, "docker", "pull", "-q", ref); err != nil {
@@ -311,16 +317,26 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 		return u.fail(err, "The update could not be installed. EmberStorm is back as it was.")
 	}
 	if err := u.run(ctx, u.cfg.Up); err != nil || !u.healthy(ctx, before) {
-		u.rollback(ctx, imagesPath, previous, snap)
+		back := u.rollback(ctx, imagesPath, previous, snap)
 		if err == nil {
 			err = errors.New("did not come up healthy")
 		}
-		u.log.Warn("update undone", "version", m.Version, "err", err)
+		u.log.Warn("update undone", "version", m.Version, "err", err, "back", back)
 		u.set(func(s *Status) {
+			if !back {
+				// Said as it is: the box may be on the old version with the
+				// new one's data, or not running.
+				s.State = "failed"
+				s.Message = "EmberStorm " + m.Version + " did not start properly, and going back to the version you had did not work either. Turn the box off and on; if it still does not start, contact support."
+				return
+			}
 			s.State = "rolled-back"
 			s.Message = "EmberStorm " + m.Version + " did not start properly, so the box went back to the version you had. Nothing was lost."
 		})
 		return err
+	}
+	if h, err := u.health(ctx); err == nil {
+		u.saveBaseline(h.Sources)
 	}
 
 	if cur := u.Status().Current; cur != nil {
@@ -366,28 +382,65 @@ func (u *Updater) healthy(ctx context.Context, before Health) bool {
 var pollEvery = 5 * time.Second
 
 // rollback puts the previous images and, when there is one, the volumes'
-// snapshot back, and starts the stack again.
-func (u *Updater) rollback(ctx context.Context, imagesPath string, previous []byte, snap string) {
+// snapshot back, and starts the stack again. It says whether all of that
+// worked: a rollback that could not put the volumes back was reported as
+// nothing lost (the thirteenth security pass).
+func (u *Updater) rollback(ctx context.Context, imagesPath string, previous []byte, snap string) bool {
+	ok := true
 	_ = u.run(ctx, u.cfg.Up, "stop")
 	if snap != "" {
-		failed := u.cfg.Volumes + "-failed"
-		_ = u.run(ctx, "btrfs", "subvolume", "delete", failed)
+		// A name of its own each time: one left from an earlier failure
+		// that could not be deleted stopped the volumes being set aside.
+		failed := u.cfg.Volumes + "-failed-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 		if err := os.Rename(u.cfg.Volumes, failed); err != nil {
 			u.log.Error("could not set the updated volumes aside", "err", err)
+			ok = false
 		} else if err := os.Rename(snap, u.cfg.Volumes); err != nil {
 			u.log.Error("could not put the volumes back", "err", err)
 			_ = os.Rename(failed, u.cfg.Volumes)
+			ok = false
 		} else {
 			_ = u.run(ctx, "btrfs", "subvolume", "delete", failed)
 		}
 	}
 	if previous != nil {
-		_ = writeFile(imagesPath, previous)
+		if err := writeFile(imagesPath, previous); err != nil {
+			ok = false
+		}
 	} else {
 		_ = os.Remove(imagesPath)
 	}
 	if err := u.run(ctx, u.cfg.Up); err != nil {
 		u.log.Error("could not start the previous version again", "err", err)
+		ok = false
+	}
+	return ok
+}
+
+// maxBaseline is the most sources a health check is ever held to.
+const maxBaseline = 32
+
+// baseline is how many sources the box last saw a version come up healthy
+// with, or maxBaseline before it has seen one.
+func (u *Updater) baseline() int {
+	var b struct {
+		Sources int `json:"sources"`
+	}
+	data, err := os.ReadFile(filepath.Join(u.cfg.StateDir, "baseline.json"))
+	if err != nil || json.Unmarshal(data, &b) != nil || b.Sources <= 0 {
+		return maxBaseline
+	}
+	return min(b.Sources, maxBaseline)
+}
+
+func (u *Updater) saveBaseline(n int) {
+	if n <= 0 {
+		return
+	}
+	data, _ := json.Marshal(map[string]int{"sources": min(n, maxBaseline)})
+	_ = os.MkdirAll(u.cfg.StateDir, 0o755)
+	if err := writeFile(filepath.Join(u.cfg.StateDir, "baseline.json"), data); err != nil {
+		u.log.Warn("could not record the sources seen", "err", err)
 	}
 }
 

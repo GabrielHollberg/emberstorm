@@ -1064,6 +1064,22 @@ var rename = os.Rename
 // filesystem cannot link, the check is made again right before the rename,
 // which narrows the window to almost nothing rather than closing it.
 func placeFile(staged, dest string) error {
+	// None of the folders a file goes into may be a link: the shelves are
+	// open to every account on the machine, and a folder swapped for a link
+	// would have uploads written wherever it pointed (the thirteenth
+	// security pass). Six levels covers every shelf's layout
+	// (pictures/Personal/<name>/<year>/<month>).
+	dir := filepath.Dir(dest)
+	for range 6 {
+		if st, err := os.Lstat(dir); err == nil && st.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("%s is a link, not a folder", filepath.Base(dir))
+		}
+		up := filepath.Dir(dir)
+		if up == dir {
+			break
+		}
+		dir = up
+	}
 	err := noClobber(staged, dest)
 	if err == nil || !crossDevice(err) {
 		return err
@@ -1610,6 +1626,13 @@ func tagSegment(value, fallback string) string {
 		return r
 	}, value))
 	value = strings.TrimRight(value, ". ")
+	// Nothing hidden (a leading dot is a folder the media servers skip) and
+	// no name Windows cannot hold (a library on a Windows drive): the tags
+	// are anybody's (the thirteenth security pass).
+	value = strings.TrimLeft(value, ". ")
+	if reservedNames.MatchString(value) {
+		value = "_" + value
+	}
 	if value == "" {
 		return fallback
 	}

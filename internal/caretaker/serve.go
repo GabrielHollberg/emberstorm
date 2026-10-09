@@ -42,7 +42,7 @@ func (u *Updater) saveSettings(s Settings) error {
 //	GET  /settings          {"auto": true}
 //	PUT  /settings          change it
 //	POST /reset             {"mode": "start-over"|"erase"} (reset.go)
-//	GET  /button            {"open": true, "until": ..., "code": ...} after five presses
+//	GET  /button            {"open": true, "until": ...} after five presses
 //	POST /button/claim      {"code"}: the code on the box's screen, closing the window
 //	POST /button/used       closed again
 //
@@ -118,10 +118,13 @@ func (u *Updater) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /button", func(w http.ResponseWriter, r *http.Request) {
 		open, until := u.buttonOpen()
+		// Never the code: that is for the box's own screen (ButtonCodeFile),
+		// or anything able to reach this socket - the app's container -
+		// could claim the window before the person at the box (the
+		// thirteenth security pass).
 		out := map[string]any{"open": open}
 		if open {
 			out["until"] = until
-			out["code"] = u.buttonCode()
 		}
 		reply(w, out)
 	})

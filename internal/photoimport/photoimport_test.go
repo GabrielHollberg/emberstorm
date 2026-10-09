@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -369,5 +370,45 @@ func TestAZipOfMillionsOfEntriesIsRefusedFirst(t *testing.T) {
 	}
 	if err := preflight(p); err != ErrImplausible {
 		t.Fatalf("preflight = %v", err)
+	}
+}
+
+// A zip that says it holds few entries, with a small directory, but holds
+// more than a download may: archive/zip would read every one (it believes
+// neither number), so they are counted first. An ordinary zip passes.
+func TestAZipUnderstatingItsEntriesIsRefused(t *testing.T) {
+	n := maxEntries + 1
+	var b bytes.Buffer
+	head := make([]byte, 46)
+	binary.LittleEndian.PutUint32(head, 0x02014b50)
+	for range n {
+		b.Write(head)
+	}
+	end := make([]byte, 22)
+	binary.LittleEndian.PutUint32(end, 0x06054b50)
+	binary.LittleEndian.PutUint16(end[8:], uint16(n%65536))
+	binary.LittleEndian.PutUint16(end[10:], uint16(n%65536))
+	binary.LittleEndian.PutUint32(end[12:], 1000)
+	binary.LittleEndian.PutUint32(end[16:], 0)
+	b.Write(end)
+	p := filepath.Join(t.TempDir(), "few.zip")
+	if err := os.WriteFile(p, b.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := preflight(p); err != ErrImplausible {
+		t.Fatalf("preflight = %v", err)
+	}
+
+	ok := filepath.Join(t.TempDir(), "ok.zip")
+	out, _ := os.Create(ok)
+	zw := zip.NewWriter(out)
+	for i := range 50 {
+		w, _ := zw.Create(fmt.Sprintf("Takeout/Google Photos/IMG_%04d.jpg", i))
+		w.Write([]byte("x"))
+	}
+	zw.Close()
+	out.Close()
+	if err := preflight(ok); err != nil {
+		t.Fatalf("an ordinary zip: %v", err)
 	}
 }

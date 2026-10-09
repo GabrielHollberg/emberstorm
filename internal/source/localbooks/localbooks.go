@@ -260,7 +260,9 @@ func (s *Source) scan(ctx context.Context) error {
 		// A link is not followed: one named like a book could point anywhere
 		// on the server, and the shelf would then serve that file (the
 		// twelfth security pass).
-		if d.Type()&fs.ModeSymlink != 0 {
+		// Nor anything else that is not a plain file: a FIFO named like a
+		// book held the scan open for ever (the thirteenth security pass).
+		if !d.Type().IsRegular() {
 			return nil
 		}
 
@@ -386,7 +388,9 @@ func (s *Source) readEPUB(b *book) error {
 	// A Calibre library puts metadata.opf beside the book. It is the same
 	// format as the one inside the epub and it is better maintained, because
 	// it is what the user edited in Calibre.
-	if raw, err := epub.ReadSidecar(filepath.Join(dir, "metadata.opf")); err == nil {
+	if st, err := os.Lstat(filepath.Join(dir, "metadata.opf")); err != nil || !st.Mode().IsRegular() {
+		// none, or a link or something that is not a file: not read
+	} else if raw, err := epub.ReadSidecar(filepath.Join(dir, "metadata.opf")); err == nil {
 		if sidecar, _, err := epub.ParseOPF(raw, ""); err == nil {
 			meta = sidecar
 		}
