@@ -927,7 +927,15 @@ Firefox 157 itself, and a whole Blu-ray. **And an extra dropped after its film**
 by the size of what holds the film's name - much smaller to `extras/`, about
 as large a second version, exactly its size left for the copy check -
 in the plan and on arrival (`titleBeside`);
-`TestAnExtraAfterItsFilmGoesBesideIt`.
+`TestAnExtraAfterItsFilmGoesBesideIt`. **Then named for what they are** (the same day, the owner's asking: "t00"
+meant nothing): as each numbered title arrives (`labelTitle`, after the bytes
+are in, since the plan knows only sizes), a second version is named by what
+differs from the film - its picture size, else its length ("Name - 2h 24m.mkv",
+the label Jellyfin shows for the version) - and an extra by its length
+("extras/Name - Extra (12 min).mkv", "Extra 2 (12 min)" when two match). A
+subtitle follows its title whichever arrives first (`titleRenames`, in memory
+while the server runs); a title nothing can be read from keeps its number.
+`TestADiscsTitlesAreNamedForWhatTheyAre`.
 **Find the right film** (a film's hold menu, owner only; `filmmatch.go`,
 `source.FilmMatcher`, `jellyfin/identify.go`): Jellyfin's own Identify - `POST
 /Items/RemoteSearch/Movie` by name and year (TheMovieDb and the Open Movie

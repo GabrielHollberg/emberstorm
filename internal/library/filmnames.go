@@ -1,11 +1,14 @@
 package library
 
 import (
+	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/GabrielHollberg/soundstorm/internal/media"
 )
@@ -180,6 +183,105 @@ func titleBeside(folder, rel, dropped string, size int64) (string, bool) {
 		return rel, false
 	}
 	return out, true
+}
+
+// A disc's other titles are named for what they are once they arrive (the
+// owner's asking, 2026-10-09): the plan, knowing only sizes, gives each its
+// ripper's number - "Name - t12.mkv" beside the film, "extras/Name -
+// t01.mkv" - and as the bytes land the number is swapped for something a
+// person can tell apart. A second version is named by what differs from the
+// film: its picture size when that differs, else its length ("Name - 2h
+// 21m.mkv", the label Jellyfin shows for the version); an extra by its length
+// ("Name - Extra (12 min).mkv", a number added when two match). A subtitle
+// that came with a title follows it: one already there is renamed with it,
+// one arriving after is given the new name (titleRenames, for as long as the
+// server runs - a drop's files come together). Unreadable, the number stays.
+var (
+	numberedTitle = regexp.MustCompile(`^(.*) - t(\d{2,3})$`)
+	titleRenames  sync.Map // folder + "\x00" + dir + old core -> new core
+)
+
+func labelTitle(folder, rel, staged string) string {
+	dir, file := path.Split(rel)
+	ext := path.Ext(file)
+	stem := strings.TrimSuffix(file, ext)
+	tail := companionTail.FindString(stem)
+	core := strings.TrimSuffix(stem, tail)
+	m := numberedTitle.FindStringSubmatch(core)
+	if m == nil {
+		return rel
+	}
+	key := folder + "\x00" + dir + core
+	if companionExtensions[strings.ToLower(ext)] {
+		if v, ok := titleRenames.Load(key); ok {
+			return dir + v.(string) + tail + ext
+		}
+		return rel
+	}
+	base := m[1]
+	t := TraitsOf(media.KindVideo, staged)
+	var label string
+	if path.Base(strings.TrimSuffix(dir, "/")) == "extras" {
+		if t.Seconds <= 0 {
+			return rel
+		}
+		label = "Extra (" + minutes(t.Seconds) + ")"
+	} else {
+		have := TraitsOf(media.KindVideo, filepath.Join(folder, filepath.FromSlash(dir+base+ext)))
+		switch p := resolution(t); {
+		case p != "" && p != resolution(have):
+			label = p
+		case t.Seconds > 0:
+			label = length(t.Seconds)
+		default:
+			return rel
+		}
+	}
+	newCore := ""
+	for n := 1; n < 100; n++ {
+		l := label
+		if n > 1 {
+			if strings.HasPrefix(label, "Extra (") {
+				l = fmt.Sprintf("Extra %d (%s", n, strings.TrimPrefix(label, "Extra ("))
+			} else {
+				l = fmt.Sprintf("%s %d", label, n)
+			}
+		}
+		c := base + " - " + labelName(l)
+		if _, err := os.Lstat(filepath.Join(folder, filepath.FromSlash(dir+c+ext))); err != nil {
+			newCore = c
+			break
+		}
+	}
+	if newCore == "" {
+		return rel
+	}
+	titleRenames.Store(key, newCore)
+	// Its subtitles that arrived first follow it.
+	here := filepath.Join(folder, filepath.FromSlash(dir))
+	if entries, err := os.ReadDir(here); err == nil {
+		for _, e := range entries {
+			name := e.Name()
+			if !e.Type().IsRegular() || !strings.HasPrefix(name, core+".") ||
+				!companionExtensions[strings.ToLower(path.Ext(name))] {
+				continue
+			}
+			to := newCore + strings.TrimPrefix(name, core)
+			if _, err := os.Lstat(filepath.Join(here, to)); err == nil {
+				continue
+			}
+			_ = os.Rename(filepath.Join(here, name), filepath.Join(here, to))
+		}
+	}
+	return dir + newCore + tail + ext
+}
+
+// minutes is an extra's length as people say it: "12 min", "40 sec".
+func minutes(s float64) string {
+	if s < 60 {
+		return fmt.Sprintf("%d sec", int(math.Round(s)))
+	}
+	return fmt.Sprintf("%d min", int(math.Round(s/60)))
 }
 
 // tidyFilm is a film's place on its shelf (rel within it) with the ripper's
