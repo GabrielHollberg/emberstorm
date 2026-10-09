@@ -161,6 +161,8 @@ type Question struct {
 func (l *Library) PlanSized(paths []string, sizes []int64, choices map[string]media.Kind) ([]Placement, []Question) {
 	out, questions := l.Plan(paths, choices)
 	discTitles(out, sizes)
+	// A ripped disc of a show: its episodes numbered (episodes.go).
+	l.numberDrop(out, sizes)
 	// Extras dropped after their film: its name is taken already.
 	if folder := l.PathFor(media.KindVideo); folder != "" {
 		prefix := folderName(media.KindVideo) + "/"

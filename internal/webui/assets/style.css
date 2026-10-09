@@ -4588,3 +4588,26 @@ html, body { overscroll-behavior-y: none; }
 .crop-buttons { display: flex; gap: 12px; width: min(88vw, 520px); }
 .crop-buttons button { flex: 1; padding: 12px; font-weight: 600; }
 .crop-buttons .primary { background: var(--accent); border-color: var(--accent); color: #08131f; }
+.numbering-sheet { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.7); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: calc(var(--safe-top, 0px) + 16px) 12px calc(var(--safe-bottom, 0px) + 16px); }
+html.numbering-open { overflow: hidden; }
+.numbering-card { width: min(860px, 100%); background: var(--surface); border-radius: 16px; padding: 18px; display: grid; gap: 12px; }
+.numbering-card h2 { margin: 0; }
+.numbering-card > p { margin: 0; }
+.numbering-start { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.numbering-start label, .numbering-nums label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.numbering-start input, .numbering-nums input { width: 4.2em; }
+.numbering-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.numbering-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: 'moves what role nums' 'moves to to to'; gap: 4px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.numbering-row.clash { outline: 2px solid #e5484d; }
+.numbering-row.role-playall, .numbering-row.role-drop { opacity: 0.6; }
+.numbering-moves { grid-area: moves; display: grid; gap: 2px; }
+.numbering-moves button { min-width: 36px; min-height: 30px; padding: 0; }
+.numbering-what { grid-area: what; display: grid; min-width: 0; }
+.numbering-what strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.numbering-row select { grid-area: role; }
+.numbering-nums { grid-area: nums; display: flex; gap: 8px; }
+.numbering-to { grid-area: to; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.numbering-note { color: #e5484d; min-height: 1em; }
+.numbering-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+.show-numbering { margin-top: 8px; }
+@media (max-width: 600px) { .numbering-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'moves what' 'moves role' 'moves nums' 'moves to'; } }

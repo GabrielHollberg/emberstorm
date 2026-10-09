@@ -6731,6 +6731,13 @@ function renderMainMenu(item, opts = {}) {
       event.stopPropagation();
       renderPosterChoice(item);
     }, { chevron: true, detail: 'Shown to everyone here' }));
+    if (isShow) {
+      entries.push(menuItem('queue', 'Number the episodes', (event) => {
+        event.stopPropagation();
+        closeItemMenu();
+        openNumbering(item);
+      }));
+    }
   }
   // An episode's picture: the databases' stills for it, or one of the
   // owner's own, placed in a wide frame (the owner's asking, 2026-10-09).
@@ -15493,6 +15500,16 @@ async function showShow(series) {
     button.addEventListener('click', () => playVideo(next));
     text.append(button);
   }
+  // Number the episodes: put a ripped disc's files in order and name them as
+  // the TV server reads episodes (episodes.go). The owner's alone.
+  if (state.me && state.me.owner && !state.offline) {
+    const fix = document.createElement('button');
+    fix.type = 'button';
+    fix.className = 'ghost show-numbering';
+    fix.textContent = 'Number the episodes';
+    fix.addEventListener('click', () => openNumbering(series));
+    text.append(fix);
+  }
   head.append(poster, text);
 
   const list = document.createElement('ol');
@@ -15520,6 +15537,199 @@ async function showShow(series) {
 }
 
 const episodeLabel = (e) => (e.extra.season && e.extra.number ? `S${e.extra.season} E${e.extra.number}` : e.title);
+
+// openNumbering shows a show's files in order with what each will become -
+// an episode with its season and number, an extra, or not kept (a play-all:
+// the episodes joined in one file) - as the server suggests, for the owner to
+// put right: reorder with the arrows (the episodes renumber in the new order,
+// from the season and episode at the top), change any number or what a file
+// is, then Apply, which renames them on the server (episodes.go).
+async function openNumbering(series) {
+  const { ok, body } = await api(`/api/tv/numbering?${new URLSearchParams({ source: series.sourceId, id: series.id })}`);
+  if (!ok || !body) { showToast((body && body.error) || 'Could not read the show’s files.'); return; }
+  const show = body.show;
+  // In the order they play: episodes by season and number, then extras, then
+  // what is not kept.
+  const rank = { episode: 0, extra: 1, playall: 2, drop: 3 };
+  let rows = (body.rows || []).map((r) => ({ ...r }))
+    .sort((x, y) => (rank[x.role] - rank[y.role]) || ((x.season || 0) - (y.season || 0)) || ((x.episode || 0) - (y.episode || 0)));
+  if (!rows.length) { showToast('This show has no video files to number.'); return; }
+
+  const sheet = document.createElement('div');
+  sheet.className = 'numbering-sheet';
+  const card = document.createElement('div');
+  card.className = 'numbering-card';
+  const h = document.createElement('h2');
+  h.textContent = 'Number the episodes';
+  const intro = document.createElement('p');
+  intro.className = 'muted';
+  intro.textContent = 'In the order they play. The arrows move a file; the episodes number themselves in order from the start below. A play-all is all the episodes in one file - it goes to the bin.';
+  const startRow = document.createElement('div');
+  startRow.className = 'numbering-start';
+  const seasonIn = document.createElement('input');
+  const epIn = document.createElement('input');
+  for (const [inp, label] of [[seasonIn, 'Starts at season'], [epIn, 'episode']]) {
+    inp.type = 'number';
+    inp.min = inp === seasonIn ? '0' : '1';
+    inp.max = '999';
+    inp.inputMode = 'numeric';
+    const l = document.createElement('label');
+    l.textContent = label;
+    l.append(inp);
+    startRow.append(l);
+  }
+  const firstEp = rows.find((r) => r.role === 'episode');
+  seasonIn.value = String(firstEp ? firstEp.season : 1);
+  epIn.value = String(firstEp ? firstEp.episode : 1);
+  const renumber = document.createElement('button');
+  renumber.type = 'button';
+  renumber.className = 'ghost';
+  renumber.textContent = 'Number in this order';
+  startRow.append(renumber);
+  const list = document.createElement('ol');
+  list.className = 'numbering-list';
+  const note = document.createElement('p');
+  note.className = 'numbering-note';
+  const buttons = document.createElement('div');
+  buttons.className = 'numbering-buttons';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'ghost';
+  cancel.textContent = 'Cancel';
+  const apply = document.createElement('button');
+  apply.type = 'button';
+  apply.className = 'primary';
+  apply.textContent = 'Apply';
+  buttons.append(cancel, apply);
+  card.append(h, intro, startRow, list, note, buttons);
+  sheet.append(card);
+  document.body.append(sheet);
+  document.documentElement.classList.add('numbering-open');
+  const close = () => { sheet.remove(); document.documentElement.classList.remove('numbering-open'); };
+  cancel.addEventListener('click', close);
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const ext = (p) => (p.match(/\.[^./]+$/) || [''])[0].toLowerCase();
+  const base = (p) => p.split('/').pop();
+  const target = (r) => {
+    if (r.role === 'episode') return r.season >= 0 && r.episode >= 1 ? `Season ${pad(r.season)}/${show} S${pad(r.season)}E${pad(r.episode)}${ext(r.path)}` : '?';
+    if (r.role === 'extra') return `extras/${base(r.path)}`;
+    return 'to the bin';
+  };
+  const length = (r) => (r.seconds ? `${Math.round(r.seconds / 60)} min` : `${(r.size / 1e9).toFixed(2)} GB`);
+  // Episodes numbered in the order shown, from the start at the top.
+  const numberInOrder = () => {
+    let s = Math.max(0, Number(seasonIn.value) || 0);
+    let e = Math.max(1, Number(epIn.value) || 1);
+    for (const r of rows) {
+      if (r.role !== 'episode') continue;
+      r.season = s;
+      r.episode = e;
+      e += 1;
+    }
+    draw();
+  };
+  const draw = () => {
+    // Names that would land on one another.
+    const seen = new Map();
+    for (const r of rows) {
+      if (r.role !== 'episode') continue;
+      const k = `${r.season}x${r.episode}`;
+      seen.set(k, (seen.get(k) || 0) + 1);
+    }
+    list.replaceChildren(...rows.map((r, i) => {
+      const li = document.createElement('li');
+      li.className = `numbering-row role-${r.role}`;
+      const moves = document.createElement('div');
+      moves.className = 'numbering-moves';
+      for (const [label, d] of [['↑', -1], ['↓', 1]]) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ghost';
+        b.textContent = label;
+        b.setAttribute('aria-label', d < 0 ? 'Move up' : 'Move down');
+        b.disabled = i + d < 0 || i + d >= rows.length;
+        b.addEventListener('click', () => {
+          [rows[i], rows[i + d]] = [rows[i + d], rows[i]];
+          numberInOrder();
+        });
+        moves.append(b);
+      }
+      const what = document.createElement('div');
+      what.className = 'numbering-what';
+      const name = document.createElement('strong');
+      name.textContent = base(r.path);
+      const meta = document.createElement('span');
+      meta.className = 'muted';
+      meta.textContent = length(r);
+      what.append(name, meta);
+      const role = document.createElement('select');
+      for (const [v, t] of [['episode', 'Episode'], ['extra', 'Extra'], ['playall', 'Play all'], ['drop', 'Don’t keep']]) {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = t;
+        role.append(o);
+      }
+      role.value = r.role;
+      role.addEventListener('change', () => { r.role = role.value; numberInOrder(); });
+      const nums = document.createElement('div');
+      nums.className = 'numbering-nums';
+      if (r.role === 'episode') {
+        for (const key of ['season', 'episode']) {
+          const inp = document.createElement('input');
+          inp.type = 'number';
+          inp.min = key === 'season' ? '0' : '1';
+          inp.max = '999';
+          inp.inputMode = 'numeric';
+          inp.value = String(r[key] || '');
+          inp.setAttribute('aria-label', key === 'season' ? 'Season' : 'Episode');
+          inp.addEventListener('change', () => { r[key] = Number(inp.value) || 0; draw(); });
+          const l = document.createElement('label');
+          l.textContent = key === 'season' ? 'S' : 'E';
+          l.append(inp);
+          nums.append(l);
+        }
+      }
+      const to = document.createElement('div');
+      to.className = 'numbering-to';
+      to.textContent = `→ ${target(r)}`;
+      if (r.role === 'episode' && seen.get(`${r.season}x${r.episode}`) > 1) {
+        li.classList.add('clash');
+        to.textContent += '  (two files have this number)';
+      }
+      li.append(moves, what, role, nums, to);
+      return li;
+    }));
+    const clashes = [...seen.values()].some((n) => n > 1);
+    apply.disabled = clashes;
+    note.textContent = clashes ? 'Two files have the same episode number. Change one, or Number in this order.' : '';
+  };
+  renumber.addEventListener('click', numberInOrder);
+  seasonIn.addEventListener('change', numberInOrder);
+  epIn.addEventListener('change', numberInOrder);
+  draw();
+
+  apply.addEventListener('click', async () => {
+    apply.disabled = true;
+    note.textContent = 'Renaming…';
+    const res = await api('/api/tv/numbering', {
+      method: 'POST',
+      body: JSON.stringify({ source: series.sourceId, id: series.id, rows: rows.map((r) => ({ path: r.path, role: r.role, season: r.season || 0, episode: r.episode || 0 })) }),
+    });
+    if (!res.ok) {
+      apply.disabled = false;
+      note.textContent = (res.body && res.body.error) || 'Could not rename them.';
+      return;
+    }
+    close();
+    const b = res.body || {};
+    showToast(`Done${b.binned ? ` - ${b.binned} play-all${b.binned === 1 ? '' : 's'} in the bin` : ''}. The episode names and pictures arrive in a minute.`);
+    // The TV server looks again; the show's page follows as it does.
+    for (const wait of [5000, 20000, 45000]) {
+      setTimeout(() => { if (state.openShow === series && !$('music-view').classList.contains('hidden')) showShow(series); }, wait);
+    }
+  });
+}
 
 // What to watch now: one part-watched, else the one after the last finished,
 // else the first.
