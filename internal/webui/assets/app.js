@@ -3630,6 +3630,10 @@ function closeVideo() {
   for (const track of [...player.querySelectorAll('track')]) track.remove();
   player.load();
   show($('subtitle-picker'), false);
+  // And the last film's audio languages: left showing, choosing one started
+  // that film again over the next (a review, 2026-10-09).
+  show($('audio-picker'), false);
+  $('audio-picker').onchange = null;
   show($('video-overlay'), false);
 }
 
@@ -4341,6 +4345,16 @@ $('audio-player').addEventListener('pause', () => {
   savePosition();
   // Give the position a moment to reach Audiobookshelf before asking again.
   setTimeout(refreshContinue, 1500);
+});
+
+// "End of this chapter" in a book whose chapters are marks in its files: the
+// moment the next chapter starts (setSleep).
+$('audio-player').addEventListener('timeupdate', () => {
+  if (!sleep.atSongEnd || sleep.chapterEnd == null || !audio.item || audio.item.kind !== 'audiobook') return;
+  if (elapsed() < sleep.chapterEnd - 0.3) return;
+  savePosition();
+  $('audio-player').pause();
+  setSleep(null);
 });
 
 // The whole point of a track list: chapter 1 ending means chapter 2 starting,
@@ -11408,7 +11422,7 @@ async function showOfflineApp() {
 // Playing". When it runs out the music fades over eight seconds rather than
 // cutting off, then pauses; on an iPhone, which does not let a page set the
 // volume, it simply pauses.
-const sleep = { until: 0, atSongEnd: false, tick: 0, fading: false };
+const sleep = { until: 0, atSongEnd: false, tick: 0, fading: false, chapterEnd: null };
 const SLEEP_FADE_MS = 8000;
 
 function setSleep(choice) {
@@ -11416,8 +11430,13 @@ function setSleep(choice) {
   const wasAtSongEnd = sleep.atSongEnd;
   sleep.until = 0;
   sleep.atSongEnd = false;
+  sleep.chapterEnd = null;
   if (choice === 'song') {
     sleep.atSongEnd = true;
+    // A book's chapter is often a mark inside one file (an m4b), not a file of
+    // its own: "end of this chapter" waited for the file to end, hours on (a
+    // review, 2026-10-09). It stops where the next chapter starts.
+    if (audio.item && audio.item.kind === 'audiobook') sleep.chapterEnd = nextChapterStart();
     // In the Android app the native player holds the next songs and moves
     // into them by itself: they are taken back, or "after this song" played
     // on into the next (a review).
@@ -11434,7 +11453,9 @@ function setSleep(choice) {
   // half-hour timer ran for hours until the phone was woken (the owner's
   // report, 2026-10-07). The page's own timer still runs while it is awake.
   try {
-    if (NATIVE_AUDIO && window.soundstormApp.sleepAt) window.soundstormApp.sleepAt(sleep.until || 0);
+    const rate = $('audio-player').playbackRate || 1;
+    const chapterAt = sleep.chapterEnd != null ? Date.now() + Math.max(0, sleep.chapterEnd - elapsed()) * 1000 / rate : 0;
+    if (NATIVE_AUDIO && window.soundstormApp.sleepAt) window.soundstormApp.sleepAt(sleep.until || chapterAt);
   } catch { /* an app without it */ }
   // Turned off before the song ended: the next songs are handed over again.
   if (NATIVE_AUDIO && wasAtSongEnd && !sleep.atSongEnd) {
@@ -14319,7 +14340,7 @@ function renderFilmMatch(item) {
     const body = await res.json().catch(() => null);
     if (!res.ok) { showToast((body && body.error) || 'Could not change the cover.'); return; }
     showToast('Cover changed, for everyone.');
-    setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch(); }, 1500);
+    refreshWatchLater([1500]);
   }, { detail: 'Shown to everyone here' });
   menu.replaceChildren(back, search, list, ownPicture, note);
   if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
@@ -14378,7 +14399,7 @@ function renderFilmMatch(item) {
         closeItemMenu();
         showToast(`Now it’s ${name.textContent}. The poster and details arrive in a moment.`);
         // The film server fetches them itself: look again as they land.
-        for (const wait of [4000, 12000]) setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch(); }, wait);
+        refreshWatchLater([4000, 12000]);
       });
       return row;
     }));
@@ -14506,12 +14527,7 @@ async function setPosterFor(item, blob, note) {
   closeItemMenu();
   const episode = Boolean(item.extra && item.extra.type === 'Episode');
   showToast(episode ? 'Picture changed, for everyone.' : 'Cover changed, for everyone.');
-  for (const wait of [2500, 8000]) {
-    setTimeout(() => {
-      if (episode && state.openShow && !$('music-view').classList.contains('hidden')) showShow(state.openShow);
-      else if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch();
-    }, wait);
-  }
+  refreshWatchLater([2500, 8000]);
 }
 
 /* ---------------------------------------------------- making audiobooks */
@@ -15587,9 +15603,28 @@ window.addEventListener('popstate', async () => {
 // A show's page: its episodes, season by season, with where this person is -
 // a bar along an episode part-watched, a tick on one finished - and one
 // button for what to watch now: carry on, or the next one, or the first.
+// refreshWatchLater looks again, after waits, at the films or the show page
+// on screen when a change was made there (a cover, a match, a numbering) -
+// and not at all once somebody has moved on: it used to pull them back onto
+// an old show page, or out of one they had opened since (a review, 2026-10-09).
+function refreshWatchLater(waits) {
+  let seq = state.searchSeq;
+  const show = state.openShow && state.openShowSeq === seq ? state.openShow : null;
+  for (const wait of waits) {
+    setTimeout(() => {
+      if (state.searchSeq !== seq) return;
+      if (show) showShow(show);
+      else if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch();
+      else return;
+      seq = state.searchSeq;
+    }, wait);
+  }
+}
+
 async function showShow(series) {
   state.openShow = series;
   const seq = ++state.searchSeq;
+  state.openShowSeq = seq;
   const view = $('music-view');
   show($('results'), false);
   show($('results-bar'), true);
@@ -16002,9 +16037,7 @@ async function openNumbering(series) {
     const b = res.body || {};
     showToast(`Done${b.binned ? ` - ${b.binned} play-all${b.binned === 1 ? '' : 's'} in the bin` : ''}. The episode names and pictures arrive in a minute.`);
     // The TV server looks again; the show's page follows as it does.
-    for (const wait of [5000, 20000, 45000]) {
-      setTimeout(() => { if (state.openShow === series && !$('music-view').classList.contains('hidden')) showShow(series); }, wait);
-    }
+    refreshWatchLater([5000, 20000, 45000]);
   });
 }
 

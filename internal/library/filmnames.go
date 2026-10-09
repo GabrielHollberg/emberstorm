@@ -33,7 +33,7 @@ import (
 
 var (
 	rippedTitle = regexp.MustCompile(`(?i)[ _.-]*_t\d{2,3}$`)
-	filmPart    = regexp.MustCompile(`(?i)[ _.-]*\b(?:pt|part|cd|dis[ck])[ _.]*(\d{1,2})$`)
+	filmPart    = regexp.MustCompile(`(?i)[ _.-]*\b(pt|part|cd|dis[ck])[ _.]*(\d{1,2})$`)
 	lostColon   = regexp.MustCompile(`(\S)- `)
 	manySpaces  = regexp.MustCompile(`\s{2,}`)
 	// What may follow a film's name in a companion's: a language, "forced".
@@ -293,10 +293,15 @@ func tidyFilm(rel string) string {
 	tail := companionTail.FindString(stem)
 	stem = strings.TrimSuffix(stem, tail)
 
+	ripped := rippedTitle.MatchString(stem)
 	name := rippedTitle.ReplaceAllString(stem, "")
 	part := ""
-	if m := filmPart.FindStringSubmatch(name); m != nil {
-		part = " - part" + strings.TrimLeft(m[1], "0")
+	// "Part 1" is often a film's own title - Deathly Hallows Part 1 and Part
+	// 2 were filed as two halves of one film (a review, 2026-10-09). So the
+	// ripper's forms (PT. 1, CD1, Disc 2) always stack, and a plain "Part N"
+	// only on a file that also carried a ripper's title number.
+	if m := filmPart.FindStringSubmatch(name); m != nil && (ripped || !strings.EqualFold(m[1], "part")) {
+		part = " - part" + strings.TrimLeft(m[2], "0")
 		if part == " - part" {
 			part = " - part0"
 		}

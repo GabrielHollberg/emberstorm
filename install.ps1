@@ -143,6 +143,15 @@ $ScriptUrl  = if ($env:SOUNDSTORM_SCRIPT_URL) { $env:SOUNDSTORM_SCRIPT_URL } els
 # The product was called SoundStorm before EmberStorm (2026-10-07): an install
 # made then lives in a folder of that name, and is found there, so updating it
 # carries on in place.
+# Run as the copy saved in an install folder - the shortcuts, the uninstall
+# entry - that folder is the install, wherever it is: an install made with
+# SOUNDSTORM_DIR elsewhere was looked for in the default folder, and its icon,
+# update and uninstall all failed (a review, 2026-10-09). Set in the
+# environment, so the newer copy this may hand over to keeps it.
+if (-not $env:SOUNDSTORM_DIR -and $PSCommandPath -and [IO.Path]::GetFileName($PSCommandPath) -eq 'soundstorm.ps1' -and
+    (Test-Path (Join-Path $PSScriptRoot 'docker-compose.yml'))) {
+    $env:SOUNDSTORM_DIR = $PSScriptRoot
+}
 $Dir       = if ($env:SOUNDSTORM_DIR) { $env:SOUNDSTORM_DIR }
              elseif (Test-Path (Join-Path $env:USERPROFILE 'SoundStorm\docker-compose.yml')) { Join-Path $env:USERPROFILE 'SoundStorm' }
              else { Join-Path $env:USERPROFILE 'EmberStorm' }
@@ -3515,6 +3524,12 @@ if ($Library) {
         New-Item -ItemType Directory -Force -Path $full -ErrorAction Stop | Out-Null
     } catch {
         Stop-With "  Could not use $Library for the library: $($_.Exception.Message)`n`n  Check the drive is connected, then run the setup again."
+    }
+    # Docker's settings file cuts a value at " #" and stops at a starting
+    # quote: the shelves were mounted from an empty folder beside the media
+    # (a review, 2026-10-09).
+    if ($full -match ' #' -or $full -match "^['""]") {
+        Stop-With "  The folder $full cannot be used for the library: its name has "" #"" in it, or starts with a quote.`n`n  Rename it, then run the setup again."
     }
     $previous = Get-LibraryPath
     Set-EnvSetting 'SOUNDSTORM_LIBRARY_PATH' ($full -replace '\\', '/')
