@@ -6732,6 +6732,15 @@ function renderMainMenu(item, opts = {}) {
       renderPosterChoice(item);
     }, { chevron: true, detail: 'Shown to everyone here' }));
   }
+  // An episode's picture: the databases' stills for it, or one of the
+  // owner's own, placed in a wide frame (the owner's asking, 2026-10-09).
+  if (item.kind === 'tv' && item.extra && item.extra.type === 'Episode'
+      && state.me && state.me.owner && !state.offline) {
+    entries.push(menuItem('image', 'Choose a picture', (event) => {
+      event.stopPropagation();
+      renderPosterChoice(item);
+    }, { chevron: true, detail: 'Shown to everyone here' }));
+  }
   if (state.me && state.me.owner && !state.offline && item.sourceId !== 'storyteller') {
     // Stopped here: the menu is redrawn at once, and a click reaching the
     // page from a button no longer in the menu reads as a click outside it.
@@ -14245,6 +14254,9 @@ function renderFilmMatch(item) {
 // show already identified - other years, countries, styles - and tapping one
 // makes it the poster, for everyone (filmmatch.go, Choose a poster).
 function renderPosterChoice(item) {
+  // An episode's picture is a wide still (the owner's asking, 2026-10-09).
+  const episode = Boolean(item.extra && item.extra.type === 'Episode');
+  const aspect = episode ? 16 / 9 : 1;
   const menu = $('item-menu');
   const note = menuNote();
   const back = document.createElement('button');
@@ -14252,21 +14264,27 @@ function renderPosterChoice(item) {
   back.className = 'menu-back';
   back.append(icon('back'));
   const label = document.createElement('span');
-  label.textContent = 'Choose a poster';
+  label.textContent = episode ? 'Choose a picture' : 'Choose a poster';
   back.append(label);
   back.addEventListener('click', (event) => {
     event.stopPropagation();
     renderMainMenu(item, state.menuOpts);
   });
   const grid = document.createElement('div');
-  grid.className = 'menu-results poster-grid';
+  grid.className = `menu-results poster-grid${episode ? ' wide' : ''}`;
   const say = (text) => {
     const p = document.createElement('p');
     p.className = 'menu-confirm';
     p.textContent = text;
     grid.replaceChildren(p);
   };
-  menu.replaceChildren(back, grid, note);
+  // Or a picture of the owner's own, placed the same way, for everyone.
+  const ownPicture = menuItem('image', 'Choose a picture instead', async (event) => {
+    event.stopPropagation();
+    const blob = await pickCoverImage(aspect);
+    if (blob) await setPosterFor(item, blob);
+  }, { detail: 'Shown to everyone here' });
+  menu.replaceChildren(back, grid, ownPicture, note);
   if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
   say('Looking…');
   const base = `/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/posters`;
@@ -14275,7 +14293,8 @@ function renderPosterChoice(item) {
     if (!ok) { say((body && body.error) || 'Could not look them up.'); return; }
     const posters = (body && body.posters) || [];
     if (!posters.length) {
-      say(`No posters were found for it. If it is the wrong ${item.kind === 'tv' ? 'show' : 'film'}, find the right one first.`);
+      say(episode ? 'No pictures were found for this episode. Choose one of your own instead.'
+        : `No posters were found for it. If it is the wrong ${item.kind === 'tv' ? 'show' : 'film'}, find the right one first.`);
       return;
     }
     grid.replaceChildren(...posters.map((p) => {
@@ -14301,7 +14320,7 @@ function renderPosterChoice(item) {
         let placed = null;
         try {
           const big = await fetch(`${p.poster}&size=large`);
-          if (big.ok) placed = await squarePicture(await big.blob());
+          if (big.ok) placed = await squarePicture(await big.blob(), aspect);
           else throw new Error('no poster');
         } catch {
           tile.disabled = false;
@@ -14311,29 +14330,43 @@ function renderPosterChoice(item) {
         }
         tile.disabled = false;
         if (!placed) return; // cancelled: the posters are still here
-        let res;
-        try {
-          res = await fetch(`/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/poster`, {
-            method: 'PUT', body: placed, headers: { 'Content-Type': 'image/jpeg' },
-          });
-        } catch {
-          showToast('Could not change the cover.');
-          return;
-        }
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          note.textContent = (body && body.error) || 'Could not change it.';
-          show(note, true);
-          return;
-        }
-        closeItemMenu();
-        showToast('Cover changed, for everyone.');
-        for (const wait of [2500, 8000]) setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch(); }, wait);
+        await setPosterFor(item, placed, note);
       });
       return tile;
     }));
     if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
   });
+}
+
+
+// setPosterFor makes a placed picture a film's, show's or episode's cover for
+// everyone (PUT .../poster), and shows it: an episode on its show's page, the
+// rest on the shelf.
+async function setPosterFor(item, blob, note) {
+  let res;
+  try {
+    res = await fetch(`/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/poster`, {
+      method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' },
+    });
+  } catch {
+    showToast('Could not change the picture.');
+    return;
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (note && note.isConnected) { note.textContent = (body && body.error) || 'Could not change it.'; show(note, true); }
+    else showToast((body && body.error) || 'Could not change it.');
+    return;
+  }
+  closeItemMenu();
+  const episode = Boolean(item.extra && item.extra.type === 'Episode');
+  showToast(episode ? 'Picture changed, for everyone.' : 'Cover changed, for everyone.');
+  for (const wait of [2500, 8000]) {
+    setTimeout(() => {
+      if (episode && state.openShow && !$('music-view').classList.contains('hidden')) showShow(state.openShow);
+      else if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch();
+    }, wait);
+  }
 }
 
 /* ---------------------------------------------------- making audiobooks */
@@ -15410,6 +15443,7 @@ window.addEventListener('popstate', async () => {
 // a bar along an episode part-watched, a tick on one finished - and one
 // button for what to watch now: carry on, or the next one, or the first.
 async function showShow(series) {
+  state.openShow = series;
   const seq = ++state.searchSeq;
   const view = $('music-view');
   show($('results'), false);
@@ -15541,7 +15575,13 @@ function episodeRow(episode, fraction) {
     done.classList.add('episode-done');
     row.append(done);
   }
-  row.addEventListener('click', () => playVideo(episode));
+  row.addEventListener('click', () => {
+    // The lift that ends a hold is not a tap.
+    if (state.suppressClick) { state.suppressClick = false; return; }
+    playVideo(episode);
+  });
+  // A hold (or right-click) opens its menu: download, favourite, its picture.
+  attachHoldMenu(row, () => openItemMenu(episode, thumb));
   li.append(row);
   return li;
 }
@@ -17287,8 +17327,8 @@ function repaintCovers() {
 // device's own files, or the person's photos on the server (the owner's
 // asking) - asked first whenever they have Photos. Either way it is cropped
 // square here, as before.
-function pickCoverImage() {
-  if (state.offline || TV || !shelfAvailable('picture')) return pickCoverFile();
+function pickCoverImage(aspect = 1) {
+  if (state.offline || TV || !shelfAvailable('picture')) return pickCoverFile(aspect);
   return new Promise((resolve) => {
     const sheet = document.createElement('div');
     sheet.className = 'pick-source';
@@ -17313,8 +17353,8 @@ function pickCoverImage() {
     document.body.append(sheet);
     const done = (v) => { sheet.remove(); resolve(v); };
     // The file picker is opened from this tap, as a browser requires.
-    here.addEventListener('click', () => { sheet.remove(); pickCoverFile().then(resolve); });
-    photos.addEventListener('click', () => { sheet.remove(); pickServerPhoto().then(resolve); });
+    here.addEventListener('click', () => { sheet.remove(); pickCoverFile(aspect).then(resolve); });
+    photos.addEventListener('click', () => { sheet.remove(); pickServerPhoto(aspect).then(resolve); });
     cancel.addEventListener('click', () => done(null));
     sheet.addEventListener('click', (event) => { if (event.target === sheet) done(null); });
   });
@@ -17324,7 +17364,9 @@ function pickCoverImage() {
 // placed by the person first (the owner's asking): the picture in a square
 // frame, dragged to move, pinched (or scrolled, or the slider) to zoom, always
 // filling the frame. Null if they cancel.
-async function squarePicture(source) {
+// aspect is the frame's width over its height: 1 for a cover, 16 / 9 for an
+// episode's picture (the owner's asking, 2026-10-09).
+async function squarePicture(source, aspect = 1) {
   const bmp = await createImageBitmap(source);
   return new Promise((resolve) => {
     const sheet = document.createElement('div');
@@ -17334,6 +17376,10 @@ async function squarePicture(source) {
     hint.textContent = touchScreen() ? 'Drag to move, pinch to zoom, twist to turn' : 'Drag to move, scroll to zoom';
     const frame = document.createElement('div');
     frame.className = 'crop-frame';
+    if (aspect !== 1) {
+      frame.style.aspectRatio = String(aspect);
+      frame.style.width = `min(92vw, ${Math.round(62 * aspect)}vh, ${Math.round(520 * Math.min(aspect, 1.5))}px)`;
+    }
     const canvas = document.createElement('canvas');
     frame.append(canvas);
     const zoom = document.createElement('input');
@@ -17369,18 +17415,23 @@ async function squarePicture(source) {
     sheet.append(hint, frame, tools, buttons);
     document.body.append(sheet);
 
-    // The view: the frame's side V (CSS px), the picture's scale (CSS px per
-    // picture px) as a multiple z of the scale that just covers the frame,
-    // its centre's offset from the frame's centre, and how far it is turned
-    // (radians, about its centre). Turned, it must still cover the frame:
-    // the frame's corners stay inside the turned picture.
+    // The view: the frame's width V and height V / aspect (CSS px), the
+    // picture's scale (CSS px per picture px) as a multiple z of the scale
+    // that just covers the frame, its centre's offset from the frame's
+    // centre, and how far it is turned (radians, about its centre). Turned,
+    // it must still cover the frame: the frame's corners stay inside the
+    // turned picture.
     let V = frame.clientWidth;
+    const VH = () => V / aspect;
     let z = 1;
     let cx = 0;
     let cy = 0;
     let turn = 0;
-    const spread = () => Math.abs(Math.cos(turn)) + Math.abs(Math.sin(turn));
-    const cover = () => (V * spread()) / Math.min(bmp.width, bmp.height);
+    // How far the frame reaches along the picture's own (turned) directions,
+    // from its middle: half the frame's extent projected onto each.
+    const reachU = () => (V / 2) * Math.abs(Math.cos(turn)) + (VH() / 2) * Math.abs(Math.sin(turn));
+    const reachV = () => (V / 2) * Math.abs(Math.sin(turn)) + (VH() / 2) * Math.abs(Math.cos(turn));
+    const cover = () => Math.max((2 * reachU()) / bmp.width, (2 * reachV()) / bmp.height);
     const clamp = () => {
       z = Math.max(1, Math.min(4, z));
       const sc = cover() * z;
@@ -17390,20 +17441,19 @@ async function squarePicture(source) {
       const si = Math.sin(turn);
       let u = cx * co + cy * si;
       let v = -cx * si + cy * co;
-      const reach = (V / 2) * spread();
-      const mu = Math.max(0, (bmp.width * sc) / 2 - reach);
-      const mv = Math.max(0, (bmp.height * sc) / 2 - reach);
+      const mu = Math.max(0, (bmp.width * sc) / 2 - reachU());
+      const mv = Math.max(0, (bmp.height * sc) / 2 - reachV());
       u = Math.max(-mu, Math.min(mu, u));
       v = Math.max(-mv, Math.min(mv, v));
       cx = u * co - v * si;
       cy = u * si + v * co;
     };
-    // The picture drawn into a square of side n as it shows in the frame.
+    // The picture drawn into a frame n wide as it shows on screen.
     const paint = (ctx, n) => {
       const k = n / V;
       const sc = cover() * z * k;
       ctx.save();
-      ctx.translate(n / 2 + cx * k, n / 2 + cy * k);
+      ctx.translate(n / 2 + cx * k, (n / aspect) / 2 + cy * k);
       ctx.rotate(turn);
       ctx.drawImage(bmp, (-bmp.width * sc) / 2, (-bmp.height * sc) / 2, bmp.width * sc, bmp.height * sc);
       ctx.restore();
@@ -17430,7 +17480,7 @@ async function squarePicture(source) {
       V = frame.clientWidth;
       if (canvas.width !== Math.round(V * dpr)) {
         canvas.width = Math.round(V * dpr);
-        canvas.height = Math.round(V * dpr);
+        canvas.height = Math.round((V / aspect) * dpr);
       }
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -17448,7 +17498,7 @@ async function squarePicture(source) {
       z = Math.max(1, Math.min(4, nz));
       const k = z / before;
       const ox = px - V / 2;
-      const oy = py - V / 2;
+      const oy = py - VH() / 2;
       cx = ox - (ox - cx) * k;
       cy = oy - (oy - cy) * k;
       draw();
@@ -17479,7 +17529,7 @@ async function squarePicture(source) {
         const my = (a.y + b.y) / 2 - r.top;
         // The twist since the fingers came down, turning about between them.
         const want = snap(pinch.turn + Math.atan2(b.y - a.y, b.x - a.x) - pinch.a);
-        turnAbout(want - turn, mx - V / 2, my - V / 2);
+        turnAbout(want - turn, mx - V / 2, my - VH() / 2);
         zoomAt(pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d), mx, my);
       }
     });
@@ -17494,7 +17544,7 @@ async function squarePicture(source) {
       const r = frame.getBoundingClientRect();
       zoomAt(z * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
     }, { passive: false });
-    zoom.addEventListener('input', () => zoomAt(Number(zoom.value), V / 2, V / 2));
+    zoom.addEventListener('input', () => zoomAt(Number(zoom.value), V / 2, VH() / 2));
     rotate.addEventListener('click', () => {
       // A quarter turn to the right, from the nearest straight angle.
       const q = Math.round(turn / (Math.PI / 2)) * (Math.PI / 2);
@@ -17510,11 +17560,11 @@ async function squarePicture(source) {
     cancel.addEventListener('click', () => finish(null));
     use.addEventListener('click', () => {
       // What is inside the frame, turned as it shows, at about the picture's
-      // own pixels (1000 at most).
-      const out = Math.max(1, Math.min(1000, Math.round(V / (cover() * z))));
+      // own pixels (1000 at most across a cover, 1280 across a wide one).
+      const out = Math.max(1, Math.min(aspect > 1 ? 1280 : 1000, Math.round(V / (cover() * z))));
       const c = document.createElement('canvas');
       c.width = out;
-      c.height = out;
+      c.height = Math.max(1, Math.round(out / aspect));
       paint(c.getContext('2d'), out);
       c.toBlob((blob) => finish(blob), 'image/jpeg', 0.9);
     });
@@ -17523,7 +17573,7 @@ async function squarePicture(source) {
 
 // The person's photos, newest first, a tap choosing one (its large preview,
 // which is a JPEG whatever the original was - a HEIC included).
-function pickServerPhoto() {
+function pickServerPhoto(aspect = 1) {
   return new Promise((resolve) => {
     const sheet = document.createElement('div');
     sheet.className = 'pick-photos';
@@ -17580,7 +17630,7 @@ function pickServerPhoto() {
         try {
           const resp = await fetch(photoPreview(it), { credentials: 'same-origin' });
           if (!resp.ok) throw new Error(String(resp.status));
-          const out = await squarePicture(await resp.blob());
+          const out = await squarePicture(await resp.blob(), aspect);
           show(note, false);
           if (out) done(out);
         } catch {
@@ -17653,7 +17703,7 @@ function pickServerPhoto() {
   });
 }
 
-function pickCoverFile() {
+function pickCoverFile(aspect = 1) {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -17663,7 +17713,7 @@ function pickCoverFile() {
       const file = input.files && input.files[0];
       if (!file) { resolve(null); return; }
       try {
-        resolve(await squarePicture(file));
+        resolve(await squarePicture(file, aspect));
       } catch {
         showToast("That picture can't be opened here. Try a JPEG or PNG.");
         resolve(null);
