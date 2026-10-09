@@ -3506,6 +3506,12 @@ at the end; every way into a book resumes from it. Three fixes:
   last recorded it (`source.Position.UpdatedAt`, its `lastUpdate`), and the
   device's own is used, and sent, only when it is newer; otherwise the
   server's is taken and the device's dropped.
+- **Ebooks had the same old-copy-wins:** the reader keeps a place on every
+  device for every book, and one that never reached the server always won
+  there; now only when newer than the server's (`loadProgress` in reader.js,
+  against `/api/book/progress`'s `updatedAt`). Films and episodes keep no
+  device copy (the server's alone) and stop with the screen, so neither
+  problem applies; a downloaded film watched offline does not keep its place.
 - **Play from the beginning** in an audiobook's hold menu: the one way into a
   book that does not resume (`audio.fromStart`).
 
