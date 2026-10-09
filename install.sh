@@ -1327,6 +1327,15 @@ if [ "$UPGRADE" = "0" ]; then
 	fi
 else
 	PORT=$(get_env SOUNDSTORM_PORT)
+	# A port asked for when running it (SOUNDSTORM_PORT=9000 sh install.sh,
+	# as the busy-port message says) is the port from now on: kept only in
+	# the environment, compose published that one while this waited on the
+	# old, and the next update went back to it (a review, 2026-10-09).
+	if [ -n "${SOUNDSTORM_PORT:-}" ] && [ "$SOUNDSTORM_PORT" != "$PORT" ]; then
+		PORT=$SOUNDSTORM_PORT
+		set_env SOUNDSTORM_PORT "$PORT"
+		note "using port $PORT, as asked"
+	fi
 	[ -n "$PORT" ] || PORT="$FIRST_PORT"
 fi
 
@@ -1450,6 +1459,14 @@ install_address_watch
 if [ -n "$LIBRARY" ]; then
 	mkdir -p "$LIBRARY" || die "Could not use $LIBRARY for the library. Check the drive is mounted, then run this again."
 	full=$(cd "$LIBRARY" && pwd)
+	# Docker's settings file cuts a value at " #" and stops at a starting
+	# quote: the shelves were mounted from an empty folder beside the media
+	# (a review, 2026-10-09).
+	case "$full" in
+	*" #"* | \'* | \"*)
+		die "The folder $full cannot be used for the library: its name has \" #\" in it, or starts with a quote. Rename it, then run this again."
+		;;
+	esac
 	previous=$(library_path)
 	set_env SOUNDSTORM_LIBRARY_PATH "$full"
 	set_env SOUNDSTORM_LIBRARY_HINT "$full"
@@ -1602,8 +1619,25 @@ until health_ok "$URL/healthz"; do
 	sleep 2
 done
 
+# Run again after a first install stopped part way (a download that failed),
+# it counts as an update, but nobody has made an account yet: it still shows
+# the setup code, or the first screen asked for a code never shown (a review,
+# 2026-10-09). The server says whether anybody has.
+if [ "$UPGRADE" = "1" ] && [ -z "$SETUP_QS" ] && [ -z "$IMPORT" ]; then
+	if command -v curl >/dev/null 2>&1; then
+		session=$(curl -fsS "http://localhost:$PORT/api/session" 2>/dev/null) || session=''
+	elif command -v wget >/dev/null 2>&1; then
+		session=$(wget -q -O - "http://localhost:$PORT/api/session" 2>/dev/null) || session=''
+	else
+		session=''
+	fi
+	case "$session" in
+	*'"hasAccount":false'*) SETUP_QS="/?setup=$SETUP_CODE" ;;
+	esac
+fi
+
 say ""
-if [ "$UPGRADE" = "1" ]; then
+if [ "$UPGRADE" = "1" ] && [ -z "$SETUP_QS" ]; then
 	say "${GREEN}${BOLD}Up to date.${OFF} EmberStorm is running at ${BOLD}$URL${OFF}."
 else
 	say "${GREEN}${BOLD}Ready.${OFF} Open ${BOLD}$URL$SETUP_QS${OFF} and create your account."
