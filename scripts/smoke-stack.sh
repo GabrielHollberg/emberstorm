@@ -16,7 +16,10 @@ DIR=${SMOKE_DIR:-$ROOT/.smoke}
 PORT=${SMOKE_PORT:-8296}
 IMAGE=${SMOKE_IMAGE:-soundstorm:dev}
 NET=ss-smoke
-TOOLS=ghcr.io/immich-app/immich-server:v3 # has ffmpeg, and is pulled anyway
+# The backends at exactly the versions the install runs: docker-compose.yml's
+# pinned images.
+pinned() { awk -v s="  $1:" '$0==s{f=1;next} f&&/^  [a-z]/{f=0} f&&/^    image: /{print $2; exit}' "$ROOT/docker-compose.yml"; }
+TOOLS=$(pinned immich-server) # has ffmpeg, and is pulled anyway
 export MSYS_NO_PATHCONV=1
 
 # A host path Docker on Windows understands (H:/...), as it is on Linux.
@@ -58,17 +61,17 @@ up() {
   start() { docker start "$1" >/dev/null 2>&1 || return 1; }
   start ss-smoke-db || docker run -d --name ss-smoke-db --network "$NET" -e POSTGRES_USER=postgres -e POSTGRES_DB=immich -e POSTGRES_PASSWORD=smoke \
     -e POSTGRES_INITDB_ARGS=--data-checksums --shm-size 128m -v ss-smoke-imdb:/var/lib/postgresql/data \
-    ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0 >/dev/null
-  start ss-smoke-redis || docker run -d --name ss-smoke-redis --network "$NET" docker.io/valkey/valkey:9 >/dev/null
+    "$(pinned immich-database)" >/dev/null
+  start ss-smoke-redis || docker run -d --name ss-smoke-redis --network "$NET" "$(pinned immich-redis)" >/dev/null
   sleep 5
   start ss-smoke-immich || docker run -d --name ss-smoke-immich --network "$NET" -e DB_HOSTNAME=ss-smoke-db -e DB_USERNAME=postgres -e DB_DATABASE_NAME=immich \
     -e DB_PASSWORD=smoke -e REDIS_HOSTNAME=ss-smoke-redis -e IMMICH_MACHINE_LEARNING_ENABLED=false \
     -v "$LIB/pictures:/pictures:ro" -v ss-smoke-imup:/data "$TOOLS" >/dev/null
   start ss-smoke-jellyfin || docker run -d --name ss-smoke-jellyfin --network "$NET" -v "$LIB/movies:/media/movies:ro" -v "$LIB/tv:/media/tv:ro" \
-    -v ss-smoke-jf:/config jellyfin/jellyfin:latest >/dev/null
+    -v ss-smoke-jf:/config "$(pinned jellyfin)" >/dev/null
   start ss-smoke-navidrome || docker run -d --name ss-smoke-navidrome --network "$NET" -e ND_MUSICFOLDER=/music -e ND_DATAFOLDER=/data \
     -e ND_SUBSONIC_DEFAULTREPORTREALPATH=true -e ND_SCANINTERVAL=1m -e ND_ENABLEEXTERNALSERVICES=false -e ND_ENABLETRANSCODINGCONFIG=true \
-    -v "$LIB/music:/music:ro" -v ss-smoke-nd:/data deluan/navidrome:latest >/dev/null
+    -v "$LIB/music:/music:ro" -v ss-smoke-nd:/data "$(pinned navidrome)" >/dev/null
   start ss-smoke-app || docker run -d --name ss-smoke-app --network "$NET" -p "127.0.0.1:$PORT:8080" \
     -e SOUNDSTORM_SETUP_CODE=SMOKESETUP42 -e SOUNDSTORM_TLS=off -e SOUNDSTORM_STARTER_LIBRARY=false -e SOUNDSTORM_PORT=8080 \
     -e SOUNDSTORM_LIBRARY_DIR=/library -e SOUNDSTORM_NAVIDROME_URL=http://ss-smoke-navidrome:4533 \
