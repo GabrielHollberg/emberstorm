@@ -3774,6 +3774,7 @@ function playAudio(item, fromQueue) {
   savePosition();
 
   audio.item = item;
+  if (NATIVE_AUDIO && window.soundstormApp && typeof window.soundstormApp.place === 'function') window.soundstormApp.place(null);
   audio.tracks = [];
   audio.chapters = [];
   audio.captionChapter = -1;
@@ -3904,9 +3905,16 @@ async function loadPlayback(item) {
     }
     if (audio.item !== item) return;
     audio.urlMap = map;
+    // Listened to here while offline: that place is used, and sent, only if
+    // it is newer than the server's - a book listened to further on another
+    // device since keeps the server's place (the owner's asking, 2026-10-09:
+    // the server is the record, and the newest listening wins).
     const here = localPosition(item);
-    if (here && !here.synced) {
+    const serverAt = (info.position && info.position.updatedAt) || 0;
+    if (here && !here.synced && (!info.position || here.at > serverAt)) {
       info.position = { ...(info.position || {}), seconds: here.seconds, finished: false };
+    } else if (here && !here.synced && info.position) {
+      keepLocalPosition(item, info.position.seconds, true);
     } else if (!info.position && here) {
       info.position = { seconds: here.seconds, finished: false };
     }
@@ -3939,9 +3947,36 @@ async function loadPlayback(item) {
   if (!audio.started) {
     // A book somebody finished starts again from the beginning rather than
     // from its last second.
-    const resume = audio.resumable && !info.position.finished ? info.position.seconds : 0;
+    const fromStart = audio.fromStart === item;
+    audio.fromStart = null;
+    const resume = !fromStart && audio.resumable && !info.position.finished ? info.position.seconds : 0;
     seekTo(resume, item);
+    tellNativePlace(item);
   }
+}
+
+// In the phone apps the app's own player plays a book, and keeps playing with
+// the screen off - when the phone sleeps this page and its saves with it, so
+// an hour listened with the screen off was an hour back on the next device
+// (the owner's report, 2026-10-09). So the app is told where this book's place
+// is saved and where each of its files begins, and saves it itself while it
+// plays (Android's NativeAudio "place"). Nothing for a song, a downloaded book
+// (it plays here, from the device) or a book playing on a TV.
+function tellNativePlace(item) {
+  const app = window.soundstormApp;
+  if (!NATIVE_AUDIO || !app || typeof app.place !== 'function') return;
+  if (!item || item.kind !== 'audiobook' || !audio.resumable || RA.on || isDownloaded(item)) {
+    app.place(null);
+    return;
+  }
+  const files = audio.tracks.length > 1
+    ? audio.tracks.map((t) => ({ url: new URL(t.url, location.href).href, offset: t.startSeconds || 0 }))
+    : [{ url: new URL(audio.hlsURL || playPath(item), location.href).href, offset: 0 }];
+  app.place({
+    path: `/api/playback/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}`,
+    duration: Number.isFinite(audio.duration) ? audio.duration : 0,
+    files,
+  });
 }
 
 // seekTo starts playing at a position on the whole item's timeline, picking
@@ -6564,6 +6599,15 @@ function renderMainMenu(item, opts = {}) {
       closeItemMenu();
       setSelecting(true);
       toggleSelected(item, card);
+    }));
+  }
+  // Play from the beginning: every other way into a book picks up at its
+  // place (the owner's asking, 2026-10-09).
+  if (item.kind === 'audiobook' && !opts.nowPlaying) {
+    entries.push(menuItem('play', 'Play from the beginning', () => {
+      closeItemMenu();
+      audio.fromStart = item;
+      play(item);
     }));
   }
   entries.push(

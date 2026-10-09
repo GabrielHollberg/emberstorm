@@ -492,6 +492,7 @@ type mediaProgress struct {
 	CurrentTime looseFloat `json:"currentTime"`
 	Duration    looseFloat `json:"duration"`
 	IsFinished  looseBool  `json:"isFinished"`
+	LastUpdate  looseFloat `json:"lastUpdate"`
 }
 
 // looseFloat is a number that tolerates not being one.
@@ -581,9 +582,10 @@ func (s *Source) Position(ctx context.Context, itemID string) (source.Position, 
 		duration = 0
 	}
 	return source.Position{
-		Seconds:  seconds,
-		Duration: duration,
-		Finished: bool(progress.IsFinished),
+		Seconds:   seconds,
+		Duration:  duration,
+		Finished:  bool(progress.IsFinished),
+		UpdatedAt: int64(progress.LastUpdate),
 	}, nil
 }
 

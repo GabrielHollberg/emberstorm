@@ -268,13 +268,13 @@ func TestPositionOfAnUnstartedBookIsTheStart(t *testing.T) {
 
 func TestPositionIsRead(t *testing.T) {
 	rec := newRecorder(t, http.StatusOK,
-		`{"currentTime":2500.5,"duration":4989.02,"progress":0.5,"isFinished":false}`)
+		`{"currentTime":2500.5,"duration":4989.02,"progress":0.5,"isFinished":false,"lastUpdate":1791000000000}`)
 
 	pos, err := newTestSource(t, rec.srv.URL).Position(context.Background(), "bk1")
 	if err != nil {
 		t.Fatalf("Position: %v", err)
 	}
-	if pos.Seconds != 2500.5 || pos.Duration != 4989.02 {
+	if pos.Seconds != 2500.5 || pos.Duration != 4989.02 || pos.UpdatedAt != 1791000000000 {
 		t.Errorf("position = %+v", pos)
 	}
 }

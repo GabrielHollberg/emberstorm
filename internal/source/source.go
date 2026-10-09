@@ -208,6 +208,11 @@ type Position struct {
 	// Finished marks a book somebody listened to the end of. It is one-way
 	// here: see PositionTracker.
 	Finished bool `json:"finished,omitempty"`
+
+	// UpdatedAt is when the backend last recorded it, in milliseconds since
+	// 1970, where it says: a device that listened offline compares it with
+	// its own, and the newer place wins.
+	UpdatedAt int64 `json:"updatedAt,omitempty"`
 }
 
 // PositionTracker is an optional interface for sources that remember how far
