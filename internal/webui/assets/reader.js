@@ -350,16 +350,25 @@ function keepLocalRead(item, place, synced) {
   } catch { /* storage full */ }
 }
 
+// The server is the record, and the newest reading wins (the owner's asking,
+// 2026-10-09): a place kept here that never reached the server is used only
+// when it is newer than the server's - read on a plane, say - and not when
+// the book has been read further on another device since, which used to pull
+// the place back.
 async function loadProgress(item) {
   const here = localRead(item);
-  if (here && !here.synced && here.location) return here;
+  const unsent = here && !here.synced && here.location ? here : null;
   try {
     const resp = await fetch(`/api/book/progress?${bookParams(item)}`, {
       credentials: 'same-origin',
     });
     if (resp.ok) {
       const body = await resp.json();
-      if (body.found) return body;
+      if (!body.found) return unsent || null;
+      const serverAt = Date.parse(body.updatedAt || '') || 0;
+      if (unsent && unsent.at > serverAt) return unsent;
+      if (unsent) keepLocalRead(item, { location: body.location, fraction: body.fraction }, true);
+      return body;
     }
   } catch {
     // offline
