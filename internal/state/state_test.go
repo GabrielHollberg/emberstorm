@@ -409,3 +409,33 @@ func TestAnUpgradedFileHasNotInstalledTheStarterLibrary(t *testing.T) {
 		t.Error("an upgraded file claims the starter library is installed")
 	}
 }
+
+// A backend set up afresh forgets the accounts made on it for each person:
+// they went with its data, and kept they would be refused for good.
+func TestABackendSetUpAgainForgetsItsMembersAccounts(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetIdentity("u1", "immich", Identity{Token: "old-key"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetIdentity("u1", "audiobookshelf", Identity{Token: "kept"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSetupSecret("immich/member/u1", "password", "half-made"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetBackend("immich", Backend{Type: "immich", Token: "new-admin"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.Identity("u1", "immich"); ok {
+		t.Error("the member's old account on the reset backend was kept")
+	}
+	if id, ok := s.Identity("u1", "audiobookshelf"); !ok || id.Token != "kept" {
+		t.Error("another backend's account was forgotten too")
+	}
+	if _, ok := s.SetupSecret("immich/member/u1", "password"); ok {
+		t.Error("the member's half-made setup secret was kept")
+	}
+}

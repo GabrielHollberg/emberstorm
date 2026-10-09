@@ -534,18 +534,31 @@ func (h *hlsSessions) watch(stop func(sourceID, session string)) {
 	})
 }
 
+// idle is the conversions to stop: sessions asked for nothing in hlsIdle.
+// A person's sessions are kept as "session|item" (allow), the sources by the
+// session alone (note): looked up by the session part, or nothing was ever
+// stopped and the sources grew for good (a review, 2026-10-09). A session no
+// longer seen at all is forgotten.
 func (h *hlsSessions) idle(now time.Time) [][2]string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	var out [][2]string
+	live := map[string]bool{}
 	for _, mine := range h.seen {
-		for session, at := range mine {
-			if session != "" && now.Sub(at) > hlsIdle {
-				if src, ok := h.sources[session]; ok {
-					out = append(out, [2]string{src, session})
-					delete(h.sources, session)
-				}
+		for key, at := range mine {
+			session, _, _ := strings.Cut(key, "|")
+			if session == "" {
+				continue
 			}
+			if now.Sub(at) <= hlsIdle {
+				live[session] = true
+			}
+		}
+	}
+	for session, src := range h.sources {
+		if !live[session] {
+			out = append(out, [2]string{src, session})
+			delete(h.sources, session)
 		}
 	}
 	return out

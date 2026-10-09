@@ -4016,6 +4016,11 @@ async function loadPlayback(item) {
 function tellNativePlace(item) {
   const app = window.soundstormApp;
   if (!NATIVE_AUDIO || !app || typeof app.place !== 'function') return;
+  // Not until the jump to the saved place is done: told while the player is
+  // still at the file's start, it saved 0:00 as the book's place (a review,
+  // 2026-10-09). The player forgets the place whenever a new file loads, and
+  // is told again once the book is playing (below).
+  if (audio.pendingSeek) return;
   if (!item || item.kind !== 'audiobook' || !audio.resumable || RA.on || isDownloaded(item)) {
     app.place(null);
     return;
@@ -4102,6 +4107,12 @@ function startAt(url, offset) {
   setAudioSource(player, (audio.urlMap && audio.urlMap[url]) || url);
   if (!(offset > 0)) begin();
 }
+
+// The app's player is told the book's place each time the book plays - after
+// a resume's jump, a pause, or a move into another file (tellNativePlace).
+$('audio-player').addEventListener('playing', () => {
+  if (audio.item && audio.item.kind === 'audiobook' && audio.started) tellNativePlace(audio.item);
+});
 
 // The resumed book's safety net (startAt): checked as it plays.
 $('audio-player').addEventListener('timeupdate', () => {
@@ -23429,9 +23440,9 @@ function openRemote(target) {
   show($('rc'), true);
   show($('rc-chip'), false);
   $('rc-note').textContent = '';
-  refreshRemote();
+  refreshPlayerRemote();
   clearInterval(PLAYER.remoteTimer);
-  PLAYER.remoteTimer = setInterval(refreshRemote, 1500);
+  PLAYER.remoteTimer = setInterval(refreshPlayerRemote, 1500);
 }
 function closeRemote() {
   show($('rc'), false);
@@ -23461,7 +23472,7 @@ const clock = (s) => {
   const sec = String(s % 60).padStart(2, '0');
   return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
 };
-async function refreshRemote() {
+async function refreshPlayerRemote() {
   const target = PLAYER.target;
   if (!target) return;
   const { ok, status, body } = await api(`/api/players/${target.id}`);
@@ -23508,7 +23519,7 @@ function remoteSend(cmd) {
   $('rc-note').textContent = '';
   api(`/api/players/${PLAYER.target.id}/command`, { method: 'POST', body: JSON.stringify(cmd) }).then((r) => {
     if (!r.ok) $('rc-note').textContent = (r.body && r.body.error) || 'That did not go through.';
-    setTimeout(refreshRemote, 900);
+    setTimeout(refreshPlayerRemote, 900);
   });
 }
 // The position the remote shows, run on from the last report.

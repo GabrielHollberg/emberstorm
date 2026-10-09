@@ -119,6 +119,10 @@ type autoCert struct {
 	// checkEvery: the name service could not say whether remote access works,
 	// and half a day is too long to leave that unanswered.
 	recheckSoon bool
+
+	// refusedSince is when the name service first refused this install's
+	// registration (401) without a success since; zero while it answers.
+	refusedSince time.Time
 	// pointed is the chosen name this run has made sure leads here (its home
 	// and away names at the name service), so it is asked once, not every step.
 	pointed string
@@ -435,12 +439,31 @@ func (a *autoCert) step(ctx context.Context) error {
 	if err != nil {
 		var se *names.StatusError
 		if errors.As(err, &se) && se.Status == 401 {
-			// The service no longer recognizes this registration - its secret
-			// was rotated. Forget it, and the next step registers afresh.
-			a.forget()
+			// The service no longer recognizes this registration. Its secret
+			// may have been rotated for good - or set wrongly for a while, and
+			// forgetting at the first refusal had every install drop its name
+			// for a new one, breaking every bookmark and saved app address,
+			// beyond repair by putting the secret back (a review, 2026-10-09).
+			// So only after three days of refusals, and the old registration
+			// is kept aside, not deleted.
+			a.mu.Lock()
+			if a.refusedSince.IsZero() {
+				a.refusedSince = time.Now()
+			}
+			long := time.Since(a.refusedSince) > 72*time.Hour
+			a.mu.Unlock()
+			if long {
+				a.log.Warn("the name service has refused this install's name for three days; registering a new one", "name", reg.Name)
+				a.forget()
+			} else {
+				a.log.Warn("the name service refused this install's name; keeping it and trying again", "name", reg.Name)
+			}
 		}
 		return fmt.Errorf("point %s at %s: %w", reg.Name, a.announce, err)
 	}
+	a.mu.Lock()
+	a.refusedSince = time.Time{}
+	a.mu.Unlock()
 	// The service moved to another zone (soundstorm.dev to emberstorm.app,
 	// 2026-10-07): the same id under the new zone becomes this install's name,
 	// kept, and the certificate below is made again for it.
@@ -730,8 +753,11 @@ func verdict(err error) bool {
 func (a *autoCert) forget() {
 	a.mu.Lock()
 	a.reg, a.cert = names.Registration{}, nil
+	a.refusedSince = time.Time{}
 	a.mu.Unlock()
-	os.Remove(filepath.Join(a.dir, registrationFile))
+	// Kept aside rather than deleted: a name given up wrongly can be put back.
+	file := filepath.Join(a.dir, registrationFile)
+	_ = os.Rename(file, file+".old")
 }
 
 // accountKey is the Let's Encrypt account, which is nothing but a key: an
