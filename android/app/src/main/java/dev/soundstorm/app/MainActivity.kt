@@ -263,6 +263,7 @@ class MainActivity : Activity() {
         PlayerLog.add("app left")
         resumed = false
         CookieManager.getInstance().flush()
+        mirrorCookies()
         super.onPause()
     }
 
@@ -1139,6 +1140,34 @@ class MainActivity : Activity() {
         statusScrim.setBackgroundColor(color)
     }
 
+    /**
+     * The sign-in, this device's mark and who is kept on it, copied from the
+     * install name in use to its twin (home to away, away to home). Cookies
+     * belong to one name, so signed in at home the away name knew nobody and
+     * asked again the first time the phone was off the Wi-Fi (the owner's
+     * report). A cookie gone here - signed out - goes there too.
+     */
+    private fun mirrorCookies(from: Uri? = server) {
+        val s = from ?: return
+        if (s.scheme != "https") return
+        val twin = ServerAddress.twinHost(s.host) ?: return
+        val port = if (s.port != -1) ":${s.port}" else ""
+        val here = "https://${s.host}$port/"
+        val there = "https://$twin$port/"
+        val cm = CookieManager.getInstance()
+        val have = (cm.getCookie(here) ?: "").split(";").mapNotNull {
+            val kv = it.trim()
+            val i = kv.indexOf('=')
+            if (i > 0) kv.substring(0, i) to kv.substring(i + 1) else null
+        }.toMap()
+        for (name in MIRRORED_COOKIES) {
+            val v = have[name]
+            val age = if (v != null) 30L * 24 * 3600 else 0L
+            cm.setCookie(there, "$name=${v ?: ""}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=$age")
+        }
+        cm.flush()
+    }
+
     private fun isServer(url: Uri): Boolean {
         val s = server ?: return false
         return url.scheme == s.scheme && url.host == s.host && url.port == s.port
@@ -1328,6 +1357,7 @@ class MainActivity : Activity() {
             val awayHost = ServerAddress.awayHost(host)
             if (s != null && awayHost != null && !triedAway) {
                 triedAway = true
+                mirrorCookies(s)
                 val away = s.buildUpon().encodedAuthority(
                     awayHost + if (s.port != -1) ":${s.port}" else ""
                 ).build()
@@ -1354,6 +1384,7 @@ class MainActivity : Activity() {
             // Loaded: the next failure may try the away name again.
             triedAway = false
             CookieManager.getInstance().flush()
+            mirrorCookies()
         }
 
         override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
@@ -1539,6 +1570,9 @@ class MainActivity : Activity() {
 
     companion object {
         private const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
+        private val MIRRORED_COOKIES = listOf(
+            "__Host-soundstorm_session", "__Host-soundstorm_device", "__Host-soundstorm_profiles",
+        )
         private const val PICK_FILES = 1
         private const val BACKUP_PERMISSION = 2
     }

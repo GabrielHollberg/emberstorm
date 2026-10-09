@@ -45,6 +45,14 @@ object ServerAddress {
         return h.removeSuffix(".home.$z") + ".net.$z"
     }
 
+    /** An install name's twin: the away name of a home one, the home name of an away one. */
+    fun twinHost(host: String?): String? {
+        awayHost(host)?.let { return it }
+        val h = host?.lowercase() ?: return null
+        val z = ZONES.firstOrNull { h.endsWith(".net.$it") } ?: return null
+        return h.removeSuffix(".net.$z") + ".home.$z"
+    }
+
     /**
      * The install id the server at [base] answers with (/healthz's "id"), or
      * null. Run off the main thread.
