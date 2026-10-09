@@ -6435,6 +6435,69 @@ Not done: the backends' way out to the internet
 Audiobookshelf's audiobooks folder still writable, our own copies of the
 images.
 
+**A review for bugs across the whole project (2026-10-09, on the PC)**:
+nine reviewers, one per part, every finding checked against the code before
+changing. Fixed:
+
+- **Server:** idle video conversions were never stopped (the idle check read
+  the session key wrongly); one refused answer from the names service forgot
+  the install's name (now only after 72 hours of refusals, and the old
+  registration kept aside); a backend set up afresh kept its members' old
+  accounts; deleting a photo took every photo sharing its name's start
+  (companions on the picture shelf are only its side files); undo across
+  drives; sign-ins in use now renew instead of ending after 30 days; "Part 1"
+  and "Part 2" films no longer made one film; Storyteller signs in again with
+  its kept password; a backend's library listing that failed no longer makes
+  a second library; AudioMuse's last good answer is used for a minute after
+  it fails; a rescan has ten minutes, not thirty seconds; a play after a
+  crash mid-write is kept in the listening history; a held sign-in is
+  refused once the password has changed (`TestAHeldSignInDiesWithItsPassword`);
+  two taps on a voice sample no longer mix two files.
+- **Web:** the remote-access card was hidden by two functions of one name
+  (`refreshPlayerRemote`); closing the review sheet no longer blocks every
+  later upload; files the phone app holds are never sent by the page as
+  text; a retry starts the right file at the right place; a show's page is
+  not pulled back by a late refresh; the last film's audio picker hidden;
+  "end of this chapter" stops at the chapter, not the file's end; reading in
+  the line views saved on closing.
+- **Android 0.55:** a book's place saved only once the resume has landed
+  (0.54 could save 0:00); a server error no longer counts photos as backed
+  up; the sleep timer while loading; lock-screen skips with the page gone;
+  uploads kept to their own server and sent once.
+- **Box and installers:** container logs capped (10MB, three files); a port
+  asked for kept; the setup code shown after an interrupted first install; a
+  custom install folder found by its saved script; a library folder whose
+  name Docker's settings would cut refused.
+
+**Left from this review** (smaller or wanting a decision): keep-both
+subtitles not following the renamed video; a late second version's
+subtitles going to extras; Replace binning the old file before the new one
+is checked; renumbering with no rollback if a move fails half way; the names
+service's claim race and a lost claim blocking renewals; restore and
+reset-password run while the server is up; photo room not held for home
+videos and imports; the web's upload progress from the app overwriting the
+next review; Back and the TV remote in the newer sheets; queue edits not
+sent to a controlled TV; the hls.js first-load race; object URLs never
+revoked; uninstall's library path, and `%` in the address check's cron line.
+
+**For the Mac, from this review (iPhone and Apple TV):**
+- Apple TV `moveServer`: copies cookies by name, but over TLS the session is
+  `__Host-soundstorm_session` - copy both names.
+- iPhone `PhotoBackup`: an export error stays shown after later runs work;
+  clear it when a run gets through.
+- iPhone `FileUploads`: the server is the app's current one, not each job's
+  own (a server switched mid-upload sends the rest there); a resumed session
+  can hand a file over twice.
+- Apple TV `VideoPlayer`: Up next saves the next episode as finished.
+- Apple TV `Player`: a book's place can be saved as 0 before its resume
+  seek lands (Android 0.54 had the same; send the place only once settled).
+- iPhone `VolumeKeys`: stays on after the page reloads while controlling a
+  TV; turn it off when the page goes.
+- iPhone background task: not scheduled again after it runs.
+- iPhone backup queue: copies whose upload finished while the app was
+  closed are left on disk; restoring the sessions' tasks races a run
+  starting at launch.
+
 ## Tailscale, and why it is a profile rather than a service
 
 Reaching SoundStorm away from home is the one thing the LAN address cannot do.

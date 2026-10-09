@@ -205,3 +205,24 @@ func TestTheServerHasAName(t *testing.T) {
 		t.Fatalf("emptied, back to the default: %q", name)
 	}
 }
+
+// A sign-in held with the old password is not let in once the password has
+// changed, even if somebody approves it.
+func TestAHeldSignInDiesWithItsPassword(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t)
+	h.do(t, http.MethodPut, "/api/settings/new-devices", `{"enabled":true}`)
+	thief := h.another(t)
+	_, out := signInAs(t, thief, "gabe", "correct horse")
+	id, _ := out["pending"].(string)
+	if id == "" {
+		t.Fatalf("not held: %v", out)
+	}
+	if resp, body := h.do(t, http.MethodPost, "/api/account/password", `{"current":"correct horse","password":"rainy tuesday in lisbon"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("changing the password: %d %s", resp.StatusCode, body)
+	}
+	h.do(t, http.MethodPost, "/api/devices/pending/"+id, `{"approve":true}`)
+	if resp, body := thief.do(t, http.MethodGet, "/api/login/pending/"+id, ""); signedIn(body) {
+		t.Fatalf("let in with the old password: %d %s", resp.StatusCode, body)
+	}
+}

@@ -73,9 +73,18 @@ func (s *Store) logListen(userID string, l Listen) error {
 	if fi, err := os.Stat(p); err == nil && fi.Size() >= maxListenLog {
 		return nil
 	}
-	f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return err
+	}
+	// A crash mid-write leaves a last line with no end; the next play written
+	// straight after it would join it, and both be skipped as damage (a
+	// review, 2026-10-09). Such a line is ended first.
+	if fi, err := f.Stat(); err == nil && fi.Size() > 0 {
+		last := make([]byte, 1)
+		if _, err := f.ReadAt(last, fi.Size()-1); err == nil && last[0] != '\n' {
+			line = append([]byte{'\n'}, line...)
+		}
 	}
 	if _, err := f.Write(append(line, '\n')); err != nil {
 		f.Close()

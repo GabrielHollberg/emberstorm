@@ -76,3 +76,18 @@ func TestForgettingSomebodyTakesTheirListens(t *testing.T) {
 		t.Errorf("left %v", m)
 	}
 }
+
+func TestAPlayAfterACutOffLineIsKept(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := Open(dir)
+	_ = s.RecordPlay("u1", played("a"), time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC))
+	p := filepath.Join(dir, "listens", "u1-2026.jsonl")
+	f, _ := os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0)
+	f.WriteString(`{"at":"2026-05-01T10:00:00Z","s":"nd","id":"b","t":"cut sh`)
+	f.Close()
+	_ = s.RecordPlay("u1", played("c"), time.Date(2026, 5, 1, 11, 0, 0, 0, time.UTC))
+	got, err := s.Listens("u1", 2026)
+	if err != nil || len(got) != 2 || got[1].ID != "c" {
+		t.Errorf("the play after a cut-off line = %+v, %v", got, err)
+	}
+}

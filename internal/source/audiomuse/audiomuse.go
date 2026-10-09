@@ -169,8 +169,14 @@ func (s *Source) Features(ctx context.Context) (map[string]Features, error) {
 	}
 	// Shortly after a failed read, not again: with AudioMuse down every radio
 	// request began a whole read of its own.
-	if s.features == nil && time.Since(s.failedAt) < time.Minute {
+	// And with an old copy in hand, that copy at once: every request waited
+	// for a fresh read to fail first (a review, 2026-10-09).
+	if time.Since(s.failedAt) < time.Minute {
+		f := s.features
 		s.mu.Unlock()
+		if f != nil {
+			return f, nil
+		}
 		return nil, errors.New("audiomuse: analysis could not be read")
 	}
 	done := make(chan struct{})

@@ -104,7 +104,9 @@ func (s *Server) handleVoiceSample(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(dir, voice+".mp3")
 	if _, err := os.Stat(path); err != nil {
 		_ = os.MkdirAll(dir, 0o700)
-		f, err := os.Create(path + ".part")
+		// A file of its own for each request: two taps at once wrote into one
+		// ".part" together and kept the mix as the sample (a review, 2026-10-09).
+		f, err := os.CreateTemp(dir, voice+".*.part")
 		if err != nil {
 			http.Error(w, "could not make a sample", http.StatusInternalServerError)
 			return
@@ -114,11 +116,11 @@ func (s *Server) handleVoiceSample(w http.ResponseWriter, r *http.Request) {
 		cancel()
 		f.Close()
 		if err != nil {
-			os.Remove(path + ".part")
+			os.Remove(f.Name())
 			http.Error(w, "the voice did not answer", http.StatusBadGateway)
 			return
 		}
-		_ = os.Rename(path+".part", path)
+		_ = os.Rename(f.Name(), path)
 	}
 	w.Header().Set("Content-Type", "audio/mpeg")
 	w.Header().Set("Cache-Control", "private, max-age=86400")
