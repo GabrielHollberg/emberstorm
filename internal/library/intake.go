@@ -1047,6 +1047,16 @@ func (l *Library) SaveWith(kind media.Kind, rel string, r io.Reader, route Route
 			}
 		}
 	}
+	// A disc's numbered title named for what it is, now its bytes are here
+	// (filmnames.go, labelTitle).
+	if kind == media.KindVideo && decided == "" {
+		if named := labelTitle(folder, rel, tmpName); named != rel {
+			rel, dest = named, filepath.Join(folder, filepath.FromSlash(named))
+			if !within(folder, dest) {
+				return "", fmt.Errorf("that path does not stay inside the library")
+			}
+		}
+	}
 	if _, err := os.Lstat(dest); err == nil {
 		// An exact copy is already there whatever was decided; a different
 		// file with the name is kept beside, replaced, or refused as asked.
