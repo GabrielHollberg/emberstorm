@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/GabrielHollberg/soundstorm/internal/auth"
+	"github.com/GabrielHollberg/soundstorm/internal/episodeguide"
 	"github.com/GabrielHollberg/soundstorm/internal/library"
 	"github.com/GabrielHollberg/soundstorm/internal/media"
 	"github.com/GabrielHollberg/soundstorm/internal/source"
@@ -117,4 +118,42 @@ func (s *Server) handleApplyNumbering(w http.ResponseWriter, r *http.Request) {
 	s.log.Info("episodes numbered", "show", folder, "moved", moved, "binned", binned, "by", user.Name)
 	s.scheduleRescan(media.KindTV)
 	writeJSON(w, http.StatusOK, map[string]int{"moved": moved, "binned": binned})
+}
+
+// handleEpisodeGuide is the show's episodes as TVmaze lists them, to check
+// the numbering against: names, and lengths that tell a double episode or an
+// extra. Only when the owner asks - it says which show this is to TVmaze.
+//
+//	GET /api/tv/guide?source=&id=   episodeguide.Guide
+func (s *Server) handleEpisodeGuide(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	q := r.URL.Query()
+	src, folder, err := s.showFolder(ctx, q.Get("source"), q.Get("id"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	var ids map[string]string
+	if p, ok := src.(source.ProviderIDer); ok {
+		ids, _ = p.ProviderIDs(ctx, q.Get("id"))
+	}
+	name := library.ShowName(folder)
+	if g, ok := src.(source.ItemGetter); ok {
+		if it, found := g.ItemByID(ctx, q.Get("id")); found && it.Title != "" {
+			name = it.Title
+		}
+	}
+	s.guideOnce.Do(func() { s.guide = episodeguide.New("") })
+	g, err := s.guide.Find(ctx, ids, name)
+	if errors.Is(err, episodeguide.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "The episode guide does not know this show. Find the right show first, then try again.")
+		return
+	}
+	if err != nil {
+		s.log.Info("episode guide", "err", err)
+		writeError(w, http.StatusBadGateway, "Could not reach the episode guide. Try again in a minute.")
+		return
+	}
+	writeJSON(w, http.StatusOK, g)
 }

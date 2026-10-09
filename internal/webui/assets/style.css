@@ -4597,7 +4597,7 @@ html.numbering-open { overflow: hidden; }
 .numbering-start label, .numbering-nums label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
 .numbering-start input, .numbering-nums input { width: 4.2em; }
 .numbering-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.numbering-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: 'moves what role nums' 'moves to to to'; gap: 4px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.numbering-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; grid-template-areas: 'handle moves what role nums' 'handle moves to to to'; gap: 4px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
 .numbering-row.clash { outline: 2px solid #e5484d; }
 .numbering-row.role-playall, .numbering-row.role-drop { opacity: 0.6; }
 .numbering-moves { grid-area: moves; display: grid; gap: 2px; }
@@ -4610,4 +4610,12 @@ html.numbering-open { overflow: hidden; }
 .numbering-note { color: #e5484d; min-height: 1em; }
 .numbering-buttons { display: flex; justify-content: flex-end; gap: 10px; }
 .show-numbering { margin-top: 8px; }
-@media (max-width: 600px) { .numbering-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'moves what' 'moves role' 'moves nums' 'moves to'; } }
+@media (max-width: 600px) { .numbering-row { grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: 'handle moves what' 'handle moves role' 'handle moves nums' 'handle moves to'; } }
+.numbering-handle { grid-area: handle; align-self: stretch; display: flex; align-items: center; padding: 0 2px; color: var(--muted); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.numbering-handle svg { width: 20px; height: 20px; }
+.numbering-list.dragging .numbering-row { transition: transform 0.15s ease; }
+.numbering-list.dragging .numbering-row.dragging { transition: none; position: relative; z-index: 2; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); cursor: grabbing; }
+.numbering-guide-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.numbering-guide { color: var(--accent); font-size: 13px; }
+.numbering-guide.warn { color: #f5a524; }
+.numbering-row.guide-warn { outline: 1px solid rgba(245, 165, 36, 0.6); }

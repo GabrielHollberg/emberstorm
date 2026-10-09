@@ -15541,9 +15541,12 @@ const episodeLabel = (e) => (e.extra.season && e.extra.number ? `S${e.extra.seas
 // openNumbering shows a show's files in order with what each will become -
 // an episode with its season and number, an extra, or not kept (a play-all:
 // the episodes joined in one file) - as the server suggests, for the owner to
-// put right: reorder with the arrows (the episodes renumber in the new order,
-// from the season and episode at the top), change any number or what a file
-// is, then Apply, which renames them on the server (episodes.go).
+// put right: reorder by dragging a row's handle or with the arrows (the
+// episodes renumber in the new order, from the season and episode at the
+// top), change any number or what a file is, then Apply, which renames them
+// on the server (episodes.go). Check against the episode guide asks TVmaze
+// (through the server) for the show's episodes, and each row then says which
+// episode its number is and whether its length fits.
 async function openNumbering(series) {
   const { ok, body } = await api(`/api/tv/numbering?${new URLSearchParams({ source: series.sourceId, id: series.id })}`);
   if (!ok || !body) { showToast((body && body.error) || 'Could not read the show’s files.'); return; }
@@ -15563,7 +15566,7 @@ async function openNumbering(series) {
   h.textContent = 'Number the episodes';
   const intro = document.createElement('p');
   intro.className = 'muted';
-  intro.textContent = 'In the order they play. The arrows move a file; the episodes number themselves in order from the start below. A play-all is all the episodes in one file - it goes to the bin.';
+  intro.textContent = 'In the order they play. Drag a file by its handle, or use the arrows; the episodes number themselves in order from the start below. A play-all is all the episodes in one file - it goes to the bin.';
   const startRow = document.createElement('div');
   startRow.className = 'numbering-start';
   const seasonIn = document.createElement('input');
@@ -15586,6 +15589,21 @@ async function openNumbering(series) {
   renumber.className = 'ghost';
   renumber.textContent = 'Number in this order';
   startRow.append(renumber);
+  // The episode guide: the show's real episodes, to check the numbers against.
+  const guideRow = document.createElement('div');
+  guideRow.className = 'numbering-guide-row';
+  const guideBtn = document.createElement('button');
+  guideBtn.type = 'button';
+  guideBtn.className = 'ghost';
+  guideBtn.textContent = 'Check against the episode guide';
+  const guideNote = document.createElement('span');
+  guideNote.className = 'muted';
+  guideNote.textContent = 'Looks the show up on TVmaze, a free episode guide.';
+  guideRow.append(guideBtn, guideNote);
+  let guide = null; // {show, year, byName, episodes} once asked
+  let guideSummary = '';
+  const guideAt = new Map();
+  const guideSeason = new Map();
   const list = document.createElement('ol');
   list.className = 'numbering-list';
   const note = document.createElement('p');
@@ -15601,7 +15619,7 @@ async function openNumbering(series) {
   apply.className = 'primary';
   apply.textContent = 'Apply';
   buttons.append(cancel, apply);
-  card.append(h, intro, startRow, list, note, buttons);
+  card.append(h, intro, startRow, guideRow, list, note, buttons);
   sheet.append(card);
   document.body.append(sheet);
   document.documentElement.classList.add('numbering-open');
@@ -15617,6 +15635,25 @@ async function openNumbering(series) {
     return 'to the bin';
   };
   const length = (r) => (r.seconds ? `${Math.round(r.seconds / 60)} min` : `${(r.size / 1e9).toFixed(2)} GB`);
+  // What the guide says of a row's number: the episode's name, and a warning
+  // when the file's length does not fit it. A guide's length is often the
+  // slot (30 for a 23-minute cartoon), so only a file far off counts.
+  const guideLine = (r) => {
+    if (!guide || r.role !== 'episode') return null;
+    const g = guideAt.get(`${r.season}x${r.episode}`);
+    if (!g) {
+      const n = guideSeason.get(r.season);
+      return { text: n ? `Season ${r.season} has ${n} episode${n === 1 ? '' : 's'} in the guide - not this one` : 'Not in the guide', warn: true };
+    }
+    let text = g.name || `Episode ${g.episode}`;
+    let warn = false;
+    if (r.seconds && g.minutes) {
+      const m = r.seconds / 60;
+      if (m > g.minutes * 1.6) { text += ` - but this file is ${Math.round(m)} min, about ${Math.round(m / g.minutes)} episodes long`; warn = true; }
+      else if (m < g.minutes * 0.4) { text += ` - but this file is only ${Math.round(m)} min: an extra?`; warn = true; }
+    }
+    return { text, warn };
+  };
   // Episodes numbered in the order shown, from the start at the top.
   const numberInOrder = () => {
     let s = Math.max(0, Number(seasonIn.value) || 0);
@@ -15640,6 +15677,12 @@ async function openNumbering(series) {
     list.replaceChildren(...rows.map((r, i) => {
       const li = document.createElement('li');
       li.className = `numbering-row role-${r.role}`;
+      li.dataset.index = String(i);
+      const handle = document.createElement('div');
+      handle.className = 'numbering-handle';
+      handle.title = 'Drag to move';
+      handle.append(icon('grip'));
+      handle.addEventListener('pointerdown', (ev) => dragRow(ev, li));
       const moves = document.createElement('div');
       moves.className = 'numbering-moves';
       for (const [label, d] of [['↑', -1], ['↓', 1]]) {
@@ -15663,6 +15706,14 @@ async function openNumbering(series) {
       meta.className = 'muted';
       meta.textContent = length(r);
       what.append(name, meta);
+      const said = guideLine(r);
+      if (said) {
+        const gl = document.createElement('span');
+        gl.className = `numbering-guide${said.warn ? ' warn' : ''}`;
+        gl.textContent = said.text;
+        what.append(gl);
+        if (said.warn) li.classList.add('guide-warn');
+      }
       const role = document.createElement('select');
       for (const [v, t] of [['episode', 'Episode'], ['extra', 'Extra'], ['playall', 'Play all'], ['drop', 'Don’t keep']]) {
         const o = document.createElement('option');
@@ -15697,13 +15748,101 @@ async function openNumbering(series) {
         li.classList.add('clash');
         to.textContent += '  (two files have this number)';
       }
-      li.append(moves, what, role, nums, to);
+      li.append(handle, moves, what, role, nums, to);
       return li;
     }));
     const clashes = [...seen.values()].some((n) => n > 1);
     apply.disabled = clashes;
+    // Most files not fitting the guide's lengths is likely another show of the
+    // same name (a remake): said once, above the files.
+    if (guide) {
+      const eps = rows.filter((r) => r.role === 'episode' && r.seconds);
+      const off = eps.filter((r) => { const said = guideLine(r); return said && said.warn; }).length;
+      list.dataset.wrongShow = eps.length >= 2 && off * 2 > eps.length ? '1' : '';
+      guideNote.textContent = guideSummary + (list.dataset.wrongShow ? ' Most of your files do not fit its episodes’ lengths - it may be another show of this name. Use Find the right show, then check again.' : '');
+    }
     note.textContent = clashes ? 'Two files have the same episode number. Change one, or Number in this order.' : '';
   };
+  // Dragging a row by its handle: it follows the finger or mouse, the others
+  // make way, and letting go puts it there and numbers them again.
+  const dragRow = (ev, li) => {
+    if (ev.button > 0) return;
+    ev.preventDefault();
+    const from = Number(li.dataset.index);
+    const items = [...list.children];
+    const boxes = items.map((el) => el.getBoundingClientRect());
+    const gap = items.length > 1 ? Math.abs(boxes[1].top - boxes[0].top) : boxes[from].height;
+    const startY = ev.clientY;
+    const startScroll = card.scrollTop;
+    let to = from;
+    let lastY = ev.clientY;
+    li.classList.add('dragging');
+    list.classList.add('dragging');
+    const place = () => {
+      const dy = lastY - startY + (card.scrollTop - startScroll);
+      li.style.transform = `translateY(${dy}px)`;
+      const mid = boxes[from].top + boxes[from].height / 2 + dy;
+      to = from;
+      for (let k = 0; k < boxes.length; k++) {
+        const c = boxes[k].top + boxes[k].height / 2;
+        if (k < from && mid < c && k < to) to = k;
+        if (k > from && mid > c) to = k;
+      }
+      items.forEach((el, k) => {
+        if (k === from) return;
+        let shift = 0;
+        if (from < to && k > from && k <= to) shift = -gap;
+        if (from > to && k >= to && k < from) shift = gap;
+        el.style.transform = shift ? `translateY(${shift}px)` : '';
+      });
+    };
+    // Near the sheet's edges it scrolls, while the finger rests there too.
+    const edge = setInterval(() => {
+      const box = card.getBoundingClientRect();
+      const before = card.scrollTop;
+      if (lastY < box.top + 48) card.scrollTop -= 14;
+      else if (lastY > box.bottom - 48) card.scrollTop += 14;
+      if (card.scrollTop !== before) place();
+    }, 30);
+    const move = (e) => { lastY = e.clientY; place(); };
+    const end = () => {
+      clearInterval(edge);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      items.forEach((el) => { el.style.transform = ''; });
+      li.classList.remove('dragging');
+      list.classList.remove('dragging');
+      if (to !== from) {
+        const [moved] = rows.splice(from, 1);
+        rows.splice(to, 0, moved);
+        numberInOrder();
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  };
+  guideBtn.addEventListener('click', async () => {
+    guideBtn.disabled = true;
+    guideNote.textContent = 'Asking the episode guide…';
+    const res = await api(`/api/tv/guide?${new URLSearchParams({ source: series.sourceId, id: series.id })}`);
+    guideBtn.disabled = false;
+    if (!res.ok || !res.body) { guideNote.textContent = (res.body && res.body.error) || 'Could not reach the episode guide.'; return; }
+    guide = res.body;
+    guideAt.clear();
+    guideSeason.clear();
+    for (const e of guide.episodes || []) {
+      guideAt.set(`${e.season}x${e.episode}`, e);
+      guideSeason.set(e.season, (guideSeason.get(e.season) || 0) + 1);
+    }
+    const seasons = guideSeason.size;
+    guideSummary = `${guide.show}${guide.year ? ` (${guide.year})` : ''}: ${(guide.episodes || []).length} episodes in ${seasons} season${seasons === 1 ? '' : 's'}, from TVmaze.`
+      + (guide.byName ? ' Found by its name only - check it is the right show, or use Find the right show first.' : '');
+    guideNote.textContent = guideSummary;
+    guideBtn.textContent = 'Check again';
+    draw();
+  });
   renumber.addEventListener('click', numberInOrder);
   seasonIn.addEventListener('change', numberInOrder);
   epIn.addEventListener('change', numberInOrder);

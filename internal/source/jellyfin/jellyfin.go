@@ -952,6 +952,22 @@ func (s *Source) ItemFiles(ctx context.Context, itemID string) ([]string, error)
 	return files, nil
 }
 
+// ProviderIDs is the outside databases' numbers for an item this source
+// owns ("Imdb", "Tvdb", "Tmdb"), as Jellyfin found them.
+func (s *Source) ProviderIDs(ctx context.Context, itemID string) (map[string]string, error) {
+	if err := s.owns(ctx, itemID); err != nil {
+		return nil, err
+	}
+	var item struct {
+		ProviderIds map[string]string `json:"ProviderIds"`
+	}
+	path := "/Users/" + url.PathEscape(s.cfg.UserID) + "/Items/" + url.PathEscape(itemID)
+	if err := s.http.JSON(ctx, path, url.Values{"Fields": {"ProviderIds"}}, &item); err != nil {
+		return nil, fmt.Errorf("jellyfin %q: provider ids: %w", s.id, err)
+	}
+	return item.ProviderIds, nil
+}
+
 type itemsResponsePaths struct {
 	Items []struct {
 		Path string `json:"Path"`

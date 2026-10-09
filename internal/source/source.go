@@ -865,6 +865,13 @@ type ShowBrowser interface {
 	NextEpisode(ctx context.Context, episodeID string) (media.Item, bool, error)
 }
 
+// ProviderIDer is an optional interface for a source that knows which
+// outside databases' numbers an item has (Jellyfin's ProviderIds: "Imdb",
+// "Tvdb", "Tmdb"), once it has been identified.
+type ProviderIDer interface {
+	ProviderIDs(ctx context.Context, itemID string) (map[string]string, error)
+}
+
 // PhotoMonth is one month of a photo library and how many it holds.
 type PhotoMonth struct {
 	Month string `json:"month"` // "2024-01"

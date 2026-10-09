@@ -36,6 +36,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/GabrielHollberg/soundstorm/internal/episodeguide"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -116,6 +117,11 @@ type Server struct {
 	filmMatches filmMatchCache
 	// posterChoices are the posters last listed for a film or show (filmmatch.go).
 	posterChoices posterListCache
+	// guide is the episode guide a show's numbering is checked against
+	// (episodes.go), made when first asked for; guideAsks limits asking it.
+	guideOnce sync.Once
+	guide     *episodeguide.Client
+	guideAsks allowance
 	// other writes worth a ceiling: listening positions sent on to the
 	// audiobook server, the scrobbling token checked online, the read-along
 	// queue reordered.
@@ -662,6 +668,7 @@ func (s *Server) Routes() http.Handler {
 	owner.HandleFunc("POST /api/films/{source}/{id}/match", s.limited(&s.listWrites, 60, time.Second, s.handleFilmMatch))
 	owner.HandleFunc("GET /api/films/poster", s.handleFilmPosterProxy)
 	owner.HandleFunc("GET /api/tv/numbering", s.handleNumbering)
+	owner.HandleFunc("GET /api/tv/guide", s.limited(&s.guideAsks, 20, 3*time.Second, s.handleEpisodeGuide))
 	owner.HandleFunc("POST /api/tv/numbering", s.limited(&s.listWrites, 60, time.Second, s.handleApplyNumbering))
 	owner.HandleFunc("GET /api/films/{source}/{id}/posters", s.limited(&s.listWrites, 60, time.Second, s.handlePosterChoices))
 	owner.HandleFunc("POST /api/films/{source}/{id}/posters", s.limited(&s.listWrites, 60, time.Second, s.handleChoosePoster))
@@ -698,6 +705,7 @@ func (s *Server) Routes() http.Handler {
 	guarded.Handle("/api/move", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/films/", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/tv/numbering", s.auth.RequireOwner(owner))
+	guarded.Handle("/api/tv/guide", s.auth.RequireOwner(owner))
 
 	mux.Handle("/api/", s.auth.Require(s.withUserContext(guarded)))
 
