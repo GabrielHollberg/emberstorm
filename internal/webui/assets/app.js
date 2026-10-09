@@ -4384,7 +4384,8 @@ window.addEventListener('drop', (event) => {
 async function collectFiles(dataTransfer) {
   // Already listed, with their paths: a USB drive's files (bringInDrive).
   if (dataTransfer.dropped) return dataTransfer.dropped;
-  const entries = [...(dataTransfer.items || [])]
+  // Caught at the drop (snapshotTransfer), or read from it now.
+  const entries = dataTransfer.entries || [...(dataTransfer.items || [])]
     .map((item) => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
     .filter(Boolean);
 
@@ -4430,12 +4431,33 @@ function walkEntry(entry, prefix, out) {
 /* ---- the drop itself ---- */
 
 let intakeBusy = false;
+// Drops made while others are being looked at or sent (the owner's asking,
+// 2026-10-09: a second drop did nothing at all). Each is taken as it comes -
+// a drop's folders can only be read from what was caught during the drop
+// itself - and looked at once the files before it are in.
+const intakeQueue = [];
+
+function snapshotTransfer(dataTransfer) {
+  if (dataTransfer.dropped || dataTransfer.entries) return dataTransfer;
+  const entries = [...(dataTransfer.items || [])]
+    .map((item) => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
+    .filter(Boolean);
+  return { entries, files: [...(dataTransfer.files || [])] };
+}
 
 async function intake(dataTransfer) {
-  if (intakeBusy) return;
+  const caught = snapshotTransfer(dataTransfer);
+  if (intakeBusy) {
+    intakeQueue.push(caught);
+    const n = intakeQueue.length;
+    showToast(n === 1 ? 'Got them - they will be looked at as soon as these are in.'
+      : `Got them - ${n} more drops will be looked at as soon as these are in.`);
+    return;
+  }
   intakeBusy = true;
   try {
-    await runIntake(dataTransfer);
+    await runIntake(caught);
+    while (intakeQueue.length) await runIntake(intakeQueue.shift());
   } finally {
     intakeBusy = false;
   }
