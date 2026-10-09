@@ -516,6 +516,29 @@ func (s *Server) handleBackupCheck(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"have": have, "usage": s.photoUsageJSON(u)})
 }
 
+// GET /api/photos/backup/marker: the person's photo folder summed up in one
+// short string (library.PersonalMarker). A phone keeps the marker from the end
+// of its last run with the photos the server confirmed; while the marker is
+// unchanged it checks only photos it has not had confirmed, and when it has
+// changed - a photo deleted or lost here, files added or moved by hand - or a
+// day has passed, it checks every photo again (the owner's asking,
+// 2026-10-09: a run used to check the whole library every time). Read fresh
+// each time: two a run, against hundreds of checks for a big library.
+func (s *Server) handleBackupMarker(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	if _, err := s.uploadKind(r, string(media.KindPicture)); err != nil {
+		writeError(w, statusForUpload(err), err.Error())
+		return
+	}
+	if !s.backupAccount(w, r, u) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"marker": s.library.PersonalMarker(u.Name)})
+}
+
 // PUT /api/photos/backup?name=&taken=: one photo or video from a phone, the
 // whole request body, into the person's own folder by when it was taken. The
 // owner's phone backs up the same way, into their own folder.

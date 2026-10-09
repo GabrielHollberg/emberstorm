@@ -7318,6 +7318,27 @@ each sent again on the next run. The UI test's second-run path - finding the
 backup switch in Settings when it is already on - fails to tap the switch
 now that Settings has more cards above it; the first-run path passes.)*
 `TestADeletedBackupIsNotSentBack`.
+**And each run checks only what is new** (2026-10-09, the owner's asking:
+professional, no more work than needed - a run asked about every photo,
+about 500 requests for 50,000, plus the iPhone looking each one up). The
+server gives a marker of the person's photo folder (`GET
+/api/photos/backup/marker`, `library.PersonalMarker`: a count and an
+order-free sum of each file's place and size, date files left out) that
+changes when a photo is added, removed, renamed or replaced. The phone keeps
+the photos the server confirmed with a stamp (Android: MediaStore's size and
+last change, free to read) and the marker from the end of its last run;
+while the marker holds it checks only photos not confirmed or edited since.
+It checks every photo when the marker moved, a day has passed, the server
+has no marker (an older one) or another server or account is chosen; a full
+check cut short is finished by the next run (`fullPending`). The server
+stays the record - lost photos come back on the next full check. Android
+0.53 (`PhotoBackup.confirmed`, `fullDue`). `TestTheBackupMarkerFollowsThePhotoFolder`.
+Not tried on a phone. **For the Mac:** the iPhone's `PhotoBackup` wants the
+same: keep each asset's `localIdentifier` with a stamp
+(`modificationDate`, which changes on an edit) once the server confirms it,
+fetch the marker at the start and end of a run, and while it holds look up
+and check only assets not confirmed - which also spares the Photos lookups
+of every asset that made the looks stutter after opening.
 **Then the iPhone's first full run flooded the server**: iOS sent dozens of
 the background session's files at once over one connection, the server took
 four per person, and the rest waited three minutes and got 429 - 898 refusals

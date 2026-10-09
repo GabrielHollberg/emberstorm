@@ -275,3 +275,50 @@ func TestAnOldBackupHealsOnTheNextCheck(t *testing.T) {
 		t.Errorf("a picture with no date inside should be dated: %v", err)
 	}
 }
+
+// The backup marker changes when a photo arrives or goes, not otherwise, and
+// not for a date file written beside a photo: a phone checks only its newest
+// photos while it holds, and all of them when it moves.
+func TestTheBackupMarkerFollowsThePhotoFolder(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t)
+	marker := func() string {
+		t.Helper()
+		status, body := h.do(t, http.MethodGet, "/api/photos/backup/marker", "")
+		var out struct{ Marker string }
+		_ = json.Unmarshal(body, &out)
+		if status.StatusCode != http.StatusOK || out.Marker == "" {
+			t.Fatalf("marker: %d %s", status.StatusCode, body)
+		}
+		return out.Marker
+	}
+	empty := marker()
+	taken := time.Date(2019, 3, 14, 15, 9, 26, 0, time.UTC).UnixMilli()
+	req, _ := http.NewRequest(http.MethodPut, h.srv.URL+"/api/photos/backup?name=Old.png&taken="+strconv.FormatInt(taken, 10),
+		strings.NewReader("\x89PNG\r\n\x1a\n a backed-up picture"))
+	resp, err := h.client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("backup: %v %v", err, resp)
+	}
+	resp.Body.Close()
+	one := marker()
+	if one == empty {
+		t.Fatal("a photo arrived and the marker did not change")
+	}
+	if again := marker(); again != one {
+		t.Errorf("nothing changed and the marker did: %s then %s", one, again)
+	}
+	dir := filepath.Join(h.libraryRoot(t), "pictures", "Personal", "gabe", "2019", "03")
+	if err := os.WriteFile(filepath.Join(dir, "Old.png.xmp"), []byte("<x/>"), 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if got := marker(); got != one {
+		t.Errorf("a date file beside a photo moved the marker: %s then %s", one, got)
+	}
+	if err := os.Remove(filepath.Join(dir, "Old.png")); err != nil {
+		t.Fatal(err)
+	}
+	if got := marker(); got != empty {
+		t.Errorf("the photo removed by hand: marker %s, want the empty folder's %s", got, empty)
+	}
+}

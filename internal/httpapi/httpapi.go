@@ -563,6 +563,7 @@ func (s *Server) Routes() http.Handler {
 	// Everyone's own photos: their space, and their phone's backup.
 	guarded.HandleFunc("GET /api/photos/usage", s.handlePhotoUsage)
 	guarded.HandleFunc("POST /api/photos/backup/check", s.limited(&s.photoChecks, 60, time.Second, s.handleBackupCheck))
+	guarded.HandleFunc("GET /api/photos/backup/marker", s.limited(&s.photoChecks, 60, time.Second, s.handleBackupMarker))
 	guarded.HandleFunc("GET /api/photos/albums", s.handlePhotoAlbums)
 	guarded.HandleFunc("POST /api/photos/albums", s.limited(&s.listWrites, 60, time.Second, s.handleCreatePhotoAlbum))
 	guarded.HandleFunc("POST /api/photos/albums/{id}/add", s.limited(&s.listWrites, 60, time.Second, s.handlePhotoAlbumItems(true)))
