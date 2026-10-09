@@ -4065,6 +4065,9 @@ function startAt(url, offset) {
   // What is playing, for starting it again after the connection drops
   // (audioRecover); kept without any retry mark of its own.
   audio.currentURL = String(url).replace(/[?&]retry=\d+$/, '');
+  // Where this file was asked to start: a retry before it has played starts
+  // there, not where the last file had got to (audioRecover).
+  audio.askedOffset = offset > 0 ? offset : 0;
   // Start the clock now, or the first timeupdate is already older than the
   // interval and every play begins by writing back the position it just read.
   audio.savedAt = Date.now();
@@ -4846,7 +4849,11 @@ function reviewPlan(files, review) {
     $('intake-questions').replaceChildren();
     $('intake-list').replaceChildren();
     files.forEach(renderIntakeRow);
-    const done = (d) => { host.replaceChildren(); resolve(d); };
+    // Closing the sheet (its X) is a Cancel too: left waiting, the drop never
+    // finished and every later one was queued behind it for good (a review,
+    // 2026-10-09).
+    const done = (d) => { INTAKE.reviewDone = null; host.replaceChildren(); resolve(d); };
+    INTAKE.reviewDone = done;
     const groupOf = (p) => p.group || p.path;
     const excluded = review.excluded;
     const asked = review.asked;
@@ -4970,7 +4977,7 @@ function reviewPlan(files, review) {
     cancel.type = 'button';
     cancel.className = 'ghost';
     cancel.textContent = 'Cancel';
-    cancel.addEventListener('click', () => resolve(null));
+    cancel.addEventListener('click', () => done(null));
     actions.append(cancel);
     host.append(actions);
     filesToggle(files.length > 0);
@@ -5759,6 +5766,23 @@ async function sendFiles(plan, dropped) {
       followAppUploads();
       return;
     }
+    // A file only the app can read (picked in it, or shared into it) is never
+    // sent from here: the page cannot read it, and sent anyway it went up as
+    // the words "[object Object]" (a review, 2026-10-09). Files the page
+    // holds itself still go.
+    const appOnly = queue.filter((item) => !(item.file instanceof Blob));
+    for (const item of appOnly) {
+      markIntakeRow(item.path, { ok: false, error: r ? 'not added - the app could not read it; add it again' : 'not added - the app did not answer; add it again' });
+    }
+    if (appOnly.length) {
+      const kept = queue.filter((item) => item.file instanceof Blob);
+      queue.length = 0;
+      queue.push(...kept);
+      if (!queue.length) {
+        $('intake-title').textContent = 'Not added - try adding them again.';
+        return;
+      }
+    }
   }
   show($('intake-bar'), true);
   INTAKE.sending = true;
@@ -6014,6 +6038,7 @@ $('intake-close').addEventListener('click', () => {
   show($('intake-chip'), false);
   $('intake-questions').replaceChildren();
   $('intake-review').replaceChildren();
+  if (INTAKE.reviewDone) INTAKE.reviewDone(null);
 });
 
 /* ------------------------------------------------------------------- boot */
@@ -9753,12 +9778,14 @@ const audioRecover = (() => {
   let tries = 0;
   let timer = 0;
   let lastT = 0;
+  let lastURL = '';
   let waitingSince = 0;
   let gaveUp = false;
   let failedAt = 0;
   player.addEventListener('timeupdate', () => {
     if (player.paused || !(player.currentTime > 0)) return;
     lastT = player.currentTime;
+    lastURL = audio.currentURL;
     if (tries && Date.now() - failedAt > 4000) {
       if (tries >= 2) showToast('Playing again');
       tries = 0;
@@ -9781,7 +9808,7 @@ const audioRecover = (() => {
       waitingSince = 0;
       rememberSlowLink();
       noteStreamQuality(item);
-      startAt(playPath(item), lastT);
+      startAt(playPath(item), reached());
       return;
     }
     if (waitingSince && !player.paused && Date.now() - waitingSince > 20000) {
@@ -9791,6 +9818,11 @@ const audioRecover = (() => {
   }, 3000);
   addEventListener('online', () => { if (timer) { clearTimeout(timer); timer = 0; retry(); } });
   const playable = () => audio.item && audio.currentURL && !(typeof RA !== 'undefined' && RA.on);
+  // Where this file got to: its own last moment, or where it was asked to
+  // start if it never played - not the last file's (a review, 2026-10-09: a
+  // chapter that failed at its start was retried at the chapter before's end,
+  // and skipped).
+  const reached = () => (lastURL === audio.currentURL ? lastT : (audio.askedOffset || 0));
   function schedule() {
     if (!playable() || timer) return;
     failedAt = Date.now();
@@ -9810,7 +9842,7 @@ const audioRecover = (() => {
     const url = audio.currentURL;
     const kept = audio.urlMap && audio.urlMap[url];
     const again = kept || !/^(\/|https?:)/.test(url) ? url : `${url}${url.includes('?') ? '&' : '?'}retry=${tries}`;
-    startAt(again, lastT);
+    startAt(again, reached());
     audio.currentURL = url;
   }
   return {

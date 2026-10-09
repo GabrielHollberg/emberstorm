@@ -469,7 +469,12 @@ class BackupWorker(context: Context, params: WorkerParameters) : Worker(context,
         val c = applicationContext
         // The job that waits for new photos is used up by running; set it up
         // again for the next one.
-        PhotoBackup.watchForNewPhotos(c)
+        // Set up again from the new-photo job itself (APPEND_OR_REPLACE, which
+        // replaces it as it ends); from any other job only if missing (KEEP) -
+        // appended from those, a new link was added to its chain every run
+        // and they piled up (a review, 2026-10-09).
+        val fromNewPhoto = triggeredContentUris.isNotEmpty() || triggeredContentAuthorities.isNotEmpty()
+        PhotoBackup.watchForNewPhotos(c, if (fromNewPhoto) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP)
         if (!PhotoBackup.enabled(c) || !PhotoBackup.hasPermission(c)) return Result.success()
         val candidates = PhotoBackup.servers(c)
         if (candidates.isEmpty()) return Result.success()
@@ -549,7 +554,9 @@ class BackupWorker(context: Context, params: WorkerParameters) : Worker(context,
                         // over: newest first, every retry met it first and
                         // nothing older was ever sent (a review). Space, the
                         // sign-in and access still stop the job.
-                        if (e.code in listOf(401, 403, 429, 507)) throw e
+                        // A server error or timeout is not this photo's fault: tried again
+                        // later, never counted as backed up (a review, 2026-10-09).
+                        if (e.code in listOf(401, 403, 408, 429, 507) || e.code >= 500) throw e
                         android.util.Log.w("PhotoBackup", "passed over ${item.name}: ${e.message}")
                         PhotoBackup.record(c, problem = "Passed over ${item.name}: ${e.message}")
                     }

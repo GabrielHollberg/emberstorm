@@ -696,6 +696,21 @@ func (m *Manager) liveSession(r *http.Request) (string, state.User, bool) {
 	return "", state.User{}, false
 }
 
+// Renew keeps a session in use alive: past half its life it is extended to a
+// full one, and the cookie sent again. Without it every device was signed out
+// thirty days after signing in however much it was used - TVs, the apps and
+// phone backup with them (a review, 2026-10-09). A device unused for thirty
+// days still is.
+func (m *Manager) Renew(w http.ResponseWriter, r *http.Request) {
+	token, _, ok := m.liveSession(r)
+	if !ok {
+		return
+	}
+	if expiry, renewed := m.store.RenewSession(token, sessionTTL); renewed {
+		m.SetCookie(w, r, token, expiry)
+	}
+}
+
 // Authenticated reports whether the request carries a live session.
 func (m *Manager) Authenticated(r *http.Request) bool {
 	_, ok := m.UserFor(r)

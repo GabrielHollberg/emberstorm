@@ -562,7 +562,7 @@ const HANDS_OFF_MS = 12000;
 function startFollowing(view, timeline, audiobook) {
   stopFollowing();
   const follow = {
-    view, timeline, audiobook, index: -1, lit: null, movedByUs: false, handsOffUntil: 0,
+    view, timeline, audiobook, index: -1, lit: null, movedByUs: 0, handsOffUntil: 0,
     highlight: window.soundstormHighlight ? window.soundstormHighlight() : true,
   };
   renderHighlightButton(follow);
@@ -572,7 +572,7 @@ function startFollowing(view, timeline, audiobook) {
   // and taking it for one held the page still for the first twelve seconds.
   follow.settledAt = Date.now() + 2500;
   follow.onRelocate = () => {
-    if (follow.movedByUs || Date.now() < follow.settledAt) return;
+    if (follow.movedByUs > 0 || Date.now() < follow.settledAt) return;
     follow.handsOffUntil = Date.now() + HANDS_OFF_MS;
   };
   view.addEventListener('relocate', follow.onRelocate);
@@ -698,12 +698,15 @@ async function tick(follow) {
     const resolved = view.resolveNavigation(follow.timeline[index].h);
     if (!resolved) return;
     if (Date.now() >= follow.handsOffUntil) {
-      follow.movedByUs = true;
+      // A count, not a flag: one move's reset landing during another's took
+      // that one for a hand turn, and the page stopped following for twelve
+      // seconds (a review, 2026-10-09).
+      follow.movedByUs++;
       try {
         await view.renderer.goTo(resolved);
       } finally {
         // The relocate this causes can arrive a little after goTo settles.
-        setTimeout(() => { follow.movedByUs = false; }, 400);
+        setTimeout(() => { follow.movedByUs--; }, 400);
       }
     }
     const contents = view.renderer.getContents?.() || [];
@@ -762,10 +765,10 @@ function followWithinSentence(follow, t) {
       const range = el.ownerDocument.createRange();
       range.setStart(n, Math.min(want, n.data.length));
       range.collapse(true);
-      follow.movedByUs = true;
+      follow.movedByUs++;
       Promise.resolve(follow.view.renderer.scrollToAnchor?.(range))
         .catch(() => {})
-        .finally(() => setTimeout(() => { follow.movedByUs = false; }, 400));
+        .finally(() => setTimeout(() => { follow.movedByUs--; }, 400));
       return;
     }
     want -= n.data.length;
@@ -774,8 +777,16 @@ function followWithinSentence(follow, t) {
 
 export async function close() {
   opening++;
+  // Reading in the moving line or a word at a time, on its own: the pages
+  // did not move, so nothing was saved - turned to where the reading got to
+  // first, which saves it (a review, 2026-10-09).
+  const reading = free.on && !session.follow;
   stopFollowing();
-  stopFree();
+  if (reading) {
+    try { await freeToPages(); } catch { stopFree(); }
+  } else {
+    stopFree();
+  }
   await flushProgress();
 
   const frame = $('reader-pdf');

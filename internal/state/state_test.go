@@ -439,3 +439,28 @@ func TestABackendSetUpAgainForgetsItsMembersAccounts(t *testing.T) {
 		t.Error("the member's half-made setup secret was kept")
 	}
 }
+
+// A session in use is extended once past half its life, not before.
+func TestASessionInUseIsRenewed(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ttl := 30 * 24 * time.Hour
+	if err := s.AddSession("fresh", "u1", time.Now().Add(ttl)); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.RenewSession("fresh", ttl); ok {
+		t.Error("a fresh session was renewed")
+	}
+	if err := s.AddSession("old", "u1", time.Now().Add(5*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	exp, ok := s.RenewSession("old", ttl)
+	if !ok || exp.Before(time.Now().Add(ttl-time.Minute)) {
+		t.Errorf("an old session was not renewed: %v %v", exp, ok)
+	}
+	if _, ok := s.RenewSession("nobody", ttl); ok {
+		t.Error("a session that does not exist was renewed")
+	}
+}

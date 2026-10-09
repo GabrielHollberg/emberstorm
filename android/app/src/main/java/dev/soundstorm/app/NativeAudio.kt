@@ -147,7 +147,9 @@ object NativeAudio {
 
     private fun sleepNow() {
         val p = player ?: return
-        if (!p.isPlaying) return
+        // Meant to play, not only playing: a moment that falls while the next
+        // song loads (buffering) was dropped, and it played on all night.
+        if (!p.playWhenReady) return
         PlayerLog.add("sleep timer: fading out")
         val start = p.volume
         val began = android.os.SystemClock.uptimeMillis()
@@ -375,6 +377,20 @@ object NativeAudio {
 
     /** Next or previous from the lock screen, a notification or a car. */
     fun skip(next: Boolean) {
+        // No page (Android ended it in the background): the player has the
+        // songs after this one itself, so it moves among them - the page's
+        // handlers were asked and nothing happened (a review, 2026-10-09).
+        if (webView.get() == null) {
+            val p = player ?: return
+            if (next) {
+                if (p.hasNextMediaItem()) p.seekToNextMediaItem()
+            } else if (p.currentPosition > 3000 || !p.hasPreviousMediaItem()) {
+                p.seekTo(0)
+            } else {
+                p.seekToPreviousMediaItem()
+            }
+            return
+        }
         val actions = MediaBridge.current?.actions.orEmpty()
         when {
             next && "nexttrack" in actions -> MediaBridge.dispatch("nexttrack")
