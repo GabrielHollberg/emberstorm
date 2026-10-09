@@ -4491,7 +4491,9 @@ async function runIntake(dataTransfer) {
   for (;;) {
     const { ok, body } = await api('/api/upload/plan', {
       method: 'POST',
-      body: JSON.stringify({ paths, choices }),
+      // Sizes tell a disc's film from its extras (MakeMKV names every title
+      // alike): the largest is the film, the small ones its extras.
+      body: JSON.stringify({ paths, sizes: dropped.map((d) => (d.file && d.file.size) || 0), choices }),
     });
     if (!ok || !body) {
       $('intake-title').textContent = (body && body.error) || 'EmberStorm could not take those.';
@@ -5612,7 +5614,7 @@ async function sendFiles(plan, dropped) {
   const drive = queue[0].file.drive;
   if (drive && queue.every((item) => item.file.drive === drive)) {
     const jobs = queue.map((item) => ({
-      id: item.file.appId, name: item.file.name, path: item.path, kind: item.kind, group: item.group || '',
+      id: item.file.appId, name: item.file.name, path: item.upload || item.path, kind: item.kind, group: item.group || '',
       conflict: item.conflict === 'keep' || item.conflict === 'replace' ? item.conflict : '',
       as: item.conflict === 'keep' && item.asName ? item.asName : '',
       taken: (item.kind === 'picture' || item.kind === 'video') && item.file.lastModified ? item.file.lastModified : 0,
@@ -5628,7 +5630,7 @@ async function sendFiles(plan, dropped) {
     const jobs = queue.map((item) => ({
       // id: a file the iPhone app picked and holds (FileUploads.swift).
       id: item.file.appId || '',
-      name: item.file.name, size: item.file.size, path: item.path, kind: item.kind, group: item.group || '',
+      name: item.file.name, size: item.file.size, path: item.upload || item.path, kind: item.kind, group: item.group || '',
       conflict: item.conflict === 'keep' || item.conflict === 'replace' ? item.conflict : '',
       as: item.conflict === 'keep' && item.asName ? item.asName : '',
       taken: (item.kind === 'picture' || item.kind === 'video') && item.file.lastModified ? item.file.lastModified : 0,
@@ -5706,7 +5708,7 @@ function summary(added, skipped, failed, stopped = 0) {
 // progress bar looks like a hang.
 function uploadOne(item, onProgress) {
   return new Promise((resolve) => {
-    const params = new URLSearchParams({ path: item.path, kind: item.kind });
+    const params = new URLSearchParams({ path: item.upload || item.path, kind: item.kind });
     // A taken name, as the person chose: keep both, or replace.
     if (item.conflict === 'keep' || item.conflict === 'replace') params.set('conflict', item.conflict);
     if (item.conflict === 'keep' && item.asName) params.set('as', item.asName);

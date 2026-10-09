@@ -127,6 +127,11 @@ type Placement struct {
 	// UI shows: "movies/Arrival (2016)/Arrival (2016).mkv".
 	Dest string `json:"dest,omitempty"`
 
+	// Upload is the path an upload of this file should name, when not the
+	// dropped one: a disc's extras and second versions, which the server,
+	// seeing one file at a time, would name like the film (discTitles).
+	Upload string `json:"upload,omitempty"`
+
 	// Skipped and Reason explain a file EmberStorm will not take.
 	Skipped bool   `json:"skipped,omitempty"`
 	Reason  string `json:"reason,omitempty"`
@@ -149,6 +154,14 @@ type Question struct {
 	Count int `json:"count"`
 
 	Options []media.Kind `json:"options"`
+}
+
+// PlanSized is Plan with each dropped file's size (sizes[i] for paths[i], 0
+// where not known), which tells a disc's film from its extras (discTitles).
+func (l *Library) PlanSized(paths []string, sizes []int64, choices map[string]media.Kind) ([]Placement, []Question) {
+	out, questions := l.Plan(paths, choices)
+	discTitles(out, sizes)
+	return out, questions
 }
 
 // Plan decides where a set of dropped paths should go.

@@ -1593,6 +1593,9 @@ const maxPlanBody = 4 << 20
 func (s *Server) handleUploadPlan(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Paths []string `json:"paths"`
+		// Each file's size, in order, where the page knows it: a disc's film
+		// is told from its extras by them (library.discTitles).
+		Sizes []int64 `json:"sizes"`
 		// Choices answer questions a previous plan asked, keyed by group.
 		Choices map[string]string `json:"choices"`
 	}
@@ -1622,7 +1625,7 @@ func (s *Server) handleUploadPlan(w http.ResponseWriter, r *http.Request) {
 		choices[group] = kind
 	}
 
-	placements, questions := s.library.Plan(body.Paths, choices)
+	placements, questions := s.library.PlanSized(body.Paths, body.Sizes, choices)
 	// A member's pictures go to their own folder: show them where.
 	if u, ok := auth.FromContext(r.Context()); ok {
 		s.personalPlan(u, placements)
