@@ -194,9 +194,9 @@ final class AppModel {
         // name must resolve to the machine this TV is on and give its id.
         if server.host().flatMap(ServerAddress.installName)?.label != offeredName.label {
             guard await ServerAddress.sameMachine(url, server) else { return nil }
-            if ServerAddress.installName(server.host() ?? "") != nil {
-                guard let a = await ServerAddress.healthID(url), let b = await ServerAddress.healthID(server), a == b else { return nil }
-            }
+            // And the same install id at both, from a plain address too (the
+            // thirteenth pass): anybody can point a name at a private address.
+            guard let a = await ServerAddress.healthID(url), let b = await ServerAddress.healthID(server), a == b else { return nil }
         }
         guard (try? await ServerAddress.check(url)) != nil else { return nil }
         return url

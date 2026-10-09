@@ -517,11 +517,11 @@ final class PhotoBackup: NSObject {
                 out.append(twin)
             }
         }
-        for typed in [defaults.string(forKey: "backup.typed").flatMap(URL.init(string:)), ServerAddress.saved].compactMap({ $0 })
-        where !out.contains(where: { $0.host() == typed.host() && $0.port == typed.port }) {
-            out.append(typed)
-        }
-        return out
+        // Only the server backup was turned on for, and its twin, over https
+        // (the thirteenth pass): the address typed or saved could be plain
+        // http, which whatever answers at that address elsewhere could take,
+        // or another server altogether.
+        return out.filter { $0.scheme == "https" }
     }
 
     /// Every photo, and video if asked for, newest first.

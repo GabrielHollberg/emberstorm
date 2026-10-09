@@ -90,7 +90,7 @@ nonisolated enum ServerDiscovery {
         return found.filter { seen.insert($0.url).inserted }.sorted { $0.label < $1.label }
     }
 
-    struct Health: Decodable, Sendable { let status: String; let sources: Int; let name: String?; let setUp: Bool? }
+    struct Health: Decodable, Sendable { let status: String; let sources: Int; let name: String?; let setUp: Bool?; let id: String? }
 
     private static func health(_ url: URL, _ session: URLSession) async -> Health? {
         guard let (data, response) = try? await ServerAddress.smallData(URLRequest(url: url.appending(path: "healthz")), session: session),
@@ -106,7 +106,11 @@ nonisolated enum ServerDiscovery {
               let name = (try? JSONDecoder().decode(Session.self, from: data))?.secureName,
               ServerAddress.installName(name) != nil,
               let secure = URL(string: "https://\(name):\(port)"),
-              await health(secure, session) != nil else { return nil }
+              // The same install at both: anybody can name a private address,
+              // so the secure name must give the plain address's own id (the
+              // thirteenth pass) - a new box's setup code goes to it.
+              let mine = await health(plain, session)?.id, await health(secure, session)?.id == mine
+        else { return nil }
         return secure
     }
 

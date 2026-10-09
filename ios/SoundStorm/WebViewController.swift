@@ -170,9 +170,14 @@ final class WebViewController: UIViewController {
             pendingInvite = nil
             address = server.appending(queryItems: [URLQueryItem(name: "invite", value: token)])
         }
+        // A new box's setup code rides in the address only to its secure
+        // name (found and checked as the same install); over plain http the
+        // person types it on the page (the thirteenth pass, as Android 0.50).
         if let code = ServerAddress.pendingSetup {
             ServerAddress.pendingSetup = nil
-            address = server.appending(queryItems: [URLQueryItem(name: "setup", value: code)])
+            if server.scheme == "https" {
+                address = server.appending(queryItems: [URLQueryItem(name: "setup", value: code)])
+            }
         }
         webView.load(URLRequest(url: address))
     }
@@ -580,7 +585,10 @@ final class WebViewController: UIViewController {
            let twin = ServerAddress.twin(failed, level: "net"), ServerAddress.installName(failed.host() ?? "")?.level == "home" {
             triedTwin = true
             current = twin
-            webView.load(URLRequest(url: twin))
+            Task {
+                await Self.mirrorCookies(from: failed, to: twin)
+                self.webView.load(URLRequest(url: twin))
+            }
             return
         }
         AppChrome.shared.statusBarHidden = false
@@ -748,6 +756,26 @@ final class WebViewController: UIViewController {
         }
     }
 
+    /// The sign-in's cookies (session, device, profile) from one of an
+    /// install's names to another, and taken from there when gone from here
+    /// (signed out). Only those, only the host's own.
+    private static func mirrorCookies(from: URL, to: URL) async {
+        guard let a = from.host()?.lowercased(), let b = to.host()?.lowercased() else { return }
+        let store = WKWebsiteDataStore.default().httpCookieStore
+        let all = await store.allCookies()
+        let ours = { (c: HTTPCookie) in c.name.hasPrefix("soundstorm_") || c.name.hasPrefix("__Host-soundstorm_") }
+        let here = all.filter { $0.domain.lowercased() == a && ours($0) }
+        for cookie in here {
+            var props = cookie.properties ?? [:]
+            props[.domain] = b
+            if let copy = HTTPCookie(properties: props) { await store.setCookie(copy) }
+        }
+        let kept = Set(here.map(\.name))
+        for cookie in all where cookie.domain.lowercased() == b && ours(cookie) && !kept.contains(cookie.name) {
+            await store.deleteCookie(cookie)
+        }
+    }
+
     /// The sign-in for one of the server's names, given to another: the
     /// web view keeps cookies per name.
     private static func copyCookies(from old: URL, to new: URL) async {
@@ -775,9 +803,13 @@ final class WebViewController: UIViewController {
             guard let a = await theirs, let b = await ours, a == b else { return false }
             return await one
         }
-        // From a plain-http address: only a home name that resolves to it -
-        // any name was followed before (the eleventh security pass).
+        // From a plain-http address: only a home name that resolves to it and
+        // answers with the same install id (the eleventh and thirteenth
+        // passes - anybody can point a name at a private address).
         guard current.scheme == "http" else { return false }
+        async let theirs = ServerAddress.healthID(url)
+        async let ours = ServerAddress.healthID(current)
+        guard let a = await theirs, let b = await ours, a == b else { return false }
         return await ServerAddress.sameMachine(url, current)
     }
 }
@@ -828,6 +860,12 @@ extension WebViewController: WKNavigationDelegate {
         // owner may have renamed it since).
         let server = self.server
         Task { try? await ServerAddress.check(server) }
+        // The sign-in carried to this name's twin (home <-> away), so leaving
+        // the Wi-Fi does not ask for it again (as Android 0.52).
+        if let twin = ServerAddress.installName(current.host() ?? "").flatMap({ ServerAddress.twin(current, level: $0.level == "home" ? "net" : "home") }) {
+            let here = current
+            Task { await Self.mirrorCookies(from: here, to: twin) }
+        }
         #if DEBUG
         audioTest(webView)
         #endif

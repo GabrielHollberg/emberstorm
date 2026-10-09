@@ -58,13 +58,19 @@ final class ConnectFlowTests: XCTestCase {
         code.typeText("new-box-code")
         app.alerts.buttons["Continue"].tap()
 
-        // The page's sign-up, the code already in: only a name and password.
+        // The page's sign-up. Over plain http (this test box) the code is not
+        // put in the address - only a secure name checked as the same box gets
+        // it (the thirteenth pass) - so the page asks for it: typed there.
         let web = app.webViews.firstMatch
         let username = web.textFields.firstMatch
         XCTAssertTrue(username.waitForExistence(timeout: 15), "the sign-up never appeared")
-        XCTAssertFalse(web.staticTexts["Setup code"].exists, "the code should not be asked again")
         focus(username)
         username.typeText("tester")
+        let setupField = web.textFields.element(boundBy: 1)
+        if setupField.exists {
+            focus(setupField)
+            setupField.typeText("new-box-code")
+        }
         let password = web.secureTextFields.firstMatch
         focus(password)
         password.typeText("violet tractor glacier\n")
