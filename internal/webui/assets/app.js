@@ -3650,6 +3650,52 @@ function watchParams(item) {
   return new URLSearchParams({ source: item.sourceId, id: item.id });
 }
 
+// A film's place is also kept on the device (the owner's asking, 2026-10-09):
+// a downloaded film watched with no connection lost where it stopped, as the
+// save had nowhere to go. One that never reached the server is sent when the
+// connection comes back, and used on opening only when it is newer than the
+// server's - the newest watching wins, as for books.
+const watchKey = (item) => `soundstorm-watch:${item.sourceId}/${item.id}`;
+function localWatch(item) {
+  try {
+    const v = JSON.parse(localStorage.getItem(watchKey(item)) || 'null');
+    return v && typeof v.location === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+function keepLocalWatch(item, place, synced) {
+  try {
+    localStorage.setItem(watchKey(item), JSON.stringify({
+      ...place, synced, at: Date.now(), sourceId: item.sourceId, id: item.id,
+    }));
+  } catch { /* storage full */ }
+}
+// Places kept while offline, sent once there is a connection again.
+async function sendUnsentWatches() {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('soundstorm-watch:')) continue;
+    let v = null;
+    try { v = JSON.parse(localStorage.getItem(key) || 'null'); } catch { /* skip */ }
+    if (!v || v.synced || !v.sourceId || !v.id) continue;
+    const item = { sourceId: v.sourceId, id: v.id };
+    // Watched further elsewhere since: the server's stays, this one goes.
+    const now = await api(`/api/book/progress?${watchParams(item)}`);
+    if (!now.ok) continue;
+    if (now.body && now.body.found && (Date.parse(now.body.updatedAt || '') || 0) >= v.at) {
+      keepLocalWatch(item, { location: now.body.location, fraction: now.body.fraction }, true);
+      continue;
+    }
+    const sent = await api(`/api/book/progress?${watchParams(item)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ location: v.location, fraction: v.fraction }),
+    });
+    if (sent.ok) keepLocalWatch(item, { location: v.location, fraction: v.fraction }, true);
+  }
+}
+window.addEventListener('online', () => { sendUnsentWatches(); });
+
 // startWatching remembers what is playing and, once the player knows how long
 // it is, jumps to where this person stopped last time.
 async function startWatching(item, place = {}) {
@@ -3666,8 +3712,13 @@ async function startWatching(item, place = {}) {
     return;
   }
   const { ok, body } = await api(`/api/book/progress?${watchParams(item)}`);
-  if (state.watching !== watching || !ok || !body || !body.found) return;
-  const match = /^t=([0-9.]+)$/.exec(body.location || '');
+  if (state.watching !== watching) return;
+  // The server's place, unless one kept here is newer (watched offline).
+  const here = localWatch(item);
+  let found = ok && body && body.found ? body : null;
+  if (here && !here.synced && (!found || here.at > (Date.parse(found.updatedAt || '') || 0))) found = here;
+  if (!found) return;
+  const match = /^t=([0-9.]+)$/.exec(found.location || '');
   if (!match) return;
   const seconds = Number(match[1]);
   const player = $('video-player');
@@ -3698,13 +3749,13 @@ async function saveWatchPosition(force) {
       ? player.duration : (watching.item.durationSeconds || 0);
   if (!(seconds > 5) || !(length > 0)) return;
   watching.lastSave = now;
-  await api(`/api/book/progress?${watchParams(watching.item)}`, {
+  const place = { location: `t=${seconds.toFixed(1)}`, fraction: Math.min(1, Math.max(0, seconds / length)) };
+  keepLocalWatch(watching.item, place, false);
+  const saved = await api(`/api/book/progress?${watchParams(watching.item)}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      location: `t=${seconds.toFixed(1)}`,
-      fraction: Math.min(1, Math.max(0, seconds / length)),
-    }),
+    body: JSON.stringify(place),
   });
+  if (saved.ok) keepLocalWatch(watching.item, place, true);
   if (force) setTimeout(refreshContinue, 300);
 }
 
@@ -11156,7 +11207,7 @@ async function clearDownloads() {
     localStorage.removeItem('soundstorm.backupAsked');
     // Places kept for downloaded books are this person's too.
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith('soundstorm-pos:') || key.startsWith('soundstorm-read:')) localStorage.removeItem(key);
+      if (key.startsWith('soundstorm-pos:') || key.startsWith('soundstorm-read:') || key.startsWith('soundstorm-watch:')) localStorage.removeItem(key);
     }
     await caches.delete(OFFLINE_CACHE);
     await caches.delete(OFFLINE_SHELL);

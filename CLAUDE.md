@@ -3511,7 +3511,13 @@ at the end; every way into a book resumes from it. Three fixes:
   there; now only when newer than the server's (`loadProgress` in reader.js,
   against `/api/book/progress`'s `updatedAt`). Films and episodes keep no
   device copy (the server's alone) and stop with the screen, so neither
-  problem applies; a downloaded film watched offline does not keep its place.
+  problem applies. **And a film's place is kept on the device too** (the
+  owner's asking, the same day: a downloaded film watched offline lost it):
+  `keepLocalWatch` beside every save, one that never reached the server sent
+  on the `online` event (`sendUnsentWatches`, unless the server's is newer)
+  and used on opening only when newer than the server's. Checked on the test
+  server (`scripts/smoke/offlinewatch.js`): watched to 0:31 offline, kept on
+  the device unsent, on the server as 0:31 once back online.
 - **Play from the beginning** in an audiobook's hold menu: the one way into a
   book that does not resume (`audio.fromStart`).
 
