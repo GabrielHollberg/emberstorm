@@ -1468,6 +1468,30 @@ func (s *Store) DeleteSession(token string) error {
 	return s.save()
 }
 
+// RenewSession pushes a live session's expiry out to ttl from now once less
+// than half of ttl is left, and says so with the new expiry; a session with
+// more left is untouched, so the file is written about once a fortnight per
+// device rather than on every request.
+func (s *Store) RenewSession(token string, ttl time.Duration) (time.Time, bool) {
+	if token == "" {
+		return time.Time{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := hashSessionToken(token)
+	session, ok := s.d.Sessions[key]
+	now := time.Now()
+	if !ok || !now.Before(session.Expires) || session.Expires.Sub(now) > ttl/2 {
+		return time.Time{}, false
+	}
+	session.Expires = now.Add(ttl)
+	s.d.Sessions[key] = session
+	if err := s.save(); err != nil {
+		return time.Time{}, false
+	}
+	return session.Expires, true
+}
+
 // DeleteSessionsFor signs an account out everywhere except keep, which may be
 // empty. Used when a password changes: the old one may be known to somebody,
 // and their session would otherwise outlive the change by up to a month.

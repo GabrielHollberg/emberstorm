@@ -738,6 +738,7 @@ func (s *Server) withUserContext(next http.Handler) http.Handler {
 			})
 			return
 		}
+		s.auth.Renew(w, r)
 		ctx := source.WithUserID(r.Context(), user.ID)
 		// And what they are allowed to reach. Set here, once, for every
 		// guarded route - the Registry refuses anything outside it, so a

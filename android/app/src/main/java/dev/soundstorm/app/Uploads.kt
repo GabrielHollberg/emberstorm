@@ -140,6 +140,9 @@ object Uploads {
                     .put("conflict", j.optString("conflict"))
                     .put("as", j.optString("as"))
                     .put("taken", j.optLong("taken", 0)).put("state", "waiting")
+                    // Its own server: files still waiting when another server's
+                    // are added went to that one, under its sign-in (a review).
+                    .put("server", server)
             }
         }
         if (missing > 0) return JSONObject().put("added", false).put("missing", missing)
@@ -314,7 +317,23 @@ class UploadStopReceiver : BroadcastReceiver() {
 
 /** Sends what is waiting, one file at a time, in the foreground. */
 class UploadWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
+    companion object {
+        // One sender at a time: a job replaced while sending (an option
+        // changed) kept sending its file, and the new one sent the same file
+        // beside it (a review, 2026-10-09).
+        private val busy = java.util.concurrent.atomic.AtomicBoolean(false)
+    }
+
     override fun doWork(): Result {
+        if (!busy.compareAndSet(false, true)) return Result.retry()
+        try {
+            return work()
+        } finally {
+            busy.set(false)
+        }
+    }
+
+    private fun work(): Result {
         val c = applicationContext
         Uploads.record(c, running = true, problem = "")
         try {
@@ -331,7 +350,7 @@ class UploadWorker(context: Context, params: WorkerParameters) : Worker(context,
                 val size = job.optLong("size", 0)
                 Uploads.record(c, name = name, sent = 0, size = size)
                 runCatching { setForegroundAsync(Uploads.foregroundInfo(c, i, total, name, 0, size)).get() }
-                val server = q.optString("server")
+                val server = job.optString("server").ifEmpty { q.optString("server") }
                 val outcome: Pair<String, String> = try {
                     val dest = Uploads.send(c, server, job) { sent ->
                         Uploads.record(c, sent = sent)
