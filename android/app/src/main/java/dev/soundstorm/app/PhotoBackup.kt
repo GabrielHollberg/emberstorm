@@ -457,8 +457,13 @@ class BackupWorker(context: Context, params: WorkerParameters) : Worker(context,
         // APPEND_OR_REPLACE, which replaces it as it ends; from any other job
         // only if missing (KEEP) - appended from those, a new link was added
         // to its chain every run and they piled up.
+        // Only on a job's first run: a new-photo job run again (a server
+        // error asks for a retry) added another link to the chain each time,
+        // and it never shrank (a review).
         val fromNewPhoto = triggeredContentUris.isNotEmpty() || triggeredContentAuthorities.isNotEmpty()
-        PhotoBackup.watchForNewPhotos(applicationContext, if (fromNewPhoto) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP)
+        if (runAttemptCount == 0) {
+            PhotoBackup.watchForNewPhotos(applicationContext, if (fromNewPhoto) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP)
+        }
         if (!busy.compareAndSet(false, true)) return Result.success()
         try {
             return backUp()

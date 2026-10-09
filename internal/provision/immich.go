@@ -243,19 +243,24 @@ func enableImmichWatching(ctx context.Context, c *httpx.Client, authed map[strin
 // folder; signing in as the member is the only way to mint their API key.
 // The password is generated, used once and kept, like Audiobookshelf's.
 // existingImmichLibrary is the library a person's account already has on
-// their folder, or "".
-func existingImmichLibrary(ctx context.Context, c *httpx.Client, admin map[string]string, ownerID, folder string) string {
+// their folder, or "". A listing that did not answer is an error, tried
+// again later: taken for "none", a second library was made and every photo
+// processed twice (a review).
+func existingImmichLibrary(ctx context.Context, c *httpx.Client, admin map[string]string, ownerID, folder string) (string, error) {
 	resp, err := c.Do(ctx, httpx.Request{Method: http.MethodGet, Path: "/api/libraries", Headers: admin})
-	if err != nil || resp.Err() != nil {
-		return ""
+	if err != nil {
+		return "", fmt.Errorf("list photo libraries: %w", err)
+	}
+	if err := resp.Err(); err != nil {
+		return "", fmt.Errorf("list photo libraries: %w", err)
 	}
 	var libs []struct {
 		ID          string   `json:"id"`
 		OwnerID     string   `json:"ownerId"`
 		ImportPaths []string `json:"importPaths"`
 	}
-	if resp.JSON(&libs) != nil {
-		return ""
+	if err := resp.JSON(&libs); err != nil {
+		return "", fmt.Errorf("read photo libraries: %w", err)
 	}
 	for _, l := range libs {
 		if l.OwnerID != ownerID {
@@ -263,11 +268,11 @@ func existingImmichLibrary(ctx context.Context, c *httpx.Client, admin map[strin
 		}
 		for _, p := range l.ImportPaths {
 			if p == folder {
-				return l.ID
+				return l.ID, nil
 			}
 		}
 	}
-	return ""
+	return "", nil
 }
 
 func createImmichMember(ctx context.Context, c *httpx.Client, sec secrets, adminKey, username, name, folder string) (state.Identity, error) {
@@ -347,7 +352,11 @@ func createImmichMember(ctx context.Context, c *httpx.Client, sec secrets, admin
 	// An account signed in to again (set up before) already has its library:
 	// a second one had every photo processed twice and the faces doubled.
 	if kept {
-		if id := existingImmichLibrary(ctx, c, admin, user.ID, folder); id != "" {
+		id, err := existingImmichLibrary(ctx, c, admin, user.ID, folder)
+		if err != nil {
+			return state.Identity{}, err
+		}
+		if id != "" {
 			return state.Identity{
 				Username:  email,
 				Password:  password,

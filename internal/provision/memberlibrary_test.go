@@ -50,3 +50,30 @@ func TestAPhotoAccountSignedInAgainKeepsItsLibrary(t *testing.T) {
 		t.Errorf("library %q, %d made, key %q: want sam's own, none made", id.LibraryID, made.Load(), id.Token)
 	}
 }
+
+// A library listing that does not answer makes no second library: the
+// account is made again on a later try.
+func TestAPhotoAccountWaitsWhenItsLibrariesCannotBeListed(t *testing.T) {
+	var made atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/admin/users":
+			w.WriteHeader(http.StatusBadRequest)
+		case r.URL.Path == "/api/auth/login":
+			json.NewEncoder(w).Encode(map[string]string{"accessToken": "t", "userId": "u-sam"})
+		case r.URL.Path == "/api/api-keys":
+			json.NewEncoder(w).Encode(map[string]string{"secret": "new-key"})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/libraries":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case r.Method == http.MethodPost && r.URL.Path == "/api/libraries":
+			made.Add(1)
+			json.NewEncoder(w).Encode(map[string]string{"id": "second"})
+		}
+	}))
+	defer srv.Close()
+	c, _ := httpx.New(srv.URL, 5*time.Second)
+	kept := func(string) (string, bool, error) { return "sams-pass", true, nil }
+	if _, err := createImmichMember(context.Background(), c, kept, "admin", "sam", "Sam", "/pictures/Personal/sam"); err == nil || made.Load() != 0 {
+		t.Errorf("err %v, %d libraries made: want an error and none", err, made.Load())
+	}
+}
