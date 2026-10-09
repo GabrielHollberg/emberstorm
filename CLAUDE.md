@@ -6506,6 +6506,24 @@ What that found, and was put right:
   start (and saved that as its place) - thirty seconds now; a new photo
   arriving during a long backup left nothing watching for the next one.
 
+**And checked a third time** (the owner's asking: everything the review
+changed, as it stands, three fresh reviewers). Every original bug held fixed;
+put right: a photo account signed in to again made a second library when the
+listing did not answer (now an error, tried later); a retry after a dropped
+connection started at the file's old place after Play from the beginning
+(`audio.startSeq`); the chapter sleep timer, stopped by the phone app's own
+player with the screen off, was set again for the next chapter when the page
+woke (a pause no longer works it out again, and a chapter end gone by ends
+the timer); a book opened while the last one closed waits for the close
+(`closing` in reader.js), which had saved the old place into it. **Android
+0.57**: a page made again takes a paused book over without forgetting where
+its place is saved; a new-photo job retried added a link to its chain each
+time. Left: a member not yet back in Photos after the photo library is set
+up again is missing from an album's people until they open it (no
+`RemoteID`); Immich keeps the API keys of accounts made again; on the box,
+`systemctl cat docker` in the VM to see Debian's unit passes no log options
+that `daemon.json` would clash with.
+
 **Left from this review** (smaller or wanting a decision): keep-both
 subtitles not following the renamed video; a late second version's
 subtitles going to extras; Replace binning the old file before the new one

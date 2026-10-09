@@ -419,6 +419,7 @@ function isPDF(item) {
 let opening = 0;
 
 export async function open(item, options = {}) {
+  if (closing) await closing.catch(() => {});
   const me = ++opening;
   const stillOpen = () => me === opening;
   const overlay = $('reader-overlay');
@@ -775,23 +776,20 @@ function followWithinSentence(follow, t) {
   }
 }
 
-let closing = false;
+let closing = null;
 
 export async function close() {
   // Once at a time: turning to the pages may wait on a chapter, and a second
-  // tap meanwhile turned twice (a review).
-  if (closing) return;
-  closing = true;
-  try {
-    await closeBook();
-  } finally {
-    closing = false;
-  }
+  // tap meanwhile turned twice (a review). A book opened meanwhile waits for
+  // it (open), or the close saved the old place into the new book and tore
+  // it down (a review).
+  if (closing) return closing;
+  closing = closeBook().finally(() => { closing = null; });
+  return closing;
 }
 
 async function closeBook() {
   opening++;
-  const closingItem = session.item;
   // Reading in the moving line or a word at a time, on its own: the pages
   // did not move, so nothing was saved - turned to where the reading got to
   // first, which saves it (a review, 2026-10-09).
@@ -803,8 +801,6 @@ async function closeBook() {
     stopFree();
   }
   await flushProgress();
-  // Another book opened while that waited: it is not closed with this one.
-  if (session.item !== closingItem) return;
 
   const frame = $('reader-pdf');
   frame.removeAttribute('src');

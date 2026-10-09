@@ -254,8 +254,11 @@ object NativeAudio {
             else -> PlayerLog.add("page: $cmd")
         }
         if (cmd == "load" || cmd == "stop") resume = null
-        // A new file: the book's place is told again once it plays there.
-        if (cmd == "load") place = null
+        // A new file: the book's place is told again once it plays there. Not
+        // the file already playing - a page made again takes it over with a
+        // load of it, paused, and no "playing" comes to tell the place again,
+        // so nothing listened after was saved (a review).
+        if (cmd == "load" && m.optString("url") != p.currentMediaItem?.localConfiguration?.uri?.toString()) place = null
         when (cmd) {
             "load" -> {
                 val url = m.optString("url")

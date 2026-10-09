@@ -4077,6 +4077,7 @@ function startAt(url, offset) {
   // Where this file was asked to start: a retry before it has played starts
   // there, not where the last file had got to (audioRecover).
   audio.askedOffset = offset > 0 ? offset : 0;
+  audio.startSeq = (audio.startSeq || 0) + 1;
   // Start the clock now, or the first timeupdate is already older than the
   // interval and every play begins by writing back the position it just read.
   audio.savedAt = Date.now();
@@ -4354,9 +4355,13 @@ $('audio-player').addEventListener('pause', () => {
 
 // "End of this chapter" in a book whose chapters are marks in its files: the
 // moment the next chapter starts (setSleep).
-for (const ev of ['seeking', 'seeked', 'playing', 'pause', 'ratechange']) {
+for (const ev of ['seeking', 'seeked', 'playing', 'ratechange']) {
   $('audio-player').addEventListener(ev, syncChapterSleep);
 }
+$('audio-player').addEventListener('pause', () => {
+  if (!sleep.atSongEnd || sleep.until || !NATIVE_AUDIO || !window.soundstormApp.sleepAt) return;
+  try { window.soundstormApp.sleepAt(0); } catch { /* an app without it */ }
+});
 $('audio-player').addEventListener('timeupdate', () => {
   if (!sleep.atSongEnd || sleep.chapterEnd == null || !audio.item || audio.item.kind !== 'audiobook') return;
   if ($('audio-player').seeking) return;
@@ -9816,6 +9821,7 @@ const audioRecover = (() => {
   let timer = 0;
   let lastT = 0;
   let lastURL = '';
+  let lastSeq = -1;
   let waitingSince = 0;
   let gaveUp = false;
   let failedAt = 0;
@@ -9823,6 +9829,7 @@ const audioRecover = (() => {
     if (player.paused || !(player.currentTime > 0)) return;
     lastT = player.currentTime;
     lastURL = audio.currentURL;
+    lastSeq = audio.startSeq;
     if (tries && Date.now() - failedAt > 4000) {
       if (tries >= 2) showToast('Playing again');
       tries = 0;
@@ -9859,7 +9866,9 @@ const audioRecover = (() => {
   // start if it never played - not the last file's (a review, 2026-10-09: a
   // chapter that failed at its start was retried at the chapter before's end,
   // and skipped).
-  const reached = () => (lastURL === audio.currentURL ? lastT : (audio.askedOffset || 0));
+  // And not this file's from before it was started again at another place
+  // (Play from the beginning, a song played again): each start is its own.
+  const reached = () => (lastURL === audio.currentURL && lastSeq === audio.startSeq ? lastT : (audio.askedOffset || 0));
   function schedule() {
     if (!playable() || timer) return;
     failedAt = Date.now();
@@ -11489,10 +11498,19 @@ function setSleep(choice) {
 // worked out again whenever the place, the book or the speed changes - and
 // the phone app's player, which stops the book with the screen off, is told
 // the moment again then, and nothing while paused.
-function syncChapterSleep() {
+function syncChapterSleep(e) {
   if (!sleep.atSongEnd) return;
   const book = audio.item && audio.item.kind === 'audiobook';
+  // Played again after the chapter's end went by while this page slept (the
+  // phone app's player stopped the book there): the timer has done its work,
+  // not set again for the chapter after.
+  if (e && e.type === 'playing' && book && sleep.chapterEnd != null && sleep.chapterItem === audio.item
+      && elapsed() >= sleep.chapterEnd - 0.3) {
+    setSleep(null);
+    return;
+  }
   sleep.chapterEnd = book ? nextChapterStart() : null;
+  sleep.chapterItem = audio.item;
   if (!NATIVE_AUDIO || !window.soundstormApp.sleepAt || sleep.until) return;
   try {
     const el = $('audio-player');
