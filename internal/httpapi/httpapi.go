@@ -1957,7 +1957,10 @@ func (s *Server) scheduleRescan(kind media.Kind) {
 // and its own timer will find the file anyway.
 func (s *Server) rescanNow(kind media.Kind) {
 	// A fresh context: the request that triggered this finished long ago.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Ten minutes, not thirty seconds: the book shelf reads every new book in
+	// its scan, and a big drop (a Calibre library) ran past thirty seconds and
+	// threw away what it had read (a review, 2026-10-09).
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	// Before asking, not after. A backend that finds its folder completely

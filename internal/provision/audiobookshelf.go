@@ -156,15 +156,20 @@ func ensureAudiobookshelfLibrary(ctx context.Context, c *httpx.Client, token, pa
 	if err != nil {
 		return "", err
 	}
-	if resp.OK() {
-		if err := resp.JSON(&existing); err == nil {
-			for _, lib := range existing.Libraries {
-				for _, f := range lib.Folders {
-					if f.FullPath == path {
-						log.Info("audiobookshelf library already present", "name", lib.Name)
-						return lib.ID, scanAudiobookshelfLibrary(ctx, c, lib.ID, authed)
-					}
-				}
+	// Only a listing that answered and read is taken to say the library is not
+	// there: one refused while the server loads, made a second library on the
+	// same folder, scanned twice (a review, 2026-10-09). Tried again instead.
+	if err := resp.Err(); err != nil {
+		return "", fmt.Errorf("list audiobookshelf libraries: %w", err)
+	}
+	if err := resp.JSON(&existing); err != nil {
+		return "", fmt.Errorf("read audiobookshelf libraries: %w", err)
+	}
+	for _, lib := range existing.Libraries {
+		for _, f := range lib.Folders {
+			if f.FullPath == path {
+				log.Info("audiobookshelf library already present", "name", lib.Name)
+				return lib.ID, scanAudiobookshelfLibrary(ctx, c, lib.ID, authed)
 			}
 		}
 	}

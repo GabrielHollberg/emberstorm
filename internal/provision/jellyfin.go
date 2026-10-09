@@ -206,15 +206,19 @@ func ensureJellyfinLibrary(ctx context.Context, c *httpx.Client, token, name, co
 	if err != nil {
 		return err
 	}
-	if resp.OK() {
-		if err := resp.JSON(&existing); err == nil {
-			for _, lib := range existing {
-				for _, loc := range lib.Locations {
-					if loc == path {
-						log.Info("jellyfin library already present", "name", lib.Name)
-						return triggerJellyfinScan(ctx, c, authed)
-					}
-				}
+	// Only a listing that answered and read says the library is not there
+	// (a review, 2026-10-09): see Audiobookshelf's.
+	if err := resp.Err(); err != nil {
+		return fmt.Errorf("list jellyfin libraries: %w", err)
+	}
+	if err := resp.JSON(&existing); err != nil {
+		return fmt.Errorf("read jellyfin libraries: %w", err)
+	}
+	for _, lib := range existing {
+		for _, loc := range lib.Locations {
+			if loc == path {
+				log.Info("jellyfin library already present", "name", lib.Name)
+				return triggerJellyfinScan(ctx, c, authed)
 			}
 		}
 	}

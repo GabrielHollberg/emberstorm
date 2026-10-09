@@ -418,6 +418,16 @@ func (m *Manager) secretsFor(backendID string) secrets {
 			if v, ok := m.store.SetupSecret(backendID, name); ok {
 				return v, true, nil
 			}
+			// Set up before, its password saved with it: a setup run again
+			// because the backend refused its token (a session that ran out)
+			// signs in with that password, rather than refusing an account it
+			// has the password for (a review, 2026-10-09: Storyteller's
+			// thirty-day session broke read-along for good when it ran out).
+			if name == "password" {
+				if b, ok := m.store.Backend(backendID); ok && b.Password != "" {
+					return b.Password, true, nil
+				}
+			}
 		}
 		v, err := generatePassword()
 		if err != nil {

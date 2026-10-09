@@ -51,6 +51,10 @@ type pendingSignIn struct {
 	// account's 50 and pushed out real ones (a review).
 	answer int  // 0 waiting, 1 approved, -1 refused
 	keep   bool // "keep me on this device", applied once it is in
+	// salt is the account's password salt when it was held: a password
+	// changed meanwhile (the leak being dealt with) must not let an
+	// approval made in the old password's name through (a review, 2026-10-09).
+	salt []byte
 }
 
 type pendingSignIns struct {
@@ -83,6 +87,7 @@ func (s *Server) holdSignIn(r *http.Request, user state.User, keep bool) *pendin
 	q := &pendingSignIn{
 		ID: hex.EncodeToString(raw), UserID: user.ID, UserName: user.Name,
 		Device: deviceLabel(r.UserAgent()), At: time.Now(), keep: keep,
+		salt: append([]byte(nil), user.Salt...),
 	}
 	p.m[q.ID] = q
 	return q
@@ -143,6 +148,10 @@ func (s *Server) handlePendingSignIn(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.store.User(q.UserID)
 	if !ok {
 		writeError(w, http.StatusNotFound, "that account is gone")
+		return
+	}
+	if subtle.ConstantTimeCompare(user.Salt, q.salt) != 1 {
+		writeError(w, http.StatusForbidden, "the password changed while this sign-in waited; sign in again")
 		return
 	}
 	token, expiry, err := s.auth.SessionFor(user)
