@@ -100,7 +100,7 @@ func (l *Library) Resolve(kind media.Kind, rels []string) ([]string, error) {
 		}
 		picked := []string{full}
 		if !info.IsDir() {
-			picked = withCompanions(full)
+			picked = withCompanions(full, kind)
 			parent := filepath.Dir(full)
 			// Not for documents: a folder like Taxes/2024 is somebody's own
 			// arrangement, holding spreadsheets and notes beside the PDF,
@@ -146,7 +146,13 @@ func (l *Library) inShelf(shelf, rel string) (string, error) {
 }
 
 // withCompanions is a file and the siblings named after it.
-func withCompanions(file string) []string {
+//
+// On the pictures shelf only a photo's own side files go with it - its date
+// file (.xmp), a download's record (.json), an iPhone's edit (.aae) - never
+// another picture: "IMG_0001-edited.jpg" and "IMG_0001.JPG" beside
+// "IMG_0001.HEIC" are photos of their own, and deleting or moving one took
+// the others with it (a review, 2026-10-09).
+func withCompanions(file string, kind media.Kind) []string {
 	out := []string{file}
 	dir, base := filepath.Split(file)
 	stem := strings.TrimSuffix(base, filepath.Ext(base))
@@ -164,12 +170,23 @@ func withCompanions(file string) []string {
 		if !strings.ContainsRune(".-_", rune(name[len(stem)])) {
 			continue
 		}
-		if companionExtensions[strings.ToLower(filepath.Ext(name))] {
+		ext := strings.ToLower(filepath.Ext(name))
+		if kind == media.KindPicture {
+			if photoSidecars[ext] {
+				out = append(out, filepath.Join(dir, name))
+			}
+			continue
+		}
+		if companionExtensions[ext] {
 			out = append(out, filepath.Join(dir, name))
 		}
 	}
 	return out
 }
+
+// photoSidecars are the only files that go with a photo when it is deleted or
+// moved.
+var photoSidecars = map[string]bool{".xmp": true, ".json": true, ".aae": true}
 
 // otherMediaIn reports whether dir holds media of this kind besides the files
 // already picked - anywhere beneath it, since a film folder can keep extras in
@@ -318,9 +335,12 @@ func (l *Library) Restore(id string) (entry BinEntry, restored int, blocked []st
 			}
 			// A file never replaces one that arrived since it was checked
 			// (an upload landing at that moment - a review).
+			// placeFile, as an upload lands: no link across drives (a shelf
+			// on its own disk), so it copies there - noClobber alone refused,
+			// and every undo on such a shelf put nothing back (a review).
 			move := moveTree
 			if info.Mode().IsRegular() {
-				move = noClobber
+				move = placeFile
 			}
 			if err := move(from, to); err != nil {
 				blocked = append(blocked, rel)

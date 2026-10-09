@@ -285,7 +285,9 @@ func TestAutoModeFailureLeavesTheLocalAuthorityServing(t *testing.T) {
 }
 
 // Rotating the service's secret invalidates every token. An install has to
-// notice and register again rather than failing its renewals for ever.
+// notice and register again rather than failing its renewals for ever - but
+// not at the first refusal: a secret set wrongly for a while must not cost
+// every install its name. It keeps its name until refused for three days.
 func TestAutoModeRegistersAgainWhenTheServiceForgetsIt(t *testing.T) {
 	dir := t.TempDir()
 	oldURL, _, _ := nameService(t, "the-first-secret-long-enough-to-use")
@@ -298,6 +300,16 @@ func TestAutoModeRegistersAgainWhenTheServiceForgetsIt(t *testing.T) {
 
 	rotatedURL, _, registrations := nameService(t, "a-rotated-secret-that-is-long-enough")
 	s.auto.names = &names.Client{Base: rotatedURL}
+	if err := s.auto.step(context.Background()); err == nil {
+		t.Fatal("a step with a stale registration succeeded")
+	}
+	if err := s.auto.step(context.Background()); err == nil || s.PublicName() != first {
+		t.Fatalf("refused once, the install gave up its name: %v, %q", err, s.PublicName())
+	}
+	// Refused for three days: a new name.
+	s.auto.mu.Lock()
+	s.auto.refusedSince = time.Now().Add(-73 * time.Hour)
+	s.auto.mu.Unlock()
 	if err := s.auto.step(context.Background()); err == nil {
 		t.Fatal("a step with a stale registration succeeded")
 	}

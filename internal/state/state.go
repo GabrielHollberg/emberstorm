@@ -1296,6 +1296,18 @@ func (s *Store) SetBackend(id string, b Backend) error {
 	s.d.Backends[id] = b
 	// Set up: what the setup was holding on to is now in b, or not needed.
 	delete(s.d.SetupSecrets, id)
+	// Set up afresh (its data reset, so the old login was refused): the
+	// accounts made on it for each person went with that data, and kept they
+	// failed for good - every member's photos or places refused (a review,
+	// 2026-10-09). Forgotten, each is made again the next time it is needed.
+	for _, ids := range s.d.Identities {
+		delete(ids, id)
+	}
+	for key := range s.d.SetupSecrets {
+		if strings.HasPrefix(key, id+"/member/") {
+			delete(s.d.SetupSecrets, key)
+		}
+	}
 	return s.save()
 }
 

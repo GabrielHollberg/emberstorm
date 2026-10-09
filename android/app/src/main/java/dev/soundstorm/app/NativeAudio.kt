@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.Executors
 import java.lang.ref.WeakReference
 
 /**
@@ -67,6 +68,8 @@ object NativeAudio {
     private var place: Place? = null
     private var placeSavedAt = 0L
     private var placeLast = -1.0
+    // One save at a time, in order: an older one must not land after a newer.
+    private val placeSender = Executors.newSingleThreadExecutor()
 
     private fun setPlace(context: Context, o: JSONObject?) {
         if (o == null) {
@@ -98,6 +101,9 @@ object NativeAudio {
         val uri = p.currentMediaItem?.localConfiguration?.uri ?: return
         val file = pl.files.indexOfFirst { Uri.parse(it.first).path == uri.path }
         if (file < 0) return
+        // Only from a settled player: not while loading, buffering or jumping,
+        // when its position is not yet the book's (a review, 2026-10-09).
+        if (seeking || (p.playbackState != Player.STATE_READY && p.playbackState != Player.STATE_ENDED)) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (!force && now - placeSavedAt < 10_000) return
         val finished = p.playbackState == Player.STATE_ENDED && file == pl.files.lastIndex
@@ -106,7 +112,7 @@ object NativeAudio {
         placeSavedAt = now
         placeLast = seconds
         val body = JSONObject().put("seconds", seconds).put("duration", pl.duration).put("finished", finished).toString()
-        Thread {
+        placeSender.execute {
             runCatching {
                 WebCookies.install()
                 val conn = URL(pl.url).openConnection() as HttpURLConnection
@@ -120,7 +126,7 @@ object NativeAudio {
                 conn.responseCode
                 conn.disconnect()
             }.onFailure { PlayerLog.add("place not saved: ${it.javaClass.simpleName}") }
-        }.start()
+        }
     }
     private var resume: Resume? = null
 
@@ -246,6 +252,8 @@ object NativeAudio {
             else -> PlayerLog.add("page: $cmd")
         }
         if (cmd == "load" || cmd == "stop") resume = null
+        // A new file: the book's place is told again once it plays there.
+        if (cmd == "load") place = null
         when (cmd) {
             "load" -> {
                 val url = m.optString("url")

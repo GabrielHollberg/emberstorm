@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/GabrielHollberg/soundstorm/internal/media"
 	"github.com/GabrielHollberg/soundstorm/internal/source"
@@ -68,5 +69,24 @@ func TestMixesFromListeningAndTheLibrary(t *testing.T) {
 	_ = json.Unmarshal(body, &mix)
 	if len(mix.Songs) != 0 {
 		t.Errorf("sam's most played has the owner's %d songs", len(mix.Songs))
+	}
+}
+
+// A conversion asked for nothing for a while is stopped, once; one still
+// being asked for is not.
+func TestAQuietConversionIsStopped(t *testing.T) {
+	var h hlsSessions
+	start := time.Now()
+	h.allow("u1", "quiet|film1", start)
+	h.note("jellyfin", "quiet")
+	h.allow("u1", "busy|film2", start)
+	h.note("jellyfin", "busy")
+	h.allow("u1", "busy|film2", start.Add(3*time.Minute))
+	got := h.idle(start.Add(4 * time.Minute))
+	if len(got) != 1 || got[0] != [2]string{"jellyfin", "quiet"} {
+		t.Fatalf("stopped %v, want only the quiet session", got)
+	}
+	if again := h.idle(start.Add(5 * time.Minute)); len(again) != 0 {
+		t.Errorf("stopped again: %v", again)
 	}
 }

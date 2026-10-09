@@ -208,3 +208,47 @@ func TestSweepEmptiesOnlyOldEntries(t *testing.T) {
 		t.Error("an entry inside its time was emptied")
 	}
 }
+
+// Deleting or moving a photo takes its side files, never another photo with
+// a similar name; a film still takes its subtitles.
+func TestAPhotoTakesOnlyItsSideFiles(t *testing.T) {
+	l := newLibrary(t)
+	pics := l.PathFor(media.KindPicture)
+	dir := filepath.Join(pics, "Personal", "sam", "2024", "05")
+	if err := os.MkdirAll(dir, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"IMG_0001.jpg", "IMG_0001-edited.jpg", "IMG_0001.JPG.png", "IMG_0001.jpg.xmp", "IMG_0001.AAE", "IMG_0002.jpg"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte(n), 0o666); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := l.Resolve(media.KindPicture, []string{"Personal/sam/2024/05/IMG_0001.jpg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{
+		"pictures/Personal/sam/2024/05/IMG_0001.jpg":     true,
+		"pictures/Personal/sam/2024/05/IMG_0001.jpg.xmp": true,
+		"pictures/Personal/sam/2024/05/IMG_0001.AAE":     true,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("took %v", got)
+	}
+	for _, g := range got {
+		if !want[g] {
+			t.Errorf("took %s", g)
+		}
+	}
+
+	films := l.PathFor(media.KindVideo)
+	fdir := filepath.Join(films, "Dune")
+	_ = os.MkdirAll(fdir, 0o777)
+	for _, n := range []string{"Dune.mkv", "Dune.en.srt", "Dune - 2160p.mkv"} {
+		_ = os.WriteFile(filepath.Join(fdir, n), []byte(n), 0o666)
+	}
+	got, err = l.Resolve(media.KindVideo, []string{"Dune/Dune.mkv"})
+	if err != nil || len(got) != 2 {
+		t.Errorf("a film took %v (%v), want it and its subtitles", got, err)
+	}
+}
