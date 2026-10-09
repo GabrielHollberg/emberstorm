@@ -126,3 +126,50 @@ func TestTheOwnersPictureBecomesThePoster(t *testing.T) {
 		t.Errorf("sent %q as %q", got, ct)
 	}
 }
+
+// Choose a poster: Jellyfin's posters for a title, the insecure and repeated
+// ones left out, and the one chosen fetched by Jellyfin itself.
+func TestAPosterIsChosen(t *testing.T) {
+	var chosen, provider string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/Items":
+			_ = json.NewEncoder(w).Encode(map[string]any{"Items": []any{map[string]any{"Id": r.URL.Query().Get("Ids")}}})
+		case "/Items/show-1/RemoteImages":
+			if r.URL.Query().Get("type") != "Primary" {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			io.WriteString(w, `{"Images":[
+				{"ProviderName":"TheMovieDb","Url":"https://image.tmdb.org/t/p/original/a.jpg","Width":2000,"Height":3000,"Language":"en"},
+				{"ProviderName":"TheMovieDb","Url":"https://image.tmdb.org/t/p/original/a.jpg"},
+				{"ProviderName":"Other","Url":"http://insecure.example/b.jpg"},
+				{"ProviderName":"TheMovieDb","Url":"https://image.tmdb.org/t/p/original/c.jpg","Language":"de"}],"TotalRecordCount":4}`)
+		case "/Items/show-1/RemoteImages/Download":
+			chosen, provider = r.URL.Query().Get("imageUrl"), r.URL.Query().Get("providerName")
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s, err := New(Config{ID: "jellyfin-tv", BaseURL: srv.URL, Token: "t", UserID: "u", ItemTypes: "Series,Episode"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	posters, err := s.Posters(ctx, "show-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(posters) != 2 || posters[0].Width != 2000 || posters[1].Language != "de" {
+		t.Fatalf("posters %+v", posters)
+	}
+	if err := s.ChoosePoster(ctx, "show-1", posters[1]); err != nil {
+		t.Fatal(err)
+	}
+	if chosen != "https://image.tmdb.org/t/p/original/c.jpg" || provider != "TheMovieDb" {
+		t.Errorf("chose %q from %q", chosen, provider)
+	}
+}

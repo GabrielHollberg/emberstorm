@@ -144,6 +144,122 @@ func (s *Server) handleFilmMatch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"matched": true, "name": found[body.Index].Name})
 }
 
+// Choose a poster (the owner's asking, 2026-10-09): the posters the online
+// databases have for a film or show the backend has identified - different
+// years, countries, styles - and the one chosen becomes its poster, for
+// everyone (source.PosterChooser). As with matches, the list stays on the
+// server and the page picks by place: only a poster the backend offered is
+// ever applied.
+type posterListCache struct {
+	mu sync.Mutex
+	m  map[string]posterListEntry
+}
+
+type posterListEntry struct {
+	at      time.Time
+	posters []source.PosterChoice
+}
+
+func (c *posterListCache) put(key string, posters []source.PosterChoice) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.m == nil || len(c.m) > 64 {
+		c.m = map[string]posterListEntry{}
+	}
+	c.m[key] = posterListEntry{time.Now(), posters}
+}
+
+func (c *posterListCache) get(key string) []source.PosterChoice {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.m[key]
+	if !ok || time.Since(e.at) > filmMatchKeep {
+		return nil
+	}
+	return e.posters
+}
+
+func (s *Server) posterChooser(w http.ResponseWriter, r *http.Request) (source.PosterChooser, string, bool) {
+	src, ok := s.reg.ByID(r.Context(), r.PathValue("source"))
+	pc, can := src.(source.PosterChooser)
+	if !ok || !can {
+		writeError(w, http.StatusNotFound, "that library has no posters to choose from")
+		return nil, "", false
+	}
+	user, _ := auth.FromContext(r.Context())
+	return pc, user.ID + "|" + r.PathValue("source") + "|" + r.PathValue("id"), true
+}
+
+// GET /api/films/{source}/{id}/posters
+func (s *Server) handlePosterChoices(w http.ResponseWriter, r *http.Request) {
+	pc, key, ok := s.posterChooser(w, r)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+	all, err := pc.Posters(ctx, r.PathValue("id"))
+	if err != nil {
+		s.log.Warn("poster choices", "err", err)
+		writeError(w, http.StatusBadGateway, "could not look them up just now; try again")
+		return
+	}
+	// Only posters the page can be shown through the server (posterAllowed).
+	var kept []source.PosterChoice
+	for _, p := range all {
+		if posterAllowed(p.URL) != "" {
+			kept = append(kept, p)
+			if len(kept) == 60 {
+				break
+			}
+		}
+	}
+	s.posterChoices.put(key, kept)
+	type out struct {
+		Index    int    `json:"index"`
+		Poster   string `json:"poster"`
+		Width    int    `json:"width,omitempty"`
+		Height   int    `json:"height,omitempty"`
+		Language string `json:"language,omitempty"`
+	}
+	list := []out{}
+	for i, p := range kept {
+		list = append(list, out{
+			Index: i, Poster: "/api/films/poster?u=" + url.QueryEscape(p.URL),
+			Width: p.Width, Height: p.Height, Language: p.Language,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"posters": list})
+}
+
+// POST /api/films/{source}/{id}/posters {"index"}
+func (s *Server) handleChoosePoster(w http.ResponseWriter, r *http.Request) {
+	pc, key, ok := s.posterChooser(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Index int `json:"index"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256)).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "expected a JSON body with index")
+		return
+	}
+	found := s.posterChoices.get(key)
+	if body.Index < 0 || body.Index >= len(found) {
+		writeError(w, http.StatusConflict, "look at the posters again, then choose")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if err := pc.ChoosePoster(ctx, r.PathValue("id"), found[body.Index]); err != nil {
+		s.log.Warn("choose poster", "err", err)
+		writeError(w, http.StatusBadGateway, "could not change it just now; try again")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"set": true})
+}
+
 // searchYear is a year typed with a film's name, or 0.
 func searchYear(s string) int {
 	year, _ := strconv.Atoi(s)

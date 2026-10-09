@@ -6717,12 +6717,20 @@ function renderMainMenu(item, opts = {}) {
   }
   // Find the right film: for one the film server did not recognise from its
   // file name (a frame of the video for its cover), or got wrong.
-  if (item.kind === 'video' && state.me && state.me.owner && !state.offline
+  // And a show (the owner's asking, 2026-10-09): the same lookup, for series.
+  const isShow = item.kind === 'tv' && item.extra && item.extra.type === 'Series';
+  if ((item.kind === 'video' || isShow) && state.me && state.me.owner && !state.offline
       && !(item.extra && item.extra.type === 'Episode')) {
-    entries.push(menuItem('search', 'Find the right film', (event) => {
+    entries.push(menuItem('search', isShow ? 'Find the right show' : 'Find the right film', (event) => {
       event.stopPropagation();
       renderFilmMatch(item);
     }, { chevron: true }));
+    // A different poster for the same title: the ones the film databases
+    // have for it (filmmatch.go, Choose a poster).
+    entries.push(menuItem('image', 'Choose a poster', (event) => {
+      event.stopPropagation();
+      renderPosterChoice(item);
+    }, { chevron: true, detail: 'Shown to everyone here' }));
   }
   if (state.me && state.me.owner && !state.offline && item.sourceId !== 'storyteller') {
     // Stopped here: the menu is redrawn at once, and a click reaching the
@@ -14109,6 +14117,8 @@ function renderPairPicker(item) {
 // tells the server which film this is (filmmatch.go). The file is not touched;
 // the poster and details arrive a moment later.
 function renderFilmMatch(item) {
+  const isShow = item.kind === 'tv';
+  const what = isShow ? 'show' : 'film';
   const menu = $('item-menu');
   const note = menuNote();
   const back = document.createElement('button');
@@ -14116,7 +14126,7 @@ function renderFilmMatch(item) {
   back.className = 'menu-back';
   back.append(icon('back'));
   const label = document.createElement('span');
-  label.textContent = 'Find the right film';
+  label.textContent = `Find the right ${what}`;
   back.append(label);
   back.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -14125,7 +14135,7 @@ function renderFilmMatch(item) {
   const search = document.createElement('input');
   search.type = 'search';
   search.className = 'menu-search';
-  search.placeholder = 'The film’s name, and its year if you know it';
+  search.placeholder = `The ${what}’s name, and its year if you know it`;
   let start = item.title
     .replace(/_t\d{2,3}$/i, '')
     .replace(/[ _.-]*\b(?:pt|part|cd|dis[ck])[ _.]*\d{1,2}$/i, '')
@@ -14170,7 +14180,7 @@ function renderFilmMatch(item) {
   const find = async () => {
     const mine = ++seq;
     let q = search.value.trim();
-    if (!q) { say('Type the film’s name.'); return; }
+    if (!q) { say(`Type the ${what}’s name.`); return; }
     // A year typed at the end narrows it down.
     let year = '';
     const y = q.match(/[\s(]((?:19|20)\d\d)\)?$/);
@@ -14214,7 +14224,7 @@ function renderFilmMatch(item) {
         closeItemMenu();
         showToast(`Now it’s ${name.textContent}. The poster and details arrive in a moment.`);
         // The film server fetches them itself: look again as they land.
-        for (const wait of [4000, 12000]) setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video') runSearch(); }, wait);
+        for (const wait of [4000, 12000]) setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch(); }, wait);
       });
       return row;
     }));
@@ -14229,6 +14239,78 @@ function renderFilmMatch(item) {
   });
   search.addEventListener('click', (event) => event.stopPropagation());
   find();
+}
+
+// renderPosterChoice shows the posters the film databases have for a film or
+// show already identified - other years, countries, styles - and tapping one
+// makes it the poster, for everyone (filmmatch.go, Choose a poster).
+function renderPosterChoice(item) {
+  const menu = $('item-menu');
+  const note = menuNote();
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'menu-back';
+  back.append(icon('back'));
+  const label = document.createElement('span');
+  label.textContent = 'Choose a poster';
+  back.append(label);
+  back.addEventListener('click', (event) => {
+    event.stopPropagation();
+    renderMainMenu(item, state.menuOpts);
+  });
+  const grid = document.createElement('div');
+  grid.className = 'menu-results poster-grid';
+  const say = (text) => {
+    const p = document.createElement('p');
+    p.className = 'menu-confirm';
+    p.textContent = text;
+    grid.replaceChildren(p);
+  };
+  menu.replaceChildren(back, grid, note);
+  if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
+  say('Looking…');
+  const base = `/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/posters`;
+  api(base).then(({ ok, body }) => {
+    if (state.menuFor !== item) return;
+    if (!ok) { say((body && body.error) || 'Could not look them up.'); return; }
+    const posters = (body && body.posters) || [];
+    if (!posters.length) {
+      say(`No posters were found for it. If it is the wrong ${item.kind === 'tv' ? 'show' : 'film'}, find the right one first.`);
+      return;
+    }
+    grid.replaceChildren(...posters.map((p) => {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'poster-choice';
+      const pic = document.createElement('img');
+      pic.alt = p.language ? `Poster (${p.language})` : 'Poster';
+      pic.loading = 'lazy';
+      pic.src = p.poster;
+      tile.append(pic);
+      if (p.language) {
+        const lang = document.createElement('span');
+        lang.className = 'poster-lang';
+        lang.textContent = p.language.toUpperCase();
+        tile.append(lang);
+      }
+      tile.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        tile.disabled = true;
+        const res = await api(base, { method: 'POST', body: JSON.stringify({ index: p.index }) });
+        if (!res.ok) {
+          tile.disabled = false;
+          note.textContent = (res.body && res.body.error) || 'Could not change it.';
+          show(note, true);
+          return;
+        }
+        closeItemMenu();
+        showToast('Poster changed, for everyone. It shows in a moment.');
+        for (const wait of [2500, 8000]) setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch(); }, wait);
+      });
+      return tile;
+    }));
+    if (state.menuAnchor) placeMenu(menu, state.menuAnchor);
+  });
 }
 
 /* ---------------------------------------------------- making audiobooks */

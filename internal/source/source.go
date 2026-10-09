@@ -914,6 +914,24 @@ type FilmMatcher interface {
 	ApplyMatch(ctx context.Context, itemID string, m FilmMatch) error
 }
 
+// PosterChoice is one of the posters an online database has for a title.
+type PosterChoice struct {
+	URL      string // the database's own picture address
+	Provider string
+	Width    int
+	Height   int
+	Language string
+}
+
+// PosterChooser is an optional interface for a video source whose backend
+// can list the posters the online databases have for a film or show it has
+// identified, and take one of them as its poster, for everyone (the owner's
+// asking, 2026-10-09: a different poster for the same title).
+type PosterChooser interface {
+	Posters(ctx context.Context, itemID string) ([]PosterChoice, error)
+	ChoosePoster(ctx context.Context, itemID string, p PosterChoice) error
+}
+
 // PosterSetter is an optional interface for a video source whose backend
 // takes a picture of the owner's choosing as an item's poster, for everyone.
 type PosterSetter interface {

@@ -114,6 +114,8 @@ type Server struct {
 	listWrites allowance
 	// Answers to "Find the right film", kept for the choosing (filmmatch.go).
 	filmMatches filmMatchCache
+	// posterChoices are the posters last listed for a film or show (filmmatch.go).
+	posterChoices posterListCache
 	// other writes worth a ceiling: listening positions sent on to the
 	// audiobook server, the scrobbling token checked online, the read-along
 	// queue reordered.
@@ -659,6 +661,8 @@ func (s *Server) Routes() http.Handler {
 	owner.HandleFunc("GET /api/films/{source}/{id}/matches", s.limited(&s.listWrites, 60, time.Second, s.handleFilmMatches))
 	owner.HandleFunc("POST /api/films/{source}/{id}/match", s.limited(&s.listWrites, 60, time.Second, s.handleFilmMatch))
 	owner.HandleFunc("GET /api/films/poster", s.handleFilmPosterProxy)
+	owner.HandleFunc("GET /api/films/{source}/{id}/posters", s.limited(&s.listWrites, 60, time.Second, s.handlePosterChoices))
+	owner.HandleFunc("POST /api/films/{source}/{id}/posters", s.limited(&s.listWrites, 60, time.Second, s.handleChoosePoster))
 	owner.HandleFunc("PUT /api/films/{source}/{id}/poster", s.limited(&s.listWrites, 60, time.Second, s.handleFilmPoster))
 	guarded.Handle("/api/users", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/tvs", s.auth.RequireOwner(owner))
