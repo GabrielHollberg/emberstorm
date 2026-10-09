@@ -14296,15 +14296,38 @@ function renderPosterChoice(item) {
       tile.addEventListener('click', async (event) => {
         event.stopPropagation();
         tile.disabled = true;
-        const res = await api(base, { method: 'POST', body: JSON.stringify({ index: p.index }) });
-        if (!res.ok) {
+        // Placed by hand first, as any cover is (the owner's asking): the
+        // poster, larger, in the square frame - what shows on the shelf.
+        let placed = null;
+        try {
+          const big = await fetch(`${p.poster}&size=large`);
+          if (big.ok) placed = await squarePicture(await big.blob());
+          else throw new Error('no poster');
+        } catch {
           tile.disabled = false;
-          note.textContent = (res.body && res.body.error) || 'Could not change it.';
+          note.textContent = 'Could not open that poster.';
+          show(note, true);
+          return;
+        }
+        tile.disabled = false;
+        if (!placed) return; // cancelled: the posters are still here
+        let res;
+        try {
+          res = await fetch(`/api/films/${encodeURIComponent(item.sourceId)}/${escapeId(item.id)}/poster`, {
+            method: 'PUT', body: placed, headers: { 'Content-Type': 'image/jpeg' },
+          });
+        } catch {
+          showToast('Could not change the cover.');
+          return;
+        }
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          note.textContent = (body && body.error) || 'Could not change it.';
           show(note, true);
           return;
         }
         closeItemMenu();
-        showToast('Poster changed, for everyone. It shows in a moment.');
+        showToast('Cover changed, for everyone.');
         for (const wait of [2500, 8000]) setTimeout(() => { if (state.tab === 'watch' || state.kind === 'video' || state.kind === 'tv') runSearch(); }, wait);
       });
       return tile;

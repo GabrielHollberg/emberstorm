@@ -272,7 +272,11 @@ func searchYear(s string) int {
 // posterAllowed is the address to fetch a search's poster from, or "" for one
 // that is not a film database's picture: the server fetches it, so an address
 // it was handed must not lead anywhere else. TheMovieDb's at a card's size.
-func posterAllowed(raw string) string {
+func posterAllowed(raw string) string { return posterAt(raw, "w342") }
+
+// posterAt is posterAllowed at a size of TheMovieDb's: w342 for a card, w780
+// for placing it as a cover (Choose a poster's frame), sharp at 1000px.
+func posterAt(raw, size string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" {
 		return ""
@@ -283,7 +287,7 @@ func posterAllowed(raw string) string {
 			return ""
 		}
 		if parts := strings.SplitN(strings.TrimPrefix(u.Path, "/t/p/"), "/", 2); len(parts) == 2 {
-			u.Path = "/t/p/w342/" + parts[1]
+			u.Path = "/t/p/" + size + "/" + parts[1]
 		}
 	case "m.media-amazon.com":
 		if !strings.HasPrefix(u.Path, "/images/") {
@@ -304,7 +308,11 @@ var posterClient = &http.Client{
 // GET /api/films/poster?u= - a search answer's poster, through the server, as
 // the page's own policy loads pictures from nowhere else.
 func (s *Server) handleFilmPosterProxy(w http.ResponseWriter, r *http.Request) {
-	addr := posterAllowed(r.URL.Query().Get("u"))
+	size := "w342"
+	if r.URL.Query().Get("size") == "large" {
+		size = "w780"
+	}
+	addr := posterAt(r.URL.Query().Get("u"), size)
 	if addr == "" {
 		writeError(w, http.StatusBadRequest, "not a film poster")
 		return
