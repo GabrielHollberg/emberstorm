@@ -5076,6 +5076,16 @@ updates through a silent 3-second command, its exit code, output and folder
 right, a missing program a failure, Docker's signature read. Not seen: on the
 test box.
 
+**WSL's welcome window kept away, and the restart said plainly** (2026-10-10,
+the test box): Docker's first start of WSL put "Welcome to Windows Subsystem
+for Linux" over the setup. It shows while the person's `OOBEComplete` (HKCU
+...\Lxss, read by wslservice) is unset, so `Initialize-Docker` sets it first,
+never changing one already there. The restart screen says the window comes
+back by itself within a minute or two of signing in, and its question says
+what Yes and No do (Yes read as "yes, I have programs open"). Checked: the
+flag written once and left alone after, on a throwaway key. Not seen: the
+welcome staying away on a fresh PC.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
