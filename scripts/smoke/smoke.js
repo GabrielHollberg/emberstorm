@@ -53,11 +53,19 @@ const shown = (id) => { const el = document.getElementById(id); return Boolean(e
 
 async function live(browser) {
   await step('live server is healthy', async () => {
-    const r = await fetch(`${base}/healthz`);
-    if (!r.ok) throw new Error(`healthz answered ${r.status}`);
-    const body = await r.json();
+    // Given a minute and a half: straight after a deploy a backend or two is
+    // still reconnecting, and "8 sources, expected 9" on every deploy was a
+    // false alarm that taught everyone to read past this check.
     const want = Number(process.env.SMOKE_LIVE_SOURCES || 9);
-    if ((body.sources || 0) < want) throw new Error(`${body.sources} sources, expected ${want}`);
+    let body = {};
+    for (let i = 0; i < 30; i++) {
+      const r = await fetch(`${base}/healthz`);
+      if (!r.ok) throw new Error(`healthz answered ${r.status}`);
+      body = await r.json();
+      if ((body.sources || 0) >= want) return;
+      await new Promise((done) => setTimeout(done, 3000));
+    }
+    throw new Error(`${body.sources} sources, expected ${want}`);
   });
   await step('live page loads without a script error', async () => {
     const { ctx, page } = await context(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
