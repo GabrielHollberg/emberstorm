@@ -1,6 +1,7 @@
 [Unit]
 Description=EmberStorm follows the box's address on the home network
-After=soundstorm.service
+# Not After=soundstorm.service: a oneshot waits for one still starting, and
+# a first start can take an hour; address.sh asks whether it is running.
 
 [Service]
 Type=oneshot

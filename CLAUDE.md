@@ -851,9 +851,44 @@ with one setting and lost the box's secrets. Checked: the address check in a
 Debian container (address changed and EmberStorm started, nothing the second
 time, nothing during an update, avahi's setting), `set_env` refusing an
 unreadable `.env`, `build.sh`'s syntax. Not checked: an image built with them
-(the firmware packages' names are trixie's), nor in the VM. The box's clock
+(below, all of it seen in the VM). The box's clock
 is UTC, so those hours are UTC until the owner's time zone is set (a
 before-selling item).
+
+**The USB stick that installs the box** (`box/installer.sh`, the owner's
+question "is this the best way?" answered yes, 2026-10-10: the eMMC is
+soldered in, so a box can only be given its system by starting it from
+something else - and the same stick is the factory's tool and the way a box
+is put right). Made after `build.sh`, from the same Debian base: the box's
+system as a raw image cut at its last partition, compressed (zstd), with its
+SHA-256 and size, and `installer/rootfs/.../install.sh` run at start-up
+(`emberstorm-install.service`, on the screen). It finds the eMMC (the one
+`mmcblkN`, never its boot or rpmb parts, never the stick; `INSTALL_TARGET`
+names another, the VM's `vda`), says what it will do and waits 20 seconds
+(switching off stops it), writes every block (dd, direct), reads it all back
+against the SHA-256, then **gives the copy disk IDs of its own** (`sgdisk -e
+-G`, a new ext4 UUID, fstab and both grub.cfgs rewritten) - the base names
+its root by PARTUUID and grub finds it by UUID, so every box and the stick
+would have shared them, and a box started with the stick in could have
+started the stick's system - adds an EmberStorm boot entry (the firmware's
+EFI/BOOT fallback finds it anyway), and switches off. The storage drive is
+kept, for putting a box right; a stick made with `FACTORY=1` wipes it
+(`wipefs`) so the box starts new. A failure says so on the screen and leaves
+the box on. Written to a stick of 16GB or more with balenaEtcher or Rufus.
+`run-vm.sh installer` starts the VM from the stick onto a blank built-in
+drive; a plain start then boots what it wrote. **Checked in the VM, end to
+end**, with a quick build (`NO_IMAGES=1`): installed and switched off in
+about two minutes; the written drive had new IDs throughout; it started from
+its own drive, grew it to 64GB, formatted the blank storage drive, and every
+service ran - waiting for any one port, the nightly security updates timed
+for 00:30-01:30, Ctrl-Alt-Del masked, Intel's graphics firmware present -
+and the address check set avahi to the one port (it had been ordered after
+EmberStorm's first start, which a oneshot waits out: no longer). Not
+checked: a real box's eMMC and firmware, Secure Boot on (OVMF here has it
+off), a whole build with the images, `FACTORY=1`. **Left for putting a box
+right:** `.env` lives on the eMMC, so a reinstalled box has a new setup code
+that no longer matches its sticker - the per-unit provisioning (before
+selling) should keep the setup code where a reinstall finds it.
 
 ## The decision that shapes everything
 

@@ -6,6 +6,11 @@
 #   wsl -d Debian -u root -- sh box/run-vm.sh          start it
 #   wsl -d Debian -u root -- sh box/run-vm.sh stop     stop it
 #   wsl -d Debian -u root -- sh box/run-vm.sh fresh    start over, both disks blank
+#   wsl -d Debian -u root -- sh box/run-vm.sh installer
+#        start from the USB stick (box/installer.sh, made with
+#        INSTALL_TARGET=vda) onto a blank built-in drive, as a real box gets
+#        its system; it switches itself off when done, and a plain start
+#        then boots what it wrote
 #
 # SoundStorm answers at http://localhost:8399, SSH (a DEV_SSH build) at
 # localhost port 2222, and the console is written to box/out/vm/console.log.
@@ -45,9 +50,18 @@ stop() {
 	rm -f "$vm/qemu.pid"
 }
 
+stick=""
 case "${1:-}" in
 stop) stop; exit 0 ;;
 fresh) stop; rm -f "$vm/system.qcow2" "$vm/data.qcow2" "$vm/vars.fd" ;;
+installer)
+	stop
+	[ -f "$out/emberstorm-installer.img" ] || { echo "Make the stick first: box/installer.sh" >&2; exit 1; }
+	rm -f "$vm/system.qcow2" "$vm/vars.fd"
+	qemu-img create -q -f qcow2 "$vm/system.qcow2" 64G
+	# The stick is not changed by a run (snapshot): it can be used again.
+	stick="-drive file=$out/emberstorm-installer.img,if=none,id=stick,format=raw,snapshot=on -device usb-storage,bus=xhci.0,drive=stick,bootindex=0"
+	;;
 esac
 
 [ -f "$out/soundstorm-box.qcow2" ] || { echo "Build it first: box/build.sh" >&2; exit 1; }
@@ -67,12 +81,14 @@ qemu-system-x86_64 \
 	-machine q35,accel=kvm -cpu host -smp 4 -m "$MEM" \
 	-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 	-drive if=pflash,format=raw,file="$vm/vars.fd" \
-	-drive file="$vm/system.qcow2",if=virtio,format=qcow2 \
+	-drive file="$vm/system.qcow2",if=none,id=system,format=qcow2 \
+	-device virtio-blk-pci,drive=system,bootindex=1 \
 	-drive file="$vm/data.qcow2",if=none,id=data,format=qcow2 \
 	-device nvme,drive=data,serial=SSDATA0001 \
 	-nic user,model=virtio-net-pci$restrict,hostfwd=tcp::8399-:8099,hostfwd=tcp::2222-:22 \
 	-display none -serial file:"$vm/console.log" \
 	-monitor unix:"$vm/monitor.sock",server,nowait \
 	-device qemu-xhci,id=xhci \
+	$stick \
 	-daemonize -pidfile "$vm/qemu.pid"
 echo "Started. Console: box/out/vm/console.log  SoundStorm: http://localhost:8399"

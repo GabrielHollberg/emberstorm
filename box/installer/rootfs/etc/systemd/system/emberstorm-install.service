@@ -1,0 +1,17 @@
+[Unit]
+Description=Install EmberStorm onto the box's built-in drive
+After=local-fs.target systemd-udev-settle.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/emberstorm-install/install.sh
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target
