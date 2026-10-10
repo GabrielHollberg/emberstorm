@@ -129,6 +129,10 @@ func (u *Updater) Handler() http.Handler {
 		w.WriteHeader(http.StatusAccepted)
 		reply(w, map[string]any{"mode": body.Mode})
 	})
+	mux.HandleFunc("POST /reset/cancel", func(w http.ResponseWriter, r *http.Request) {
+		u.CancelErase()
+		reply(w, map[string]any{"erase": false})
+	})
 	mux.HandleFunc("GET /button", func(w http.ResponseWriter, r *http.Request) {
 		open, until := u.buttonOpen()
 		// Never the code: that is for the box's own screen (ButtonCodeFile),
@@ -182,7 +186,10 @@ func (u *Updater) Serve(ctx context.Context, socket string) error {
 	// container user's (10001) - may open it.
 	_ = os.Chmod(socket, 0o660)
 	_ = os.Chown(socket, 0, soundstormGID)
-	srv := &http.Server{Handler: u.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	// Idle connections closed: the app's container could otherwise hold the
+	// root daemon's descriptors open (the box's blind security review).
+	srv := &http.Server{Handler: u.Handler(), ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout: time.Minute, IdleTimeout: 30 * time.Second}
 	go func() {
 		<-ctx.Done()
 		_ = srv.Close()

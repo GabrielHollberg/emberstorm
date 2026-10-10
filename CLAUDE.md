@@ -890,6 +890,70 @@ right:** `.env` lives on the eMMC, so a reinstalled box has a new setup code
 that no longer matches its sticker - the per-unit provisioning (before
 selling) should keep the setup code where a reinstall finds it.
 
+**A blind security review of the box (2026-10-10, the owner's asking)**: four
+reviewers shown only the code - the caretaker; the box's own scripts, units and
+what the container may touch; the build, releases and the USB stick; the
+server's box side (reset, the button's password, USB drives). Each finding
+checked against the code. Fixed:
+
+- **A USB stick given the storage drive's UUID could still be mounted in its
+  place** (the fstab line mounts by UUID, and the label check came after), and
+  with the real drive missing the box went on afresh on the eMMC. Now only an
+  internal device carrying the UUID is mounted (`mount_dev`, by device),
+  waited for up to 90 seconds; whatever mounted it, a drive that is not
+  internal stops the box with its message. The drive is mounted `nosuid,nodev`
+  (and remounted so on boxes with the old fstab line): the backends write there
+  as root, and a file they leave stays a file.
+- **An erase asked for in the app could not be taken back, and nothing at the
+  box said it was waiting** - the owner's five presses to reset a forgotten
+  password would then erase the box. The box's screen now says "ERASING THIS
+  BOX WAS ASKED FOR IN THE APP" while it waits (`erase-waiting`, root only,
+  as the button's code is), and the page's waiting screen has **Cancel
+  erasing** (`DELETE /api/reset`, the caretaker's `POST /reset/cancel`).
+- **"At home" was any connection Docker relayed**: on a box an IPv6
+  connection reaches the container through Docker's proxy from the network's
+  gateway, a private address, and so does anything through Tailscale's sidecar
+  - so from the internet the button's window could be watched and claimed with
+  the sticker's code. On a box a connection from one of the container's own
+  networks is not home (`homeConnection`, `ownNetworks`); off a box (Docker
+  Desktop, where every connection is the gateway) it stays as it was.
+- **Every call to the caretaker left a connection open** in EmberStorm and in
+  the root caretaker, on an endpoint anyone at home can ask: one client per
+  server, no keep-alive, and the caretaker's socket closes idle ones.
+- A release found before its expiry and installed after it is refused; the
+  screen keeps only printable ASCII from the server's text (a UTF-8 C1 control
+  was still a console escape) and a keyboard cannot freeze it (Ctrl-Z stopped
+  it for good); an erase never writes the setup code empty; every unit no
+  longer starts from the base image's saved random seed.
+
+Checked: the caretaker's and server's tests (`TestAWaitingEraseShowsAndCanBeCancelled`,
+`TestAnExpiredReleaseIsNotInstalled`, `TestARelayedConnectionIsNotFromHomeOnABox`),
+and in the VM the drive mounted from its internal disk `nosuid,nodev` after a
+restart. Not checked: a stick carrying the drive's UUID, a real IPv6
+connection, the erase notice on a monitor.
+
+**Left for the owner** (from the same review): **Start over** needs no presses
+at the box, so a compromised app container can wipe every account and the
+update snapshots (only Erase waits for the button); **the same five presses**
+reset a password and confirm an erase - a different gesture for erasing would
+part them; **USB drives are opened as they are plugged in**, so the kernel's
+ext4/FAT/exFAT code and ntfs-3g (as root) read any stick (opening one only
+after the owner says yes in the app would close it); **the app's own image is
+`:latest`** in the build and in `release.sh`, which pins whatever the tag holds
+at that moment; **the models are copied from this PC's live volumes unchecked**,
+Storyteller's whisper-cpp program among them (fetch them by pinned address and
+hash); **the release key** is a plain file on the build machine (sign offline
+or with a hardware key, before the first box), and a PRODUCTION build does not
+check that box/release.pub is the real key (pin its fingerprint once made);
+**somebody holding the box** can edit GRUB's kernel line or boot another
+system, and nothing is encrypted; the USB stick writes after 20 seconds with no
+key press and its hash is not signed; Debian's base image is checked against
+its checksums over HTTPS but not their signature; a compromised version can
+make later updates roll back by breaking backends (the health baseline); the
+button's window can be closed by anyone at home with five wrong codes;
+`/api/reset/button` says it is a box to anyone; a USB device sending the power
+key counts as the button; Thunderbolt or eSATA disks pass as internal.
+
 ## The decision that shapes everything
 
 That request sounds like "build a media server". It is not, and the difference

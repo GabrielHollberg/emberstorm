@@ -37,23 +37,6 @@ storage_failed() {
 }
 trap storage_failed EXIT
 
-# The drive this box had, by its UUID in fstab. Once a box has had a data
-# drive it never goes on without it: a drive that died, came loose or showed
-# up late used to leave the box starting afresh on its system disk - "set up
-# your new EmberStorm", the household's accounts and media seemingly gone, and
-# anybody with the sticker's code able to claim it (the blind reviews).
-had=$(awk -v m="$MNT" '$2 == m && $1 ~ /^UUID=/ {sub(/^UUID=/, "", $1); print $1; exit}' /etc/fstab)
-if [ -n "$had" ] && ! mountpoint -q "$MNT"; then
-	udevadm settle 2>/dev/null || true
-	for _ in $(seq 1 45); do
-		[ -e "/dev/disk/by-uuid/$had" ] && break
-		sleep 2
-	done
-	[ -e "/dev/disk/by-uuid/$had" ] ||
-		problem "The box's storage drive is not responding. Switch the box off and on again; if this stays, contact support. Nothing has been erased."
-	mount "$MNT" || problem "The box's storage drive could not be opened. Switch the box off and on again; if this stays, contact support. Nothing has been erased."
-fi
-
 mounted() { mountpoint -q "$MNT"; }
 
 root_disk() {
@@ -83,6 +66,12 @@ internal() {
 	[ "$tran" != usb ] && [ "$rm" = 0 ]
 }
 
+# The data drive is mounted only ever by its own device, and with nothing on
+# it able to run as root or act as a device: the backends write there as
+# root, and a file they leave must stay a file.
+OPTS=noatime,nosuid,nodev
+mount_dev() { mount -t btrfs -o "$OPTS" "$1" "$MNT"; }
+
 # Mounted from a drive that is not internal (an old fstab line by label, or
 # a stick labelled to look like the data drive): let it go before anything
 # reads it.
@@ -90,6 +79,32 @@ if mounted && ! internal "$(findmnt -no SOURCE "$MNT")"; then
 	log "$(findmnt -no SOURCE "$MNT") is not an internal disk; not using it as the data drive"
 	umount "$MNT" || exit 1
 fi
+
+# The drive this box had, by its UUID in fstab. Once a box has had a data
+# drive it never goes on without it: a drive that died, came loose or showed
+# up late used to leave the box starting afresh on its system disk - "set up
+# your new EmberStorm", the household's accounts and media seemingly gone, and
+# anybody with the sticker's code able to claim it (the blind reviews).
+had=$(awk -v m="$MNT" '$2 == m && $1 ~ /^UUID=/ {sub(/^UUID=/, "", $1); print $1; exit}' /etc/fstab)
+if [ -n "$had" ] && ! mountpoint -q "$MNT"; then
+	udevadm settle 2>/dev/null || true
+	# The internal device carrying that UUID, never another: a USB stick
+	# given the same UUID could otherwise be mounted in its place, and the
+	# box run on whatever was put on it (the box's blind security review).
+	# Waited for up to 90 seconds, as a drive can be slow to appear.
+	dev=""
+	for _ in $(seq 1 45); do
+		for d in $(blkid -c /dev/null -t UUID="$had" -o device 2>/dev/null); do
+			internal "$d" && dev=$d && break
+		done
+		[ -n "$dev" ] && break
+		sleep 2
+	done
+	[ -n "$dev" ] ||
+		problem "The box's storage drive is not responding. Switch the box off and on again; if this stays, contact support. Nothing has been erased."
+	mount_dev "$dev" || problem "The box's storage drive could not be opened. Switch the box off and on again; if this stays, contact support. Nothing has been erased."
+fi
+
 
 if ! mounted; then
 	dev=""
@@ -124,13 +139,21 @@ if ! mounted; then
 		uuid=$(blkid -o value -s UUID "$dev")
 		sed -i "\|^LABEL=$LABEL |d" /etc/fstab
 		grep -q "^UUID=$uuid " /etc/fstab ||
-			echo "UUID=$uuid $MNT btrfs defaults,noatime,nofail,x-systemd.device-timeout=10s 0 0" >> /etc/fstab
-		mount "$MNT"
+			echo "UUID=$uuid $MNT btrfs defaults,$OPTS,nofail,x-systemd.device-timeout=10s 0 0" >> /etc/fstab
+		mount_dev "$dev"
 		log "data drive $dev mounted at $MNT"
 	else
 		log "no data drive; keeping everything on the system disk"
 		touch /run/soundstorm/no-data-drive
 	fi
+fi
+
+# Whatever mounted it, it is an internal disk with the options above, or the
+# box does not start.
+if mounted; then
+	internal "$(findmnt -no SOURCE "$MNT")" ||
+		problem "The box's storage drive could not be told from a plugged-in drive. Unplug any USB drives and switch the box off and on again."
+	mount -o remount,nosuid,nodev "$MNT" 2>/dev/null || true
 fi
 
 # The three parts, as subvolumes on the data drive so each can be snapshotted

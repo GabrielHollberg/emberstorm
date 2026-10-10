@@ -186,12 +186,44 @@ type presses struct {
 // EraseWait is how long an erase asked for in the app waits for the button.
 const EraseWait = 10 * time.Minute
 
-// ArmErase has the next five presses within EraseWait erase the box.
+// ArmErase has the next five presses within EraseWait erase the box. It is
+// said on the box's own screen (EraseFile), so the five presses somebody
+// makes to reset a forgotten password are never taken for an erase unawares
+// (the box's blind security review), and CancelErase takes it back.
 func (u *Updater) ArmErase() {
 	u.button.mu.Lock()
 	u.button.eraseUntil = time.Now().Add(EraseWait)
+	u.showErase(u.button.eraseUntil)
 	u.button.mu.Unlock()
 	u.log.Warn("erasing the box was asked for: waiting for five presses of the power button")
+}
+
+// CancelErase takes back an erase still waiting for the button.
+func (u *Updater) CancelErase() {
+	u.button.mu.Lock()
+	armed := time.Now().Before(u.button.eraseUntil)
+	u.button.eraseUntil = time.Time{}
+	u.showErase(time.Time{})
+	u.button.mu.Unlock()
+	if armed {
+		u.log.Warn("erasing the box was cancelled")
+	}
+}
+
+// EraseFile tells the box's screen (screen.sh, root) an erase is waiting:
+// "<until, unix seconds>". Gone once it is cancelled, done or past.
+const EraseFile = "erase-waiting"
+
+func (u *Updater) showErase(until time.Time) {
+	path := filepath.Join(u.cfg.StateDir, EraseFile)
+	if until.IsZero() {
+		_ = os.Remove(path)
+		return
+	}
+	if err := os.MkdirAll(u.cfg.StateDir, 0o700); err != nil {
+		return
+	}
+	_ = os.WriteFile(path, []byte(fmt.Sprintf("%d\n", until.Unix())), 0o600)
 }
 
 // eraseArmed is whether an erase waits for the button, and until when.
@@ -328,6 +360,7 @@ func (u *Updater) Pressed(ctx context.Context, n int) {
 		u.button.mu.Lock()
 		if time.Now().Before(u.button.eraseUntil) {
 			u.button.eraseUntil = time.Time{}
+			u.showErase(time.Time{})
 			u.button.mu.Unlock()
 			u.log.Warn("the power button was pressed five times: erasing the box, as asked in the app")
 			go func() {

@@ -203,6 +203,7 @@ virt-customize -a "$disk" \
 	--run-command 'ln -sf /dev/null /etc/systemd/system/serial-getty@.service' \
 	--run-command 'rm -f /etc/ssh/ssh_host_*' \
 	$ssh_args \
+	--delete /var/lib/systemd/random-seed \
 	--truncate /etc/machine-id
 
 say "Compressing"

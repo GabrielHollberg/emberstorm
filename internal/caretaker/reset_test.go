@@ -242,3 +242,50 @@ func TestAnInflatedHealthIsNotTheBaseline(t *testing.T) {
 		t.Fatalf("baseline %d", got)
 	}
 }
+
+// An erase waiting for the button is said on the box's screen, and taken
+// back: the five presses after that open the password, erasing nothing.
+func TestAWaitingEraseShowsAndCanBeCancelled(t *testing.T) {
+	b := newBox(t)
+	srv := filepath.Join(b.dir, "srv")
+	b.u.cfg.Volumes = filepath.Join(srv, "volumes")
+	b.u.cfg.Cache = filepath.Join(srv, "cache")
+	b.u.cfg.Library = filepath.Join(srv, "library")
+	song := filepath.Join(srv, "library/music/Artist/01.mp3")
+	os.MkdirAll(filepath.Dir(song), 0o755)
+	os.WriteFile(song, []byte("x"), 0o644)
+
+	b.u.ArmErase()
+	if _, err := os.Stat(filepath.Join(b.u.cfg.StateDir, EraseFile)); err != nil {
+		t.Fatal("the screen is not told an erase is waiting")
+	}
+	rec := httptest.NewRecorder()
+	b.u.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/reset/cancel", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cancel: %d", rec.Code)
+	}
+	if _, err := os.Stat(filepath.Join(b.u.cfg.StateDir, EraseFile)); !os.IsNotExist(err) {
+		t.Fatal("the screen still says an erase is waiting")
+	}
+	b.u.Pressed(context.Background(), 5)
+	time.Sleep(200 * time.Millisecond)
+	if _, err := os.Stat(song); err != nil {
+		t.Fatal("a cancelled erase erased")
+	}
+	if open, _ := b.u.buttonOpen(); !open {
+		t.Fatal("the presses did not open the password")
+	}
+}
+
+// A release that has expired since it was found is not installed.
+func TestAnExpiredReleaseIsNotInstalled(t *testing.T) {
+	b := newBox(t)
+	m := release(2)
+	m.Expires = time.Now().Add(-time.Minute)
+	if err := b.u.Update(context.Background(), m); err == nil {
+		t.Fatal("an expired release was installed")
+	}
+	if b.images() != "" {
+		t.Fatal("an expired release changed the images")
+	}
+}
