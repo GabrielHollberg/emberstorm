@@ -160,6 +160,7 @@ if (-not $Launch -and -not $env:SOUNDSTORM_COMPOSE_URL -and -not $env:SOUNDSTORM
 }
 $ComposeUrl = if ($env:SOUNDSTORM_COMPOSE_URL) { $env:SOUNDSTORM_COMPOSE_URL } else { "$RawBase/docker-compose.yml" }
 $ScriptUrl  = if ($env:SOUNDSTORM_SCRIPT_URL) { $env:SOUNDSTORM_SCRIPT_URL } else { "$RawBase/install.ps1" }
+$IconUrl    = "$RawBase/emberstorm.ico"
 # Only ever over https: what is downloaded here runs.
 if ($ComposeUrl -notmatch '^https://') { $ComposeUrl = "$RawBase/docker-compose.yml" }
 if ($ScriptUrl -notmatch '^https://') { $ScriptUrl = "$RawBase/install.ps1" }
@@ -4290,6 +4291,10 @@ function New-Shortcut($Path, $Target, $Arguments, $WorkingDirectory, $Descriptio
     $link = $shell.CreateShortcut($Path)
     $link.TargetPath = $Target
     if ($Arguments) { $link.Arguments = $Arguments }
+    # Shortcuts that run EmberStorm through PowerShell wear its cloud; the
+    # library folder's keeps the folder icon.
+    $icon = Join-Path $Dir 'emberstorm.ico'
+    if ($Arguments -and (Test-Path -LiteralPath $icon)) { $link.IconLocation = "$icon,0" }
     if ($WorkingDirectory) { $link.WorkingDirectory = $WorkingDirectory }
     $link.Description = $Description
     # 7 is minimized: the launcher makes sure Docker is up before opening a
@@ -4398,6 +4403,7 @@ function Register-Uninstaller([switch]$Unfinished) {
         # does not catch that.
         $strings = @{
             DisplayName     = $(if ($Unfinished) { 'EmberStorm (setup not finished)' } else { 'EmberStorm' })
+            DisplayIcon     = $(if (Test-Path -LiteralPath (Join-Path $Dir 'emberstorm.ico')) { Join-Path $Dir 'emberstorm.ico' } else { $powershell })
             DisplayVersion  = '0.1'
             Publisher       = 'EmberStorm'
             InstallLocation = $Dir
@@ -4737,7 +4743,7 @@ exit 0
     # thing here worth keeping, and the moment somebody wants it is after they
     # have already uninstalled.
     if (-not $stillRunning -and -not $partly) {
-        foreach ($leftover in @('docker-compose.yml', '.env', 'soundstorm.ps1', 'tailscale-serve.json', 'docker-compose.yml.old', 'docker-compose.yml.new')) {
+        foreach ($leftover in @('docker-compose.yml', '.env', 'soundstorm.ps1', 'tailscale-serve.json', 'docker-compose.yml.old', 'docker-compose.yml.new', 'emberstorm.ico')) {
             Remove-Item -LiteralPath (Join-Path $Dir $leftover) -Force -ErrorAction SilentlyContinue
         }
         # The setup's own copy, its notes for carrying on after a restart and
@@ -5369,6 +5375,15 @@ try {
         Copy-Item $PSCommandPath 'soundstorm.ps1' -Force
     }
 }
+# The cloud for the shortcuts and the Settings, Apps entry: they run
+# PowerShell, and showed its icon, which said nothing about EmberStorm (the
+# owner, 2026-10-10). Without it they still work, with PowerShell's.
+try {
+    Invoke-WebRequest -Uri $IconUrl -OutFile 'emberstorm.ico.new' -UseBasicParsing
+    if ((Get-Item 'emberstorm.ico.new').Length -gt 1000) { Move-Item -Force 'emberstorm.ico.new' 'emberstorm.ico' }
+} catch { }
+Remove-Item -LiteralPath 'emberstorm.ico.new' -Force -ErrorAction SilentlyContinue
+
 # In Settings, Apps from here on, so a setup cancelled during the long
 # download is taken away there, everything it did with it. An update already
 # has its entry.

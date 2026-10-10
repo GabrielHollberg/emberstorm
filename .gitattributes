@@ -27,6 +27,7 @@ Dockerfile text eol=lf
 
 # Media in the starter library and the screenshots are bytes, not text.
 *.png binary
+*.ico binary
 *.mp3 binary
 *.epub binary
 *.pdf binary
