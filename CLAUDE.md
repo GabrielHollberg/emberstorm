@@ -65,6 +65,17 @@ title sat under the camera until they were brought over. Both branches were
 merged into main on 2026-09-30. Do not start per-app branches again; if a
 short one is needed for a risky change, merge it the same day.
 
+**The image build must pass, and is checked twice** (2026-10-10: GitHub's
+publish failed on every push from 8 to 10 October at gofmt - four unformatted
+files - and nobody saw, so every new install, the test box's too, got the 8
+October EmberStorm; the live server, built here, hid it). Now: the commit hook
+(`scripts/private-check.sh staged`, already installed on both machines) refuses
+staged Go files gofmt would change - with Go's gofmt where it is installed, else
+in Docker (this PC has no Go); and `scripts/after-deploy.sh` says whether
+GitHub's last image build passed, a failure failing the check. Its live health
+step now waits up to 90s for every backend to reconnect: "8 sources, expected
+9" on every deploy was a false alarm that taught everyone to read past it.
+
 **Every session starts with `git pull` and ends with a commit and a push.**
 The owner switches machines by telling the session they are leaving; that
 session commits and pushes everything, and the next one pulls before touching
