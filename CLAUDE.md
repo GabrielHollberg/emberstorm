@@ -4742,6 +4742,56 @@ pages, finished with a code, an error with Restart now); and the real
 installer run in a scratch folder, which opened the new window and stopped
 on "already installed in another folder", writing nothing.
 
+**A review of the Windows setup (2026-10-09)**: three reviewers - bugs,
+security, the window - each finding checked against the script first. Fixed:
+
+- **The questions come first.** On a first install, where the library goes,
+  the home network, keeping it available and room for the download (25GB
+  while Docker is still to come) are asked before Step 1, then "That is
+  everything"; installing Docker is ten minutes and more, and somebody who
+  walked away came back to a question. Not when EmberStorm is installed in
+  another folder (step 2 refuses, and asks nothing first). An update asks as
+  before, in step 2.
+- **Docker's own installer is checked as Docker's**: downloaded over https
+  only (redirects too), its signature Valid and signed `O=Docker Inc`, then
+  checked again as administrator on a copy in a folder under Windows' Temp
+  only administrators can change, and run from there - so nothing can swap
+  the file between the check and the run. winget failing for any reason now
+  falls back to it.
+- **An update keeps the compose file it had** (`docker-compose.yml.old`) until
+  the new versions are downloaded: a failed download starts the old version
+  with its own file, where it used to start nothing.
+- **A restart WSL still needs is caught** (Windows' pending-restart marks):
+  Docker is installed, then one restart (`Stop-ForRestart`) finishes both;
+  and Docker's engine not starting after a fresh install offers the restart
+  too.
+- **A resumed setup keeps its settings** (`resume.env` beside the copy: the
+  install folder, repository, branch, port), and stops offering to carry on
+  after three restarts; never for a console run.
+- **Firewall**: Docker's backend allowed on Private only, blocked on Public
+  and Domain (a work laptop's network is not the setup's to open), the rule
+  made at Docker's standard path even before Docker is installed; the network
+  checked again once EmberStorm runs; "not my home network" remembered on
+  updates too. Elevated scripts load modules only from Windows' own folder.
+- **Uninstall** has the window, starts Docker if it is not running (it said
+  "removed" with nothing stopped), says when it could not stop it, takes the
+  setup's own firewall rules and restart entry away.
+- Smaller: the desktop icon never installs Docker; the sleep setting read in
+  any Windows language (powercfg's second-last value); a moved install's
+  `$` no longer doubled; auto sign-in says honestly what happened.
+- **The window**: never taller than the screen (the card and pages scroll,
+  kept on screen as it grows), a question lifted to the front, closing stops
+  the setup at its next moment rather than from inside the window's event,
+  the finish says 100%.
+
+Checked: the script parses in Windows PowerShell 5.1 and is plain ASCII; the
+screens drawn and looked at; powercfg's reading on this PC (plugged-in 0);
+the real installer in a scratch folder, which asked nothing and stopped on
+"already installed in another folder", writing nothing and leaving no
+restart entry. **Not checked:** a fresh PC (Docker's signed install, WSL's
+restart, the questions first) - the test box is the test; the uninstall (it
+would remove the live server).
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
