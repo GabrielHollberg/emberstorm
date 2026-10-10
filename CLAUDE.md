@@ -756,6 +756,41 @@ Windows checkout) - `build.sh` makes it and the logind and tmpfiles confs
 Not checked: the whole backend set, a fresh image built end to end, the
 the test unit's own button.)*
 
+### The box reviewed blind, and the power button (2026-10-10)
+
+Four reviewers who saw only the code (security; bugs and reliability; the
+buyer's experience; making real units and real hardware) went over `box/`,
+the caretaker and the box's server side before the first real unit. Their
+findings, checked against the code, are being worked through in two groups -
+before the first unit, then before selling (the list is in "Catching the Mac
+and Linux up"'s neighbour below, kept up as it goes).
+
+**The owner's decisions from it:** the password reset takes the **sticker's
+setup code** as well as the screen's code (most buyers have no monitor);
+**two quick presses** shut the box down properly and one does nothing (a PC's
+button reports only that it went down, never how long - so "hold to switch
+off" cannot be told apart; held four seconds the hardware still forces it
+off); **Debian's security updates** for the box's own system, at night;
+**Erase waits for five presses at the box** after it is confirmed in the app.
+
+**Built:** the caretaker reads every input device sending the power key
+(`powerButtons`, by the device's key bitmap: a real PC has the ACPI button,
+the fixed button and sometimes Intel's HID device, and reports a press on one
+of them - the VM's single device hid it), presses closer than 250ms counted
+once (one press reported twice), devices looked for again every half minute;
+`claimButton` takes the screen's code or the setup code from the stack's
+`.env`, case, spaces and dashes aside; `POST /reset` with erase arms it
+(`ArmErase`, ten minutes) and five presses then erase in place of opening the
+password; the page says to press the button and follows the box going away
+and coming back. The caretaker no longer waits for EmberStorm or needs
+Docker at boot, so the button works through a first start's long image load
+and when the data drive failed; a night update waits until
+`soundstorm.service` is active. The sign-in screen says the sticker's code is
+needed; the box's screen says two presses switch it off. Checked: the
+caretaker's tests (`TestThePowerButtonsAreFound` on a real-PC device list,
+`TestTheStickersCodeOpensTheWindowToo`, `TestErasingWaitsForTheButton`) and
+the server's. Not checked: the test unit's own button.
+
 ## The decision that shapes everything
 
 That request sounds like "build a media server". It is not, and the difference

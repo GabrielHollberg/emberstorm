@@ -106,6 +106,7 @@ draw() {
 		else
 			printf '\n   Forgot the password? Press the power button on the box\n'
 			printf '   five times quickly, then choose a new one on the sign-in screen.\n'
+			printf '   To switch the box off, press the power button twice.\n'
 		fi
 		;;
 	esac

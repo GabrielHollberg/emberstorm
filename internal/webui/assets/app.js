@@ -676,7 +676,7 @@ function showGate(hasAccount, setupCodeRequired) {
       if (!ok || !body || $('gate-form').dataset.mode !== 'login') return;
       show($('gate-button-hint'), Boolean(body.box) && !body.open);
       if (body.open) {
-        $('gate-button-text').textContent = `The power button on the box was pressed. Choose a new password for ${body.owner}, with the code a screen plugged into the box shows:`;
+        $('gate-button-text').textContent = `The power button on the box was pressed. Choose a new password for ${body.owner}. Type the setup code from the box's sticker - or, with a screen plugged into the box, the code it shows:`;
         show($('gate-button'), true);
       }
     });
@@ -1218,9 +1218,29 @@ $('box-reset-form').addEventListener('submit', async (event) => {
   for (const id of ['app', 'tabs', 'account']) show($(id), false);
   show($('boot'), true);
   if (!$('boot-text')) $('boot').append(Object.assign(document.createElement('p'), { id: 'boot-text', className: 'muted' }));
-  $('boot-text').textContent = boxResetMode === 'erase'
-    ? 'Erasing the box. It will be ready to set up again in a few minutes.'
-    : 'Starting over. The box will be ready to set up again in a few minutes.';
+  // Erasing waits for somebody at the box (the owner's choice, 2026-10-10):
+  // five presses of its power button within ten minutes start it; until
+  // then nothing is touched, and not pressing it is changing one's mind.
+  if (body && body.waiting === 'button') {
+    $('boot-text').textContent = 'Now press the power button on the box five times quickly, within ten minutes. The box then erases itself. Changed your mind? Just do not press it.';
+    const until = Date.now() + 11 * 60 * 1000;
+    let gone = false;
+    while (Date.now() < until || gone) {
+      await pause(5000);
+      let up = false;
+      try { up = (await fetch('/healthz', { cache: 'no-store' })).ok; } catch { /* stopping */ }
+      if (!up && !gone) {
+        gone = true;
+        $('boot-text').textContent = 'Erasing the box. It will be ready to set up again in a few minutes.';
+      } else if (up && gone) {
+        location.reload();
+        return;
+      }
+    }
+    location.reload();
+    return;
+  }
+  $('boot-text').textContent = 'Starting over. The box will be ready to set up again in a few minutes.';
   // Gone while it is reset, then back: reload into setting it up.
   await pause(15000);
   for (;;) {

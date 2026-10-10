@@ -112,17 +112,17 @@ func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// The code on the box's own screen, checked and the window closed in
-	// one step by the caretaker: only somebody at the box can read it, and
-	// only one ask can have it.
-	code := strings.Map(func(c rune) rune {
-		if c >= '0' && c <= '9' {
-			return c
-		}
-		return -1
-	}, body.Code)
+	// The code on the box's own screen, or the setup code on its sticker
+	// (for a box with no screen plugged in), checked and the window closed
+	// in one step by the caretaker: only somebody at the box can read the
+	// one, only the owner has the other, and only one ask can have it. Sent
+	// as typed - the caretaker sets case, spaces and dashes aside.
+	code := strings.TrimSpace(body.Code)
+	if len(code) > 64 {
+		code = code[:64]
+	}
 	if status, err := s.caretakerCall(r.Context(), http.MethodPost, "/button/claim", map[string]string{"code": code}, nil); err != nil || status != http.StatusOK {
-		writeError(w, http.StatusForbidden, "That is not the code on the box's screen.")
+		writeError(w, http.StatusForbidden, "That is not the setup code on the box's sticker, or the code on its screen.")
 		return
 	}
 	owner, err := s.auth.SetOwnerPassword(body.Password)
@@ -212,11 +212,16 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusTooManyRequests, err.Error())
 		return
 	}
-	code, err := s.caretakerCall(r.Context(), http.MethodPost, "/reset", map[string]string{"mode": body.Mode}, nil)
+	// Erasing waits at the caretaker for five presses of the box's power
+	// button: said back to the page, which tells the person to press them.
+	var answer struct {
+		Waiting string `json:"waiting"`
+	}
+	code, err := s.caretakerCall(r.Context(), http.MethodPost, "/reset", map[string]string{"mode": body.Mode}, &answer)
 	if err != nil || code != http.StatusAccepted {
 		writeError(w, http.StatusServiceUnavailable, "The box could not start over just now. Try again in a minute.")
 		return
 	}
-	s.log.Warn("the box is being reset", "mode", body.Mode, "by", actor.Name)
-	writeJSON(w, http.StatusAccepted, map[string]any{"mode": body.Mode})
+	s.log.Warn("the box is being reset", "mode", body.Mode, "by", actor.Name, "waiting", answer.Waiting)
+	writeJSON(w, http.StatusAccepted, map[string]any{"mode": body.Mode, "waiting": answer.Waiting})
 }

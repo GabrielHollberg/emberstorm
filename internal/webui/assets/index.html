@@ -102,12 +102,13 @@
       <p id="gate-error" class="error hidden" role="alert"></p>
       <!-- A box: the way back in when the owner's password is forgotten - the
            power button pressed five times (reset.go). -->
-      <p id="gate-button-hint" class="muted small-print hidden">Forgot the owner's password, or lost the sticker? Press the
-        power button on the box five times quickly, then come back here.</p>
+      <p id="gate-button-hint" class="muted small-print hidden">Forgot the owner's password? Press the power button on the
+        box five times quickly, then come back here. You will need the setup code from the box's sticker - or a screen
+        plugged into the box, which shows a code.</p>
       <div id="gate-button" class="hidden">
         <p id="gate-button-text"></p>
-        <label for="gate-button-code">The code on the box's screen</label>
-        <input id="gate-button-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456">
+        <label for="gate-button-code">The setup code on the box's sticker, or the code on its screen</label>
+        <input id="gate-button-code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="From the sticker or the box's screen">
         <label for="gate-button-password">New password</label>
         <input id="gate-button-password" type="password" autocomplete="new-password">
         <p class="muted small-print">At least 12 characters, and not a common one.</p>

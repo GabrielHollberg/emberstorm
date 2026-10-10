@@ -64,8 +64,8 @@ func TestResetEmptiesWhatItSays(t *testing.T) {
 	}
 }
 
-// Presses come in runs: once is a shutdown, five quickly open the owner's
-// password for a while.
+// Presses come in runs: twice is a shutdown, once nothing, five quickly open
+// the owner's password for a while.
 func TestThePowerButtonCountsRuns(t *testing.T) {
 	press := make(chan struct{}, 16)
 	runs := make(chan int, 4)
@@ -115,17 +115,96 @@ func TestThePowerButtonCountsRuns(t *testing.T) {
 	}
 	b.u.Pressed(ctx, 1)
 	b.mu.Lock()
+	if len(b.ran) != 0 {
+		t.Fatalf("one press ran %v", b.ran)
+	}
+	b.mu.Unlock()
+	b.u.Pressed(ctx, 2)
+	b.mu.Lock()
 	defer b.mu.Unlock()
 	if len(b.ran) == 0 || b.ran[len(b.ran)-1] != "systemctl poweroff" {
-		t.Fatalf("one press ran %v", b.ran)
+		t.Fatalf("two presses ran %v", b.ran)
 	}
 }
 
-func TestThePowerButtonIsFound(t *testing.T) {
-	devices := "I: Bus=0019 Vendor=0000 Product=0001 Version=0000\nN: Name=\"Power Button\"\nH: Handlers=kbd event2 \n\n" +
-		"I: Bus=0003\nN: Name=\"Keyboard\"\nH: Handlers=sysrq kbd event3\n"
-	if got := powerButton(devices); got != "/dev/input/event2" {
-		t.Fatalf("found %q", got)
+// With no screen plugged into the box, the sticker's setup code - typed with
+// any case, spaces or dashes - does what the screen's code does.
+func TestTheStickersCodeOpensTheWindowToo(t *testing.T) {
+	b := newBox(t)
+	os.WriteFile(filepath.Join(b.dir, ".env"), []byte("SOUNDSTORM_PORT=8099\nSOUNDSTORM_SETUP_CODE=k3x9m2p7qa4d8wze1rty\n"), 0o600)
+	if b.u.claimButton("K3X9-M2P7-QA4D-8WZE-1RTY") {
+		t.Fatal("the sticker's code worked with no presses")
+	}
+	b.u.Pressed(context.Background(), 5)
+	if b.u.claimButton("k3x9 m2p7 qa4d 8wze 1rtz") {
+		t.Fatal("a wrong sticker code was taken")
+	}
+	if !b.u.claimButton("K3X9-M2P7-QA4D-8WZE-1RTY") {
+		t.Fatal("the sticker's code was refused")
+	}
+	if open, _ := b.u.buttonOpen(); open {
+		t.Fatal("still open after the sticker's code")
+	}
+}
+
+// Erasing asked for through the socket waits for five presses at the box;
+// until then nothing is touched, and five presses start it.
+func TestErasingWaitsForTheButton(t *testing.T) {
+	b := newBox(t)
+	srv := filepath.Join(b.dir, "srv")
+	b.u.cfg.Volumes = filepath.Join(srv, "volumes")
+	b.u.cfg.Cache = filepath.Join(srv, "cache")
+	b.u.cfg.Library = filepath.Join(srv, "library")
+	song := filepath.Join(srv, "library/music/Artist/01.mp3")
+	os.MkdirAll(filepath.Dir(song), 0o755)
+	os.WriteFile(song, []byte("x"), 0o644)
+	os.MkdirAll(b.u.cfg.Volumes, 0o755)
+	os.MkdirAll(b.u.cfg.Cache, 0o755)
+
+	rec := httptest.NewRecorder()
+	b.u.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/reset", strings.NewReader(`{"mode":"erase"}`)))
+	if rec.Code != http.StatusAccepted || !strings.Contains(rec.Body.String(), `"waiting":"button"`) {
+		t.Fatalf("erase asked: %d %s", rec.Code, rec.Body.String())
+	}
+	time.Sleep(2500 * time.Millisecond)
+	if _, err := os.Stat(song); err != nil {
+		t.Fatal("erased with nobody at the box")
+	}
+	if erase, _ := b.u.eraseArmed(); !erase {
+		t.Fatal("not waiting for the button")
+	}
+	b.u.Pressed(context.Background(), 5)
+	for i := 0; i < 50; i++ {
+		if _, err := os.Stat(song); os.IsNotExist(err) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err := os.Stat(song); !os.IsNotExist(err) {
+		t.Fatal("five presses did not erase")
+	}
+	if open, _ := b.u.buttonOpen(); open {
+		t.Fatal("the presses that confirmed an erase opened the password too")
+	}
+}
+
+// A real PC lists more than one device sending the power key; every one is
+// watched, a keyboard is not, and an old kernel's list with no key bitmap
+// still finds the button by its name.
+func TestThePowerButtonsAreFound(t *testing.T) {
+	devices := "I: Bus=0019 Vendor=0000 Product=0001\nN: Name=\"Power Button\"\nP: Phys=PNP0C0C/button/input0\n" +
+		"H: Handlers=kbd event1 \nB: KEY=10000000000000 0\n\n" +
+		"I: Bus=0019 Vendor=0000 Product=0001\nN: Name=\"Power Button\"\nP: Phys=LNXPWRBN/button/input0\n" +
+		"H: Handlers=kbd event2 \nB: KEY=10000000000000 0\n\n" +
+		"I: Bus=0019\nN: Name=\"Intel HID events\"\nH: Handlers=rfkill kbd event5 \nB: KEY=3f000b00000000 0 10000000000000 0\n\n" +
+		"I: Bus=0003\nN: Name=\"USB Keyboard\"\nH: Handlers=sysrq kbd event3 leds\nB: KEY=1000000000007 ff9f207ac14057ff febeffdfffefffff fffffffffffffffe\n"
+	got := powerButtons(devices)
+	if strings.Join(got, " ") != "/dev/input/event1 /dev/input/event2 /dev/input/event5" {
+		t.Fatalf("found %v", got)
+	}
+	old := "I: Bus=0019\nN: Name=\"Power Button\"\nH: Handlers=kbd event2 \n\nI: Bus=0003\nN: Name=\"Keyboard\"\nH: Handlers=sysrq kbd event3\n"
+	if got := powerButtons(old); len(got) != 1 || got[0] != "/dev/input/event2" {
+		t.Fatalf("found %v without key bitmaps", got)
 	}
 }
 
