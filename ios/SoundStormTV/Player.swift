@@ -239,9 +239,7 @@ final class Player {
         player.insert(playing!, after: nil)
         enqueueNext()
         let into = seconds - files[f].start
-        if into > 0.5 {
-            player.seek(to: CMTime(seconds: into, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-        }
+        if into > 0.5 { settle(into) }
         time = seconds
         try? AVAudioSession.sharedInstance().setActive(true)
         player.playImmediately(atRate: Float(speed))
@@ -261,10 +259,27 @@ final class Player {
         updateRemoteCommands()
     }
 
+    /// A book's jump in progress (to its saved place, or a seek): until it
+    /// lands, the player's clock is not the book's - read then, the start of
+    /// the file was saved as the book's place (the review of 2026-10-09).
+    private var settling = 0
+
+    private func settle(_ into: Double) {
+        settling += 1
+        player.seek(to: CMTime(seconds: into, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            Task { @MainActor in self?.settled() }
+        }
+    }
+
+    private func settled() { settling = max(0, settling - 1) }
+
     /// Every ten seconds while playing, on pause and on leaving, as the page
     /// saves it; finished at the end of the last file.
     private func saveBook(force: Bool, finished: Bool = false) {
         guard isBook, let book = current else { return }
+        // Mid-jump the clock is the place asked for (set when the jump began),
+        // so a forced save then is still right; only the player's own reading
+        // is held off (tick).
         if !force && Date().timeIntervalSince(lastSave) < 10 { return }
         lastSave = Date()
         let (t, d) = (time, duration)
@@ -356,8 +371,7 @@ final class Player {
                 if !wasPlaying { pause() }
                 return
             }
-            player.seek(to: CMTime(seconds: t - files[f].start, preferredTimescale: 600),
-                        toleranceBefore: .zero, toleranceAfter: .zero)
+            settle(t - files[f].start)
         } else {
             player.seek(to: CMTime(seconds: t, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         }
@@ -619,6 +633,7 @@ final class Player {
         guard seconds.isFinite else { return }
         checkSleep()
         if isBook {
+            guard settling == 0 else { return }
             time = (files.indices.contains(fileIndex) ? files[fileIndex].start : 0) + seconds
             if isPlaying { saveBook(force: false) }
             // The system's Now Playing names the chapter: told when it changes.
