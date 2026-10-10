@@ -1041,7 +1041,12 @@ function New-GuiPageText([string]$Heading, [string[]]$Lines) {
 
 # Wait-GuiClosed keeps the window up until the person closes it.
 function Wait-GuiClosed {
+    # In front, as for a question: the person may have been in another
+    # window for the whole download.
+    if ($script:Gui.Window.WindowState -eq 'Minimized') { $script:Gui.Window.WindowState = 'Normal' }
+    $script:Gui.Window.Topmost = $true
     [void]$script:Gui.Window.Activate()
+    $script:Gui.Window.Topmost = $false
     while (-not $script:Gui.Closed -and $script:Gui.Window.IsVisible) {
         Update-Gui
         Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds 40
@@ -4310,7 +4315,8 @@ function Install-Shortcuts {
 
     # Somewhere to put files, one click away. The app takes a drag-and-drop
     # too, but a folder is what people reach for with a hard drive of music.
-    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'EmberStorm media.lnk') `
+    Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Desktop')) 'EmberStorm media.lnk') -Force -ErrorAction SilentlyContinue
+    New-Shortcut (Join-Path ([Environment]::GetFolderPath('Desktop')) 'EmberStorm library.lnk') `
         (Get-LibraryPath) $null $null 'Put your music, films and books in here' $false
 
     # Updating is re-running the installer, so the shortcut is the installer.
@@ -4429,6 +4435,7 @@ function Remove-Shortcuts([switch]$OldOnly) {
         $paths += @(
             (Join-Path $desktop "$n.lnk"),
             (Join-Path $desktop "$n media.lnk"),
+            (Join-Path $desktop "$n library.lnk"),
             (Join-Path $programs "$n.lnk"),
             (Join-Path $programs "Update $n.lnk"),
             (Join-Path $programs "Move $n library.lnk"),
@@ -5780,7 +5787,7 @@ if ($upgrade) {
 Write-Host "  ======================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  To add music, films or books: drag them onto the EmberStorm window, or"
-Write-Host "  put them in the 'EmberStorm media' folder on your desktop."
+Write-Host "  put them in the 'EmberStorm library' folder on your desktop."
 Write-Host ""
 if ($secure) {
     # The real certificate is in: this address works with no warning on any
@@ -5878,7 +5885,7 @@ if ($phoneAddress -and $lanAccess -in @('public', 'refused', 'failed')) {
 } elseif ($phoneAddress) {
     $phoneLines = @('', 'On your phone, TV or another computer on the same Wi-Fi:', "*  $phoneAddress")
 }
-$phoneLines += @('', 'To add your music, films and books: drop them in the "EmberStorm media" folder on your desktop, or use Add media in EmberStorm''s Settings.')
+$phoneLines += @('', 'To add your music, films and books: drop them in the "EmberStorm library" folder on your desktop, or use Add media in EmberStorm''s Settings.')
 if ($useTailscale -and $tailnet) {
     $phoneLines += @('', 'Away from home, on a device signed in to Tailscale:', "*  $tailnet")
 }
@@ -5891,9 +5898,11 @@ if (-not $upgrade -and -not $isLaptop) {
         '"Restore on AC power loss" (or "Power on after power failure") in its BIOS setup.')
 }
 $openUrl = $url
+$opensItself = -not $NoBrowser -and -not $script:Gui
+$orGoTo = if ($opensItself) { 'Browser did not open? Go to:' } else { 'Or open this address in a web browser:' }
 if ($hasAccount -ne $true -and $setupCode) {
     Callout 'NEXT: create your account' (@(
-        'Your web browser is opening EmberStorm now. On the first screen, choose',
+        $(if ($opensItself) { 'Your web browser is opening EmberStorm now. On the first screen, choose' } else { 'Click Open EmberStorm below. On the first screen, choose' }),
         'a username and password - that is your account for EmberStorm.',
         '',
         'If the page asks for a SETUP CODE, type this one:',
@@ -5902,21 +5911,21 @@ if ($hasAccount -ne $true -and $setupCode) {
         '',
         'Capitals and dashes do not matter.',
         '',
-        'Browser did not open? Go to:',
+        $orGoTo,
         "*  $url"
     ) + $phoneLines) 'Yellow'
     # With the code in the address too, so the page usually fills it in by
     # itself; it takes it out of the address once it has it.
-    if (-not $NoBrowser) { Start-Process "$url/?setup=$setupCode" }
+    if ($opensItself) { Start-Process "$url/?setup=$setupCode" }
     $openUrl = "$url/?setup=$setupCode"
 } else {
     Callout 'NEXT: open EmberStorm' (@(
-        'Your web browser is opening EmberStorm now. Sign in as usual.',
+        $(if ($opensItself) { 'Your web browser is opening EmberStorm now. Sign in as usual.' } else { 'Click Open EmberStorm below and sign in as usual.' }),
         '',
-        'Browser did not open? Go to:',
+        $orGoTo,
         "*  $url"
     ) + $phoneLines) 'Green'
-    if (-not $NoBrowser) { Start-Process $url }
+    if ($opensItself) { Start-Process $url }
     $openUrl = $url
 }
 
