@@ -1,7 +1,13 @@
 [Unit]
 Description=SoundStorm caretaker (updates)
-After=docker.service soundstorm.service
-Requires=docker.service
+# Not after EmberStorm, and not needing Docker: the power button is read
+# here, and it must work from the first moments of a box's first start
+# (loading its programs takes minutes) and when the data drive or Docker has
+# failed - shutting down and the password reset are what is left then (the
+# blind reviews, 2026-10-10). Not even after Docker, which waits for the data
+# drive (being prepared the first time can take a while). Updates and resets
+# ask Docker when they run.
+Wants=docker.service
 
 [Service]
 # caretaker.env may point at another release channel (a development box).

@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -144,11 +145,16 @@ func emptyKeepingFolders(dir string) error {
 	return first
 }
 
-// The power button: pressed once, the box shuts down properly; pressed five
-// times quickly, somebody is at the box, and for fifteen minutes the owner's
-// password can be set again from any device on the home network - the way
-// back in for a forgotten password or a lost sticker, which needs nothing
-// erased. EmberStorm asks (GET /button) and says when it was used.
+// The power button (the owner's choices, 2026-10-10): pressed twice quickly,
+// the box shuts down properly - once does nothing, so a press to "wake" it
+// switches nothing off, and a PC's button says only that it went down, never
+// how long it was held; pressed five times quickly, somebody is at the box,
+// and for fifteen minutes the owner's password can be set again from any
+// device on the home network with the code on the box's screen or the setup
+// code on the sticker - the way back in for a forgotten password, which needs
+// nothing erased. Five presses are also what lets an erase asked for in the
+// app go ahead (ArmErase): nobody erases the box without being at it.
+// EmberStorm asks (GET /button) and says when it was used.
 
 // ButtonWindow is how long five presses leave the owner's password open.
 const ButtonWindow = 15 * time.Minute
@@ -163,6 +169,27 @@ type presses struct {
 	// somewhere only somebody there can read (the blind security review).
 	code  string
 	wrong int
+	// eraseUntil: an erase asked for in the app waits until then for five
+	// presses, which start it in place of opening the password.
+	eraseUntil time.Time
+}
+
+// EraseWait is how long an erase asked for in the app waits for the button.
+const EraseWait = 10 * time.Minute
+
+// ArmErase has the next five presses within EraseWait erase the box.
+func (u *Updater) ArmErase() {
+	u.button.mu.Lock()
+	u.button.eraseUntil = time.Now().Add(EraseWait)
+	u.button.mu.Unlock()
+	u.log.Warn("erasing the box was asked for: waiting for five presses of the power button")
+}
+
+// eraseArmed is whether an erase waits for the button, and until when.
+func (u *Updater) eraseArmed() (bool, time.Time) {
+	u.button.mu.Lock()
+	defer u.button.mu.Unlock()
+	return time.Now().Before(u.button.eraseUntil), u.button.eraseUntil
 }
 
 // maxWrongCodes closes the window: a code of six digits is not guessed
@@ -202,16 +229,23 @@ func (u *Updater) buttonCode() string {
 	return u.button.code
 }
 
-// claimButton closes the window if code is the one on the screen, in one
-// step: two asks at once cannot both have it. A wrong code counts, and the
-// fifth closes the window too.
+// claimButton closes the window if code is the one on the screen - or the
+// setup code on the sticker, which only the owner has, for a box with no
+// screen plugged in (the owner's choice, 2026-10-10) - in one step: two asks
+// at once cannot both have it. A wrong code counts, and the fifth closes the
+// window too.
 func (u *Updater) claimButton(code string) bool {
 	u.button.mu.Lock()
 	defer u.button.mu.Unlock()
 	if !time.Now().Before(u.button.until) || u.button.code == "" {
 		return false
 	}
-	if subtle.ConstantTimeCompare([]byte(code), []byte(u.button.code)) != 1 {
+	screen := subtle.ConstantTimeCompare([]byte(digitsOf(code)), []byte(u.button.code)) == 1
+	sticker := false
+	if want := u.setupCode(); want != "" {
+		sticker = subtle.ConstantTimeCompare([]byte(plainCode(code)), []byte(want)) == 1
+	}
+	if !screen && !sticker {
 		u.button.wrong++
 		if u.button.wrong >= maxWrongCodes {
 			u.button.until, u.button.code = time.Time{}, ""
@@ -231,6 +265,44 @@ func (u *Updater) closeButton() {
 	u.button.mu.Unlock()
 }
 
+// setupCode is the box's setup code, as on its sticker (prepare.sh keeps it
+// in the stack's .env), plain; "" when it cannot be read.
+func (u *Updater) setupCode() string {
+	data, err := os.ReadFile(filepath.Join(u.cfg.ComposeDir, ".env"))
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "SOUNDSTORM_SETUP_CODE="); ok {
+			return plainCode(v)
+		}
+	}
+	return ""
+}
+
+// plainCode is a code as typed with case, spaces and dashes set aside.
+func plainCode(s string) string {
+	return strings.Map(func(c rune) rune {
+		switch {
+		case c >= '0' && c <= '9', c >= 'a' && c <= 'z':
+			return c
+		case c >= 'A' && c <= 'Z':
+			return c - 'A' + 'a'
+		}
+		return -1
+	}, s)
+}
+
+// digitsOf keeps a typed code's digits, as the screen's code is.
+func digitsOf(s string) string {
+	return strings.Map(func(c rune) rune {
+		if c >= '0' && c <= '9' {
+			return c
+		}
+		return -1
+	}, s)
+}
+
 // sixDigits is a code to read off a screen and type.
 func sixDigits() string {
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
@@ -245,14 +317,27 @@ func (u *Updater) Pressed(ctx context.Context, n int) {
 	switch {
 	case n >= 5:
 		u.button.mu.Lock()
+		if time.Now().Before(u.button.eraseUntil) {
+			u.button.eraseUntil = time.Time{}
+			u.button.mu.Unlock()
+			u.log.Warn("the power button was pressed five times: erasing the box, as asked in the app")
+			go func() {
+				if err := u.Reset(context.Background(), ResetErase); err != nil {
+					u.log.Error("erase", "err", err)
+				}
+			}()
+			return
+		}
 		u.button.until = time.Now().Add(ButtonWindow)
 		u.button.code, u.button.wrong = sixDigits(), 0
 		u.showButtonCode(u.button.code, u.button.until)
 		u.button.mu.Unlock()
 		u.log.Warn("the power button was pressed five times: the owner's password can be set for 15 minutes")
-	case n == 1:
-		u.log.Info("the power button was pressed: shutting down")
+	case n == 2:
+		u.log.Info("the power button was pressed twice: shutting down")
 		_ = u.run(ctx, "systemctl", "poweroff")
+	case n == 1:
+		u.log.Info("the power button was pressed once: press it twice to shut down")
 	}
 }
 
@@ -275,23 +360,61 @@ func countRuns(ctx context.Context, press <-chan struct{}, quiet time.Duration, 
 	}
 }
 
-// powerButton finds the power button's input device on Linux
-// (/proc/bus/input/devices), or "".
-func powerButton(devices string) string {
+// powerButtons finds every input device that sends the power key on Linux
+// (/proc/bus/input/devices): a real PC has more than one - the ACPI button
+// (PNP0C0C), the fixed button (LNXPWRBN), sometimes "Intel HID events" - and
+// its firmware reports a press on only one of them, which a VM's single
+// device never showed (the blind reviews, 2026-10-10). A full keyboard (one
+// with an A key) is left out: a power key on a keyboard is not the box's.
+// Without a key bitmap, a device named "Power Button" counts.
+func powerButtons(devices string) []string {
+	var out []string
 	for _, block := range strings.Split(devices, "\n\n") {
-		if !strings.Contains(block, `Name="Power Button"`) {
+		var keys, handlers string
+		named := strings.Contains(block, `Name="Power Button"`)
+		for _, line := range strings.Split(block, "\n") {
+			if v, ok := strings.CutPrefix(line, "B: KEY="); ok {
+				keys = v
+			}
+			if v, ok := strings.CutPrefix(line, "H: Handlers="); ok {
+				handlers = v
+			}
+		}
+		power := named
+		if keys != "" {
+			power = keyBit(keys, keyPower) && !keyBit(keys, keyA)
+		}
+		if !power {
 			continue
 		}
-		for _, line := range strings.Split(block, "\n") {
-			if !strings.HasPrefix(line, "H: Handlers=") {
-				continue
-			}
-			for _, h := range strings.Fields(strings.TrimPrefix(line, "H: Handlers=")) {
-				if strings.HasPrefix(h, "event") {
-					return "/dev/input/" + h
-				}
+		for _, h := range strings.Fields(handlers) {
+			if strings.HasPrefix(h, "event") {
+				out = append(out, "/dev/input/"+h)
+				break
 			}
 		}
 	}
-	return ""
+	return out
+}
+
+// Linux key codes (input-event-codes.h).
+const (
+	keyA     = 30
+	keyPower = 116
+)
+
+// keyBit reads one bit of a key bitmap as /proc/bus/input/devices writes it:
+// hex words, the most significant first, each as wide as the kernel's long.
+func keyBit(bitmap string, bit int) bool {
+	words := strings.Fields(bitmap)
+	const width = 64
+	i := len(words) - 1 - bit/width
+	if i < 0 || i >= len(words) {
+		return false
+	}
+	v, err := strconv.ParseUint(words[i], 16, 64)
+	if err != nil {
+		return false
+	}
+	return v&(1<<uint(bit%width)) != 0
 }

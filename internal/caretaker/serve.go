@@ -41,9 +41,12 @@ func (u *Updater) saveSettings(s Settings) error {
 //	POST /update            install the available update now (Update now)
 //	GET  /settings          {"auto": true}
 //	PUT  /settings          change it
-//	POST /reset             {"mode": "start-over"|"erase"} (reset.go)
-//	GET  /button            {"open": true, "until": ...} after five presses
-//	POST /button/claim      {"code"}: the code on the box's screen, closing the window
+//	POST /reset             {"mode": "start-over"|"erase"} (reset.go); erase
+//	                        waits for five presses of the button at the box
+//	GET  /button            {"open": true, "until": ...} after five presses,
+//	                        "erase": until when an erase waits for them
+//	POST /button/claim      {"code"}: the code on the box's screen, or the
+//	                        sticker's setup code, closing the window
 //	POST /button/used       closed again
 //
 // EmberStorm decides who may press these (the owner); the caretaker trusts
@@ -106,6 +109,16 @@ func (u *Updater) Handler() http.Handler {
 			return
 		}
 		u.busy.Unlock()
+		// Erasing waits for somebody at the box: five presses of its power
+		// button within EraseWait start it (Pressed). Asked for through this
+		// socket alone - which the app's container shares - nothing that
+		// cannot be undone happens (the owner's choice, 2026-10-10).
+		if body.Mode == ResetErase {
+			u.ArmErase()
+			w.WriteHeader(http.StatusAccepted)
+			reply(w, map[string]any{"mode": body.Mode, "waiting": "button", "until": time.Now().Add(EraseWait)})
+			return
+		}
 		// It outlives the request, and EmberStorm with it: the stack stops.
 		go func() {
 			time.Sleep(2 * time.Second) // the answer reaches the page first
@@ -125,6 +138,9 @@ func (u *Updater) Handler() http.Handler {
 		out := map[string]any{"open": open}
 		if open {
 			out["until"] = until
+		}
+		if erase, by := u.eraseArmed(); erase {
+			out["erase"] = by
 		}
 		reply(w, out)
 	})
@@ -204,6 +220,13 @@ func (u *Updater) schedule(ctx context.Context) {
 		// At night: wait for the window, then install.
 		if h := time.Now().Hour(); h < 2 || h >= 5 {
 			wait = untilHour(time.Now(), 2) + time.Duration(time.Now().UnixNano()%int64(time.Hour))
+			continue
+		}
+		// Only once EmberStorm has started: the caretaker no longer waits for
+		// it at boot (the power button must work from the start), and a box's
+		// first start - its programs loading - is no time to change them.
+		if err := u.run(ctx, "systemctl", "is-active", "--quiet", "soundstorm.service"); err != nil {
+			wait = 10 * time.Minute
 			continue
 		}
 		_ = u.Update(ctx, m)

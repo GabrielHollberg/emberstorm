@@ -45,7 +45,8 @@ func startCaretaker(t *testing.T) *fakeCaretaker {
 		json.NewDecoder(r.Body).Decode(&body)
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		if !c.open || body.Code != "123456" {
+		// As the real caretaker reads a typed code: spaces and dashes aside.
+		if !c.open || strings.NewReplacer(" ", "", "-", "").Replace(body.Code) != "123456" {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
