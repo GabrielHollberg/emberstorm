@@ -166,6 +166,38 @@ sections below, newest first:
    scheduled again; leftover backup copies and the restore race.
 4. Older and still open: a Share extension (as Android's Share > EmberStorm);
    the iPhone's `confirm()` while something is presented.
+*(All four done on the Mac, 2026-10-10.)* **1:** `soundstormApp.place` in
+`pageScript`; `NativeAudio` keeps the place (`setPlace`, files matched by path)
+and PUTs `{seconds, duration, finished}` every ten seconds while playing and at
+once when paused, ended or stopped, only from a settled player, one save at a
+time; a new file forgets it until the page tells it again. **2:** the marker,
+`backup-confirmed.txt` (key, `modificationDate` stamp; scope server+account),
+a full check daily, when the marker moves, with none, or after one cut short;
+only unconfirmed assets are looked up at all. The marker is read once the
+run's files are through with iOS (`markerAfterSent`), not at the run's end, or
+every sending run would see its own uploads as a change. **3:** the TV's
+`moveServer` renames `soundstorm_*` to `__Host-soundstorm_*` onto https (and
+never overwrites a `__Host-` one already there); a photo the library will not
+export is passed over with its own message (`ExportFailed`), and "could not
+reach the server" clears once a file arrives; `FileUploads` jobs carry their
+own `server`, and hand-overs run one at a time; Up next empties the player
+before the next episode loads; the TV holds a book's clock while a jump
+lands (`settling`); `VolumeKeys` off on `didCommit` and a killed page; the
+background task is always scheduled again; an upload finishing while the
+sessions are read back is not taken back as waiting (`finished`). **4:** a
+**Share extension** (`SoundStormShare`, `dev.soundstorm.app.share`, app group
+`group.dev.soundstorm.app`): what is shared is copied into the group's
+`Shared/inbox/<id>/` (`.ready` last); the app hands every ready share to
+`__soundstormShared` on opening and as each page loads, retried for a minute
+until signed in (`handShared`), moving it to `taken/` (put back if the page
+refuses); a week later anything left goes, unless an upload still waits on it
+(`SharedInbox.sweep`). An extension may not open its app, so the sheet says to
+open EmberStorm. `confirm()` while another dialog is up or closing waits for
+it (six seconds at most) rather than answering Cancel. Checked: both apps
+build; a share placed in the group folder came up in the page's review on
+opening ("Shared Book.epub -> Ebooks"). Not checked: the extension itself from
+a real Share sheet, the place saved with a phone's screen off, the marker
+against a server with photos (the Mac's test server has none).
 
 **Mac and Linux installer (`install.sh`) against today's Windows setup** -
 what Windows does that `install.sh` does not yet:
