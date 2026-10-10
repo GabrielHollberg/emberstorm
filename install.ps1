@@ -1033,6 +1033,9 @@ function New-GuiPageText([string]$Heading, [string[]]$Lines) {
             $g2 = New-Object System.Windows.Controls.Border
             $g2.Height = 8
             [void]$panel.Children.Add($g2)
+        } elseif ($line.StartsWith('!')) {
+            # "!": the one line not to miss, bright and bold.
+            [void]$panel.Children.Add((New-GuiLine $line.Substring(1) 15 '#FFFFFF' 'SemiBold'))
         } else {
             [void]$panel.Children.Add((New-GuiLine $line 14 '#B9B9C6'))
         }
@@ -3804,13 +3807,25 @@ function Confirm-AlwaysOn {
 # sign-in methods; a setting shows it again. The person unticks it and types
 # their password - Windows asks, in its own window.
 function Enable-AutoSignIn {
+    # Which name to click in Windows' list, said plainly and first: Windows
+    # signs in as whichever name is highlighted, and on the test box another
+    # account was (a half-made one from Windows' own setup) - "wrong password"
+    # at every start (the owner, 2026-10-10). A Microsoft account is listed by
+    # its email.
+    $me = $env:USERNAME
+    try {
+        $local = Get-LocalUser -Name $env:USERNAME -ErrorAction Stop
+        if ("$($local.PrincipalSource)" -eq 'MicrosoftAccount') { $me = "$env:USERNAME (listed by your Microsoft account's email)" }
+    } catch { }
     if ($script:Gui) {
         $page = New-GuiPageText 'Signing in by itself' @(
             'Windows will ask for permission, then open its own User Accounts window. In it:',
             '',
-            '1.  Untick "Users must enter a user name and password to use this computer".',
-            '2.  Click OK.',
-            '3.  Type your Windows password twice and click OK. For a Microsoft account, its password - not the PIN.',
+            "!1.  First, click your own name in the list: $me",
+            '      Windows signs in as whichever name is highlighted - with any other, it fails at every start.',
+            '2.  Untick "Users must enter a user name and password to use this computer".',
+            '3.  Click OK.',
+            '4.  Type your Windows password twice and click OK. For a Microsoft account, its password - not the PIN.',
             '',
             'If your account has no password, Windows already signs in by itself: just close that window.')
         [void](Show-GuiPage $page @('Continue'))
@@ -3820,7 +3835,7 @@ function Enable-AutoSignIn {
         $owner = New-TopmostOwner
         try {
             [void][System.Windows.Forms.MessageBox]::Show($owner,
-                "Windows will now ask for permission, then open its own User Accounts window.`r`n`r`nIn it:`r`n  1. Untick ""Users must enter a user name and password to use this computer"".`r`n  2. Click OK.`r`n  3. Type your Windows password twice and click OK. (For a Microsoft account, its password - not the PIN.)`r`n`r`nIf your account has no password, Windows already signs in by itself: just close that window.",
+                "Windows will now ask for permission, then open its own User Accounts window.`r`n`r`nIn it:`r`n  1. FIRST, click your own name in the list: $me`r`n     (Windows signs in as whichever name is highlighted.)`r`n  2. Untick ""Users must enter a user name and password to use this computer"".`r`n  3. Click OK.`r`n  4. Type your Windows password twice and click OK. (For a Microsoft account, its password - not the PIN.)`r`n`r`nIf your account has no password, Windows already signs in by itself: just close that window.",
                 'EmberStorm - signing in by itself',
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Information)
