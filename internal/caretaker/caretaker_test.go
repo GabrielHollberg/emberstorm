@@ -119,6 +119,9 @@ func newBox(t *testing.T) *box {
 		b.ran = append(b.ran, strings.TrimSpace(name+" "+strings.Join(args, " ")))
 		return nil
 	}
+	// No Docker to ask what is in use: the clean-up after an update does
+	// nothing (images_test.go tests it).
+	b.u.output = func(context.Context, string, ...string) ([]byte, error) { return nil, io.EOF }
 	pollEvery = 20 * time.Millisecond
 	return b
 }
