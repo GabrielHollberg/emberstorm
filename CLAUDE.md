@@ -5086,6 +5086,13 @@ what Yes and No do (Yes read as "yes, I have programs open"). Checked: the
 flag written once and left alone after, on a throwaway key. Not seen: the
 welcome staying away on a fresh PC.
 
+**No Docker Desktop icon on the desktop** (2026-10-10): Docker's installer
+puts one on every desktop and has no switch against it (its whole option list
+read out of the installer: none for shortcuts), so the administrator step that
+installs it deletes `Docker Desktop.lnk` from the shared and the person's desktop
+straight after; the Start menu entry stays. Checked: the generated script
+parses, the removal on a pretend desktop (EmberStorm's icon left).
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |

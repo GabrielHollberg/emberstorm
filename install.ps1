@@ -2737,6 +2737,12 @@ try {
     `$p = Start-Process -FilePath `$exe -ArgumentList 'install', '--quiet', '--accept-license'$dataRootArg -PassThru
     `$p.WaitForExit()
     Remove-Item -LiteralPath `$dir -Recurse -Force -ErrorAction SilentlyContinue
+    # Docker's installer puts a Docker Desktop icon on every desktop and has
+    # no switch against it; EmberStorm's own icon is the one to use, and a
+    # second one invites opening Docker's window. The Start menu entry stays.
+    foreach (`$desk in @([Environment]::GetFolderPath('CommonDesktopDirectory'), [Environment]::GetFolderPath('DesktopDirectory'))) {
+        if (`$desk) { Remove-Item -LiteralPath (Join-Path `$desk 'Docker Desktop.lnk') -Force -ErrorAction SilentlyContinue }
+    }
     exit `$p.ExitCode
 } catch {
     exit 78
