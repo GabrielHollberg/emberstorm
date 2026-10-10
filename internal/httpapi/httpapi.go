@@ -62,6 +62,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/provision"
 	"github.com/GabrielHollberg/soundstorm/internal/scrobble"
 	"github.com/GabrielHollberg/soundstorm/internal/source"
+	"github.com/GabrielHollberg/soundstorm/internal/starter"
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 	"github.com/GabrielHollberg/soundstorm/internal/stream"
 	"github.com/GabrielHollberg/soundstorm/internal/voices"
@@ -1462,8 +1463,16 @@ func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 		out = append(out, entry)
 	}
 
+	// Whether anything but the starter library has been put in: the welcome's
+	// "Add your music" step ticked on a new server holding only the bundled
+	// song, audiobook and book.
+	total := 0
+	for _, f := range s.library.Folders() {
+		total += f.Files
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"empty": empty,
+		"added": total > starter.Present(s.library.Root()),
 		// What to tell everyone else in the house to type. Behind the session
 		// guard like the rest of this endpoint, and omitted rather than
 		// guessed when nothing here knows it.

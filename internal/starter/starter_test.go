@@ -185,3 +185,30 @@ func countFiles(t *testing.T, root string) int {
 	})
 	return n
 }
+
+// Present is what tells "only the starter library" from "somebody added
+// something", so it has to count exactly the bundled files still there.
+func TestPresentCountsTheStarterFilesLeft(t *testing.T) {
+	root := t.TempDir()
+	if got := Present(root); got != 0 {
+		t.Fatalf("an empty library has %d starter files", got)
+	}
+	installed, err := Install(root, always, testLog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := 0
+	for _, u := range installed {
+		all += u.Files
+	}
+	if all == 0 || Present(root) != all {
+		t.Fatalf("installed %d, Present says %d", all, Present(root))
+	}
+	song := filepath.Join(root, "music", "Kimiko Ishizaka", "Open Goldberg Variations, BWV 988", "01 Aria.mp3")
+	if err := os.Remove(song); err != nil {
+		t.Fatal(err)
+	}
+	if Present(root) != all-1 {
+		t.Fatalf("one removed, Present says %d of %d", Present(root), all)
+	}
+}

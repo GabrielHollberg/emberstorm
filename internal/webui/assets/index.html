@@ -877,15 +877,6 @@
          audiobooks and books - see continue.go for where each is kept. -->
     <!-- Home's one-tap music, first of all - above Continue, at the owner's
          asking. Shown and hidden with Home (showHome). -->
-    <!-- After the owner's first sign-in: the few things that make a new
-         server useful, ticked off as they are done (renderWelcome). -->
-    <section id="welcome" class="welcome hidden" aria-labelledby="welcome-title">
-      <h2 id="welcome-title">Welcome to EmberStorm</h2>
-      <ol id="welcome-steps" class="welcome-steps"></ol>
-      <p class="muted small-print">After a lot is added, EmberStorm spends a while getting to know it -
-        listening to your music and finding faces in your photos - so it may be slower for a day or so.</p>
-      <button id="welcome-done" type="button" class="ghost small">Done</button>
-    </section>
     <div id="home-quick" class="home-quick-holder hidden"></div>
     <section id="continue" class="continue hidden" aria-labelledby="continue-title">
       <h2 id="continue-title">Continue</h2>
@@ -1368,6 +1359,19 @@
       <button id="backup-ask-yes" type="button">Turn on</button>
     </div>
   </div>
+
+  <!-- After the owner's first sign-in: the few things that make a new server
+       useful, one at a time over the whole screen, each answered - done or
+       not now - before the next (renderWelcome). -->
+  <section id="welcome" class="welcome hidden" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+    <div class="welcome-card">
+      <p id="welcome-progress" class="welcome-progress"></p>
+      <h2 id="welcome-title"></h2>
+      <div id="welcome-body" class="welcome-body"></div>
+      <div id="welcome-actions" class="welcome-actions"></div>
+      <button id="welcome-skip-all" type="button" class="welcome-skip-all">Skip the rest of the welcome</button>
+    </div>
+  </section>
 
   <script src="/static/app.js"></script>
   <script type="module" src="/static/reader.js"></script>

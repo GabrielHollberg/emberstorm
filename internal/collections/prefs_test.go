@@ -40,3 +40,23 @@ func TestPrefsAreKeptAndBounded(t *testing.T) {
 		t.Errorf("one person's preferences reached another: %+v", other)
 	}
 }
+
+// The welcome remembers the steps answered, and only names of its own.
+func TestTheWelcomesStepsAreKept(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ChangePrefs("u1", PrefsChange{WelcomeSeen: []string{"address", "media"}}); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := s.Prefs("u1"); len(p.WelcomeSeen) != 2 || p.WelcomeSeen[1] != "media" {
+		t.Errorf("welcomeSeen = %v", p.WelcomeSeen)
+	}
+	if _, err := s.ChangePrefs("u1", PrefsChange{WelcomeSeen: []string{"address", "anything"}}); err != ErrBadPrefs {
+		t.Errorf("a made-up step was kept: %v", err)
+	}
+	if p, _ := s.Prefs("u1"); len(p.WelcomeSeen) != 2 {
+		t.Errorf("a refused change touched what was kept: %v", p.WelcomeSeen)
+	}
+}

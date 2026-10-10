@@ -9646,7 +9646,24 @@ last screen and in a folded card): "Your SoundStorm address", the home address
 save it as a bookmark", and **Pick an easier one** opening Your web address
 when none is chosen. Done on Got it (`prefs.addressSeen`) or once another of
 the owner's devices, not a TV, is open; until then Use on your phone or TV
-opens unfolded. Checked in Chrome at phone size with a stand-in address: shown
+opens unfolded. **Then one step at a time, over the whole screen** (2026-10-10, the owner
+after the test box: a list with its buttons far off at the side was read past,
+and "Add your music" was ticked on a server holding only the starter
+library). The welcome is a screen over everything (`#welcome`, at the end of the
+page), each step answered - done, or Not now - before the next, "1 of 4" at the
+top and Skip the rest of the welcome at the foot: **the address first**, with an
+easier name offered right there ("That's hard to remember. Give it an easier
+name", saved through `/api/settings/web-name`) or Keep this address; then
+media ("drop them anywhere on this window", Choose files - a drop while it
+shows answers it), away from home, family (Invite someone) and the TV. A step
+already done is passed over; answered ones are kept on the account
+(`prefs.welcomeSeen`, only the five names), so it carries on where it was; a step that opens another page steps aside and Home brings the next. Media
+counts only what was added: `/api/library`'s `added` is the library's files
+less the starter files still there (`starter.Present`). Checked: the Go tests
+(`TestPresentCountsTheStarterFilesLeft`, `TestTheWelcomesStepsAreKept`), and on
+the test server at phone and computer size, made to look brand new
+(`scripts/smoke/welcome.js`): four steps in order, kept, no page error.
+Not seen: the name saved from the welcome, and a real new install. Checked in Chrome at phone size with a stand-in address: shown
 first, Got it ticked and kept. Not seen: Pick an easier one (the test server
 has no automatic HTTPS). Not checked: the nothing-found words on a phone (this Mac's network
 always finds the owner's server).
