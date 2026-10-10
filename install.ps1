@@ -4223,20 +4223,22 @@ if ($Uninstall) {
     $known = $changes.Count -gt 0
     $offer = [ordered]@{}
     if (Get-DockerDesktopPath) {
-        $offer['docker'] = @{ Text = 'Remove Docker Desktop'; Checked = [bool]$changes['docker']
-            Hint = $(if ($changes['docker']) { 'It was installed for EmberStorm. Untick it if something else on this PC uses it.' } else { 'It was on this PC before EmberStorm, or EmberStorm does not know. Tick it only if nothing else uses it - removing it removes everything in it. EmberStorm''s own programs inside it are removed either way.' }) }
+        # Docker, sleep and the lid start unticked: things somebody may have
+        # come to use for other things stay unless asked (the owner's call).
+        $offer['docker'] = @{ Text = 'Remove Docker Desktop'; Checked = $false
+            Hint = $(if ($changes['docker']) { 'It was installed for EmberStorm. Tick it to remove it, if nothing else on this PC uses it.' } else { 'It was on this PC before EmberStorm, or EmberStorm does not know. Tick it only if nothing else uses it - removing it removes everything in it. EmberStorm''s own programs inside it are removed either way.' }) }
     }
     $sleepNow = Get-PowerAcValue 'SUB_SLEEP' 'STANDBYIDLE'
     $sleepWas = if ($null -ne $changes['sleepAc']) { [int64]$changes['sleepAc'] } elseif (-not $known) { 1800 } else { $null }
     if ($sleepNow -eq 0 -and $null -ne $sleepWas -and $sleepWas -ne 0) {
-        $offer['sleep'] = $(if ($known) { @{ Text = 'Let this PC sleep when idle again, as before'; Checked = $true; Hint = 'EmberStorm kept it awake while plugged in.' } } else { @{ Text = 'Let this PC sleep when idle again'; Checked = $false; Hint = 'It never sleeps while plugged in now. If EmberStorm set that, tick this to have it sleep after 30 minutes again.' } })
+        $offer['sleep'] = $(if ($known) { @{ Text = 'Let this PC sleep when idle again, as before'; Checked = $false; Hint = 'EmberStorm kept it awake while plugged in. Tick it to put that back.' } } else { @{ Text = 'Let this PC sleep when idle again'; Checked = $false; Hint = 'It never sleeps while plugged in now. If EmberStorm set that, tick this to have it sleep after 30 minutes again.' } })
     }
     $laptop = $false
     try { $laptop = @(Get-CimInstance Win32_Battery -ErrorAction Stop).Count -gt 0 } catch { }
     $lidNow = Get-PowerAcValue 'SUB_BUTTONS' 'LIDACTION'
     $lidWas = if ($null -ne $changes['lidAc']) { [int64]$changes['lidAc'] } elseif (-not $known -and $laptop) { 1 } else { $null }
     if ($lidNow -eq 0 -and $null -ne $lidWas -and $lidWas -ne 0) {
-        $offer['lid'] = $(if ($known) { @{ Text = 'Put the lid setting back'; Checked = $true; Hint = 'Closing the lid while plugged in will sleep it again, as before.' } } else { @{ Text = 'Sleep when the lid is closed'; Checked = $false; Hint = 'Closing the lid while plugged in does nothing now. If EmberStorm set that, tick this.' } })
+        $offer['lid'] = $(if ($known) { @{ Text = 'Put the lid setting back'; Checked = $false; Hint = 'Closing the lid while plugged in would sleep it again, as before.' } } else { @{ Text = 'Sleep when the lid is closed'; Checked = $false; Hint = 'Closing the lid while plugged in does nothing now. If EmberStorm set that, tick this.' } })
     }
     $autoNow = Get-AutoSignIn
     if ($autoNow.On -and ($changes['autoSignIn'] -or (-not $known -and (Get-PasswordLess) -eq 0))) {
