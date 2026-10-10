@@ -668,6 +668,9 @@ type Prefs struct {
 	// AddressSeen is whether the owner said "Got it" to the welcome's
 	// address step (their EmberStorm address, to open and save elsewhere).
 	AddressSeen bool `json:"addressSeen,omitempty"`
+	// WelcomeSeen names the welcome's steps the owner has answered - acted on
+	// or skipped - as it goes through them one at a time.
+	WelcomeSeen []string `json:"welcomeSeen,omitempty"`
 }
 
 // CoverStyles are the ways Now Playing can fill the screen under the title:
@@ -709,13 +712,25 @@ type PrefsChange struct {
 	CoverStyle  *string             `json:"coverStyle"`
 	WelcomeDone *bool               `json:"welcomeDone"`
 	AddressSeen *bool               `json:"addressSeen"`
+	WelcomeSeen []string            `json:"welcomeSeen"`
 }
+
+// welcomeSteps are the names WelcomeSeen may hold.
+var welcomeSteps = map[string]bool{"address": true, "media": true, "away": true, "family": true, "tv": true}
 
 // ErrBadPrefs is a preference outside what is allowed.
 var ErrBadPrefs = errors.New("that preference is not allowed")
 
 // ChangePrefs applies a change to one person's preferences and saves them.
 func (s *Store) ChangePrefs(userID string, ch PrefsChange) (Prefs, error) {
+	if len(ch.WelcomeSeen) > len(welcomeSteps) {
+		return Prefs{}, ErrBadPrefs
+	}
+	for _, step := range ch.WelcomeSeen {
+		if !welcomeSteps[step] {
+			return Prefs{}, ErrBadPrefs
+		}
+	}
 	for _, rows := range []map[string][]string{ch.Pills, ch.HiddenPills} {
 		if len(rows) > maxPillRows {
 			return Prefs{}, ErrBadPrefs
@@ -787,6 +802,9 @@ func (s *Store) ChangePrefs(userID string, ch PrefsChange) (Prefs, error) {
 	}
 	if ch.AddressSeen != nil {
 		p.AddressSeen = *ch.AddressSeen
+	}
+	if ch.WelcomeSeen != nil {
+		p.WelcomeSeen = append([]string(nil), ch.WelcomeSeen...)
 	}
 	if err := s.save(userID, c); err != nil {
 		return Prefs{}, err

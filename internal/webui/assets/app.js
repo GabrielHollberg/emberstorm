@@ -11944,138 +11944,263 @@ async function loadPrefs() {
   applySpeed();
 }
 
-// The welcome after the owner's first sign-in, on Home: what makes a new
-// server useful - its media, away from home, the family, the TV - each ticked
-// once done, with a button to do it. Closed with Done (kept on the account),
-// or by itself once everything is ticked.
-async function renderWelcome() {
-  const me = state.me;
+// The welcome after the owner's first sign-in: what makes a new server
+// useful - its address, its media, away from home, the family, the TV - one at
+// a time over the whole screen, in the way on purpose, each answered (done,
+// or not now) before the next (the owner's design, 2026-10-10: a list with
+// buttons far off at its side was read past). A step already done is passed
+// over; one answered is kept on the account (welcomeSeen), so the welcome
+// carries on where it was on any device. Doing a step that opens another page
+// steps aside, and the welcome comes back with the next on Home.
+const WELCOME = { steps: [], at: null };
+
+function welcomeSeen() {
+  const seen = new Set((state.prefs && state.prefs.welcomeSeen) || []);
+  if (state.prefs && state.prefs.addressSeen) seen.add('address');
+  return seen;
+}
+
+async function welcomeAnswer(key) {
+  const seen = welcomeSeen();
+  seen.add(key);
+  await savePrefs({ welcomeSeen: [...seen].filter((k) => ['address', 'media', 'away', 'family', 'tv'].includes(k)) });
+}
+
+// Answer this step and leave for a page somewhere else: the welcome steps
+// aside, and Home shows it again, at the next step.
+async function welcomeGo(key, go) {
   state.welcomeShown = false;
   show($('welcome'), false);
-  if (!me || !me.owner || TV || state.offline || (state.prefs && state.prefs.welcomeDone)) return;
+  go();
+  await welcomeAnswer(key);
+  renderWelcome({ quiet: true });
+}
+
+async function renderWelcome(opts = {}) {
+  const me = state.me;
+  if (!opts.quiet) {
+    state.welcomeShown = false;
+    show($('welcome'), false);
+  }
+  if (!me || !me.owner || TV || state.offline || (state.prefs && state.prefs.welcomeDone)) {
+    state.welcomeShown = false;
+    show($('welcome'), false);
+    return;
+  }
   const [session, users, players, library, drives] = await Promise.all([
     api('/api/session'), api('/api/users'), api('/api/players'), api('/api/library'), api('/api/drives'),
   ]);
   const box = drives.ok && drives.body && drives.body.available;
   const remote = session.ok && session.body && session.body.remote;
-  const steps = [];
-  // Their address, first: the page moved itself to it without a word, and it
-  // is what to open in a browser on any other device - a TV's and a phone's
-  // apps find the server by themselves. Their chosen web address when they
-  // have one. Done once another of their devices (not a TV) is open, or on
-  // Got it.
   const shareURL = library.ok && library.body && library.body.shareURL;
   const webName = session.ok && session.body && session.body.webName;
+  const webNames = Boolean(session.ok && session.body && session.body.webNames);
   const address = webName ? `https://${webName}.emberstorm.app` : shareURL;
+  const others = players.ok && players.body
+    && (players.body.players || []).some((p) => p.mine && !p.tv && p.id !== PLAYER.id);
+  const steps = [];
+  // Their address, first: what to open in a browser on any other device (the
+  // apps find the server by themselves), with an easier name offered right
+  // here - the code a server is born with is hard to remember.
   if (address) {
-    const others = players.ok && players.body
-      && (players.body.players || []).some((p) => p.mine && !p.tv && p.id !== PLAYER.id);
-    const extra = document.createElement('div');
-    extra.className = 'welcome-address';
-    const row = document.createElement('div');
-    row.className = 'address-row';
-    const link = document.createElement('a');
-    link.className = 'address';
-    link.href = address;
-    link.textContent = address.replace(/\/$/, '');
-    row.append(link);
-    if (navigator.clipboard && window.isSecureContext) {
-      const copy = document.createElement('button');
-      copy.type = 'button';
-      copy.className = 'ghost small';
-      copy.textContent = 'Copy';
-      copy.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(link.textContent); copy.textContent = 'Copied'; } catch { copy.textContent = 'Could not copy'; }
-        setTimeout(() => { copy.textContent = 'Copy'; }, 1800);
-      });
-      row.append(copy);
-    }
-    extra.append(row);
-    if (!webName && session.ok && session.body && session.body.webNames) {
-      const pick = document.createElement('button');
-      pick.type = 'button';
-      pick.className = 'ghost small';
-      pick.textContent = 'Pick an easier one, like yourname.emberstorm.app';
-      pick.addEventListener('click', () => { selectTab('settings'); openSettingsCard($('web-name-block')); });
-      extra.append(pick);
-    }
-    const seen = Boolean(others || (state.prefs && state.prefs.addressSeen));
-    // Until then Use on your phone or TV opens unfolded in Settings too.
-    if (!seen) state.settingsOpen.add('devices');
     steps.push({
-      done: seen,
-      what: 'Your EmberStorm address',
-      how: 'Open it in the browser on any phone, tablet or computer at home, sign in, and save it as a bookmark.',
-      extra,
-      label: 'Got it', act: async () => { await savePrefs({ addressSeen: true }); renderWelcome(); },
+      key: 'address',
+      done: Boolean(others && webName),
+      title: webName ? 'Your EmberStorm address' : 'Your EmberStorm address',
+      body: () => welcomeAddressBody(address, webName, webNames),
+      actions: webName || !webNames
+        ? [{ label: 'Next', primary: true, act: () => welcomeNext('address') }]
+        : [{ label: 'Keep this address', act: () => welcomeNext('address') }],
     });
   }
   steps.push({
-    done: library.ok && library.body && !library.body.empty,
-    what: 'Add your music, films, books and photos',
-    how: box ? 'From this device, or from a USB drive plugged into the box.' : 'From this device, or by copying them into the library folder.',
-    label: 'Add media', act: () => { selectTab('settings'); openSettingsCard($('choose-files').closest('.account-section')); },
+    key: 'media',
+    // The starter song, audiobook and book do not count (added: the server's
+    // count leaves them out).
+    done: Boolean(library.ok && library.body && library.body.added),
+    title: 'Add your music, films, books and photos',
+    body: () => welcomeMediaBody(box),
+    actions: [
+      { label: 'Not now', act: () => welcomeNext('media') },
+      {
+        label: 'Choose files', primary: true,
+        act: () => welcomeGo('media', () => $('choose-files').click()),
+      },
+    ],
   });
   if (remote && remote.available) {
     steps.push({
+      key: 'away',
       done: Boolean(remote.enabled),
-      what: 'Use it away from home',
-      how: 'So the app works at work, on holiday, or at a friend\u2019s.',
-      label: 'Turn on', act: () => { selectTab('settings'); openSettingsCard($('remote-block')); },
+      title: 'Use it away from home',
+      body: () => welcomeText('So EmberStorm works on your phone at work, on holiday or at a friend\u2019s - not only on your home Wi-Fi.'),
+      actions: [
+        { label: 'Not now', act: () => welcomeNext('away') },
+        { label: 'Turn it on', primary: true, act: () => welcomeGo('away', () => { selectTab('settings'); openSettingsCard($('remote-block')); }) },
+      ],
     });
   }
   steps.push({
-    done: users.ok && users.body && (users.body.users || []).length > 1,
-    what: 'Add your family',
-    how: 'Each person gets their own sign-in, favorites and photos.',
-    label: 'Add people', act: () => { selectTab('settings'); selectSettingsCat('people'); },
+    key: 'family',
+    done: Boolean(users.ok && users.body && (users.body.users || []).length > 1),
+    title: 'Add your family',
+    body: () => welcomeText('Each person gets their own sign-in, favorites, playlists and photos. Invite them with a code their phone\u2019s camera can scan.'),
+    actions: [
+      { label: 'Not now', act: () => welcomeNext('family') },
+      { label: 'Invite someone', primary: true, act: () => welcomeGo('family', () => { selectTab('settings'); selectSettingsCat('people'); }) },
+    ],
   });
   steps.push({
-    done: players.ok && players.body && (players.body.players || []).some((p) => p.tv),
-    what: 'Set up your TV',
-    how: 'Get the EmberStorm app on your Apple TV or Google TV: it finds this server by itself, and you sign in with your phone.',
+    key: 'tv',
+    done: Boolean(players.ok && players.body && (players.body.players || []).some((p) => p.tv)),
+    title: 'Set up your TV',
+    body: () => welcomeText('Get the EmberStorm app on your Apple TV or Google TV. It finds this server by itself, and you sign it in with your phone - no typing with a remote.'),
+    actions: [{ label: 'Got it', primary: true, act: () => welcomeNext('tv') }],
   });
-  if (steps.every((st) => st.done)) {
+  WELCOME.steps = steps;
+  const seen = welcomeSeen();
+  const left = steps.filter((st) => !st.done);
+  const next = left.find((st) => !seen.has(st.key));
+  if (!next) {
+    state.welcomeShown = false;
+    show($('welcome'), false);
     savePrefs({ welcomeDone: true });
     return;
   }
-  const list = $('welcome-steps');
-  list.replaceChildren();
-  for (const st of steps) {
-    const li = document.createElement('li');
-    if (st.done) li.className = 'done';
-    const tick = document.createElement('span');
-    tick.className = 'tick';
-    tick.textContent = st.done ? '\u2713' : '';
-    const what = document.createElement('div');
-    what.className = 'what';
-    const b = document.createElement('b');
-    b.textContent = st.what;
-    const how = document.createElement('span');
-    how.textContent = st.how;
-    what.append(b, how);
-    if (st.extra && !st.done) what.append(st.extra);
-    li.append(tick, what);
-    if (!st.done && st.act) {
-      const go = document.createElement('button');
-      go.type = 'button';
-      go.className = 'small';
-      go.textContent = st.label;
-      go.addEventListener('click', st.act);
-      li.append(go);
-    } else {
-      li.append(document.createElement('span'));
-    }
-    list.append(li);
+  WELCOME.at = next.key;
+  $('welcome-progress').textContent = left.length > 1 ? `Welcome to EmberStorm - ${left.indexOf(next) + 1} of ${left.length}` : 'Welcome to EmberStorm';
+  $('welcome-title').textContent = next.title;
+  $('welcome-body').replaceChildren(...next.body());
+  const actions = $('welcome-actions');
+  actions.replaceChildren();
+  for (const a of next.actions) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = a.primary ? '' : 'ghost';
+    b.textContent = a.label;
+    b.addEventListener('click', a.act);
+    actions.append(b);
   }
   state.welcomeShown = true;
   show($('welcome'), state.tab === 'home' && !$('home-view').classList.contains('hidden'));
 }
-$('welcome-done').addEventListener('click', () => {
+
+async function welcomeNext(key) {
+  await welcomeAnswer(key);
+  renderWelcome({ quiet: true });
+}
+
+function welcomeText(...lines) {
+  return lines.map((line) => {
+    const p = document.createElement('p');
+    p.textContent = line;
+    return p;
+  });
+}
+
+// The address step: the address now, and - while it is still the code the
+// server was born with - an easier name offered right there.
+function welcomeAddressBody(address, webName, webNames) {
+  const out = welcomeText(webName
+    ? 'This is where your EmberStorm lives. Open it in the browser on any phone, tablet or computer - sign in, and save it as a bookmark.'
+    : 'This is where your EmberStorm lives. Open it in the browser on any phone, tablet or computer at home to sign in. The EmberStorm apps find it by themselves.');
+  const row = document.createElement('div');
+  row.className = 'address-row welcome-address';
+  const link = document.createElement('a');
+  link.className = 'address';
+  link.href = address;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.textContent = address.replace(/^https:\/\//, '').replace(/\/$/, '');
+  row.append(link);
+  if (navigator.clipboard && window.isSecureContext) {
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'ghost small';
+    copy.textContent = 'Copy';
+    copy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(address); copy.textContent = 'Copied'; } catch { copy.textContent = 'Could not copy'; }
+      setTimeout(() => { copy.textContent = 'Copy'; }, 1800);
+    });
+    row.append(copy);
+  }
+  out.push(row);
+  if (!webName && webNames) {
+    const box = document.createElement('form');
+    box.className = 'welcome-rename';
+    const head = document.createElement('b');
+    head.textContent = 'That\u2019s hard to remember. Give it an easier name:';
+    const line = document.createElement('div');
+    line.className = 'web-name-row';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 30;
+    input.autocomplete = 'off';
+    input.autocapitalize = 'off';
+    input.spellcheck = false;
+    input.placeholder = 'yourname';
+    input.setAttribute('aria-label', 'An easier name');
+    const suffix = document.createElement('span');
+    suffix.className = 'web-name-suffix';
+    suffix.textContent = '.emberstorm.app';
+    const save = document.createElement('button');
+    save.type = 'submit';
+    save.textContent = 'Use this name';
+    line.append(input, suffix, save);
+    const hint = document.createElement('p');
+    hint.className = 'muted';
+    hint.textContent = 'Letters, numbers and dashes. A family name with something added works well - thesmiths, smith-house. You can change it later in Settings.';
+    box.append(head, line, hint);
+    box.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = input.value.trim().toLowerCase().replace(/\.(?:emberstorm\.app|soundstorm\.dev)$/, '');
+      if (!name) { input.focus(); return; }
+      save.disabled = true;
+      hint.textContent = 'Checking that name...';
+      const { ok, body } = await api('/api/settings/web-name', { method: 'PUT', body: JSON.stringify({ name, code: '' }) });
+      save.disabled = false;
+      if (ok && body && body.name) {
+        paintWebName(body.name);
+        $('web-name-input').value = body.name;
+        renderWelcome({ quiet: true });
+      } else {
+        hint.textContent = (body && body.error) || 'Could not save it. Try another name.';
+      }
+    });
+    out.push(box);
+  } else if (webName) {
+    out.push(...welcomeText('It works on any computer in a minute or two. Away from home too, once you turn that on.'));
+  }
+  return out;
+}
+
+// The media step: dropped anywhere on the window is the easy way.
+function welcomeMediaBody(box) {
+  const drop = document.createElement('div');
+  drop.className = 'welcome-drop';
+  drop.textContent = 'Drag files or whole folders from your computer and drop them anywhere on this window.';
+  const out = [drop, ...welcomeText('On a phone or tablet, or to pick them yourself: Choose files.')];
+  if (box) out.push(...welcomeText('Or plug a USB drive into the box - EmberStorm asks what to do with it.'));
+  out.push(Object.assign(document.createElement('p'), {
+    className: 'muted',
+    textContent: 'After a lot is added, EmberStorm spends a while getting to know it - listening to your music and finding faces in your photos - so it may be slower for a day or so.',
+  }));
+  return out;
+}
+
+$('welcome-skip-all').addEventListener('click', () => {
   state.welcomeShown = false;
   show($('welcome'), false);
   savePrefs({ welcomeDone: true });
 });
+// Files dropped while the welcome shows are the media step done: the drop's
+// own sheet takes over.
+window.addEventListener('drop', () => {
+  if (!state.welcomeShown || WELCOME.at !== 'media') return;
+  state.welcomeShown = false;
+  show($('welcome'), false);
+  welcomeAnswer('media');
+}, true);
 
 async function savePrefs(change) {
   const { ok, body } = await api('/api/prefs', { method: 'PATCH', body: JSON.stringify(change) });

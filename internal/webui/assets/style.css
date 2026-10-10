@@ -4256,16 +4256,29 @@ html.tv .tv-me-tab.hidden { display: none; }
 .drive-ask-buttons button { width: 100%; }
 .drive-ask-buttons .soon { opacity: 0.55; }
 
-/* The welcome after the owner's first sign-in. */
-.welcome { margin: 12px 16px 4px; padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+/* The welcome: one step at a time over the whole screen, in the way on
+   purpose, each answered before the next (renderWelcome). */
+.welcome { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  padding: calc(16px + var(--safe-top, 0px)) 16px calc(16px + var(--safe-bottom, 0px));
+  background: rgba(0, 0, 0, 0.78); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .welcome.hidden { display: none; }
-.welcome h2 { margin: 0 0 8px; font-size: 18px; }
-.welcome-steps { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 10px; }
-.welcome-steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-.welcome-steps .tick { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; font-size: 14px; }
-.welcome-steps li.done .tick { background: var(--accent); border-color: var(--accent); color: #000; }
-.welcome-steps li.done .what b { text-decoration: line-through; opacity: 0.6; }
-.welcome-steps .what span { display: block; color: var(--muted); font-size: 13px; }
+.welcome-card { width: min(520px, 100%); max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
+  padding: 24px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); display: grid; gap: 14px; }
+.welcome-progress { margin: 0; color: var(--muted); font-size: 13px; letter-spacing: 0.02em; }
+.welcome-card h2 { margin: 0; font-size: 22px; line-height: 1.25; }
+.welcome-body { display: grid; gap: 12px; font-size: 15px; line-height: 1.45; }
+.welcome-body p { margin: 0; }
+.welcome-body .muted { color: var(--muted); font-size: 14px; }
+.welcome-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.welcome-actions button { min-height: 44px; padding: 0 18px; }
+.welcome-skip-all { justify-self: center; background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; cursor: pointer; padding: 4px; }
+.welcome-rename { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--accent); border-radius: 14px; }
+.welcome-rename b { font-size: 15px; }
+.welcome-rename .web-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.welcome-rename input { flex: 1 1 140px; min-width: 0; font-size: 16px; }
+.welcome-rename .web-name-suffix { color: var(--muted); }
+.welcome-drop { padding: 14px; border: 2px dashed var(--border); border-radius: 14px; text-align: center; color: var(--muted); }
 .film-matches { max-height: min(60vh, 520px); overflow-y: auto; }
 .film-match { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; height: auto; padding: 8px 10px; }
 .film-match img { width: 54px; height: 80px; object-fit: cover; border-radius: 6px; background: var(--surface); }

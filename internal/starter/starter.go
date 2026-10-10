@@ -224,3 +224,22 @@ func Attributions() []Attribution {
 		},
 	}
 }
+
+// Present counts how many of the bundled files are still in the library under
+// root, so "has anybody added anything" can leave them out: the owner's
+// welcome ticked "Add your music, films, books and photos" on a new server
+// that held only these (2026-10-10).
+func Present(root string) int {
+	n := 0
+	_ = fs.WalkDir(bundled, "media", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel := strings.TrimPrefix(p, "media/")
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil {
+			n++
+		}
+		return nil
+	})
+	return n
+}
