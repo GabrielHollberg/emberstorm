@@ -9671,7 +9671,22 @@ less the starter files still there (`starter.Present`). Checked: the Go tests
 (`TestPresentCountsTheStarterFilesLeft`, `TestTheWelcomesStepsAreKept`), and on
 the test server at phone and computer size, made to look brand new
 (`scripts/smoke/welcome.js`): four steps in order, kept, no page error.
-Not seen: the name saved from the welcome, and a real new install. Checked in Chrome at phone size with a stand-in address: shown
+Not seen: the name saved from the welcome, and a real new install.
+**And installing it as an app is offered once on each browser** (the owner's
+asking, the same day: a taskbar icon - which Windows lets no installer pin).
+After signing in, anybody, any device: "Install EmberStorm on this computer?"
+(or phone, tablet), Install and Not now (`offerInstall`, `#install-offer`).
+Chrome and Edge give the page their install question (`beforeinstallprompt`,
+kept and asked with the card); Safari on an iPhone or iPad has none, so the card
+says Share, then Add to Home Screen. Never in the phone apps, on a TV, in an app
+already installed, offline or while the owner's welcome shows; answered either
+way, remembered on the device (`soundstorm-install-offered`) and never asked
+there again - the browser's own install button stays for later. The setup's
+finished screen says how to pin the EmberStorm shortcut (Start menu, right-click,
+Pin to taskbar). Checked on the test server (`scripts/smoke/installoffer.js`, the
+install question played by hand - a real one comes only on a trusted address):
+Chrome offered, Install asked the browser, not again after a reload; an iPhone
+told how, not again after Not now. Not seen: Chrome's real install box. Checked in Chrome at phone size with a stand-in address: shown
 first, Got it ticked and kept. Not seen: Pick an easier one (the test server
 has no automatic HTTPS). Not checked: the nothing-found words on a phone (this Mac's network
 always finds the owner's server).
