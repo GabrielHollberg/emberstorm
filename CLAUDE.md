@@ -4989,6 +4989,50 @@ setting and Docker's own block rules the setup loosens are not put back;
 updates unsigned from main; the first seconds after the double-click show
 nothing (the signed .exe).
 
+**A fourth blind review (2026-10-10)**: security, bugs, and a first-time
+user reading every screen. Fixed:
+
+- **An uninstall left "partly" done could never be finished**: the entry in
+  Settings, Apps was kept but the script it runs was deleted. Kept now.
+- **The finish never said the accounts copy failed** (it looked for a file
+  just deleted), and said "Docker Desktop was kept, as asked" to somebody who
+  asked to remove it (the choice was overwritten first). Both read from what
+  was asked, kept before anything changes it.
+- **"Not my home network" was never remembered for a name like "Bob's
+  WiFi"** (kept cleaned, compared raw), and never at all on a first install
+  (no settings file yet - written once there is). The fix it advised (Update
+  and choose Yes) could no longer ask: the advice is Windows' own setting.
+- **A Windows user name with a curly apostrophe (O’Brien) broke the Docker
+  install** (only the plain apostrophe was escaped in the elevated script) -
+  and a TEMP folder set by malware could have used that to run as admin.
+  `EscapeSingleQuotedStringContent` now; checked: the old way failed to parse
+  that path, the new one keeps it intact.
+- **The restart a new PC needs read as a crash** (red, "could not finish",
+  a log): its own calm screen now - "One restart needed", blue, Restart now
+  and Later.
+- **The room and virtualization checks come before the questions** (they
+  stopped the setup after every answer, the questions having changed
+  settings by then); a Try again after the room check keeps the answers.
+- **Question pages fit a small laptop screen**: the step list steps aside
+  while a page shows.
+- **Try again on a move works** (it stopped on its own unfinished folder,
+  now marked `unfinished.txt` and made again).
+- Smaller: answers from before a restart never carry where to download from
+  (resume.env keeps the folder and port only); "That's all the questions"
+  stays in sight as the subheading and says Windows' question will name
+  "Windows PowerShell", which is this setup; the download says "media
+  servers" and no program names; Docker's version, "https" and compose file
+  names off the window; joining Docker's users explained; auto sign-in for
+  another account is a page, not a passing line; the help says Try again.
+
+Checked: parses, ASCII; the curly apostrophe through the old and new
+escaping; the calm restart screen and a page without the steps drawn; the
+real setup in a scratch folder. **Not checked**: an uninstall, a move, a
+fresh PC. **Left**: the desktop icon shows nothing while Docker starts (a
+small "Starting EmberStorm" window would help); the finish card is full on
+a first install; updates unsigned from main; Windows' prompts name Windows
+PowerShell (only an EmberStorm program of its own could change that).
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
