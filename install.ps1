@@ -1484,7 +1484,7 @@ function Stop-ForRestart([string]$Text) {
         Label = 'Restart now'
         Run   = {
             $sure = [System.Windows.MessageBox]::Show($script:Gui.Window,
-                "Restart the PC now?`r`n`r`nSave anything open in other programs first.",
+                "Restart this PC now?`r`n`r`nAny other programs still open will be closed, so save your work in them first.`r`n`r`nYes - restart now.`r`nNo - not yet. Restart when you are ready; the setup carries on by itself once you sign back in.",
                 'EmberStorm Setup', 'YesNo', 'Question')
             if ("$sure" -eq 'Yes') {
                 Start-Process -FilePath (Join-Path ([Environment]::GetFolderPath('Windows')) 'System32\shutdown.exe') -ArgumentList '/r', '/t', '0' -WindowStyle Hidden
