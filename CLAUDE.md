@@ -5117,6 +5117,17 @@ netplwiz, the folder picker and the browser through a half-hour download. The
 desktop's folder shortcut is **EmberStorm library** (was "EmberStorm media",
 removed on update). Checked: the finished screen drawn with the new words.
 
+**The shortcuts wear the cloud** (2026-10-10, the owner: the desktop's
+EmberStorm icon was PowerShell's, as the shortcuts run it, and did not look like
+EmberStorm). `emberstorm.ico` at the repository's root, drawn by
+`scripts/make-icons.py` (`windows_icon`: the app icon with rounded corners,
+16-256px), is fetched by the setup beside its script copy, and every shortcut
+that runs EmberStorm uses it, as does the Settings, Apps entry (`DisplayIcon`);
+the library folder's shortcut keeps the folder icon. **Plain bitmaps inside**
+(`bitmap_format="bmp"`): Pillow's default PNG frames read as noise in
+Windows' own icon reader at 48px. Checked: a shortcut made with it, and Windows
+reading the icon at 16, 32, 48 and 256. Not seen: on the test box's desktop.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |

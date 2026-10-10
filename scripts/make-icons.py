@@ -128,6 +128,16 @@ def icon(size, cloud_width):
     return img.resize((size, size), Image.LANCZOS).convert("RGB")
 
 
+def windows_icon():
+    """The app icon with rounded corners, transparent outside them."""
+    size = 256
+    img = icon(size, 0.66).convert("RGBA")
+    mask = Image.new("L", (size * 4, size * 4), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, size * 4 - 1, size * 4 - 1), radius=int(size * 4 * 0.22), fill=255)
+    img.putalpha(mask.resize((size, size), Image.LANCZOS))
+    return img
+
+
 def banner(width, height):
     """The TV home screen's banner: the cloud, then the name in heavy italic as
     the wordmark has it, on the app's dark background. Android TV shows a
@@ -310,6 +320,15 @@ def main():
     else:
         print("no Segoe UI Bold Italic here: left the Android TV banner as it is")
     write_tv_icons(ASSETS.parents[2] / "ios" / "SoundStormTV" / "Assets.xcassets")
+    # The Windows icon, for the setup's shortcuts and its Settings, Apps entry
+    # (the shortcuts run PowerShell, whose icon they showed). A rounded dark
+    # square like the phones' app icons, transparent outside the corners, at
+    # every size Windows asks a .ico for.
+    windows_icon().save(ASSETS.parents[2] / "emberstorm.ico",
+                        sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
+                        # Plain bitmaps: PNG inside a .ico came out as noise
+                        # in Windows' own icon reader at the small sizes.
+                        bitmap_format="bmp")
     print("wrote favicon.svg, cloud.svg, no-cover.svg, 8 icons, the TV banner and the Apple TV icons")
 
 
