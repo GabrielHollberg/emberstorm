@@ -9685,7 +9685,12 @@ there again - the browser's own install button stays for later. The setup's
 finished screen says to pin the EmberStorm shortcut (Start menu, right-click,
 Pin to taskbar): on the computer it runs on, the shortcut starts EmberStorm
 first where the app only opens the page (the owner's choice, after trying the
-other way). Checked on the test server (`scripts/smoke/installoffer.js`, the
+other way). **Not offered on that computer at all**: the setup's Open EmberStorm and
+the desktop icon open the page with `?here=server`, which the page keeps on the
+browser (`soundstorm-install-offered` = server, set on each address it lands on,
+carried across the move to the secure name) and takes out of the address with
+the setup code. Typed by hand there, it is offered once - harmless. Checked on
+the test server: opened so, the address cleaned, no offer. Checked on the test server (`scripts/smoke/installoffer.js`, the
 install question played by hand - a real one comes only on a trusted address):
 Chrome offered, Install asked the browser, not again after a reload; an iPhone
 told how, not again after Not now. Not seen: Chrome's real install box. Checked in Chrome at phone size with a stand-in address: shown
