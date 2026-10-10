@@ -119,14 +119,18 @@ $script:ResumeFile = Join-Path $env:LOCALAPPDATA 'EmberStorm\resume.env'
 if ($PSCommandPath -and $PSCommandPath -eq $script:ResumeCopy -and (Test-Path -LiteralPath $script:ResumeFile)) {
     try {
         foreach ($line in [IO.File]::ReadAllLines($script:ResumeFile)) {
-            if ($line -match '^(SOUNDSTORM_(DIR|REPO|BRANCH|COMPOSE_URL|SCRIPT_URL|PORT)|EMBERSTORM_(RESUMES|ASKED|LAN|LIBRARY))=(.*)$') {
+            if ($line -match '^(SOUNDSTORM_(DIR|REPO|BRANCH|COMPOSE_URL|SCRIPT_URL|PORT)|EMBERSTORM_(RESUMES|ASKED|LAN|LIBRARY|DOCKER_OURS))=(.*)$') {
                 [Environment]::SetEnvironmentVariable($Matches[1], $Matches[4], 'Process')
             }
         }
     } catch { }
     Remove-Item -LiteralPath $script:ResumeFile -Force -ErrorAction SilentlyContinue
-    if ($env:EMBERSTORM_LIBRARY -and -not $Library) { $Library = $env:EMBERSTORM_LIBRARY }
 }
+# Whichever process carries on after a restart - the resumed copy, the newer
+# script it hands over to, or the window it relaunches - takes the library
+# chosen before it: the environment reaches them all, $Library does not (the
+# blind review: media landed on a small C: after a restart).
+if ($env:EMBERSTORM_LIBRARY -and -not $Library) { $Library = $env:EMBERSTORM_LIBRARY }
 
 $Repo       = if ($env:SOUNDSTORM_REPO) { $env:SOUNDSTORM_REPO } else { 'GabrielHollberg/emberstorm' }
 $Branch     = if ($env:SOUNDSTORM_BRANCH) { $env:SOUNDSTORM_BRANCH } else { 'main' }
@@ -729,6 +733,13 @@ function Update-Gui {
     } catch { }
     if ($script:Gui.StopAsked) {
         $script:Gui.StopAsked = $false
+        # An update stopped before its new versions were in: the compose file
+        # that names what is here goes back, or the next start would ask for
+        # versions never downloaded (the blind review).
+        try {
+            $old = Join-Path $Dir 'docker-compose.yml.old'
+            if (Test-Path -LiteralPath $old) { Move-Item -Force -LiteralPath $old (Join-Path $Dir 'docker-compose.yml') }
+        } catch { }
         try { $script:Gui.Timer.Stop() } catch { }
         try { $script:Gui.Window.Close() } catch { }
         exit 1
@@ -1075,6 +1086,7 @@ function Restart-Setup {
         $env:SOUNDSTORM_FRESH = '1'
         Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -WindowStyle Hidden -ArgumentList (@(
             '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', "`"$copy`"") + (ConvertTo-ArgumentList $script:BoundArgs))
+        if ($AuthKey) { $env:SOUNDSTORM_TS_KEY = "$AuthKey" }
     } catch { }
     $script:Gui.Running = $false
     $script:Gui.Window.Close()
@@ -1216,7 +1228,8 @@ function Show-DockerGuide([switch]$FirstRun) {
     $script:dockerGuideShown = $true
     # A Docker set up before: nothing to say.
     if (-not $script:dockerInstalledNow -and -not $FirstRun) { return }
-    if ($script:dockerInstalledNow) {
+    # Installed by this setup, in this run or the one before a restart.
+    if ($script:dockerInstalledNow -or $env:EMBERSTORM_DOCKER_OURS -eq '1') {
         Callout 'Docker Desktop' @(
             'EmberStorm runs inside a free program called Docker Desktop.',
             'Setup installs and starts it, and answers its first questions for',
@@ -1371,6 +1384,9 @@ function Register-Resume {
             if ($lanAccess) { $keep += "EMBERSTORM_LAN=$lanAccess" }
             if ($Library -and "$Library" -notmatch "[\r\n]") { $keep += "EMBERSTORM_LIBRARY=$Library" }
         }
+        # Docker installed by this setup, its terms accepted: after the
+        # restart nobody is asked to click Accept in a window that never comes.
+        if ($script:dockerInstalledNow -or $env:EMBERSTORM_DOCKER_OURS -eq '1') { $keep += 'EMBERSTORM_DOCKER_OURS=1' }
         foreach ($name in 'SOUNDSTORM_REPO', 'SOUNDSTORM_BRANCH', 'SOUNDSTORM_COMPOSE_URL', 'SOUNDSTORM_SCRIPT_URL', 'SOUNDSTORM_PORT') {
             $value = [Environment]::GetEnvironmentVariable($name)
             if ($value -and $value -notmatch "[\r\n]") { $keep += "$name=$value" }
@@ -1414,8 +1430,15 @@ function Stop-ForRestart([string]$Text) {
 # Confirm-TryAgain asks, after Windows' permission question was refused or
 # dismissed, whether to ask again - most often it was a misclick, and stopping
 # the whole setup for one was a dead end. $false where no window can be shown.
-function Confirm-TryAgain([string]$What) {
+function Confirm-TryAgain([string]$What, [switch]$Optional) {
     if (-not $script:Gui) { return $false }
+    if ($Optional) {
+        $page = New-GuiPageText 'Windows needs your permission' @(
+            "Windows asked for permission to $What, and it was not given.",
+            '',
+            'Choose Ask again, then Yes when Windows asks - or Skip this, and EmberStorm works on this PC only for now.')
+        return ((Show-GuiPage $page @('Skip this', 'Ask again')) -eq 'Ask again')
+    }
     $page = New-GuiPageText 'Windows needs your permission' @(
         "Windows asked for permission to $What, and it was not given. EmberStorm cannot be set up without it.",
         '',
@@ -2082,7 +2105,7 @@ function Set-LanAccess([string]$Address, [int]$Port) {
     if (-not (Test-Administrator)) { Important "Windows will ask for permission - click Yes." }
     do {
         $code = Enable-LanAccess $Port $network.InterfaceIndex $makePrivate
-    } while ($null -eq $code -and (Confirm-TryAgain 'let your other devices reach EmberStorm'))
+    } while ($null -eq $code -and (Confirm-TryAgain 'let your other devices reach EmberStorm' -Optional))
     if ($null -eq $code) {
         Important "Permission was not given, so other devices still cannot reach it."
         return 'refused'
@@ -2136,7 +2159,7 @@ function Set-LanAccessRemembered([string]$Lan, [int]$Port) {
     if ($network -and $network.Category -eq 'Public' -and $network.Name -and $declined -contains $network.Name) { return 'public' }
     $result = Set-LanAccess $Lan $Port
     if ($result -eq 'public' -and $network -and $network.Name -and (Test-Path -LiteralPath $Dir)) {
-        $names = @($declined) + @($network.Name -replace '[|\r\n]', ' ')
+        $names = @($declined) + @($network.Name -replace '[|\r\n#"''`]', ' ')
         Set-EnvSetting 'SOUNDSTORM_NOT_HOME' ((@($names) | Select-Object -Last 20) -join '|')
     }
     return $result
@@ -2151,7 +2174,7 @@ function Confirm-LanOnLaunch {
     if ($declined -contains $network.Name) { return }
     $result = Set-LanAccess $lan ([int](Get-InstalledPort))
     if ($result -eq 'public') {
-        $names = @($declined) + @($network.Name -replace '[|\r\n]', ' ')
+        $names = @($declined) + @($network.Name -replace '[|\r\n#"''`]', ' ')
         Set-EnvSetting 'SOUNDSTORM_NOT_HOME' ((@($names) | Select-Object -Last 20) -join '|')
     }
 }
@@ -2376,13 +2399,14 @@ function Install-WSL {
 }
 
 function Install-Docker {
-    # No winget - often so on a brand-new Windows until the Store has updated
-    # itself: Docker's own installer straight from Docker, with the same
-    # switches (a dead end before, pointing at a website).
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Install-DockerDirect
-        return
-    }
+    # Docker's own installer, straight from Docker and checked as signed by
+    # Docker, always: winget ran as administrator from the person's own
+    # folder (which their programs can change), and on a standard account its
+    # per-user copy would not start under an administrator's password - shown
+    # as "permission refused" (the blind review). The winget path below stays
+    # only for a later decision.
+    Install-DockerDirect
+    return
 
     Note "Getting Docker Desktop - a big download that takes a few minutes."
     # Installed with its terms accepted and its questions answered, so its
@@ -2441,6 +2465,19 @@ function Install-Docker {
 # Install-DockerDirect fetches Docker Desktop's installer from Docker itself
 # and runs it as administrator, quiet and with its terms accepted - the same
 # switches winget hands it.
+# Test-AdminAccount says whether this person's account is an administrator,
+# elevated or not: an ordinary token lists Administrators only as deny-only,
+# which WindowsIdentity.Groups leaves out (the blind review: every home admin
+# was taken for a standard account).
+function Test-AdminAccount {
+    try {
+        $me = [Security.Principal.WindowsIdentity]::GetCurrent()
+        return [bool](@($me.Claims | Where-Object { $_.Value -eq 'S-1-5-32-544' }).Count)
+    } catch {
+        return $true
+    }
+}
+
 # Grant-DockerUse adds this person to Docker's docker-users group when somebody
 # else's administrator password installed it: Docker adds the account that ran
 # its installer, so on a standard account Docker refused this person and its
@@ -2448,9 +2485,8 @@ function Install-Docker {
 # counts from the next sign-in, so a restart is asked for.
 function Grant-DockerUse {
     try {
-        $me = [Security.Principal.WindowsIdentity]::GetCurrent()
-        if (@($me.Groups | ForEach-Object { $_.Value }) -contains 'S-1-5-32-544') { return }
-        $sid = "$($me.User.Value)"
+        if (Test-AdminAccount) { return }
+        $sid = "$([Security.Principal.WindowsIdentity]::GetCurrent().User.Value)"
         if ($sid -notmatch '^S-1-5-21-[0-9-]+$') { return }
     } catch { return }
     Note "Letting your account use Docker - Windows will ask for permission."
@@ -2547,7 +2583,8 @@ try {
     Copy-Item -LiteralPath '$source' -Destination `$exe
     `$sig = Get-AuthenticodeSignature -LiteralPath `$exe
     if (`$sig.Status -ne 'Valid' -or "`$(`$sig.SignerCertificate.Subject)" -notmatch '(^|, )O=Docker Inc,') { exit 77 }
-    `$p = Start-Process -FilePath `$exe -ArgumentList 'install', '--quiet', '--accept-license' -Wait -PassThru
+    `$p = Start-Process -FilePath `$exe -ArgumentList 'install', '--quiet', '--accept-license' -PassThru
+    `$p.WaitForExit()
     Remove-Item -LiteralPath `$dir -Recurse -Force -ErrorAction SilentlyContinue
     exit `$p.ExitCode
 } catch {
@@ -3537,7 +3574,11 @@ exit 0
         # is unticked and the password given.
         $auto = ''
         try { $auto = "$((Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -ErrorAction Stop).AutoAdminLogon)" } catch { }
-        if ($auto -eq '1') {
+        $who = ''
+        try { $who = "$((Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -ErrorAction Stop).DefaultUserName)" } catch { }
+        if ($auto -eq '1' -and $who -and $who -ne $env:USERNAME -and $who -notlike "*\$env:USERNAME" -and $who -notlike "$env:USERNAME@*") {
+            Important "Windows will sign in by itself as $who, not as you - EmberStorm runs in your account. To change it, run netplwiz from the Start menu and choose your own name."
+        } elseif ($auto -eq '1') {
             Good "Windows will sign in by itself when the PC starts. (Signing in with a password is allowed again on this PC, for every account - Windows needed that for it.)"
         } else {
             Note "Signing in by itself was not turned on. You can do it later: run netplwiz from the Start menu."
@@ -3571,7 +3612,7 @@ function Confirm-HomeNetwork([string]$NetworkName) {
         $page = New-GuiPageText 'Is this your home network?' @(
             "Windows is treating the network this PC is on (""$NetworkName"") as public - the setting for cafes and airports - so your phone, TV and other computers cannot reach EmberStorm.",
             '',
-            'Yes: EmberStorm marks it as private so your other devices can connect. Windows will ask for permission.',
+            'Yes: EmberStorm marks it as private so your other devices can connect. Windows will ask for permission. (Private also lets Windows share files and printers on it, as on any home network.)',
             'No: nothing is changed.')
         return ((Show-GuiPage $page @('No', 'Yes, it is my home network')) -like 'Yes*')
     }
@@ -3623,6 +3664,7 @@ function ConvertTo-Scheme([string]$Tls) {
 # the port and the certificate hosts are in there too and were worked out on a
 # run nobody is going to repeat.
 function Set-EnvSetting([string]$Name, [string]$Value) {
+    $Value = $Value -replace '[\r\n]', ''
     $envFile = Join-Path $Dir '.env'
     $lines = @()
     if (Test-Path $envFile) { $lines = @(Get-Content -Encoding UTF8 $envFile) }
@@ -4130,7 +4172,7 @@ $MoveVolumes = @('soundstorm-state', 'navidrome-data', 'jellyfin-config', 'abs-c
     'immich-data', 'immich-db', 'storyteller-data', 'audiomuse-db')
 # Settings that describe this computer and its network, worked out again on
 # the new one.
-$MoveLocal = '^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME|INSTALLED)='
+$MoveLocal = '^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME|INSTALLED|IMPORTING)='
 $MoveImage = 'alpine:3'
 # The compose project, whose name prefixes every data volume. Always
 # soundstorm; overridable only so a move can be rehearsed on a throwaway
@@ -4256,6 +4298,12 @@ function Export-Move([string]$Destination, [bool]$WithLibrary) {
     Good "About $(Format-Size $need) to copy, $(Format-Size $free) free."
 
     New-Item -ItemType Directory -Force -Path (Join-Path $dest 'volumes') | Out-Null
+    # Passwords and keys go in it: this user's alone before anything is
+    # written, not locked file by file after (the blind review). A drive with
+    # no permissions at all (most USB sticks) is said plainly.
+    if (-not (Protect-PrivateFolder $dest)) {
+        Important "This drive cannot be locked to your account, and the move folder holds EmberStorm's passwords. Keep the drive safe, and delete the folder once the new computer is set up."
+    }
     Step "Step 2 of 4 - Copying accounts, settings and the media servers' data"
     Note "EmberStorm is stopped while its data is copied, and started again after."
     Invoke-Docker @('compose', 'stop') -Capture | Out-Null
@@ -4355,9 +4403,16 @@ function Import-Settings([string]$Path) {
 # Import-Volumes restores the data volumes. Refused where EmberStorm already
 # has data: an import is for a computer it is new to.
 function Import-Volumes([string]$Path) {
+    # Brought in already by this import, which stopped later (a download, a
+    # start): carried on from there rather than refused (the blind review).
+    if ((Get-EnvSetting 'SOUNDSTORM_IMPORTING') -eq '1' -and (Test-VolumeExists "${Project}_soundstorm-state")) {
+        Note "Using the accounts and data already brought in from the move."
+        return
+    }
     if (Test-VolumeExists "${Project}_soundstorm-state") {
         Stop-With "  This computer already has EmberStorm data, so importing would write over it.`n`n  Uninstall EmberStorm here first (Settings, Apps - your media is kept), then open the move again."
     }
+    Set-EnvSetting 'SOUNDSTORM_IMPORTING' '1'
     foreach ($tar in Get-ChildItem -LiteralPath (Join-Path $Path 'volumes') -Filter '*.tar' -ErrorAction SilentlyContinue) {
         $v = $tar.BaseName
         if ($MoveVolumes -notcontains $v) { Note "Skipping $v, which this version does not know."; continue }
@@ -4453,6 +4508,7 @@ if ($env:SOUNDSTORM_WINDOW -eq '1' -and $script:WindowWanted) {
         # with nothing on screen: start again, visibly, in a console.
         $script:Gui = $null
         $env:SOUNDSTORM_CONSOLE = '1'
+        if ($script:SetupMutex) { try { $script:SetupMutex.ReleaseMutex() } catch { } }
         Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
             -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$PSCommandPath`"") +
                 (ConvertTo-ArgumentList $PSBoundParameters))
@@ -4614,7 +4670,7 @@ function Test-OwnedByMe([string]$Path) {
         $me = [Security.Principal.WindowsIdentity]::GetCurrent()
         $owner = (Get-Acl -LiteralPath $Path).GetOwner([Security.Principal.SecurityIdentifier])
         $admins = New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-544'
-        return ($owner -eq $me.User) -or ($owner -eq $admins -and $me.Groups -contains $admins)
+        return ($owner -eq $me.User) -or ($owner -eq $admins -and (Test-AdminAccount))
     } catch {
         return $true # cannot tell (a drive with no ACLs): as before
     }
@@ -4639,7 +4695,7 @@ if (-not $insideProfile) {
 if ($Import) {
     try { $Import = [IO.Path]::GetFullPath($Import) } catch { Stop-With "  Could not open $Import." }
     Test-MoveFolder $Import
-    if (Test-Path 'docker-compose.yml') {
+    if (Test-InstalledHere) {
         Stop-With "  EmberStorm is already installed in $Dir, so importing would write over it.`n`n  Uninstall it first (Settings, Apps - your media is kept), then open the move again."
     }
 }
@@ -4836,6 +4892,7 @@ $movedFrom = ''
 if ($Library) {
     try {
         $full = [IO.Path]::GetFullPath($Library)
+        $script:libraryWasThere = Test-Path -LiteralPath $full
         New-Item -ItemType Directory -Force -Path $full -ErrorAction Stop | Out-Null
     } catch {
         Stop-With "  Could not use $Library for the library: $($_.Exception.Message)`n`n  Check the drive is connected, then run the setup again."
@@ -4863,7 +4920,8 @@ if ($Library) {
     }
 }
 $libraryPath = Get-LibraryPath
-$libraryIsNew = -not (Test-Path -LiteralPath $libraryPath)
+# Before the folder was made above, when it was chosen here.
+$libraryIsNew = if ($null -ne $script:libraryWasThere) { -not $script:libraryWasThere } else { -not (Test-Path -LiteralPath $libraryPath) }
 
 foreach ($folder in 'music', 'movies', 'tv', 'audiobooks', 'ebooks', 'documents', 'pictures') {
     New-Item -ItemType Directory -Force -Path (Join-Path $libraryPath $folder) | Out-Null
@@ -4873,8 +4931,20 @@ foreach ($folder in 'music', 'movies', 'tv', 'audiobooks', 'ebooks', 'documents'
 # included (the security review). Only when made now: an existing library may
 # be shared on purpose, and changing a big one's permissions takes a while.
 $libraryInProfile = $libraryPath.TrimEnd('\').StartsWith($env:USERPROFILE.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
-if ($libraryIsNew -and -not $libraryInProfile -and (Test-OthersCanWrite $libraryPath)) {
-    if (-not (Protect-PrivateFolder $libraryPath)) { Note "Could not make the library folder private to your account." }
+if (-not $libraryInProfile) {
+    # Another account's folder is not used: one made ahead under the name the
+    # setup suggests (D:\EmberStorm) would have kept its way in (the blind
+    # review).
+    if (-not (Test-OwnedByMe $libraryPath)) {
+        Stop-With "  $libraryPath belongs to another account on this PC, so EmberStorm will not keep your library there.`n`n  Choose a folder of your own, or remove that one and run the setup again."
+    }
+    # Made now, or still empty: theirs alone. An existing library with media
+    # in it is left as it is - it may be shared on purpose, and changing a big
+    # one's permissions takes a while.
+    $empty = -not (Get-ChildItem -LiteralPath $libraryPath -Recurse -File -Force -ErrorAction SilentlyContinue | Select-Object -First 1)
+    if (($libraryIsNew -or $empty) -and (Test-OthersCanWrite $libraryPath)) {
+        if (-not (Protect-PrivateFolder $libraryPath)) { Note "Could not make the library folder private to your account." }
+    }
 }
 
 # A move: the media first, then the data, and only then does anything start -
@@ -4999,13 +5069,15 @@ if ($pull.ExitCode -ne 0 -and $upgrade) {
     Note "Starting the version you already have. Run 'Update EmberStorm' again later."
 } elseif ($pull.ExitCode -ne 0 -and $rateLimited) {
     Stop-With "  The download server is limiting how fast it hands out downloads.`n  Nothing is wrong with this PC or your internet connection.`n`n  Wait about half an hour and run the setup again - anything already`n  downloaded is kept."
+} elseif ($pull.ExitCode -ne 0 -and $pull.Output -match 'no space left on device|not enough space|disk is full|There is not enough space') {
+    Stop-With "  The drive Docker keeps its downloads on is full.`n`n  Free some space on it - Settings, System, Storage shows what is using it -`n  then run the setup again. Anything already downloaded is kept."
 } elseif ($pull.ExitCode -ne 0) {
     Stop-With "  Could not download the media servers. That is almost always the`n  internet connection. Try again - anything already downloaded is kept."
 }
 
 Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath 'docker-compose.yml.old'
 Step "Step 4 of 4 - Starting EmberStorm"
-if ($firstInstall -and -not (Test-DockerRulesReady)) {
+if ($firstInstall -and -not (Test-DockerRulesReady) -and $lanAccess -notin @('public', 'refused', 'domain')) {
     # The dialog appears the moment the port is first published, i.e. during
     # the next command, and its default answer is the one that shuts phones
     # out on a network Windows thinks is public.
@@ -5197,7 +5269,7 @@ if ($hasAccount -ne $true -and $setupCode) {
     ) + $phoneLines) 'Yellow'
     # With the code in the address too, so the page usually fills it in by
     # itself; it takes it out of the address once it has it.
-    Start-Process "$url/?setup=$setupCode"
+    if (-not $NoBrowser) { Start-Process "$url/?setup=$setupCode" }
     $openUrl = "$url/?setup=$setupCode"
 } else {
     Callout 'NEXT: open EmberStorm' (@(
@@ -5206,7 +5278,7 @@ if ($hasAccount -ne $true -and $setupCode) {
         'Browser did not open? Go to:',
         "*  $url"
     ) + $phoneLines) 'Green'
-    Start-Process $url
+    if (-not $NoBrowser) { Start-Process $url }
     $openUrl = $url
 }
 
