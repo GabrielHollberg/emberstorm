@@ -224,6 +224,9 @@ final class WebViewController: UIViewController {
           // The sleep timer, kept by the app's player: a page whose screen is
           // off is asleep, timers and all, while the music plays on.
           window.soundstormApp.sleepAt = (at) => post({ type: 'audio', cmd: 'sleep', at: at || 0 });
+          // Where an audiobook's place is saved and where its files begin, so
+          // the player saves it itself while the screen is off (NativeAudio).
+          window.soundstormApp.place = (place) => post({ type: 'audio', cmd: 'place', place: place || null });
 
           // The page's media session, passed to the app for the lock screen
           // (the page's own audio no longer plays a song from the server, so

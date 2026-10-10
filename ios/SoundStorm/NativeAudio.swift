@@ -100,13 +100,22 @@ final class NativeAudio: NSObject {
         case "upcoming": PlayerLog.add("page: upcoming, \((m["items"] as? [Any])?.count ?? 0) songs")
         case "seek": PlayerLog.add("page: seek to \((m["s"] as? NSNumber)?.doubleValue ?? 0)")
         case "play", "pause", "stop", "unqueue": PlayerLog.add("page: \(cmd)")
+        case "place": PlayerLog.add("page: place \((m["place"] as? [String: Any])?["path"] as? String ?? "none")")
         case "sleep":
             let at = (m["at"] as? NSNumber)?.doubleValue ?? 0
             let wait = at / 1000 - Date().timeIntervalSince1970
             PlayerLog.add("page: sleep timer \(at > 0 && wait.isFinite ? "in \(Int(min(max(wait, -1e9), 1e9)))s" : "off")")
         default: break
         }
+        // A new file: the book's place is told again once it plays there. Not
+        // the file already playing - a page made again takes it over with a
+        // load of it, paused, and no "playing" comes to tell the place again.
+        if cmd == "load", player.currentItem.flatMap({ urls[ObjectIdentifier($0)] }) != m["url"] as? String {
+            place = nil
+        }
         switch cmd {
+        case "place":
+            setPlace(m["place"] as? [String: Any])
         case "load":
             guard let url = allowed(m["url"]) else { return }
             if let current = player.currentItem, urls[ObjectIdentifier(current)] == url.absoluteString {
@@ -166,6 +175,8 @@ final class NativeAudio: NSObject {
             player.defaultRate = rate
             if player.rate != 0 { player.rate = rate }
         case "stop":
+            savePlace(force: true)
+            place = nil
             player.pause()
             player.removeAllItems()
             urls.removeAll()
@@ -224,6 +235,86 @@ final class NativeAudio: NSObject {
             let domain = c.domain.lowercased()
             // Only the server's own: a cookie for a parent (.emberstorm.app) could be set by another install there (the eleventh security pass).
             return domain == host || domain == "." + host
+        }
+    }
+
+    // An audiobook's place, saved by the player itself (Android 0.54's, the
+    // owner's report of 2026-10-09: an hour listened with the screen off was an
+    // hour back on the next device - iOS sleeps the page, and the page did the
+    // saving). The page says where the place is saved and where each of the
+    // book's files begins on its timeline (window.soundstormApp.place); while
+    // the book plays, the place is sent every ten seconds, and once more
+    // whenever it stops. The page still saves too while it is awake.
+    private struct Place {
+        let url: URL
+        let duration: Double
+        let files: [(path: String, offset: Double)]
+    }
+    private var place: Place?
+    private var placeSavedAt = Date.distantPast
+    private var placeLast = -1.0
+    /// One save at a time, in order: an older one must not land after a newer.
+    private var placeSending: Task<Void, Never>?
+
+    private func setPlace(_ o: [String: Any]?) {
+        place = nil
+        placeSavedAt = .distantPast
+        placeLast = -1
+        guard let o, let path = o["path"] as? String, path.hasPrefix("/api/playback/") else { return }
+        var files: [(path: String, offset: Double)] = []
+        var origin: URL?
+        for f in (o["files"] as? [[String: Any]] ?? []).prefix(2000) {
+            guard let url = allowed(f["url"]) else { continue }
+            let offset = (f["offset"] as? NSNumber)?.doubleValue ?? 0
+            guard offset.isFinite, offset >= 0 else { continue }
+            files.append((url.path, offset))
+            if origin == nil { origin = url }
+        }
+        guard let origin, !path.contains("?"), !path.contains("#"),
+              let url = URL(string: path, relativeTo: origin)?.absoluteURL,
+              url.host() == origin.host(), url.port == origin.port, isServer(url) else { return }
+        let duration = (o["duration"] as? NSNumber)?.doubleValue ?? 0
+        place = Place(url: url, duration: duration.isFinite && duration > 0 ? duration : 0, files: files)
+    }
+
+    /// Sends the book's place if it is due: every ten seconds while playing,
+    /// and at once when it stops (force).
+    private func savePlace(force: Bool) {
+        guard let pl = place, let item = player.currentItem, let current = urls[ObjectIdentifier(item)],
+              let path = URL(string: current)?.path,
+              let file = pl.files.firstIndex(where: { $0.path == path }) else { return }
+        // Only from a settled player: not while loading, buffering or jumping,
+        // when its position is not yet the book's (Android's review, 2026-10-09).
+        guard !seeking, item.status == .readyToPlay,
+              ended || player.timeControlStatus != .waitingToPlayAtSpecifiedRate else { return }
+        let now = Date()
+        if !force, now.timeIntervalSince(placeSavedAt) < 10 { return }
+        let at = player.currentTime().seconds
+        let finished = ended && file == pl.files.count - 1
+        let seconds = pl.files[file].offset + (at.isFinite ? max(0, at) : 0)
+        if !finished, abs(seconds - placeLast) < 0.5 { return }
+        placeSavedAt = now
+        placeLast = seconds
+        guard let body = try? JSONSerialization.data(withJSONObject: ["seconds": seconds, "duration": pl.duration, "finished": finished])
+        else { return }
+        let previous = placeSending
+        placeSending = Task {
+            await previous?.value
+            var request = URLRequest(url: pl.url, timeoutInterval: 15)
+            request.httpMethod = "PUT"
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            for (field, value) in HTTPCookie.requestHeaderFields(with: await cookies(for: pl.url)) {
+                request.setValue(value, forHTTPHeaderField: field)
+            }
+            // No redirects: the Cookie header set here would go with one.
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request, delegate: ArtNoRedirects())
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if status >= 300 { PlayerLog.add("place not saved: \(status)") }
+            } catch {
+                PlayerLog.add("place not saved: \((error as NSError).code)")
+            }
         }
     }
 
@@ -376,6 +467,7 @@ final class NativeAudio: NSObject {
         let s = state()
         if s["seeked"] as? Bool == true { seeking = false }
         send(s)
+        savePlace(force: player.timeControlStatus == .paused)
     }
 
     private func send(_ event: [String: Any]) {
