@@ -2686,7 +2686,7 @@ function renderResults(result, append) {
     // A phone cannot drag anything, so it is pointed at the button instead.
     $('status').textContent = matchMedia('(pointer: coarse)').matches
       ? (TV ? 'Nothing here yet. Open Settings and choose Add media' : 'Nothing here yet. Tap your circle at the top, then Settings, Add media') + ' to add music, films, books, documents or photos.'
-      : 'Nothing here yet. Drag music, films, books, documents or photos anywhere on this screen, or use Add media in Settings.';
+      : 'Nothing here yet. Drag music, films, books, documents or photos onto any EmberStorm screen, any time, or use Add media in Settings.';
   } else if (browsing) {
     // Empty shelf, full library: they filtered to a kind they have none of,
     // or its backend is still doing its first scan.
@@ -12190,7 +12190,7 @@ function welcomeAddressBody(address, webName, webNames) {
 function welcomeMediaBody(box) {
   const drop = document.createElement('div');
   drop.className = 'welcome-drop';
-  drop.textContent = 'Drag files or whole folders from your computer and drop them anywhere on this screen.';
+  drop.textContent = 'Drag files or whole folders from your computer and drop them on any EmberStorm screen - here, or any time later - and they are added to your library.';
   const out = [drop, ...welcomeText('On a phone or tablet, or to pick them yourself: Choose files.')];
   if (box) out.push(...welcomeText('Or plug a USB drive into the box - EmberStorm asks what to do with it.'));
   out.push(Object.assign(document.createElement('p'), {
