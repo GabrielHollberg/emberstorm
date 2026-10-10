@@ -4368,11 +4368,19 @@ $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Sound
 function Test-InstalledHere {
     if (-not (Test-Path -LiteralPath (Join-Path $Dir 'docker-compose.yml'))) { return $false }
     if ((Get-EnvSetting 'SOUNDSTORM_INSTALLED') -eq '1') { return $true }
-    try { $where = "$((Get-ItemProperty -Path $uninstallKey -ErrorAction Stop).InstallLocation)" } catch { $where = '' }
+    try { $entry = Get-ItemProperty -Path $uninstallKey -ErrorAction Stop } catch { return $false }
+    # The entry a setup still under way makes (Register-Uninstaller
+    # -Unfinished) is not an install: run again, it is a first install still.
+    if ("$($entry.EmberStormUnfinished)" -eq '1') { return $false }
+    $where = "$($entry.InstallLocation)"
     return [bool]($where -and $where.TrimEnd('\') -eq $Dir.TrimEnd('\'))
 }
 
-function Register-Uninstaller {
+# -Unfinished makes it while the setup is still under way, so a setup
+# cancelled or stopped part way can be taken away from Settings, Apps like any
+# app, rather than by hand (the owner's asking, 2026-10-10); it is named so
+# there, and the finished install's call makes it the ordinary entry.
+function Register-Uninstaller([switch]$Unfinished) {
     try {
         $localScript = Join-Path $Dir 'soundstorm.ps1'
         $powershell = Join-Path ([Environment]::GetFolderPath('Windows')) 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -4383,7 +4391,7 @@ function Register-Uninstaller {
         # not take an `if` as an argument expression, and a tokenizer check
         # does not catch that.
         $strings = @{
-            DisplayName     = 'EmberStorm'
+            DisplayName     = $(if ($Unfinished) { 'EmberStorm (setup not finished)' } else { 'EmberStorm' })
             DisplayVersion  = '0.1'
             Publisher       = 'EmberStorm'
             InstallLocation = $Dir
@@ -4397,6 +4405,11 @@ function Register-Uninstaller {
         foreach ($name in @('NoModify', 'NoRepair')) {
             New-ItemProperty -Path $uninstallKey -Name $name -Value 1 `
                 -PropertyType DWord -Force | Out-Null
+        }
+        if ($Unfinished) {
+            New-ItemProperty -Path $uninstallKey -Name 'EmberStormUnfinished' -Value 1 -PropertyType DWord -Force | Out-Null
+        } else {
+            Remove-ItemProperty -Path $uninstallKey -Name 'EmberStormUnfinished' -ErrorAction SilentlyContinue
         }
     } catch {
         # Being absent from the app list is untidy, not broken.
@@ -4479,7 +4492,10 @@ if ($Uninstall) {
     if ($autoNow.On -and ($changes['autoSignIn'] -or (-not $known -and (Get-PasswordLess) -eq 0))) {
         $offer['signin'] = $(if ($known) { @{ Text = 'Ask for a password at sign-in again'; Checked = $true; Hint = 'EmberStorm had Windows sign in by itself after a restart.' } } else { @{ Text = 'Ask for a password at sign-in again'; Checked = $false; Hint = 'Windows signs in by itself now. If EmberStorm set that, tick this.' } })
     }
-    $offer['backup'] = @{ Text = 'Keep a copy of your accounts'; Checked = $true; Hint = 'For if you install EmberStorm again: the accounts and the passwords it made, in a file in the EmberStorm folder. Untick it to leave nothing of them.' }
+    # Only once it had started: a setup stopped part way made no accounts.
+    if (Test-InstalledHere) {
+        $offer['backup'] = @{ Text = 'Keep a copy of your accounts'; Checked = $true; Hint = 'For if you install EmberStorm again: the accounts and the passwords it made, in a file in the EmberStorm folder. Untick it to leave nothing of them.' }
+    }
 
     $want = @{}
     foreach ($key in $offer.Keys) { $want[$key] = $offer[$key].Checked }
@@ -4583,7 +4599,9 @@ if ($Uninstall) {
                 # Docker itself (were it kept after all, they stayed).
                 Note "Removing EmberStorm's programs from Docker."
                 foreach ($image in $ours) { $null = Invoke-Docker @('image', 'rm', $image) -Capture }
-                if (-not $want['backup']) {
+                # Never asked (a setup stopped part way): a copy kept from an
+                # earlier install stays where it was.
+                if ($offer.Contains('backup') -and -not $want['backup']) {
                     Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
                     Note "No copy of your accounts kept, as asked."
                 }
@@ -5344,6 +5362,10 @@ try {
         Copy-Item $PSCommandPath 'soundstorm.ps1' -Force
     }
 }
+# In Settings, Apps from here on, so a setup cancelled during the long
+# download is taken away there, everything it did with it. An update already
+# has its entry.
+if (-not (Test-InstalledHere) -and (Test-Path -LiteralPath (Join-Path $Dir 'soundstorm.ps1'))) { Register-Uninstaller -Unfinished }
 
 # Always, whether or not Tailscale is wanted. compose bind-mounts this file,
 # and Docker's answer to a bind mount whose source is missing is to create a
@@ -5723,7 +5745,9 @@ if ((Get-EnvSetting 'SOUNDSTORM_IMPORTING') -eq '1') {
     Set-EnvSetting 'SOUNDSTORM_IMPORTING' ''
     Set-EnvSetting 'SOUNDSTORM_IMPORTED' ''
 }
-if ($NoShortcuts) { Register-Uninstaller }
+# The ordinary entry now, its "setup not finished" gone - here as well as with
+# the shortcuts, should those fail.
+Register-Uninstaller
 
 if (-not $NoShortcuts) {
     Note "Adding shortcuts to the desktop and the Start menu."
