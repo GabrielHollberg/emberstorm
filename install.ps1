@@ -1478,7 +1478,7 @@ function Clear-Resume {
 function Stop-ForRestart([string]$Text) {
     $script:RestartStop = $true
     $after = if (Register-Resume) {
-        "`n`n  After the restart, sign in and the setup carries on by itself."
+        "`n`n  After the restart, sign in and the setup carries on by itself: its window comes back on its own within a minute or two."
     } else { '' }
     Stop-With ($Text + $after) @{
         Label = 'Restart now'
@@ -3004,6 +3004,18 @@ function Start-Docker([switch]$NoStop) {
 
 function Initialize-Docker {
     $installed = [bool](Get-Command docker -ErrorAction SilentlyContinue)
+    # WSL greets its first start with a "Welcome to Windows Subsystem for
+    # Linux" window, which on the test box popped up over the setup when
+    # Docker first started it - something else to wonder about. It is shown
+    # only while this person's OOBEComplete is unset (read by wslservice), so
+    # it is set first, never changed once there.
+    try {
+        $lxss = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss'
+        if ($null -eq (Get-ItemProperty -Path $lxss -Name 'OOBEComplete' -ErrorAction SilentlyContinue)) {
+            if (-not (Test-Path $lxss)) { New-Item -Path $lxss -Force | Out-Null }
+            New-ItemProperty -Path $lxss -Name 'OOBEComplete' -Value 1 -PropertyType DWord -Force | Out-Null
+        }
+    } catch { }
 
     # Only where somebody is sitting in front of it. The desktop shortcut runs
     # this minimized at startup, and a permission prompt with no visible
