@@ -9681,7 +9681,7 @@ page), each step answered - done, or Not now - before the next, "1 of 4" at the
 top and Skip the rest of the welcome at the foot: **the address first**, with an
 easier name offered right there ("That's hard to remember. Give it an easier
 name", saved through `/api/settings/web-name`) or Keep this address; then
-media ("drop them anywhere on this screen" - "window" read as the dashed box alone, the owner said, Choose files - a drop while it
+media ("drop them on any EmberStorm screen - here, or any time later" - "window" read as the dashed box alone, the owner said, Choose files - a drop while it
 shows answers it), away from home, family (Invite someone) and the TV. A step
 already done is passed over; answered ones are kept on the account
 (`prefs.welcomeSeen`, only the five names), so it carries on where it was; a step that opens another page steps aside and Home brings the next. Media
