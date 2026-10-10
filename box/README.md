@@ -7,6 +7,7 @@ SoundStorm on it. See "Selling it on a box" in `CLAUDE.md` for why.
     box/models.sh       copies the backends' models out of a working install
     box/build.sh        builds out/soundstorm-box.qcow2
     box/run-vm.sh       boots it as a pretend box (UEFI, eMMC + NVMe drive)
+    box/installer.sh    makes the USB stick that installs it onto a real box
     box/release.sh      makes a signed release (manifest) for boxes to update to
     box/compose.box.yml the box's additions to docker-compose.yml
     box/rootfs/         files copied into the system disk
@@ -25,6 +26,22 @@ Desktop's own does not, and Hyper-V is off):
 `NO_IMAGES=1` makes a quick build without the images (about 12GB of them);
 `OFFLINE=1` on `run-vm.sh` cuts the VM off the internet. `OUT` keeps the disks on WSL's own filesystem: the Windows drive is slow
 through `/mnt`.
+
+## Installing it on a real box
+
+A box's eMMC is soldered in, so its system is written by starting the box
+from a USB stick:
+
+    wsl -d Debian -u root -- sh -c 'cd /mnt/h/dev/soundstorm && OUT=/root/box-out sh box/installer.sh'
+
+makes `out/emberstorm-installer.img`; write it to a stick of 16GB or more with
+balenaEtcher or Rufus (DD mode), plug it into the box with the network cable
+and a monitor, and start it from the stick (on the ME Mini: F7 at power-on
+for the boot menu). It shows what it is doing, takes about ten minutes, and
+switches off; take the stick out and switch on. The storage drive is kept
+(putting a box right) unless the stick was made with `FACTORY=1`, which
+wipes it so the box starts new. To try it in the VM, make the stick with
+`INSTALL_TARGET=vda`, then `run-vm.sh installer`, then `run-vm.sh`.
 
 ## How a box starts
 

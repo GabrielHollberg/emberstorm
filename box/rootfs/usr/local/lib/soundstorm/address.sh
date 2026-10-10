@@ -26,14 +26,15 @@ if [ -n "$dev" ]; then
 fi
 
 [ -n "$lan" ] || exit 0
+had=$(sed -n 's/^SOUNDSTORM_TLS_HOSTS=//p' .env 2>/dev/null | tail -n 1)
+[ "$lan" = "$had" ] && exit 0
+
 # The rest under up.sh's lock, so an update cannot begin between the look
-# and the start.
+# and the start (looked at again once it is held: run again from the top).
 if [ -z "${SOUNDSTORM_UP_LOCKED:-}" ]; then
 	export SOUNDSTORM_UP_LOCKED=1
 	exec flock /run/soundstorm-up.lock "$0" "$@"
 fi
-had=$(sed -n 's/^SOUNDSTORM_TLS_HOSTS=//p' .env 2>/dev/null | tail -n 1)
-[ "$lan" = "$had" ] && exit 0
 
 # Never in the middle of an update or a reset (the caretaker has the stack
 # stopped on purpose), and never before EmberStorm's own first start.
