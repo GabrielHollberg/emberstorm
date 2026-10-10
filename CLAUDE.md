@@ -5093,6 +5093,20 @@ installs it deletes `Docker Desktop.lnk` from the shared and the person's deskto
 straight after; the Start menu entry stays. Checked: the generated script
 parses, the removal on a pretend desktop (EmberStorm's icon left).
 
+**A setup stopped part way is uninstalled like any app** (2026-10-10, the
+owner's asking: cancelled during the download, there was nothing in Settings,
+Apps, and cleaning up meant finding folders, firewall rules and power settings
+by hand). The entry is made in step 2, once the folder and its copy of the
+script are there, as "EmberStorm (setup not finished)"
+(`Register-Uninstaller -Unfinished`, an `EmberStormUnfinished` value), and
+made the ordinary one once EmberStorm has started. `Test-InstalledHere` does
+not count the unfinished entry, so the setup run again is still a first
+install; the uninstall offers no accounts copy for it and leaves one kept
+from an earlier install alone. Cancelled before step 2 (during Docker's
+install) there is still no entry: Docker is in Settings, Apps on its own.
+Checked: the four cases of the entry and the install mark on a throwaway
+key, the setup in a scratch folder. Not seen: an uninstall of a stopped setup.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
