@@ -5053,6 +5053,17 @@ it). Checked: the rules on this PC's drives (two internal NVMe and two USB
 correctly told apart, seven cases), the page drawn, the elevated script with
 the option parsing. **Not checked**: Docker's installer taking the option -
 the box is the test.
+**Then checked for what it touched** (the same day): the library kept on a
+short C: now sends Docker's data to the roomiest internal drive too (it
+stopped, though the message offered a second drive); the folder, made at a
+drive's root, took the drive's permissions - other accounts could reach
+EmberStorm's accounts and the databases in it - so it is locked to this
+person, SYSTEM and Administrators, and one another account made first is
+refused; it is recorded (`dockerData` in changes.json) and the uninstall
+deletes it with Docker when empty, else names it. Unchanged: updates, a
+Docker already installed, moves and imports (a Docker already there keeps
+its data where it is). Checked: the rules with C: roomy and short, the lock
+on a test folder, the setup in a scratch folder.
 
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
