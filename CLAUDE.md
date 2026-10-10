@@ -4910,6 +4910,30 @@ seconds after the double-click show nothing (the signed .exe); uninstall
 leaves Docker running if it started it; a refused firewall cleanup on
 uninstall is not said; updates unsigned from main.
 
+**Uninstalling leaves only what the person keeps** (2026-10-10, the owner's
+design: after uninstalling, the PC as it was, but for the media and, if
+wanted, a copy of the accounts). The setup records each Windows change it
+makes and what was there before (`%LOCALAPPDATA%\EmberStorm\changes.json`,
+`Save-SetupChange`, the first value kept so a reinstall does not overwrite
+it): Docker installed, sleep and hibernate while plugged in, the lid, the
+Windows 11 sign-in setting, auto sign-in. Uninstall asks first, one page,
+each its own choice and shown only when the setup changed it (an install
+from before the record: only when still exactly as EmberStorm leaves it,
+put back to Windows' usual): **Remove Docker Desktop**, **Let this PC sleep
+when idle again**, **Put the lid setting back**, **Ask for a password at
+sign-in again**, **Keep a copy of your accounts** - all ticked, Cancel
+stops. Always: EmberStorm's own programs taken out of Docker even when Docker
+is kept (12GB that stayed), and the setup's own folder in AppData. Left on
+purpose: Windows Subsystem for Linux (part of Windows) and the network's
+private setting (the home network's right setting). Sleep and the lid need
+no permission; the firewall rules, auto sign-in and Docker's own uninstaller
+go in one elevated script, so Windows asks once. With no window (console),
+Docker stays and only recorded settings go back. Checked: parses, ASCII; the
+elevated script generated for three sets of choices, each parsing; the
+record kept first values; power settings read on this PC. **Not run**: an
+uninstall (it would take this PC's live install's shortcuts and entry);
+Docker's `uninstall --quiet` itself; the page on screen.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
