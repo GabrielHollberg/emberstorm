@@ -5901,9 +5901,11 @@ if ($phoneAddress -and $lanAccess -in @('public', 'refused', 'failed')) {
     $phoneLines = @('', 'On your phone, TV or another computer on the same Wi-Fi:', "*  $phoneAddress")
 }
 $phoneLines += @('', 'To add your music, films and books: drop them in the "EmberStorm library" folder on your desktop, or use Add media in EmberStorm''s Settings.')
-# Windows lets no installer pin to the taskbar; one right-click does.
-if (-not $upgrade -and -not $NoShortcuts) {
-    $phoneLines += @('', 'To keep EmberStorm on the taskbar: in the Start menu, right-click EmberStorm and choose Pin to taskbar.')
+# The app over a shortcut (the owner's choice): EmberStorm offers to install
+# itself once in the browser (offerInstall) - its own window and icon, which
+# can go on the taskbar.
+if (-not $upgrade) {
+    $phoneLines += @('', 'When EmberStorm opens in your browser, choose Install to make it an app on this computer - its own window and icon, ready to pin to the taskbar.')
 }
 if ($useTailscale -and $tailnet) {
     $phoneLines += @('', 'Away from home, on a device signed in to Tailscale:', "*  $tailnet")
