@@ -4934,6 +4934,59 @@ record kept first values; power settings read on this PC. **Not run**: an
 uninstall (it would take this PC's live install's shortcuts and entry);
 Docker's `uninstall --quiet` itself; the page on screen.
 
+**A third blind review (2026-10-10)**: security, bugs (the new uninstall
+first), and six more runs walked through the code. Fixed:
+
+- **Moving to another computer crashed every time**: the folder-locking
+  functions were defined further down than the move uses them (a function
+  defined at script level exists only once its line has run). They sit
+  before everything now.
+- **The uninstall**: "Remove Docker Desktop" is ticked only when the setup
+  installed Docker (it was ticked for a Docker already there - one click
+  would have wiped the person's own containers); for an install from before
+  the record, the settings it can only guess at are offered unticked and
+  worded as guesses; Docker already gone counts as nothing left to stop (the
+  uninstall could never finish); when EmberStorm cannot be stopped, nothing
+  else is taken back - firewall rules, shortcuts, settings, Docker - so it
+  keeps working and uninstalling again finishes; an old accounts copy is
+  deleted only once EmberStorm has stopped, and the finish says whether the
+  copy was really saved; EmberStorm's programs leave Docker whenever it
+  stopped; a refused permission keeps the record and the Settings, Apps
+  entry so uninstalling again finishes; Docker's uninstaller is checked as
+  signed by Docker before it runs as administrator; Cancel no longer clears
+  a pending carry-on-after-restart; closing the window says it is removing.
+- **Auto sign-in closed without turning it on** put the Windows 11 setting
+  back straight away (it stayed off for good, never offered back). Not done:
+  netplwiz keeps the password as a Windows secret that `AutoAdminLogon=0`
+  makes unused but does not delete (clearing it needs a Windows call the
+  setup does not make).
+- **Try again keeps the answers** (every question came back, netplwiz too),
+  and a run soon after a restart reads the answers from before it whichever
+  copy runs (a second double-click won the race and lost the library on D:);
+  the room check is not run again on carrying on.
+- **An import counts as brought in only once every volume is**
+  (`SOUNDSTORM_IMPORTED`), and its marks go once it starts.
+- **The download no longer freezes the window**: docker is read as it runs
+  (`Read-DockerLines`: both outputs, the window answering between lines), and
+  a download silent for 15 minutes is stopped.
+- **Security**: a new folder outside the person's own is private from the
+  moment it is made, any file at its top another account owns is refused,
+  and a drive that cannot keep files private (exFAT) is said; Windows' own
+  folders come from Windows, not environment variables (which a program
+  running as the person can change, and which reach elevated processes);
+  Docker's block rule covers EmberStorm's port only, not the person's own
+  containers on other networks.
+
+Checked: parses, ASCII; `Read-DockerLines` against this PC's Docker (lines
+from both outputs, the exit code, 39 window updates through the silences, a
+silent command stopped); the uninstall's and sign-in's elevated scripts
+generated and parsed; the window drawn; the real setup in a scratch folder
+(stopped on "already installed in another folder", nothing made). **Not
+checked**: an uninstall, a move, a fresh PC. **Left**: the network's private
+setting and Docker's own block rules the setup loosens are not put back;
+updates unsigned from main; the first seconds after the double-click show
+nothing (the signed .exe).
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
