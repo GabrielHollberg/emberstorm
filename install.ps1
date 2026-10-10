@@ -748,6 +748,28 @@ function Update-Gui {
     }
 }
 
+# Invoke-Pumped runs a piece of work on a second thread while this one keeps
+# the window drawn and draggable: a command that prints nothing for a while
+# (docker info as Docker starts, checking the 600MB installer's signature)
+# froze the window for 20-30 seconds on the test box, and a frozen window
+# reads as a broken one. Without the window it simply runs.
+function Invoke-Pumped([scriptblock]$Work, [object[]]$Arguments = @()) {
+    if (-not $script:Gui) { return (& $Work @Arguments) }
+    $ps = [powershell]::Create()
+    try {
+        [void]$ps.AddScript($Work.ToString())
+        foreach ($a in $Arguments) { [void]$ps.AddArgument($a) }
+        $handle = $ps.BeginInvoke()
+        while (-not $handle.IsCompleted) {
+            Update-Gui
+            [Threading.Thread]::Sleep(50)
+        }
+        return $ps.EndInvoke($handle)
+    } finally {
+        $ps.Dispose()
+    }
+}
+
 function New-WpfBrush([string]$Hex) {
     return New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($Hex))
 }
@@ -1800,11 +1822,20 @@ function Invoke-Native {
             & $Command @Arguments 2>&1 | ForEach-Object { Write-Host "$_" }
             return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = '' }
         }
-        $lines = & $Command @Arguments 2>&1 | ForEach-Object { Update-Gui; "$_" }
-        return [pscustomobject]@{
-            ExitCode = $LASTEXITCODE
-            Output   = ($lines -join [Environment]::NewLine)
-        }
+        $result = @(Invoke-Pumped {
+            param($command, $arguments, $folder)
+            $ErrorActionPreference = 'Continue'
+            if ($folder) { Set-Location -LiteralPath $folder }
+            try {
+                $lines = @(& $command @arguments 2>&1 | ForEach-Object { "$_" })
+            } catch {
+                $lines = @($_.Exception.Message)
+            }
+            # Fresh on this thread: still nothing means it never ran.
+            $code = if ($null -eq $LASTEXITCODE) { 1 } else { $LASTEXITCODE }
+            [pscustomobject]@{ ExitCode = $code; Output = ($lines -join [Environment]::NewLine) }
+        } @($Command, $Arguments, (Get-Location).ProviderPath))
+        return $result[-1]
     } catch {
         return [pscustomobject]@{ ExitCode = 1; Output = $_.Exception.Message }
     } finally {
@@ -2650,7 +2681,8 @@ function Install-DockerDirect {
     # administrator on a copy in a folder only administrators can change, the
     # copy run from there - so nothing can swap the file between the check
     # and the run (the security review).
-    $sig = Get-AuthenticodeSignature -LiteralPath $installer
+    Set-GuiStatus "Checking Docker Desktop's installer is really Docker's..."
+    $sig = @(Invoke-Pumped { param($file) Get-AuthenticodeSignature -LiteralPath $file } @($installer))[-1]
     if ($sig.Status -ne 'Valid' -or "$($sig.SignerCertificate.Subject)" -notmatch '(^|, )O=Docker Inc,') {
         Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
         Stop-With @"
