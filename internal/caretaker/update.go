@@ -295,32 +295,55 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 	before.Sources = min(before.Sources, u.baseline())
 
 	for svc, ref := range m.Images {
-		if err := u.run(ctx, "docker", "pull", "-q", ref); err != nil {
+		if err := u.runFor(ctx, pullTimeout, "docker", "pull", "-q", ref); err != nil {
 			return u.fail(fmt.Errorf("downloading %s: %w", svc, err), "The update could not be downloaded. Nothing was changed.")
 		}
 	}
 
 	imagesPath := filepath.Join(u.cfg.ComposeDir, "compose.images.yml")
-	previous, _ := os.ReadFile(imagesPath)
+	previous, err := os.ReadFile(imagesPath)
+	hadPrevious := err == nil
+
+	// Written down before anything is stopped, so a power cut from here on
+	// is finished or undone at the next start (pending.go).
+	_ = os.MkdirAll(u.cfg.StateDir, 0o755)
+	if hadPrevious {
+		if err := writeFile(filepath.Join(u.cfg.StateDir, previousImages), previous); err != nil {
+			return u.fail(err, "The update could not be prepared. Nothing was changed.")
+		}
+	}
+	p := pending{Kind: "update", Manifest: m, HadPrevious: hadPrevious}
+	if err := u.writePending(p); err != nil {
+		return u.fail(err, "The update could not be prepared. Nothing was changed.")
+	}
 
 	u.set(func(s *Status) { s.Message = "Installing EmberStorm " + m.Version })
-	if err := u.run(ctx, u.cfg.Up, "stop"); err != nil {
+	if err := u.runFor(ctx, stopTimeout, u.cfg.Up, "stop"); err != nil {
+		_ = u.runFor(ctx, upTimeout, u.cfg.Up)
+		u.clearPending()
 		return u.fail(err, "The update could not stop EmberStorm. Nothing was changed.")
 	}
 	snap := ""
 	if u.snapshots(u.cfg.Volumes) {
-		snap = u.cfg.Volumes + "-before-" + strconv.FormatInt(m.Serial, 10)
+		snap = u.snapshotPath(m.Serial)
 		if err := u.run(ctx, "btrfs", "subvolume", "snapshot", u.cfg.Volumes, snap); err != nil {
-			_ = u.run(ctx, u.cfg.Up)
+			_ = u.runFor(ctx, upTimeout, u.cfg.Up)
+			u.clearPending()
 			return u.fail(err, "The update could not save a copy of your settings first, so it was not installed.")
+		}
+		p.Snapshot = snap
+		if err := u.writePending(p); err != nil {
+			u.log.Warn("could not note the snapshot", "err", err)
 		}
 	}
 	if err := writeFile(imagesPath, ImagesFile(m)); err != nil {
 		u.rollback(ctx, imagesPath, previous, snap)
+		u.clearPending()
 		return u.fail(err, "The update could not be installed. EmberStorm is back as it was.")
 	}
-	if err := u.run(ctx, u.cfg.Up); err != nil || !u.healthy(ctx, before) {
+	if err := u.runFor(ctx, upTimeout, u.cfg.Up); err != nil || !u.healthy(ctx, before) {
 		back := u.rollback(ctx, imagesPath, previous, snap)
+		u.clearPending()
 		if err == nil {
 			err = errors.New("did not come up healthy")
 		}
@@ -338,10 +361,18 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 		})
 		return err
 	}
+	u.record(ctx, m, snap, previous)
+	u.clearPending()
+	u.log.Info("updated", "version", m.Version, "serial", m.Serial)
+	return nil
+}
+
+// record makes m the box's version once it is up and healthy, and tidies
+// what the update before it left.
+func (u *Updater) record(ctx context.Context, m *Manifest, snap string, previous []byte) {
 	if h, err := u.health(ctx); err == nil {
 		u.saveBaseline(h.Sources)
 	}
-
 	cur := u.Status().Current
 	if cur != nil {
 		_ = u.save("previous.json", cur)
@@ -359,8 +390,22 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 		s.State = "updated"
 		s.Message = "Updated to EmberStorm " + m.Version + "."
 	})
-	u.log.Info("updated", "version", m.Version, "serial", m.Serial)
-	return nil
+}
+
+// How long each step may take before it counts as failed: a download that
+// hangs, or a start that never ends, used to hold the box "updating" for
+// ever, with nothing else - a reset, the next update - able to start.
+const (
+	pullTimeout = 30 * time.Minute
+	stopTimeout = 5 * time.Minute
+	upTimeout   = 15 * time.Minute
+)
+
+// runFor runs a command, given at most d.
+func (u *Updater) runFor(ctx context.Context, d time.Duration, name string, args ...string) error {
+	ctx, cancel := context.WithTimeout(ctx, d)
+	defer cancel()
+	return u.run(ctx, name, args...)
 }
 
 func (u *Updater) fail(err error, message string) error {
@@ -394,8 +439,15 @@ var pollEvery = 5 * time.Second
 // nothing lost (the thirteenth security pass).
 func (u *Updater) rollback(ctx context.Context, imagesPath string, previous []byte, snap string) bool {
 	ok := true
-	_ = u.run(ctx, u.cfg.Up, "stop")
-	if snap != "" {
+	_ = u.runFor(ctx, stopTimeout, u.cfg.Up, "stop")
+	if snap != "" && !exists(u.cfg.Volumes) && exists(snap) {
+		// A rollback cut short after setting the volumes aside: the copy
+		// goes straight back.
+		if err := os.Rename(snap, u.cfg.Volumes); err != nil {
+			u.log.Error("could not put the volumes back", "err", err)
+			ok = false
+		}
+	} else if snap != "" && exists(snap) {
 		// A name of its own each time: one left from an earlier failure
 		// that could not be deleted stopped the volumes being set aside.
 		failed := u.cfg.Volumes + "-failed-" + strconv.FormatInt(time.Now().UnixNano(), 36)
@@ -417,7 +469,7 @@ func (u *Updater) rollback(ctx context.Context, imagesPath string, previous []by
 	} else {
 		_ = os.Remove(imagesPath)
 	}
-	if err := u.run(ctx, u.cfg.Up); err != nil {
+	if err := u.runFor(ctx, upTimeout, u.cfg.Up); err != nil {
 		u.log.Error("could not start the previous version again", "err", err)
 		ok = false
 	}

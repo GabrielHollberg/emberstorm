@@ -51,10 +51,16 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	defer u.busy.Unlock()
 	u.log.Warn("resetting the box", "mode", mode)
 	u.set(func(s *Status) { s.State = "resetting"; s.Message = "Starting over" })
+	// Written down first: cut short by a power cut, it is done again at the
+	// next start (pending.go) rather than leaving a box half emptied.
+	if err := u.writePending(pending{Kind: "reset", Mode: mode}); err != nil {
+		u.log.Warn("could not note the reset", "err", err)
+	}
 
 	// Down, not only stopped: the containers go, and with them what each
 	// kept of its own - its logs above all (the twelfth security pass).
-	if err := u.run(ctx, u.cfg.Up, "down"); err != nil {
+	if err := u.runFor(ctx, stopTimeout, u.cfg.Up, "down"); err != nil {
+		u.clearPending()
 		u.set(func(s *Status) {
 			s.State = "failed"
 			s.Message = "Could not stop EmberStorm to start over. Nothing was changed."
@@ -96,7 +102,10 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 		u.log.Error("could not ready the drive again", "err", err)
 	}
 
-	if err := u.run(ctx, u.cfg.Up); err != nil {
+	// Everything taken away is gone now: starting again is all that is
+	// left, which a restart does by itself.
+	u.clearPending()
+	if err := u.runFor(ctx, upTimeout, u.cfg.Up); err != nil {
 		u.set(func(s *Status) {
 			s.State = "failed"
 			s.Message = "Started over, but EmberStorm did not start again. Turning the box off and on may help."
