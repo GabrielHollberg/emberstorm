@@ -858,6 +858,14 @@ extension WebViewController: WKNavigationDelegate {
         return .allow
     }
 
+    /// A new page (a reload, the move to the secure name, a server changed):
+    /// the volume buttons go back to the phone. Left on, they kept turning a
+    /// TV the new page knew nothing of, and the phone's own volume stayed
+    /// stuck in the middle - the page says again if it still controls one.
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        volumeKeys.set(false, in: nil)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         // What the server calls itself now, for the list of servers (the
         // owner may have renamed it since).
@@ -910,6 +918,7 @@ extension WebViewController: WKNavigationDelegate {
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         // iOS reclaims a background web view's memory by killing its page.
         // Reloading is what Safari does when you come back to such a tab.
+        volumeKeys.set(false, in: nil)
         load()
     }
 }
