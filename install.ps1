@@ -2451,6 +2451,7 @@ function Install-Docker {
     # now.
     if (Get-Command docker -ErrorAction SilentlyContinue) {
         Good "Docker Desktop installed."
+        Save-SetupChange 'docker' $true
         Hide-DockerDashboard
         Grant-DockerUse
         return
@@ -2611,6 +2612,7 @@ try {
     Refresh-Path
     if (Get-Command docker -ErrorAction SilentlyContinue) {
         Good "Docker Desktop installed."
+        Save-SetupChange 'docker' $true
         Hide-DockerDashboard
         Grant-DockerUse
         return
@@ -3398,6 +3400,61 @@ function Show-TailscaleDialog {
 # restart, which Docker Desktop needs before EmberStorm can start. That last
 # is off unless chosen, and says why: whoever switches the PC on gets into
 # this Windows account (the owner's call, 2026-10-09).
+# What the setup changes on Windows, and what was there before, kept in the
+# person's own folder so an uninstall can offer to put each back - exactly as
+# it was, not a guess. The first value kept is the one from before EmberStorm:
+# a second install does not write over it.
+$script:ChangesFile = Join-Path $env:LOCALAPPDATA 'EmberStorm\changes.json'
+function Get-SetupChanges {
+    $all = @{}
+    try {
+        $read = Get-Content -Raw -LiteralPath $script:ChangesFile -ErrorAction Stop | ConvertFrom-Json
+        foreach ($p in $read.PSObject.Properties) { $all[$p.Name] = $p.Value }
+    } catch { }
+    return $all
+}
+function Save-SetupChange([string]$Name, $Value) {
+    try {
+        $all = Get-SetupChanges
+        if ($all.ContainsKey($Name)) { return }
+        $all[$Name] = $Value
+        New-Item -ItemType Directory -Force -Path (Split-Path $script:ChangesFile) | Out-Null
+        [IO.File]::WriteAllText($script:ChangesFile, ($all | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
+    } catch { }
+}
+
+# Get-PowerAcValue reads one plugged-in power setting of the plan in use: the
+# second last hex number powercfg prints for it (then the battery's), as its
+# words are in Windows' own language. $null when it cannot tell.
+function Get-PowerAcValue([string]$Group, [string]$Setting) {
+    try {
+        $out = & (Join-Path $env:SystemRoot 'System32\powercfg.exe') /query SCHEME_CURRENT $Group $Setting 2>$null
+        $values = @($out | Where-Object { $_ -match ':\s*0x([0-9a-fA-F]{8})\s*$' } | ForEach-Object { [Convert]::ToInt64(($_ -replace '^.*0x', ''), 16) })
+        if ($values.Count -ge 2) { return $values[$values.Count - 2] }
+    } catch { }
+    return $null
+}
+
+# Get-AutoSignIn answers whether Windows signs in by itself, and as whom.
+function Get-AutoSignIn {
+    try {
+        $w = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -ErrorAction Stop
+        return @{ On = ("$($w.AutoAdminLogon)" -eq '1'); Who = "$($w.DefaultUserName)" }
+    } catch {
+        return @{ On = $false; Who = '' }
+    }
+}
+
+# Get-PasswordLess reads the Windows 11 setting the auto sign-in turns off:
+# its number, or 'absent'.
+function Get-PasswordLess {
+    try {
+        $v = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device' -ErrorAction Stop).DevicePasswordLessBuildVersion
+        if ($null -ne $v) { return [int]$v }
+    } catch { }
+    return 'absent'
+}
+
 function Confirm-AlwaysOn {
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
@@ -3511,12 +3568,18 @@ function Confirm-AlwaysOn {
     }
 
     if ($choices['awake']) {
+        $was = Get-PowerAcValue 'SUB_SLEEP' 'STANDBYIDLE'
+        if ($null -ne $was) { Save-SetupChange 'sleepAc' $was }
+        $was = Get-PowerAcValue 'SUB_SLEEP' 'HIBERNATEIDLE'
+        if ($null -ne $was) { Save-SetupChange 'hibernateAc' $was }
         $okAwake = ((Invoke-Native $powercfg @('/change', 'standby-timeout-ac', '0')).ExitCode -eq 0)
         $null = Invoke-Native $powercfg @('/change', 'hibernate-timeout-ac', '0')
         if ($okAwake) { Good "This PC stays awake while it is plugged in." }
         else { Note "Could not change the sleep setting. Set Sleep to Never in Windows Settings, System, Power." }
     }
     if ($choices['lid']) {
+        $was = Get-PowerAcValue 'SUB_BUTTONS' 'LIDACTION'
+        if ($null -ne $was) { Save-SetupChange 'lidAc' $was }
         $okLid = ((Invoke-Native $powercfg @('/setacvalueindex', 'SCHEME_CURRENT', 'SUB_BUTTONS', 'LIDACTION', '0')).ExitCode -eq 0)
         $null = Invoke-Native $powercfg @('/setactive', 'SCHEME_CURRENT')
         if ($okLid) { Good "Closing the lid no longer sleeps it while plugged in." }
@@ -3556,6 +3619,8 @@ function Enable-AutoSignIn {
         }
     } catch { }
     }
+    $signedInBefore = (Get-AutoSignIn).On
+    Save-SetupChange 'passwordLess' (Get-PasswordLess)
     $script = @'
 $ErrorActionPreference = 'SilentlyContinue'
 $env:PSModulePath = "$PSHOME\Modules"
@@ -3579,6 +3644,7 @@ exit 0
         if ($auto -eq '1' -and $who -and $who -ne $env:USERNAME -and $who -notlike "*\$env:USERNAME" -and $who -notlike "$env:USERNAME@*") {
             Important "Windows will sign in by itself as $who, not as you - EmberStorm runs in your account. To change it, run netplwiz from the Start menu and choose your own name."
         } elseif ($auto -eq '1') {
+            if (-not $signedInBefore) { Save-SetupChange 'autoSignIn' $true }
             Good "Windows will sign in by itself when the PC starts. (Signing in with a password is allowed again on this PC, for every account - Windows needed that for it.)"
         } else {
             Note "Signing in by itself was not turned on. You can do it later: run netplwiz from the Start menu."
@@ -4033,6 +4099,68 @@ if ($Uninstall) {
     $stillRunning = $false
     $stopReason = ''
 
+    # What else to take back, asked first - only what the setup changed (or,
+    # for an install from before it kept a record, what is still exactly as
+    # EmberStorm leaves it), each its own choice: somebody may have come to
+    # want a PC that never sleeps (the owner's design, 2026-10-10).
+    $changes = Get-SetupChanges
+    $known = $changes.Count -gt 0
+    $offer = [ordered]@{}
+    if (Get-DockerDesktopPath) {
+        $offer['docker'] = @{ Text = 'Remove Docker Desktop'; Checked = $true
+            Hint = $(if ($changes['docker']) { 'It was installed for EmberStorm. Untick it if something else on this PC uses it.' } else { 'EmberStorm ran in it. Untick it if something else on this PC uses it - either way, the 12GB of EmberStorm''s own programs inside it are removed.' }) }
+    }
+    $sleepNow = Get-PowerAcValue 'SUB_SLEEP' 'STANDBYIDLE'
+    $sleepWas = if ($null -ne $changes['sleepAc']) { [int64]$changes['sleepAc'] } elseif (-not $known) { 1800 } else { $null }
+    if ($sleepNow -eq 0 -and $null -ne $sleepWas -and $sleepWas -ne 0) {
+        $offer['sleep'] = @{ Text = 'Let this PC sleep when idle again, as before'; Checked = $true; Hint = 'EmberStorm kept it awake while plugged in.' }
+    }
+    $laptop = $false
+    try { $laptop = @(Get-CimInstance Win32_Battery -ErrorAction Stop).Count -gt 0 } catch { }
+    $lidNow = Get-PowerAcValue 'SUB_BUTTONS' 'LIDACTION'
+    $lidWas = if ($null -ne $changes['lidAc']) { [int64]$changes['lidAc'] } elseif (-not $known -and $laptop) { 1 } else { $null }
+    if ($lidNow -eq 0 -and $null -ne $lidWas -and $lidWas -ne 0) {
+        $offer['lid'] = @{ Text = 'Put the lid setting back'; Checked = $true; Hint = 'Closing the lid while plugged in will sleep it again, as before.' }
+    }
+    $autoNow = Get-AutoSignIn
+    if ($autoNow.On -and ($changes['autoSignIn'] -or (-not $known -and (Get-PasswordLess) -eq 0))) {
+        $offer['signin'] = @{ Text = 'Ask for a password at sign-in again'; Checked = $true; Hint = 'EmberStorm had Windows sign in by itself after a restart.' }
+    }
+    $offer['backup'] = @{ Text = 'Keep a copy of your accounts'; Checked = $true; Hint = 'For if you install EmberStorm again: the accounts and the passwords it made, in a file in the EmberStorm folder. Untick it to leave nothing of them.' }
+
+    $want = @{}
+    foreach ($key in $offer.Keys) { $want[$key] = $offer[$key].Checked }
+    if ($script:Gui) {
+        $page = New-GuiPageText 'A few choices first' @('Your music, films, books and photos are always kept. And:')
+        $checks = @{}
+        foreach ($key in $offer.Keys) {
+            $c = New-Object System.Windows.Controls.CheckBox
+            $c.IsChecked = $offer[$key].Checked
+            $c.Margin = '0,14,0,0'
+            $c.Foreground = New-WpfBrush '#F2F2FA'
+            $c.VerticalContentAlignment = 'Top'
+            $stack = New-Object System.Windows.Controls.StackPanel
+            $stack.Margin = '6,-2,0,0'
+            [void]$stack.Children.Add((New-GuiLine $offer[$key].Text 15 '#F2F2FA' 'SemiBold'))
+            [void]$stack.Children.Add((New-GuiLine $offer[$key].Hint 13 '#9696A5'))
+            $c.Content = $stack
+            [void]$page.Children.Add($c)
+            $checks[$key] = $c
+        }
+        $answer = Show-GuiPage $page @('Cancel', 'Uninstall') 'Uninstall'
+        if ($answer -ne 'Uninstall') {
+            $script:Gui.Running = $false
+            try { $script:Gui.Window.Close() } catch { }
+            exit 0
+        }
+        foreach ($key in $checks.Keys) { $want[$key] = [bool]$checks[$key].IsChecked }
+    } else {
+        # No window to ask in: nothing taken that was not asked about - Docker
+        # stays; only settings the setup itself recorded are put back.
+        $want['docker'] = $false
+        if (-not $known) { $want['sleep'] = $false; $want['lid'] = $false; $want['signin'] = $false }
+    }
+
     $library = Get-LibraryPath
     $hasLibrary = Test-Path $library
 
@@ -4052,21 +4180,26 @@ if ($Uninstall) {
             # backends stop existing anywhere, and somebody uninstalling to
             # move machines has no other warning that they were about to.
             $backup = Join-Path $Dir 'soundstorm-backup.json'
-            $saved = Invoke-Docker @(
-                'compose', 'run', '--rm', '-v', "${Dir}:/backup",
-                'soundstorm', 'backup', '/backup/soundstorm-backup.json'
-            ) -Capture
-            if ($saved.ExitCode -eq 0 -and (Test-Path $backup)) {
-                # Written by the container through a bind mount, so it arrives
-                # with the folder's permissions; it holds every media server's
-                # password, so it gets this user's alone.
-                Protect-SecretFile $backup
-                Good "Saved to $backup"
-                Note "Keep it if you might reinstall - it is the only copy of the passwords EmberStorm made on the media servers."
+            if ($want['backup']) {
+                $saved = Invoke-Docker @(
+                    'compose', 'run', '--rm', '-v', "${Dir}:/backup",
+                    'soundstorm', 'backup', '/backup/soundstorm-backup.json'
+                ) -Capture
+                if ($saved.ExitCode -eq 0 -and (Test-Path $backup)) {
+                    # Written by the container through a bind mount, so it arrives
+                    # with the folder's permissions; it holds every media server's
+                    # password, so it gets this user's alone.
+                    Protect-SecretFile $backup
+                    Good "Saved to $backup"
+                    Note "Keep it if you might reinstall - it is the only copy of the passwords EmberStorm made on the media servers."
+                } else {
+                    # Not fatal: somebody uninstalling has asked to lose this, and
+                    # refusing to uninstall because the backup failed is worse.
+                    Note "Could not save a copy. Carrying on with the uninstall."
+                }
             } else {
-                # Not fatal: somebody uninstalling has asked to lose this, and
-                # refusing to uninstall because the backup failed is worse.
-                Note "Could not save a copy. Carrying on with the uninstall."
+                Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+                Note "No copy of your accounts kept, as asked."
             }
 
             Step "Step 2 of 4 - Stopping EmberStorm"
@@ -4076,10 +4209,16 @@ if ($Uninstall) {
             # bind mount from the folder and is not touched by this.
             # With the remote-access profile too, or its container would be
             # left running and the network it holds would fail the rest.
+            # Which programs are EmberStorm's, read before they are stopped:
+            # taken out of Docker after, 12GB that was left inside it.
+            $ours = @(((Invoke-Docker @('compose', '--profile', 'tailscale', 'config', '--images') -Capture).Output -split "`r?`n") | Where-Object { $_ -match '^\S+$' })
             $down = Invoke-Docker @('compose', '--profile', 'tailscale', 'down', '-v') -Capture
             if ($down.ExitCode -ne 0) {
                 $stillRunning = $true
                 $stopReason = 'Docker could not stop it.'
+            } elseif (-not $want['docker']) {
+                Note "Removing EmberStorm's programs from Docker."
+                foreach ($image in $ours) { $null = Invoke-Docker @('image', 'rm', $image) -Capture }
             }
         } else {
             Note "Docker is not available, so the containers were left alone."
@@ -4088,22 +4227,80 @@ if ($Uninstall) {
         }
     }
 
-    # The setup's own firewall rules go with it (asked once; Windows' own
-    # rules and the network's private setting are left as they are).
+    # Sleep and the lid as they were: the person's own setting, no
+    # permission needed.
+    $putBack = @()
+    $powercfg = Join-Path $env:SystemRoot 'System32\powercfg.exe'
+    if ($want['sleep'] -and $offer.Contains('sleep')) {
+        $null = Invoke-Native $powercfg @('/setacvalueindex', 'SCHEME_CURRENT', 'SUB_SLEEP', 'STANDBYIDLE', "$sleepWas")
+        if ($null -ne $changes['hibernateAc']) {
+            $null = Invoke-Native $powercfg @('/setacvalueindex', 'SCHEME_CURRENT', 'SUB_SLEEP', 'HIBERNATEIDLE', "$([int64]$changes['hibernateAc'])")
+        }
+        $putBack += 'sleeping when idle'
+    }
+    if ($want['lid'] -and $offer.Contains('lid')) {
+        $null = Invoke-Native $powercfg @('/setacvalueindex', 'SCHEME_CURRENT', 'SUB_BUTTONS', 'LIDACTION', "$lidWas")
+        $putBack += 'the lid setting'
+    }
+    if ($putBack.Count) { $null = Invoke-Native $powercfg @('/setactive', 'SCHEME_CURRENT') }
+
+    # What needs an administrator, together, so Windows asks once: the
+    # setup's own firewall rules (Windows' own rules and the network's
+    # private setting are left as they are), signing in by itself turned off
+    # and the Windows 11 setting it needed put back, and Docker Desktop
+    # removed. Everything put in this script is a fixed string, a number or
+    # a true/false.
     try {
-        $ours = @(Get-NetFirewallRule -ErrorAction Stop | Where-Object {
+        $rules = @(Get-NetFirewallRule -ErrorAction Stop | Where-Object {
             $_.DisplayName -eq $script:LanRuleName -or $_.DisplayName -like "$($script:DockerRuleName)*" })
-    } catch { $ours = @() }
-    if ($ours.Count) {
-        Note "Removing EmberStorm's firewall rules - Windows will ask for permission."
-        $cleanup = @"
+    } catch { $rules = @() }
+    $signinBack = [bool]($want['signin'] -and $offer.Contains('signin'))
+    $dockerOut = [bool]($want['docker'] -and $offer.Contains('docker') -and -not $stillRunning)
+    $dockerUninstaller = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop Installer.exe'
+    if ($dockerOut -and -not (Test-Path -LiteralPath $dockerUninstaller)) {
+        $dockerOut = $false
+        Note "Could not find Docker Desktop's uninstaller - remove it in Settings, Apps."
+    }
+    if ($rules.Count -or $signinBack -or $dockerOut) {
+        $passwordLess = if ($changes['passwordLess'] -is [int] -or "$($changes['passwordLess'])" -match '^\d+$') { [int]$changes['passwordLess'] } elseif ($changes['passwordLess'] -eq 'absent') { -1 } else { 2 }
+        $admin = @"
 `$ErrorActionPreference = 'SilentlyContinue'
 `$env:PSModulePath = "`$PSHOME\Modules"
 Get-NetFirewallRule -DisplayName '$($script:LanRuleName)' | Remove-NetFirewallRule
 Get-NetFirewallRule -DisplayName '$($script:DockerRuleName)*' | Remove-NetFirewallRule
+if (`$$(if ($signinBack) { 'true' } else { 'false' })) {
+    `$winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+    Set-ItemProperty -Path `$winlogon -Name 'AutoAdminLogon' -Value '0'
+    Remove-ItemProperty -Path `$winlogon -Name 'DefaultPassword'
+    `$device = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device'
+    if ($passwordLess -lt 0) { Remove-ItemProperty -Path `$device -Name 'DevicePasswordLessBuildVersion' }
+    else { if (-not (Test-Path `$device)) { New-Item -Path `$device -Force | Out-Null }; Set-ItemProperty -Path `$device -Name 'DevicePasswordLessBuildVersion' -Value $passwordLess -Type DWord }
+}
+if (`$$(if ($dockerOut) { 'true' } else { 'false' })) {
+    `$p = Start-Process -FilePath (Join-Path `$env:ProgramFiles 'Docker\Docker\Docker Desktop Installer.exe') -ArgumentList 'uninstall', '--quiet' -PassThru
+    `$p.WaitForExit()
+}
 exit 0
 "@
-        $null = Invoke-Elevated (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cleanup)))
+        if ($dockerOut) {
+            Note "Removing Docker Desktop - Windows will ask for permission. This takes a minute or two."
+            # Closed first: its uninstaller will not remove a Docker that runs.
+            Get-Process -Name 'Docker Desktop' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        } else {
+            Note "Putting things back - Windows will ask for permission."
+        }
+        $code = Invoke-Elevated (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($admin)))
+        if ($null -eq $code) {
+            $dockerOut = $false
+            $signinBack = $false
+            Note "Windows' permission was not given, so the firewall rules, signing in by itself and Docker were left as they were."
+        } else {
+            if ($signinBack) { $putBack += 'asking for a password at sign-in' }
+            if ($dockerOut -and (Get-DockerDesktopPath)) {
+                $dockerOut = $false
+                Note "Docker Desktop could not be removed - remove it in Settings, Apps."
+            }
+        }
     }
 
     Step "Step 3 of 4 - Removing shortcuts"
@@ -4119,9 +4316,12 @@ exit 0
     # thing here worth keeping, and the moment somebody wants it is after they
     # have already uninstalled.
     if (-not $stillRunning) {
-        foreach ($leftover in @('docker-compose.yml', '.env', 'soundstorm.ps1', 'tailscale-serve.json')) {
+        foreach ($leftover in @('docker-compose.yml', '.env', 'soundstorm.ps1', 'tailscale-serve.json', 'docker-compose.yml.old', 'docker-compose.yml.new')) {
             Remove-Item -LiteralPath (Join-Path $Dir $leftover) -Force -ErrorAction SilentlyContinue
         }
+        # The setup's own copy, its notes for carrying on after a restart and
+        # its record of what it changed.
+        Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'EmberStorm') -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     Write-Host ""
@@ -4151,10 +4351,17 @@ exit 0
         if (-not $stillRunning -and (Test-Path -LiteralPath $backupFile)) {
             $lines += @('A copy of your accounts and the media servers'' passwords was saved, for if you install EmberStorm again:', "*$backupFile", '')
         }
+        if ($putBack.Count) {
+            $lines += @("Put back as it was: $($putBack -join ', ').", '')
+        }
         if ($hasLibrary) {
             $lines += @('Your media has been left exactly where it was:', "*$library", '', 'Delete that folder yourself if you want it gone. Nothing else will touch it.')
         }
-        $lines += @('', 'Docker Desktop was left installed - other things may be using it. It can be removed in Settings, Apps.')
+        if ($dockerOut) {
+            $lines += @('', 'Docker Desktop was removed too.')
+        } elseif (Get-DockerDesktopPath) {
+            $lines += @('', 'Docker Desktop was kept, as asked. It can be removed later in Settings, Apps.')
+        }
         Set-GuiMessage $(if ($stillRunning) { 'Not quite finished' } else { 'Your media is kept' }) $lines $(if ($stillRunning) { 'Yellow' } else { 'Green' })
         Complete-Gui $(if ($stillRunning) { 'EmberStorm is partly removed' } else { 'EmberStorm is removed' }) 'Your music, films, books and photos were not touched.' ''
     }
