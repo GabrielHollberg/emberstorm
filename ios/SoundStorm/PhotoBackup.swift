@@ -285,6 +285,10 @@ final class PhotoBackup: NSObject {
         start()
         Task {
             await run?.value
+            // Asked for again whether or not a run went: one that did not
+            // (waiting for Wi-Fi, files still with iOS, run minutes ago) left
+            // no next one asked for, and background runs stopped for good.
+            schedule()
             task.setTaskCompleted(success: true)
         }
     }
@@ -342,6 +346,14 @@ final class PhotoBackup: NSObject {
         let video: Bool
         /// As Photos records it (`size(of:)`), worked out with the rest.
         let size: Int64
+        /// When the photo last changed (`stamp(of:)`): an edit is checked again.
+        let stamp: String
+    }
+
+    /// When a photo last changed, as kept with the photos the server has
+    /// confirmed: an edit changes it, so an edited photo is checked again.
+    nonisolated private static func stamp(of asset: PHAsset) -> String {
+        String(Int64(((asset.modificationDate ?? asset.creationDate)?.timeIntervalSince1970 ?? 0) * 1000))
     }
 
     /// Something of Photos' handed between threads; only read.
@@ -375,15 +387,33 @@ final class PhotoBackup: NSObject {
         // run went on after opening the app (the owner's report, 2026-10-06).
         let videos = self.videos
         let roll = await Task.detached(priority: .utility) { Handed(value: Self.cameraRoll(videos: videos)) }.value.value
-        // Only what this run has learnt: the server answers for the rest.
         known = []
         var sent = known
+        // Only what is new, while the server's marker of the photo folder
+        // holds (see "Checking only what is new"); every photo when it moved,
+        // daily, or with no marker at all.
+        let confirmed = confirmedList()
+        var markerNow: String?
+        for candidate in servers {
+            markerNow = await marker(candidate)
+            if markerNow != nil { server = candidate; break }
+        }
+        let full = confirmed.isEmpty || fullDue(markerNow)
+        if full { set("fullPending", true) }
+        let stamps = full ? [:] : await Task.detached(priority: .utility) {
+            Dictionary(roll.map { ($0.localIdentifier, (Self.stamp(of: $0), Self.isLive($0))) }, uniquingKeysWith: { a, _ in a })
+        }.value
         // A Live Photo counts as one, still and clip together.
-        let waiting = roll
-        set("done", 0)
+        let waiting = full ? roll : roll.filter { asset in
+            guard let (stamp, live) = stamps[asset.localIdentifier] else { return true }
+            return confirmed[asset.localIdentifier] != stamp || (live && confirmed[asset.localIdentifier + "#live"] != stamp)
+        }
+        PlayerLog.add("photo backup: \(full ? "checking every photo" : "checking \(waiting.count) new or changed") of \(roll.count)")
+        set("done", roll.count - waiting.count)
         set("total", roll.count)
         set("problem", "")
         halted = false
+        defer { closeRun(server, completed: !halted && !Task.isCancelled && lastWholeRun != nil, full: full, roll: roll) }
         do {
             var start = 0
             while start < waiting.count {
@@ -399,6 +429,7 @@ final class PhotoBackup: NSObject {
                     if units.isEmpty {
                         markSent([asset.localIdentifier], list)
                         sent.insert(asset.localIdentifier)
+                        confirm([(asset.localIdentifier, stamps[asset.localIdentifier]?.0 ?? Self.stamp(of: asset))])
                         bumpDone()
                     }
                     batch += units.filter { !sent.contains($0.key) && !Uploader.shared.pending.keys.contains($0.key) }
@@ -425,6 +456,7 @@ final class PhotoBackup: NSObject {
                     sent.insert(item.key)
                     if isLast(item, sent: sent) { bumpDone() }
                 }
+                confirm(zip(batch, have).filter { $0.1 }.map { ($0.0.key, $0.0.stamp) })
                 for (item, had) in zip(batch, have) where !had {
                     // Room with iOS first: topped up as files arrive.
                     while Uploader.shared.pending.count >= Self.maxQueued || Uploader.shared.pending.bytes >= Self.maxQueuedBytes {
@@ -432,7 +464,15 @@ final class PhotoBackup: NSObject {
                     }
                     guard !Task.isCancelled, mayRun, !halted else { return }
                     let pendingOthers = batch.filter { $0.assetID == item.assetID && $0.key != item.key && !sent.contains($0.key) }
-                    try await enqueue(item, to: server, list: list, last: pendingOthers.allSatisfy { Uploader.shared.pending.keys.contains($0.key) })
+                    do {
+                        try await enqueue(item, to: server, list: list, last: pendingOthers.allSatisfy { Uploader.shared.pending.keys.contains($0.key) })
+                    } catch let e as ExportFailed {
+                        // One photo the library would not hand over (iCloud
+                        // refusing it, a file gone): named and passed over -
+                        // as "could not reach the server" it stopped the run
+                        // and stayed on screen after later runs went through.
+                        set("problem", "Couldn't read \(item.name) from your photos (\(e.reason)). The rest carry on.")
+                    }
                 }
             }
             if !halted { lastWholeRun = Date() }
@@ -442,7 +482,7 @@ final class PhotoBackup: NSObject {
             // Put away or switched off; what is with iOS goes on, and the next
             // run carries on from there.
         } catch {
-            if !Task.isCancelled { set("problem", "Could not reach the server; it will try again.") }
+            if !Task.isCancelled { set("problem", Self.unreachable) }
         }
     }
 
@@ -476,13 +516,19 @@ final class PhotoBackup: NSObject {
     /// when this is a relaunch after the app was ended.
     func uploaded(_ meta: Uploader.Meta) {
         markSent([meta.key], meta.list)
+        if let stamp = meta.stamp { confirm([(meta.key, stamp)]) }
         if meta.last { bumpDone() }
+        // A file through: a network problem said earlier is over.
+        if defaults.string(forKey: "backup.problem") == Self.unreachable { set("problem", "") }
         sentSome()
     }
+
+    static let unreachable = "Could not reach the server; it will try again."
 
     /// One of the files with iOS is through: the run that waited for them
     /// starts once all are.
     func sentSome() {
+        saveMarkerIfSent()
         if startWhenSent, Uploader.shared.pending.count == 0, Date() >= busyUntil { start() }
     }
 
@@ -502,7 +548,12 @@ final class PhotoBackup: NSObject {
         }
         if [401, 403, 507].contains(code) {
             stopFor(Refused(code: code, message: message))
+        } else if code >= 500 || code == 408 {
+            // The server's trouble, not this photo's: sent again next run.
+            set("problem", Self.unreachable)
         } else {
+            // Passed over, and not asked about again until it changes.
+            if let stamp = meta.stamp { confirm([(meta.key, stamp)]) }
             set("problem", "Couldn't back up \(meta.name)\(message.isEmpty ? "" : ": " + message). The rest carry on.")
         }
     }
@@ -549,12 +600,13 @@ final class PhotoBackup: NSObject {
         guard let resource = resources.first(where: { wanted.contains($0.type) }) else { return [] }
         let when = asset.creationDate ?? asset.modificationDate ?? Date()
         let taken = Int64(when.timeIntervalSince1970 * 1000)
+        let stamp = Self.stamp(of: asset)
         var out = [Item(key: asset.localIdentifier, assetID: asset.localIdentifier, resource: resource,
-                        name: resource.originalFilename, taken: taken, video: video, size: size(of: resource))]
+                        name: resource.originalFilename, taken: taken, video: video, size: size(of: resource), stamp: stamp)]
         if Self.isLive(asset), let clip = resources.first(where: { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }) {
             let base = (resource.originalFilename as NSString).deletingPathExtension
             out.append(Item(key: Self.liveKey(asset), assetID: asset.localIdentifier, resource: clip,
-                            name: base + ".MOV", taken: taken, video: true, size: size(of: clip)))
+                            name: base + ".MOV", taken: taken, video: true, size: size(of: clip), stamp: stamp))
         }
         return out
     }
@@ -609,7 +661,7 @@ final class PhotoBackup: NSObject {
         }
         let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int64) ?? 0
         Uploader.shared.enqueue(request, file: file, size: size, wifiOnly: wifiOnly,
-                                meta: Uploader.Meta(key: item.key, list: list, last: last, name: item.name, video: item.video))
+                                meta: Uploader.Meta(key: item.key, list: list, last: last, name: item.name, video: item.video, stamp: item.stamp))
     }
 
     /// The original resource to a file of its own, from iCloud if that is
@@ -621,9 +673,17 @@ final class PhotoBackup: NSObject {
             .appending(path: "backup-" + UUID().uuidString + (ext.isEmpty ? "" : "." + ext))
         let options = PHAssetResourceRequestOptions()
         options.isNetworkAccessAllowed = true
-        try await PHAssetResourceManager.default().writeData(for: resource, toFile: file, options: options)
+        do {
+            try await PHAssetResourceManager.default().writeData(for: resource, toFile: file, options: options)
+        } catch {
+            try? FileManager.default.removeItem(at: file)
+            if Task.isCancelled { throw CancellationError() }
+            throw ExportFailed(reason: (error as NSError).localizedDescription)
+        }
         return file
     }
+
+    struct ExportFailed: Error { let reason: String }
 
     private func account() -> [URLQueryItem] {
         guard let a = defaults.string(forKey: "backup.account"), !a.isEmpty else { return [] }
@@ -697,6 +757,106 @@ final class PhotoBackup: NSObject {
     func markSent(_ keys: [String], _ list: String) {
         known.formUnion(keys)
     }
+
+    // MARK: Checking only what is new
+    //
+    // A run used to ask the server about every photo on the phone, every time,
+    // and look each one up in the photo library first (the owner's asking,
+    // 2026-10-09: no more work than needed; Android 0.53 does this). Now the
+    // phone keeps the photos the server has confirmed, with their stamp, and
+    // the server's marker of the person's photo folder from when the last
+    // run's files were through. While the marker is unchanged, only photos not
+    // confirmed (new, or edited since) are checked. When it has changed - a
+    // photo deleted or lost there, files moved by hand - or a day has passed,
+    // or the server has no marker (an older one), every photo is checked, as
+    // before; a full check cut short is finished by the next run. The server
+    // stays the record: the list only says what need not be asked about while
+    // nothing there has changed.
+
+    static let fullEvery: TimeInterval = 24 * 3600
+    private static var confirmedFile: URL { folder.appending(path: "backup-confirmed.txt") }
+
+    /// Whose list it is: another server or account starts afresh.
+    private var scope: String {
+        (defaults.string(forKey: "backup.server") ?? "") + "|" + (defaults.string(forKey: "backup.account") ?? "")
+    }
+
+    /// The photos the server has confirmed, by key, with their stamp.
+    private func confirmedList() -> [String: String] {
+        if defaults.string(forKey: "backup.confirmedScope") != scope {
+            try? FileManager.default.removeItem(at: Self.confirmedFile)
+            set("confirmedScope", scope)
+            set("marker", nil)
+            set("fullPending", true)
+            return [:]
+        }
+        guard let text = try? String(contentsOf: Self.confirmedFile, encoding: .utf8) else { return [:] }
+        var out: [String: String] = [:]
+        for line in text.split(separator: "\n") {
+            guard let tab = line.firstIndex(of: "\t") else { continue }
+            out[String(line[..<tab])] = String(line[line.index(after: tab)...])
+        }
+        return out
+    }
+
+    private func confirm(_ entries: [(key: String, stamp: String)]) {
+        guard !entries.isEmpty, defaults.string(forKey: "backup.confirmedScope") == scope else { return }
+        let text = entries.map { "\($0.key)\t\($0.stamp)\n" }.joined()
+        if let handle = try? FileHandle(forWritingTo: Self.confirmedFile) {
+            handle.seekToEndOfFile()
+            handle.write(Data(text.utf8))
+            try? handle.close()
+        } else {
+            try? Data(text.utf8).write(to: Self.confirmedFile, options: .atomic)
+        }
+    }
+
+    private func fullDue(_ marker: String?) -> Bool {
+        guard let marker else { return true }
+        let last = defaults.object(forKey: "backup.lastFull") as? Date ?? .distantPast
+        return bool("fullPending", true) || defaults.string(forKey: "backup.marker") != marker
+            || Date().timeIntervalSince(last) > Self.fullEvery
+    }
+
+    /// The server's marker of this person's photo folder, or nil (an older
+    /// server, or no answer).
+    private func marker(_ server: URL) async -> String? {
+        var request = URLRequest(url: address(server, "/api/photos/backup/marker", query: account()))
+        request.timeoutInterval = 20
+        guard (try? await signIn(&request)) != nil,
+              let (data, response) = try? await Self.plain.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200, data.count < 64 << 10,
+              let answer = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let marker = answer["marker"] as? String, !marker.isEmpty else { return nil }
+        return marker
+    }
+
+    /// The marker is read once this run's files are through (they change it:
+    /// what this run sent is its own doing); until then, where to ask.
+    private var markerAfterSent: URL?
+
+    private func closeRun(_ server: URL, completed: Bool, full: Bool, roll: [PHAsset]) {
+        if completed, full {
+            // A full check got through every photo: the list is what is on
+            // the phone now, as far as the server confirmed it.
+            let ids = Set(roll.map(\.localIdentifier))
+            let keep = confirmedList().filter { ids.contains($0.key.replacingOccurrences(of: "#live", with: "")) }
+            let text = keep.map { "\($0.key)\t\($0.value)\n" }.joined()
+            try? Data(text.utf8).write(to: Self.confirmedFile, options: .atomic)
+            set("fullPending", false)
+            set("lastFull", Date())
+        }
+        markerAfterSent = server
+        saveMarkerIfSent()
+    }
+
+    private func saveMarkerIfSent() {
+        guard let server = markerAfterSent, Uploader.shared.pending.count == 0 else { return }
+        markerAfterSent = nil
+        Task {
+            if let m = await marker(server) { set("marker", m) }
+        }
+    }
 }
 
 extension PhotoBackup: PHPhotoLibraryChangeObserver {
@@ -744,6 +904,9 @@ nonisolated final class Uploader: NSObject, URLSessionDataDelegate, @unchecked S
         let last: Bool
         let name: String
         let video: Bool
+        /// The photo's stamp, kept with it once confirmed (missing from an
+        /// upload handed over before there were stamps).
+        var stamp: String?
         var file = ""
         var size: Int64 = 0
     }
@@ -762,6 +925,9 @@ nonisolated final class Uploader: NSObject, URLSessionDataDelegate, @unchecked S
     private var shown = Date.distantPast
     private var finishedEvents: (@Sendable () -> Void)?
     private var restoring: Task<Void, Never>?
+    /// Uploads that finished while the sessions' tasks were being read back.
+    private var finished: Set<String> = []
+    private var restoreDone = false
 
     private(set) var anyNetwork: URLSession!
     private(set) var wifiOnly: URLSession!
@@ -802,9 +968,20 @@ nonisolated final class Uploader: NSObject, URLSessionDataDelegate, @unchecked S
         for session in [anyNetwork!, wifiOnly!] {
             for task in await session.allTasks {
                 guard let meta = Self.meta(task), task.state == .running || task.state == .suspended else { continue }
-                lock.withLock { waiting[meta.key] = meta }
-                keep.insert(meta.file)
+                // One that finished while its list was being read is not taken
+                // back as waiting: it would wait for ever, and every run after
+                // waited on it ("files still with iOS").
+                let added = lock.withLock { () -> Bool in
+                    guard !finished.contains(meta.file) else { return false }
+                    waiting[meta.key] = meta
+                    return true
+                }
+                if added { keep.insert(meta.file) }
             }
+        }
+        lock.withLock {
+            finished.removeAll()
+            restoreDone = true
         }
         let files = (try? FileManager.default.contentsOfDirectory(at: Self.queueFolder, includingPropertiesForKeys: nil)) ?? []
         for file in files where !keep.contains(file.path) { try? FileManager.default.removeItem(at: file) }
@@ -855,6 +1032,7 @@ nonisolated final class Uploader: NSObject, URLSessionDataDelegate, @unchecked S
         guard let meta = Self.meta(task) else { return }
         let remaining = lock.withLock { () -> Int in
             waiting.removeValue(forKey: meta.key)
+            if !restoreDone { finished.insert(meta.file) }
             return waiting.count
         }
         try? FileManager.default.removeItem(atPath: meta.file)
