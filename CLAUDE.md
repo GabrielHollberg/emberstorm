@@ -4680,9 +4680,30 @@ setup on the test box's fresh Windows):
   default would), so Windows' "allow Docker Desktop Backend?" alert does not
   appear (`DockerRuleName`, `Test-DockerRulesReady`; the callout about it
   only when it still can).
-- **Keep this PC awake?** asked once on a first install, unless it already
-  never sleeps plugged in (`Confirm-StayAwake`: `powercfg` plugged-in sleep
-  and hibernate to never; battery untouched) - asleep, nothing reaches it.
+- **Keeping it available, in one window** (`Confirm-AlwaysOn`, right after
+  the network question - every question together, then "That is everything -
+  the rest needs nothing from you"): stay awake while plugged in (unless it
+  already never sleeps), keep running with the lid closed while plugged in
+  (laptops), and **sign in to Windows by itself after a restart** - off unless
+  ticked, saying the catch (whoever switches the PC on gets into the account;
+  the owner's choice, 2026-10-09), since Docker Desktop and so EmberStorm run
+  only once somebody is signed in. That one is Windows' own switch
+  (`Enable-AutoSignIn`: Windows 11's setting that hides it reset, then
+  netplwiz, where the person unticks it and types the password - Windows keeps
+  it, encrypted; nothing in a file or this setup). A desktop's finished
+  screen says how to have it switch back on after a power cut (the BIOS's
+  "Restore on AC power loss").
+- **It looks like EmberStorm and shows how far along it is** (2026-10-09, the
+  owner's asking: "does it look nice, does it always show something is
+  happening"): the app's dark colours and blue, the cloud drawn at the top
+  (`Draw-Cloud`, the logo's own shapes), and the library and always-on windows
+  alike (`Set-DarkTheme`); a bar of its own with a percentage - each step a
+  share by how long it really takes (`Set-GuiStep`), filled from what can be
+  measured (Docker's installer in megabytes, "310 of 635 MB"; EmberStorm's
+  download from the bytes of each layer docker reports, with the count of
+  images - `Set-GuiStepProgress`, never going back) and creeping on where
+  nothing can be (an install, a start), with a light running along it so it
+  never sits still. Windows' own message boxes and title bar stay Windows'.
 - **Room for the download**: 20GB free where Docker keeps it (the person's
   own folder's drive), or a plain stop saying so (`Test-DownloadRoom`).
 - The finished screen says it starts when somebody signs in to the PC, not
@@ -4694,7 +4715,9 @@ direct link answers (a 635MB installer). The administrator script for the networ
 decoded and parsed with Docker's rules in it; the plugged-in sleep setting
 read on this PC. Not seen: a real restart carrying on, the BIOS restart, the
 new buttons on screen, Docker installed without winget, the firewall alert
-staying away on a fresh PC.
+staying away on a fresh PC, auto sign-in end to end, the bar through a real
+download. Seen: the main window part way, the always-on and library windows,
+drawn on this PC and captured; Docker's progress lines read from samples.
 
 **No console stays open, from the double-click on.** The setup file hands
 straight to PowerShell started minimized and hidden, and closes - it does not
