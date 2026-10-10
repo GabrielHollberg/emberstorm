@@ -86,6 +86,95 @@ die() {
 
 # --- the things that have to be true ----------------------------------------
 
+# ask_yes asks a yes-or-no question on the terminal - the script may arrive
+# through a pipe, so it reads the terminal itself - and answers with $2 (yes
+# or no) when there is nobody to ask.
+ask_yes() {
+	answer=''
+	if [ -t 0 ]; then
+		printf '  %s ' "$1"
+		read -r answer || answer=''
+	elif [ -r /dev/tty ] && ( : </dev/tty ) 2>/dev/null; then
+		printf '  %s ' "$1"
+		read -r answer </dev/tty || answer=''
+	fi
+	case "$answer" in
+	[Yy]*) return 0 ;;
+	[Nn]*) return 1 ;;
+	esac
+	[ "$2" = "yes" ]
+}
+
+# keep_awake offers to keep the computer from sleeping while plugged in:
+# asleep, nothing reaches EmberStorm (2026-10-09, as the Windows setup does).
+# A Mac is also told to start up again after a power cut, which it can do by
+# itself. On Linux only a laptop or a desktop with a sleeping session is asked;
+# a plain server does not sleep.
+keep_awake() {
+	case "$(uname -s)" in
+	Darwin)
+		sleep_ac=$(pmset -g custom 2>/dev/null | awk '/AC Power/{ac=1} ac && $1=="sleep"{print $2; exit}')
+		[ "$sleep_ac" = "0" ] && return 0
+		say ""
+		say "EmberStorm can only be reached while this Mac is awake."
+		if ask_yes "Keep it awake while plugged in, and start up again after a power cut? [Y/n]" yes; then
+			if as_root pmset -c sleep 0 && as_root pmset -a autorestart 1; then
+				note "This Mac stays awake while plugged in, and starts again after a power cut."
+			else
+				note "Could not change it. System Settings, Energy, has the same switches."
+			fi
+			if pmset -g batt 2>/dev/null | grep -q InternalBattery; then
+				note "A MacBook still sleeps with its lid closed unless a screen is plugged in."
+			fi
+		fi
+		;;
+	Linux)
+		laptop=0
+		for b in /sys/class/power_supply/BAT*; do [ -e "$b" ] && laptop=1; done
+		gnome=0
+		if command -v gsettings >/dev/null 2>&1 &&
+			[ "$(gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 2>/dev/null)" = "'suspend'" ]; then
+			gnome=1
+		fi
+		[ "$laptop" = "0" ] && [ "$gnome" = "0" ] && return 0
+		say ""
+		say "EmberStorm can only be reached while this computer is awake."
+		if ask_yes "Keep it awake while plugged in? [Y/n]" yes; then
+			if [ "$gnome" = "1" ]; then
+				gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null &&
+					note "It no longer goes to sleep on its own while plugged in."
+			fi
+			if [ "$laptop" = "1" ] && [ -d /etc/systemd ]; then
+				# The lid too, on mains power only; logind reads it from the
+				# next start.
+				if printf '[Login]\nHandleLidSwitchExternalPower=ignore\n' |
+					as_root sh -c 'mkdir -p /etc/systemd/logind.conf.d && cat > /etc/systemd/logind.conf.d/emberstorm-lid.conf'; then
+					note "Closing the lid will not sleep it while plugged in (from the next restart)."
+				fi
+			fi
+		fi
+		;;
+	esac
+}
+
+# check_room stops before the long download when the disk Docker keeps its
+# images on is short of the 20GB it needs, saying so plainly - a full disk
+# failed part way through with an error from Docker nobody could read.
+check_room() {
+	case "$(uname -s)" in
+	Darwin) where="$HOME" ;;
+	*) where=$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || true); [ -n "$where" ] && [ -d "$where" ] || where=/ ;;
+	esac
+	free_kb=$(df -Pk "$where" 2>/dev/null | awk 'NR==2{print $4}')
+	case "$free_kb" in ''|*[!0-9]*) return 0 ;; esac
+	[ "$free_kb" -ge 20971520 ] && return 0
+	die "EmberStorm's programs need about 20 GB free where Docker keeps them
+($where), and there is $((free_kb / 1048576)) GB.
+
+Free some space there, then run this again. Your library can still go on
+another drive (--library)."
+}
+
 need_docker() {
 	if ! command -v docker >/dev/null 2>&1; then
 		case "$(uname -s)" in
@@ -1538,7 +1627,7 @@ if [ "$TAILSCALE" = "on" ]; then
 		if [ -t 0 ]; then
 			printf '  Paste the auth key here: '
 			read -r key
-		elif [ -r /dev/tty ] && { : </dev/tty; } 2>/dev/null; then
+		elif [ -r /dev/tty ] && ( : </dev/tty ) 2>/dev/null; then
 			printf '  Paste the auth key here: '
 			read -r key </dev/tty
 		fi
@@ -1570,10 +1659,18 @@ fi
 # and Docker answers a missing bind-mount source by creating a directory there.
 [ -f tailscale-serve.json ] || write_serve_config
 
+# Before the long download, while somebody is still watching: whether the
+# computer may sleep, and whether there is room for what comes next.
+if [ "$UPGRADE" != "1" ]; then
+	keep_awake
+	check_room
+fi
+
 if [ "$UPGRADE" = "1" ]; then
 	step "Checking for newer versions"
 else
 	step "Downloading the media servers"
+	note "That is everything - the rest needs nothing from you."
 	note "about 8GB the first time - the photo and film servers are most of it"
 fi
 if ! $COMPOSE $PROFILE pull; then
@@ -1710,6 +1807,30 @@ if [ "$TLS_MODE" = "self-signed" ]; then
 	say ""
 elif [ "$TLS_MODE" = "off" ]; then
 	note "Run this again with --https to encrypt the connection."
+	say ""
+fi
+
+# When it runs: on Linux Docker is a system service, so EmberStorm comes back
+# when the computer starts, signed in or not; on a Mac, Docker Desktop starts
+# when somebody signs in.
+if [ "$UPGRADE" != "1" ]; then
+	case "$(uname -s)" in
+	Darwin)
+		note "EmberStorm starts when you sign in to this Mac. To have it come back by"
+		note "itself after a restart: System Settings, Users & Groups, Automatically"
+		note "log in as (not offered while FileVault is on)."
+		;;
+	*)
+		note "EmberStorm starts by itself whenever this computer starts - no sign-in"
+		note "needed."
+		laptop=0
+		for b in /sys/class/power_supply/BAT*; do [ -e "$b" ] && laptop=1; done
+		if [ "$laptop" = "0" ]; then
+			note "To have it switch itself back on after a power cut, turn on \"Restore on"
+			note "AC power loss\" (or \"Power on after power failure\") in its BIOS setup."
+		fi
+		;;
+	esac
 	say ""
 fi
 
