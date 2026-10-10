@@ -791,6 +791,25 @@ caretaker's tests (`TestThePowerButtonsAreFound` on a real-PC device list,
 `TestTheStickersCodeOpensTheWindowToo`, `TestErasingWaitsForTheButton`) and
 the server's. Not checked: the test unit's own button.
 
+**A missing data drive never makes a box look new** (the gravest finding:
+a drive dead, loose or late at boot left the box starting afresh on its eMMC -
+"set up your new EmberStorm", the family's accounts and media seemingly
+gone, and the sticker's code able to claim it). Once fstab holds the data
+drive's UUID, storage.sh waits up to 90 seconds for it and otherwise stops
+(so Docker, which needs it, never starts and makes nothing on the eMMC);
+every storage failure leaves its reason in `/run/soundstorm/storage-problem`,
+which the box's screen shows ("EmberStorm cannot start... Nothing has been
+erased") with how to switch it off; a box with no data drive at all says so
+there too (`no-data-drive`, read by nothing before). A new drive is made
+without discarding it first (`mkfs.btrfs -K`) and the unit has no start
+timeout, so a big drive is not cut off part way every boot. The screen also
+takes its address from the route out (never Docker's 10.231.x networks, shown
+with a QR code when the cable was out), the name avahi really announces
+(`soundstorm-2.local` for a second box), and strips control characters from
+the server's text. Checked: the screen's two storage states drawn in a
+container, recognising a box that has had a drive. Not checked: in the VM
+with the drive taken away.
+
 ## The decision that shapes everything
 
 That request sounds like "build a media server". It is not, and the difference

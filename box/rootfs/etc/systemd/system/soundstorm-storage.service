@@ -9,6 +9,9 @@ Wants=systemd-udev-settle.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# Preparing a new data drive, or waiting for one that is slow, must not be
+# cut short and started again on every boot.
+TimeoutStartSec=infinity
 ExecStart=/usr/local/lib/soundstorm/storage.sh
 
 [Install]
