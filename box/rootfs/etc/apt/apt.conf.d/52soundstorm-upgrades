@@ -1,0 +1,7 @@
+// Security updates only (Debian's own default, 50unattended-upgrades). When
+// one needs a restart (the kernel), the box restarts itself after the
+// caretaker's window; EmberStorm comes back by itself.
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "05:30";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
