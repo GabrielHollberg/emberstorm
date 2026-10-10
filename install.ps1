@@ -5131,9 +5131,11 @@ if ($Launch) {
         # closed the tab setup opened reaches for this icon next, and without
         # the code the first screen asks for one they have no idea where to
         # find.
-        $open = $url
+        # here=server: the page offers no "install as an app" on the
+        # computer it runs on, where this pinned icon is the way in.
+        $open = "$url/?here=server"
         $code = Get-EnvSetting 'SOUNDSTORM_SETUP_CODE'
-        if ($code -and (Get-HasAccount $url) -ne $true) { $open = "$url/?setup=$code" }
+        if ($code -and (Get-HasAccount $url) -ne $true) { $open = "$url/?setup=$code&here=server" }
         Start-Process $open
     }
     exit 0
@@ -5939,8 +5941,8 @@ if ($hasAccount -ne $true -and $setupCode) {
     ) + $phoneLines) 'Yellow'
     # With the code in the address too, so the page usually fills it in by
     # itself; it takes it out of the address once it has it.
-    if ($opensItself) { Start-Process "$url/?setup=$setupCode" }
-    $openUrl = "$url/?setup=$setupCode"
+    if ($opensItself) { Start-Process "$url/?setup=$setupCode&here=server" }
+    $openUrl = "$url/?setup=$setupCode&here=server"
 } else {
     Callout 'NEXT: open EmberStorm' (@(
         $(if ($opensItself) { 'Your web browser is opening EmberStorm now. Sign in as usual.' } else { 'Click Open EmberStorm below and sign in as usual.' }),
@@ -5948,8 +5950,8 @@ if ($hasAccount -ne $true -and $setupCode) {
         $orGoTo,
         "*  $url"
     ) + $phoneLines) 'Green'
-    if ($opensItself) { Start-Process $url }
-    $openUrl = $url
+    if ($opensItself) { Start-Process "$url/?here=server" }
+    $openUrl = "$url/?here=server"
 }
 
 # After a move, the old files are still where they were - moving them for

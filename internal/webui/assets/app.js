@@ -616,10 +616,20 @@ const setupFromAddress = new URLSearchParams(location.search).get('setup') || ''
 // the new page as nothing. The installer waits for that name before opening
 // the browser, so on a fresh install the move nearly always happened, and the
 // first screen asked for a setup code the person had never been shown.
+// Opened on the server's own computer - by the setup's Open EmberStorm or its
+// desktop icon, which add ?here=server: no offer to install EmberStorm as an
+// app there, where the pinned shortcut also starts it (the owner's choice,
+// 2026-10-10). Kept on each address it lands on, carried across the move to
+// the secure name with the rest of the address.
+if (new URLSearchParams(location.search).get('here') === 'server') {
+  try { localStorage.setItem('soundstorm-install-offered', 'server'); } catch { /* private browsing */ }
+}
+
 function forgetSetupCodeInAddress() {
   const params = new URLSearchParams(location.search);
-  if (!params.has('setup')) return;
+  if (!params.has('setup') && !params.has('here')) return;
   params.delete('setup');
+  params.delete('here');
   const rest = params.toString();
   history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
 }
