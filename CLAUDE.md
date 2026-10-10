@@ -7330,6 +7330,14 @@ Phones away from home then got the local authority's certificate for
 the remote name is now read from the certificate on disk, and an unanswered
 check is retried after five minutes rather than twelve hours.
 
+**A working away name is not dropped on one failed check** (2026-10-10, a
+deploy: the check 17 seconds after the restart, the router's port just opened,
+came back 424, and the away name left the certificate until the next half-day
+check - phones away from home lost the server). Found unreachable while it had
+been working, the name is kept and checked again five minutes on, three times
+(`unreachableRetries`, `takeUnreachableTry`), before it is dropped; a success
+starts the count afresh. `TestAnUnreachableNameServiceKeepsTheRemoteName`.
+
 **Renewals say what they replace (ACME Renewal Information, RFC 9773;
 2026-10-03).** Let's Encrypt's 50 certificates a week per registered domain
 counts ordinary renewals too ("ARI renewals" alone are exempt), and every

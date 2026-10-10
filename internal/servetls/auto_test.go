@@ -614,12 +614,34 @@ func TestAnUnreachableNameServiceKeepsTheRemoteName(t *testing.T) {
 		}
 	}
 
+	// A name that was working, found unreachable: kept for a few quick
+	// re-checks (a restart's first check came too soon after the router's
+	// port opened, 2026-10-10), dropped only once they all fail.
 	answer = http.StatusFailedDependency
+	for i := 0; i < unreachableRetries; i++ {
+		if err := s.auto.step(context.Background()); err != nil {
+			t.Fatalf("step with the port closed: %v", err)
+		}
+		if s.RemoteName() != publicName || !s.auto.recheckSoon {
+			t.Fatalf("check %d with the port closed: remote name %q, recheck soon %v", i+1, s.RemoteName(), s.auto.recheckSoon)
+		}
+		s.auto.recheckSoon = false
+	}
 	if err := s.auto.step(context.Background()); err != nil {
 		t.Fatalf("step with the port closed: %v", err)
 	}
 	if s.RemoteName() != "" {
-		t.Errorf("remote name %q kept after the service found the port closed", s.RemoteName())
+		t.Errorf("remote name %q kept after the service kept finding the port closed", s.RemoteName())
+	}
+
+	// Reachable again, and closed once more: the tries start afresh.
+	answer = http.StatusOK
+	if err := s.auto.step(context.Background()); err != nil || s.RemoteName() != publicName {
+		t.Fatalf("back again: err %v, remote name %q", err, s.RemoteName())
+	}
+	answer = http.StatusFailedDependency
+	if err := s.auto.step(context.Background()); err != nil || s.RemoteName() != publicName {
+		t.Fatalf("closed once after coming back: err %v, remote name %q", err, s.RemoteName())
 	}
 }
 
