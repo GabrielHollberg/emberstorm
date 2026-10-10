@@ -94,8 +94,8 @@ type Server struct {
 	// opening, signing up - in a table of its own: from many /64s those keys
 	// filled the one table, and then an install's renewal was refused for
 	// want of room (the twelfth security pass).
-	open *limits
-	find *findIndex
+	open   *limits
+	find   *findIndex
 	claims claimCache
 	// claimMu makes finding a name free and claiming it one step: two
 	// installs claiming one free name at once both wrote a claim, and either

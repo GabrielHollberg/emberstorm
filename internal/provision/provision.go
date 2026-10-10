@@ -119,7 +119,7 @@ type Manager struct {
 	// privacy is which people's own folders the owner's photo library is
 	// known to leave out (SyncPhotoPrivacy), for PhotoFolderPrivate.
 	privacy photoPrivacy
-	order    []string
+	order   []string
 
 	// PhotoFolder makes a person's own photo folder, if it is not there yet,
 	// and answers where it is inside the pictures folder ("Personal/alice").
