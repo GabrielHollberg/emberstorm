@@ -298,6 +298,83 @@ function New-GuiFont([float]$Size, [System.Drawing.FontStyle]$Style = 'Regular',
     return (New-Object System.Drawing.Font($Family, $Size, $Style))
 }
 
+# The window's colours: the app's own - black, light text, its blue - so the
+# setup looks like what it installs (2026-10-09: it was a plain white box).
+# Only once System.Drawing is there: a run that never shows a window (the
+# desktop icon, the console) must not fail on a type it does not need.
+try { Add-Type -AssemblyName System.Drawing -ErrorAction Stop } catch { }
+$script:Ui = @{}
+try { $script:Ui = @{
+    Bg     = [System.Drawing.Color]::FromArgb(14, 14, 18)
+    Panel  = [System.Drawing.Color]::FromArgb(28, 28, 36)
+    Text   = [System.Drawing.Color]::FromArgb(235, 235, 245)
+    Dim    = [System.Drawing.Color]::FromArgb(150, 150, 165)
+    Faint  = [System.Drawing.Color]::FromArgb(95, 95, 110)
+    Accent = [System.Drawing.Color]::FromArgb(106, 168, 255)
+    Good   = [System.Drawing.Color]::FromArgb(76, 195, 138)
+    Warn   = [System.Drawing.Color]::FromArgb(240, 168, 72)
+    Bad    = [System.Drawing.Color]::FromArgb(255, 112, 112)
+} } catch { }
+
+# Draw-Cloud paints the EmberStorm cloud and its bolt - the logo's own shapes,
+# as scripts/make-icons.py draws them - Height pixels tall at X, Y.
+function Draw-Cloud($Graphics, [float]$X, [float]$Y, [float]$Height, $Color) {
+    $k = $Height / 125.0
+    $ox = $X - 176.5 * $k
+    $oy = $Y - 177.0 * $k
+    $Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $brush = New-Object System.Drawing.SolidBrush $Color
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddEllipse([float]($ox + (234.0 - 43.5) * $k), [float]($oy + (220.5 - 43.5) * $k), [float](87.0 * $k), [float](87.0 * $k))
+    $path.AddEllipse([float]($ox + (283.0 - 23.7) * $k), [float]($oy + (212.7 - 23.7) * $k), [float](47.4 * $k), [float](47.4 * $k))
+    $r = 42.0 * $k
+    $bx = $ox + 176.5 * $k; $by = $oy + 207.0 * $k; $bw = 148.0 * $k; $bh = 42.0 * $k
+    $path.AddArc([float]$bx, [float]$by, [float]$r, [float]$r, 90, 180)
+    $path.AddArc([float]($bx + $bw - $r), [float]$by, [float]$r, [float]$r, 270, 180)
+    $path.CloseFigure()
+    $old = $Graphics.Clip
+    $Graphics.SetClip((New-Object System.Drawing.RectangleF ([float]$X - 1), ([float]$Y - 1), ([float](150 * $k) + 2), ([float]($oy + 249.0 * $k - $Y + 1))))
+    $Graphics.FillPath($brush, $path)
+    $Graphics.Clip = $old
+    $points = @((243, 240), (271, 240), (260, 261), (278, 261), (238, 302), (251, 273), (231, 273)) |
+        ForEach-Object { New-Object System.Drawing.PointF ([float]($ox + $_[0] * $k)), ([float]($oy + $_[1] * $k)) }
+    $Graphics.FillPolygon($brush, [System.Drawing.PointF[]]$points)
+    $brush.Dispose(); $path.Dispose()
+}
+
+# Set-DarkTheme gives a window of the setup's own (the library question, the
+# always-on one) the main window's colours.
+function Set-DarkTheme($Control) {
+    $Control.BackColor = $script:Ui.Bg
+    $Control.ForeColor = $script:Ui.Text
+    foreach ($c in $Control.Controls) {
+        if ($c -is [System.Windows.Forms.Button]) {
+            $c.FlatStyle = 'Flat'
+            $c.FlatAppearance.BorderSize = 0
+            $c.BackColor = $script:Ui.Panel
+            $c.ForeColor = $script:Ui.Text
+        } elseif ($c -is [System.Windows.Forms.TextBox]) {
+            $c.BackColor = $script:Ui.Panel
+            $c.ForeColor = $script:Ui.Text
+            $c.BorderStyle = 'FixedSingle'
+        } elseif ($c -is [System.Windows.Forms.CheckBox] -or $c -is [System.Windows.Forms.Label]) {
+            if ($c.ForeColor -eq [System.Drawing.Color]::DimGray -or $c.ForeColor -eq [System.Drawing.Color]::Gray) { $c.ForeColor = $script:Ui.Dim }
+            elseif ($c.ForeColor -eq [System.Drawing.Color]::Firebrick) { $c.ForeColor = $script:Ui.Bad }
+            else { $c.ForeColor = $script:Ui.Text }
+            $c.BackColor = $script:Ui.Bg
+        }
+    }
+}
+
+# Set-PrimaryButton draws a button in the app's blue: the one to press.
+function Set-PrimaryButton($Button) {
+    $Button.FlatStyle = 'Flat'
+    $Button.FlatAppearance.BorderSize = 0
+    $Button.BackColor = $script:Ui.Accent
+    $Button.ForeColor = [System.Drawing.Color]::FromArgb(10, 10, 14)
+    $Button.Font = New-GuiFont 10 'Bold'
+}
+
 # New-SetupWindow builds the window and shows it, without waiting on it.
 function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepNames) {
     Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
@@ -319,23 +396,34 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
     $form.MaximizeBox = $false
     $form.AutoScaleMode = 'Dpi'
     $form.Font = New-GuiFont 10
-    $form.BackColor = [System.Drawing.Color]::White
+    $form.BackColor = $script:Ui.Bg
+    $form.ForeColor = $script:Ui.Text
     $form.ClientSize = New-Object System.Drawing.Size(640, 552)
     $g.Form = $form
+
+    # The cloud, drawn: the setup a person sees should look like what it
+    # installs.
+    $logo = New-Object System.Windows.Forms.Panel
+    $logo.Location = New-Object System.Drawing.Point(24, 18)
+    $logo.Size = New-Object System.Drawing.Size(48, 42)
+    $logo.BackColor = $script:Ui.Bg
+    $logo.Add_Paint({ param($sender, $e) Draw-Cloud $e.Graphics 1 1 40 $script:Ui.Text })
+    $form.Controls.Add($logo)
 
     $title = New-Object System.Windows.Forms.Label
     $title.Text = $Heading
     $title.Font = New-GuiFont 16 'Bold'
-    $title.Location = New-Object System.Drawing.Point(24, 16)
-    $title.Size = New-Object System.Drawing.Size(592, 36)
+    $title.ForeColor = $script:Ui.Text
+    $title.Location = New-Object System.Drawing.Point(80, 16)
+    $title.Size = New-Object System.Drawing.Size(536, 36)
     $form.Controls.Add($title)
     $g.Title = $title
 
     $sub = New-Object System.Windows.Forms.Label
     $sub.Text = $Subheading
-    $sub.ForeColor = [System.Drawing.Color]::DimGray
-    $sub.Location = New-Object System.Drawing.Point(24, 54)
-    $sub.Size = New-Object System.Drawing.Size(592, 44)
+    $sub.ForeColor = $script:Ui.Dim
+    $sub.Location = New-Object System.Drawing.Point(80, 54)
+    $sub.Size = New-Object System.Drawing.Size(536, 44)
     $form.Controls.Add($sub)
     $g.Sub = $sub
 
@@ -350,23 +438,84 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
 
     $status = New-Object System.Windows.Forms.Label
     $status.Location = New-Object System.Drawing.Point(24, 222)
-    $status.Size = New-Object System.Drawing.Size(592, 44)
+    $status.Size = New-Object System.Drawing.Size(520, 44)
     $status.AutoEllipsis = $true
+    $status.ForeColor = $script:Ui.Text
     $form.Controls.Add($status)
     $g.Status = $status
 
-    $bar = New-Object System.Windows.Forms.ProgressBar
-    $bar.Location = New-Object System.Drawing.Point(24, 268)
-    $bar.Size = New-Object System.Drawing.Size(592, 14)
-    $bar.Style = 'Marquee'
-    $bar.MarqueeAnimationSpeed = 30
+    $percent = New-Object System.Windows.Forms.Label
+    $percent.Location = New-Object System.Drawing.Point(548, 246)
+    $percent.Size = New-Object System.Drawing.Size(68, 20)
+    $percent.TextAlign = 'MiddleRight'
+    $percent.ForeColor = $script:Ui.Dim
+    $form.Controls.Add($percent)
+    $g.Percent = $percent
+
+    # A bar of the setup's own, in the app's blue: how far along the whole
+    # setup is, from what each step reports (bytes downloaded, images
+    # fetched) and, where a step cannot say, creeping on steadily so it never
+    # sits still (Set-GuiStep, Set-GuiStepProgress). Moving to the end of
+    # each step's share, never past it.
+    $g.Progress = 0.0
+    $g.Lo = 0.0
+    $g.Hi = 0.02
+    $g.Phase = 0.0
+    $g.Tick = [DateTime]::Now
+    $bar = New-Object System.Windows.Forms.Panel
+    $bar.Location = New-Object System.Drawing.Point(24, 270)
+    $bar.Size = New-Object System.Drawing.Size(592, 10)
+    $bar.BackColor = $script:Ui.Bg
+    $bar.Add_Paint({
+        param($sender, $e)
+        $w = $script:Gui
+        $gr = $e.Graphics
+        $gr.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $width = $sender.Width; $height = $sender.Height
+        $track = New-Object System.Drawing.SolidBrush $script:Ui.Panel
+        $gr.FillRectangle($track, 0, 0, $width, $height)
+        $fill = New-Object System.Drawing.SolidBrush $script:Ui.Accent
+        $done = [Math]::Max(0.0, [Math]::Min(1.0, $w.Progress))
+        $gr.FillRectangle($fill, 0, 0, [int]($width * $done), $height)
+        # A soft light running along the filled part: it moves while
+        # anything is happening, however slowly the bar itself does.
+        if ($w.Running -and $done -gt 0) {
+            $shine = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(70, 255, 255, 255))
+            $x = ($w.Phase % 1.0) * ($width * $done + 80) - 80
+            $gr.FillRectangle($shine, [int][Math]::Max(0, $x), 0, [int][Math]::Max(0, [Math]::Min(80, $width * $done - $x)), $height)
+            $shine.Dispose()
+        }
+        $track.Dispose(); $fill.Dispose()
+    })
     $form.Controls.Add($bar)
     $g.Bar = $bar
+
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 40
+    $timer.Add_Tick({
+        $w = $script:Gui
+        if (-not $w -or -not $w.Running) { return }
+        $now = [DateTime]::Now
+        $dt = ($now - $w.Tick).TotalSeconds
+        $w.Tick = $now
+        # Creeping toward the end of this step's share - never reaching it -
+        # so a step that cannot measure itself (an install, a start) still
+        # moves; about two thirds of the way in three minutes.
+        $target = $w.Lo + ($w.Hi - $w.Lo) * 0.97
+        if ($w.Progress -lt $target) { $w.Progress += ($target - $w.Progress) * [Math]::Min(1.0, $dt / 180.0) }
+        $w.Phase += $dt / 1.6
+        $w.Percent.Text = "$([int]([Math]::Floor($w.Progress * 100)))%"
+        $w.Bar.Invalidate()
+    })
+    $timer.Start()
+    $g.Timer = $timer
 
     $message = New-Object System.Windows.Forms.RichTextBox
     $message.Location = New-Object System.Drawing.Point(24, 298)
     $message.Size = New-Object System.Drawing.Size(592, 192)
     $message.ReadOnly = $true
+    $message.BackColor = $script:Ui.Panel
+    $message.ForeColor = $script:Ui.Text
     $message.BorderStyle = 'None'
     $message.ScrollBars = 'Vertical'
     $message.DetectUrls = $true
@@ -377,6 +526,8 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
     $g.Message = $message
 
     $toggle = New-Object System.Windows.Forms.LinkLabel
+    $toggle.LinkColor = $script:Ui.Dim
+    $toggle.ActiveLinkColor = $script:Ui.Accent
     $toggle.Text = 'Show details'
     $toggle.Location = New-Object System.Drawing.Point(24, 510)
     $toggle.Size = New-Object System.Drawing.Size(200, 24)
@@ -388,6 +539,7 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
     $open.Location = New-Object System.Drawing.Point(344, 504)
     $open.Size = New-Object System.Drawing.Size(160, 34)
     $open.Visible = $false
+    Set-PrimaryButton $open
     $open.Add_Click({
         if ($script:Gui.ShowLog) {
             Protect-SetupLog
@@ -404,6 +556,10 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
     $close.Text = 'Cancel'
     $close.Location = New-Object System.Drawing.Point(516, 504)
     $close.Size = New-Object System.Drawing.Size(100, 34)
+    $close.FlatStyle = 'Flat'
+    $close.FlatAppearance.BorderSize = 0
+    $close.BackColor = $script:Ui.Panel
+    $close.ForeColor = $script:Ui.Text
     $close.Add_Click({ $script:Gui.Form.Close() })
     $form.Controls.Add($close)
     $g.Close = $close
@@ -482,16 +638,16 @@ function Set-GuiStepMarks([switch]$Failed) {
         $n = $i + 1
         if ($n -lt $w.Current) {
             $label.Text = "  $done   $($label.Tag)"
-            $label.ForeColor = [System.Drawing.Color]::SeaGreen
+            $label.ForeColor = $script:Ui.Good
             $label.Font = New-GuiFont 10
         } elseif ($n -eq $w.Current) {
             $mark = if ($Failed) { $bad } else { $now }
             $label.Text = "  $mark   $($label.Tag)"
-            $label.ForeColor = if ($Failed) { [System.Drawing.Color]::Firebrick } else { [System.Drawing.Color]::FromArgb(0, 90, 180) }
+            $label.ForeColor = if ($Failed) { $script:Ui.Bad } else { $script:Ui.Accent }
             $label.Font = New-GuiFont 10 'Bold'
         } else {
             $label.Text = "  $todo   $($label.Tag)"
-            $label.ForeColor = [System.Drawing.Color]::Gray
+            $label.ForeColor = $script:Ui.Faint
             $label.Font = New-GuiFont 10
         }
     }
@@ -505,6 +661,15 @@ function Set-GuiStep([string]$Text) {
         if ($n -ge 1 -and $n -le $script:Gui.Steps.Count) {
             $script:Gui.Steps[$n - 1].Tag = $Matches[2]
             $script:Gui.Current = $n
+            # Each step's share of the bar, by how long it really takes on a
+            # fresh PC: getting Docker, the folder and the questions, the
+            # long download, starting up.
+            $shares = @{ 1 = @(0.0, 0.24); 2 = @(0.24, 0.30); 3 = @(0.30, 0.92); 4 = @(0.92, 0.99) }
+            if ($shares.ContainsKey($n)) {
+                $script:Gui.Lo = $shares[$n][0]
+                $script:Gui.Hi = $shares[$n][1]
+                if ($script:Gui.Progress -lt $script:Gui.Lo) { $script:Gui.Progress = $script:Gui.Lo }
+            }
         }
     }
     # A new step is a new stage, and what the last one said to do is over.
@@ -519,11 +684,21 @@ function Set-GuiStatus([string]$Text, [string]$Kind = 'Note') {
     if (-not $script:Gui) { return }
     $script:Gui.Status.Text = $Text.Trim()
     $script:Gui.Status.ForeColor = switch ($Kind) {
-        'Good' { [System.Drawing.Color]::SeaGreen }
-        'Important' { [System.Drawing.Color]::FromArgb(176, 96, 0) }
-        default { [System.Drawing.Color]::Black }
+        'Good' { $script:Ui.Good }
+        'Important' { $script:Ui.Warn }
+        default { $script:Ui.Text }
     }
     Update-Gui
+}
+
+# Set-GuiStepProgress says how far through its own step the setup is, 0 to 1,
+# when it can measure it; the bar never goes back.
+function Set-GuiStepProgress([double]$Fraction) {
+    if (-not $script:Gui) { return }
+    $w = $script:Gui
+    $f = [Math]::Max(0.0, [Math]::Min(1.0, $Fraction))
+    $at = $w.Lo + ($w.Hi - $w.Lo) * $f
+    if ($at -gt $w.Progress) { $w.Progress = $at }
 }
 
 function Add-GuiDetail([string]$Text) {
@@ -539,11 +714,12 @@ function Set-GuiMessage([string]$Title, [string[]]$Lines, [string]$Color = 'Yell
     if (-not $script:Gui) { return }
     $box = $script:Gui.Message
     $box.BackColor = switch ($Color) {
-        'Cyan' { [System.Drawing.Color]::FromArgb(232, 243, 252) }
-        'Green' { [System.Drawing.Color]::FromArgb(231, 245, 234) }
-        'Red' { [System.Drawing.Color]::FromArgb(252, 234, 234) }
-        default { [System.Drawing.Color]::FromArgb(255, 248, 225) }
+        'Cyan' { [System.Drawing.Color]::FromArgb(20, 34, 52) }
+        'Green' { [System.Drawing.Color]::FromArgb(18, 42, 30) }
+        'Red' { [System.Drawing.Color]::FromArgb(56, 22, 24) }
+        default { [System.Drawing.Color]::FromArgb(50, 42, 18) }
     }
+    $box.ForeColor = $script:Ui.Text
     $box.Clear()
     $box.SelectionFont = New-GuiFont 11 'Bold'
     $box.AppendText("$Title`n")
@@ -573,6 +749,7 @@ function Expand-GuiMessage {
     $w = $script:Gui
     $w.Status.Visible = $false
     $w.Bar.Visible = $false
+    $w.Percent.Visible = $false
     $w.Message.Location = New-Object System.Drawing.Point(24, 222)
     $w.Message.Size = New-Object System.Drawing.Size(592, 268)
 }
@@ -596,8 +773,10 @@ function Complete-Gui([string]$Heading, [string]$Subheading, [string]$OpenUrl) {
     $w.Running = $false
     $w.Current = $w.Steps.Count + 1
     Set-GuiStepMarks
+    $w.Progress = 1.0
+    $w.Percent.Text = ''
     $w.Title.Text = $Heading
-    $w.Title.ForeColor = [System.Drawing.Color]::SeaGreen
+    $w.Title.ForeColor = $script:Ui.Good
     $w.Sub.Text = $Subheading
     $w.Status.Text = ''
     Expand-GuiMessage
@@ -612,8 +791,9 @@ function Stop-Gui([string]$Text, $Action = $null) {
     $w = $script:Gui
     $w.Running = $false
     Set-GuiStepMarks -Failed
+    $w.Percent.Text = ''
     $w.Title.Text = 'EmberStorm could not finish'
-    $w.Title.ForeColor = [System.Drawing.Color]::Firebrick
+    $w.Title.ForeColor = $script:Ui.Bad
     $w.Sub.Text = 'Nothing is lost - running the setup again carries on from where it stopped.'
     $w.Status.Text = ''
     Expand-GuiMessage
@@ -632,6 +812,7 @@ function Stop-Gui([string]$Text, $Action = $null) {
         $act.Location = New-Object System.Drawing.Point(152, 504)
         $act.Size = New-Object System.Drawing.Size(180, 34)
         $act.Tag = $Action.Run
+        Set-PrimaryButton $act
         $act.Add_Click({ param($sender) & $sender.Tag })
         $w.Form.Controls.Add($act)
         $w.Form.AcceptButton = $act
@@ -1078,9 +1259,30 @@ function Invoke-Docker {
             $pending = New-Object System.Collections.Generic.List[string]
             $total = 0
             $done = 0
+            # Bytes, from the progress lines docker prints for each layer
+            # ("a1b2c3d4e5f6 Downloading [==>  ] 45.6MB/1.2GB"): with the
+            # images' count, what moves the bar - images differ a hundredfold
+            # in size, so the count alone jumped and then sat.
+            $layers = @{}
+            $units = @{ 'B' = 1.0; 'kB' = 1e3; 'MB' = 1e6; 'GB' = 1e9 }
+            $lastBar = Get-Date
             & docker @Arguments 2>&1 | ForEach-Object {
                 Update-Gui
                 $line = "$_"
+                if ($line -match '^\s*([0-9a-f]{12})\s+Downloading\s+\[[^\]]*\]\s+([\d.]+)\s*([kKMG]?B)/([\d.]+)\s*([kKMG]?B)') {
+                    $layers[$Matches[1]] = @(([double]$Matches[2] * $units[$Matches[3]]), ([double]$Matches[4] * $units[$Matches[5]]))
+                } elseif ($line -match '^\s*([0-9a-f]{12})\s+(Download complete|Pull complete|Extracting)' -and $layers.ContainsKey($Matches[1])) {
+                    $layers[$Matches[1]][0] = $layers[$Matches[1]][1]
+                }
+                if (((Get-Date) - $lastBar).TotalSeconds -ge 1 -and $total -gt 0) {
+                    $lastBar = Get-Date
+                    $got = 0.0; $known = 0.0
+                    foreach ($v in $layers.Values) { $got += $v[0]; $known += $v[1] }
+                    $byCount = $done / $total
+                    $byBytes = if ($known -gt 0) { $got / $known } else { 0 }
+                    Set-GuiStepProgress ([Math]::Max($byCount, $byBytes) * 0.97)
+                    if ($got -gt 0) { Set-GuiStatus ("Downloaded {0} of {1} parts - {2:N1} GB so far" -f $done, $total, ($got / 1e9)) }
+                }
                 if ($line -match '^\s*(?:Image\s+)?(\S+)\s+(Pulling|Pulled|Interrupted|Error)\s*$') {
                     $image = $Matches[1]
                     if ($Matches[2] -eq 'Pulling') {
@@ -1897,9 +2099,33 @@ function Install-DockerDirect {
     $url = "https://desktop.docker.com/win/main/$arch/Docker%20Desktop%20Installer.exe"
     $installer = Join-Path $env:TEMP 'EmberStorm-Docker-Installer.exe'
     $curl = Join-Path $env:SystemRoot 'System32\curl.exe'
+    # Its size first, for "310 of 635 MB" as it comes.
+    $size = 0
+    try {
+        $head = & $curl -sIL $url 2>$null
+        $last = @($head | Where-Object { $_ -match '^content-length:\s*(\d+)' }) | Select-Object -Last 1
+        if ($last -match '(\d+)') { $size = [long]$Matches[1] }
+    } catch { }
+    Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
     $download = Start-Process -FilePath $curl -ArgumentList '-fsSL', '--retry', '3', '-o', "`"$installer`"", $url `
         -WindowStyle Hidden -PassThru
-    $null = Wait-ProcessPumped $download
+    $null = $download.Handle
+    $shown = Get-Date
+    while (-not $download.WaitForExit(250)) {
+        Update-Gui
+        if (((Get-Date) - $shown).TotalSeconds -ge 1) {
+            $shown = Get-Date
+            $got = 0
+            try { $got = (Get-Item -LiteralPath $installer -ErrorAction Stop).Length } catch { }
+            if ($size -gt 0) {
+                Set-GuiStatus "Downloading Docker Desktop: $([int]($got / 1MB)) of $([int]($size / 1MB)) MB"
+                Set-GuiStepProgress (0.15 + 0.45 * ($got / $size))
+            } else {
+                Set-GuiStatus "Downloading Docker Desktop: $([int]($got / 1MB)) MB so far"
+            }
+        }
+    }
+    Note "Installing Docker Desktop. This takes a few minutes."
     if ($download.ExitCode -ne 0 -or -not (Test-Path $installer) -or (Get-Item $installer).Length -lt 10MB) {
         Stop-With @"
   Docker Desktop could not be downloaded (curl exit code: $($download.ExitCode)).
@@ -2502,6 +2728,8 @@ function Select-LibraryLocation([string]$Default, [string]$Intro = '') {
         $browser.Dispose()
     })
 
+    Set-DarkTheme $form
+    Set-PrimaryButton $ok
     $chosen = $Default
     try {
         # Closing the window with the X means "carry on with what it shows" -
@@ -2644,45 +2872,145 @@ function Show-TailscaleDialog {
     return $key
 }
 
-# Confirm-StayAwake offers to keep a plugged-in PC from sleeping: asleep, it
-# answers nobody, and Windows' default puts a PC to sleep after half an hour
-# untouched - a server the phone could reach only after somebody moved the
-# mouse (2026-10-09). Asked, never assumed: on a laptop carried about it is
-# the wrong answer. Only the plugged-in timeouts change; on battery Windows
-# keeps its own.
-function Confirm-StayAwake {
+# Confirm-AlwaysOn asks, in one window, what keeps EmberStorm reachable all
+# the time - a server is only as good as the PC staying on - and does what was
+# ticked: staying awake while plugged in, not sleeping when a laptop's lid
+# is closed (plugged in only), and signing in to Windows by itself after a
+# restart, which Docker Desktop needs before EmberStorm can start. That last
+# is off unless chosen, and says why: whoever switches the PC on gets into
+# this Windows account (the owner's call, 2026-10-09).
+function Confirm-AlwaysOn {
     try {
-        $battery = @(Get-CimInstance Win32_Battery -ErrorAction Stop)
+        Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
     } catch {
-        $battery = @()
+        return
     }
-    $standby = $null
+    $laptop = $false
+    try { $laptop = @(Get-CimInstance Win32_Battery -ErrorAction Stop).Count -gt 0 } catch { }
+    $powercfg = Join-Path $env:SystemRoot 'System32\powercfg.exe'
+    $sleepsNow = $true
     try {
-        $out = & (Join-Path $env:SystemRoot 'System32\powercfg.exe') /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>$null
+        $out = & $powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>$null
         $line = @($out | Where-Object { $_ -match 'Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)' }) | Select-Object -First 1
-        if ($line -and $line -match '0x([0-9a-fA-F]+)') { $standby = [Convert]::ToInt32($Matches[1], 16) }
+        if ($line -and $line -match '0x([0-9a-fA-F]+)' -and [Convert]::ToInt32($Matches[1], 16) -eq 0) { $sleepsNow = $false }
     } catch { }
-    if ($standby -eq 0) { return }   # already never sleeps when plugged in
-    $what = if ($battery.Count) { 'This laptop goes to sleep' } else { 'This PC goes to sleep' }
-    $text = "$what when it is left alone for a while, and asleep, EmberStorm cannot be reached - your phone and TV would find nothing until somebody wakes it.`r`n`r`nKeep it awake while it is plugged in?`r`n`r`nThe screen still turns off. You can change this any time in Windows Settings, System, Power."
+
+    Note "A window has opened asking how to keep EmberStorm available."
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = 'EmberStorm - keep it available'
+    $form.FormBorderStyle = 'FixedDialog'
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.StartPosition = 'CenterScreen'
+    $form.TopMost = $true
+    $form.AutoScaleMode = 'Dpi'
+    $form.Font = New-GuiFont 10
+    $form.ClientSize = New-Object System.Drawing.Size(560, 390)
+
+    $heading = New-Object System.Windows.Forms.Label
+    $heading.Text = 'EmberStorm can only be reached while this PC is on and awake. To keep it that way:'
+    $heading.Font = New-GuiFont 11 'Bold'
+    $heading.Location = New-Object System.Drawing.Point(20, 16)
+    $heading.Size = New-Object System.Drawing.Size(520, 48)
+    $form.Controls.Add($heading)
+
+    $y = 72
+    $boxes = @{}
+    $add = {
+        param($key, $text, $hint, $checked)
+        $c = New-Object System.Windows.Forms.CheckBox
+        $c.Text = $text
+        $c.Checked = $checked
+        $c.Font = New-GuiFont 10 'Bold'
+        $c.Location = New-Object System.Drawing.Point(20, $script:alwaysY)
+        $c.Size = New-Object System.Drawing.Size(520, 24)
+        $form.Controls.Add($c)
+        $h = New-Object System.Windows.Forms.Label
+        $h.Text = $hint
+        $h.ForeColor = [System.Drawing.Color]::DimGray
+        $h.Location = New-Object System.Drawing.Point(38, ($script:alwaysY + 24))
+        # Room for three lines: the sign-in one's catch must be read whole.
+        $h.Size = New-Object System.Drawing.Size(500, 64)
+        $form.Controls.Add($h)
+        $script:alwaysY += 96
+        $boxes[$key] = $c
+    }
+    $script:alwaysY = $y
+    if ($sleepsNow) {
+        & $add 'awake' 'Stay awake while plugged in' 'Asleep, nothing can reach it. The screen still turns off as usual.' $true
+    }
+    if ($laptop) {
+        & $add 'lid' 'Keep running with the lid closed (while plugged in)' 'On battery, closing the lid still puts it to sleep.' $true
+    }
+    & $add 'signin' 'Sign in to Windows by itself after a restart' 'EmberStorm starts once Windows is signed in. After a power cut or an update restart, this signs in for you - but then anyone who switches this PC on gets into this Windows account. Best only for a PC kept just for EmberStorm.' $false
+
+    $ok = New-Object System.Windows.Forms.Button
+    $ok.Text = 'Continue'
+    $ok.Location = New-Object System.Drawing.Point(420, ($script:alwaysY + 8))
+    $ok.Size = New-Object System.Drawing.Size(120, 34)
+    $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $form.Controls.Add($ok)
+    $form.AcceptButton = $ok
+    $form.ClientSize = New-Object System.Drawing.Size(560, ($script:alwaysY + 58))
+    Set-DarkTheme $form
+    Set-PrimaryButton $ok
+    $form.ActiveControl = $ok
+    try {
+        # Closed with the X: what it shows, as the library question takes it.
+        [void]$form.ShowDialog()
+    } finally {
+        $form.Dispose()
+    }
+
+    if ($boxes.ContainsKey('awake') -and $boxes['awake'].Checked) {
+        $okAwake = ((Invoke-Native $powercfg @('/change', 'standby-timeout-ac', '0')).ExitCode -eq 0)
+        $null = Invoke-Native $powercfg @('/change', 'hibernate-timeout-ac', '0')
+        if ($okAwake) { Good "This PC stays awake while it is plugged in." }
+        else { Note "Could not change the sleep setting. Set Sleep to Never in Windows Settings, System, Power." }
+    }
+    if ($boxes.ContainsKey('lid') -and $boxes['lid'].Checked) {
+        $okLid = ((Invoke-Native $powercfg @('/setacvalueindex', 'SCHEME_CURRENT', 'SUB_BUTTONS', 'LIDACTION', '0')).ExitCode -eq 0)
+        $null = Invoke-Native $powercfg @('/setactive', 'SCHEME_CURRENT')
+        if ($okLid) { Good "Closing the lid no longer sleeps it while plugged in." }
+    }
+    if ($boxes['signin'].Checked) { Enable-AutoSignIn }
+}
+
+# Enable-AutoSignIn has Windows sign in by itself when the PC starts, by
+# Windows' own way of doing it: its "Users must enter a user name and
+# password" switch, which keeps the password itself, encrypted (never this
+# setup, never a file). Windows 11 hides the switch while it prefers its own
+# sign-in methods; a setting shows it again. The person unticks it and types
+# their password - Windows asks, in its own window.
+function Enable-AutoSignIn {
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
         $owner = New-TopmostOwner
         try {
-            $answer = [System.Windows.Forms.MessageBox]::Show($owner, $text, 'EmberStorm - keep this PC awake?',
-                [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+            [void][System.Windows.Forms.MessageBox]::Show($owner,
+                "Windows will now ask for permission, then open its own User Accounts window.`r`n`r`nIn it:`r`n  1. Untick ""Users must enter a user name and password to use this computer"".`r`n  2. Click OK.`r`n  3. Type your Windows password twice and click OK. (For a Microsoft account, its password - not the PIN.)`r`n`r`nIf your account has no password, Windows already signs in by itself: just close that window.",
+                'EmberStorm - signing in by itself',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information)
         } finally {
             $owner.Dispose()
         }
-        if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { Note "Leaving the sleep settings as they are."; return }
-    } catch {
-        return
+    } catch { }
+    $script = @'
+$ErrorActionPreference = 'SilentlyContinue'
+$key = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device'
+if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
+Set-ItemProperty -Path $key -Name 'DevicePasswordLessBuildVersion' -Value 0 -Type DWord
+Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\netplwiz.exe') -Wait
+exit 0
+'@
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+    $code = Invoke-Elevated (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded)
+    if ($null -eq $code) {
+        Note "Signing in by itself was not set up (no permission). You can do it later: run netplwiz from the Start menu."
+    } else {
+        Good "Windows sign-in set up."
     }
-    $powercfg = Join-Path $env:SystemRoot 'System32\powercfg.exe'
-    $ok = ((Invoke-Native $powercfg @('/change', 'standby-timeout-ac', '0')).ExitCode -eq 0)
-    $null = Invoke-Native $powercfg @('/change', 'hibernate-timeout-ac', '0')
-    if ($ok) { Good "This PC stays awake while it is plugged in." }
-    else { Note "Could not change the sleep setting. Set Sleep to Never in Windows Settings, System, Power." }
 }
 
 # Test-DownloadRoom stops before the long download when the drive Docker keeps
@@ -3892,7 +4220,9 @@ if ($useTailscale) { $composeArgs = @('--profile', 'tailscale') }
 # Docker Desktop Backend?" alert never appears (2026-10-09).
 $lan = Get-LanAddress
 $lanAccess = Set-LanAccess $lan ([int]$port)
-if (-not $upgrade) { Confirm-StayAwake }
+# And with it, keeping EmberStorm reachable - the questions together, then
+# nothing more is asked.
+if (-not $upgrade) { Confirm-AlwaysOn }
 
 # Room for the download, on the drive Docker keeps it on (its disk lives in
 # the person's own folder, on C: unless moved): a full drive failed part way
@@ -3903,7 +4233,7 @@ if ($upgrade) {
     Step "Step 3 of 4 - Checking for a newer version"
 } else {
     Step "Step 3 of 4 - Downloading the media servers"
-    Note "About 8GB the first time. This is the long part - leave it running."
+    Note "That is everything - the rest needs nothing from you. About 8GB to download, the long part: leave this window open."
     Note "A line appears every half minute to show it is still going."
 }
 # Shown rather than captured: this is the part that takes minutes, and a
@@ -4095,6 +4425,14 @@ if ($phoneAddress) {
 }
 if ($useTailscale -and $tailnet) {
     $phoneLines += @('', 'Away from home, on a device signed in to Tailscale:', "*  $tailnet")
+}
+# A desktop stays off after a power cut unless its BIOS says otherwise -
+# something only the person can change, so it is said here.
+$isLaptop = $false
+try { $isLaptop = @(Get-CimInstance Win32_Battery -ErrorAction Stop).Count -gt 0 } catch { }
+if (-not $upgrade -and -not $isLaptop) {
+    $phoneLines += @('', 'To have this PC switch itself back on after a power cut, turn on',
+        '"Restore on AC power loss" (or "Power on after power failure") in its BIOS setup.')
 }
 $openUrl = $url
 if ($hasAccount -ne $true -and $setupCode) {
