@@ -4792,6 +4792,65 @@ restart entry. **Not checked:** a fresh PC (Docker's signed install, WSL's
 restart, the questions first) - the test box is the test; the uninstall (it
 would remove the live server).
 
+**A blind review of the Windows setup (2026-10-10)**: three fresh reviewers -
+security, bugs, the experience - shown only the script and the setup file,
+not these notes; each finding checked against the code. Fixed:
+
+- **A first install stopped part way was an update from then on** (the
+  compose file is written before the download): "installed" is now a mark,
+  `SOUNDSTORM_INSTALLED=1` in .env, written once EmberStorm has started and
+  answered (`Test-InstalledHere`; installs from before it count by their
+  uninstall entry). A `.env` already there is kept, not written afresh (it
+  held the setup code and every secret, lost with `SOUNDSTORM_FORCE`).
+- **After a restart the questions were asked again**, and a library chosen in
+  the window was lost: `resume.env` carries `EMBERSTORM_ASKED`, `_LAN` and
+  `_LIBRARY`, and the resumed run carries on without asking.
+- **Uninstall**: Docker not starting no longer ends it part way
+  (`Start-Docker -NoStop`); when EmberStorm could not be stopped, the entry in
+  Settings, Apps and its files stay so uninstalling again can finish (they
+  were removed, leaving no way back); `down` takes the Tailscale profile too;
+  the finish names the saved backup.
+- **Docker on a standard account**: the account that ran Docker's installer
+  (an administrator's) was the one let in, so Docker never answered this
+  person - `Grant-DockerUse` adds them to `docker-users`, then a restart.
+- **A move**: an error now starts EmberStorm again before saying it has; an
+  imported TLS choice is read after the import. `-NoShortcuts` installs get
+  their uninstall entry.
+- **Security**: a folder outside the person's own is made theirs alone
+  (`Test-OthersCanWrite`, `Protect-PrivateFolder`: this person, SYSTEM and
+  Administrators), and files planted under the names the setup writes next
+  (`.new`, `.old`, the backup) are refused - another account could take over
+  the compose file; a library made now on another drive is theirs alone too
+  (at a drive root every account could read members' private photos; an
+  existing library is left, as it may be shared on purpose and a big one
+  takes a while); Docker's backend is let in on EmberStorm's port only, not
+  every port any container publishes; download addresses must be https; the
+  folder Docker's installer is copied into is made administrators-only
+  first.
+- **The window**: one setup at a time (`Local\EmberStormSetup`, a second one
+  says it is running); a failure offers **Try again** (`Restart-Setup`);
+  **Restart now** asks first (it was the default, and Enter lost unsaved
+  work); "That's all the questions. Windows may still ask for permission";
+  the status line no longer loses half of two-part messages; no "show this to
+  whoever gave you the app"; the failure's subheading claims nothing it
+  cannot keep; the finish shows the phone address only when phones can reach
+  it (else how to fix it), the address on its own line, and how to add media;
+  auto sign-in says whether it really turned on (read back from Winlogon) and
+  that it allows password sign-in for every account; Esc is Cancel, the title
+  bar's buttons have names for screen readers, steps still to come are
+  easier to read.
+
+Checked: the script parses in Windows PowerShell 5.1 and is plain ASCII; the
+folder lock on a real folder under C:\ (open to others before, only the
+three after, a new file inheriting it); the install mark's four cases and
+the resume file read back; the window drawn; the real setup in a scratch
+folder (stopped on "already installed in another folder", nothing written,
+no restart entry). **Not checked:** a fresh PC, a standard account, the
+uninstall, the one-at-a-time message, Try again. **Left:** updates unsigned
+from main; the setup file's second download before the window shows (the
+signed .exe replaces it); undoing the power and sign-in changes on uninstall;
+Docker's data on a bigger drive when C: is small; a visible keyboard focus.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
