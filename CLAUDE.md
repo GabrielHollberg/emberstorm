@@ -9682,8 +9682,8 @@ says Share, then Add to Home Screen. Never in the phone apps, on a TV, in an app
 already installed, offline or while the owner's welcome shows; answered either
 way, remembered on the device (`soundstorm-install-offered`) and never asked
 there again - the browser's own install button stays for later. The setup's
-finished screen says how to pin the EmberStorm shortcut (Start menu, right-click,
-Pin to taskbar). Checked on the test server (`scripts/smoke/installoffer.js`, the
+finished screen points to it ("choose Install to make it an app"), not to
+pinning the shortcut: the owner would rather people install the app. Checked on the test server (`scripts/smoke/installoffer.js`, the
 install question played by hand - a real one comes only on a trusted address):
 Chrome offered, Install asked the browser, not again after a reload; an iPhone
 told how, not again after Not now. Not seen: Chrome's real install box. Checked in Chrome at phone size with a stand-in address: shown
