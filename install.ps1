@@ -224,9 +224,6 @@ $script:Gui = $null
 $script:SetupLog = Join-Path $env:TEMP 'EmberStorm-setup.log'
 
 # Update-Gui lets the window repaint and answer clicks. A no-op without one.
-function Update-Gui {
-    if ($script:Gui) { [System.Windows.Forms.Application]::DoEvents() }
-}
 
 # Write-Host is wrapped, not replaced: everything this script prints still goes
 # to the console when there is one, and to the log file always - and, with the
@@ -376,171 +373,221 @@ function Set-PrimaryButton($Button) {
 }
 
 # New-SetupWindow builds the window and shows it, without waiting on it.
+#
+# WPF, not Windows Forms (2026-10-09, the owner: the window "looks old, plain
+# text"): a borderless window with rounded corners and a title bar of its own,
+# the cloud drawn from the logo's own shapes, steps with markers, a bar with a
+# gradient and a light running along it, cards for what to read, and the
+# questions as pages in this same window - so, going to plan, a person sees
+# this one window and Windows' own permission prompts, nothing else. It sizes
+# itself to what it shows. WPF is part of Windows (.NET Framework): nothing is
+# installed or compiled for it. The functions below are the same ones the rest
+# of the setup always called.
 function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepNames) {
+    Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase -ErrorAction Stop
     Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
-    [System.Windows.Forms.Application]::EnableVisualStyles()
 
+    $xaml = @'
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="EmberStorm Setup" Width="680" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="14"
+        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+  <Window.Resources>
+    <Style x:Key="Btn" TargetType="Button">
+      <Setter Property="Foreground" Value="#EBEBF5"/>
+      <Setter Property="Background" Value="#262631"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Padding" Value="18,9"/>
+      <Setter Property="Margin" Value="10,0,0,0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="B" CornerRadius="9" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="B" Property="Opacity" Value="0.86"/></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="B" Property="Opacity" Value="0.7"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
+      <Setter Property="Foreground" Value="#0A0A10"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Background">
+        <Setter.Value>
+          <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#7DB4FF" Offset="0"/>
+            <GradientStop Color="#5E9BFF" Offset="1"/>
+          </LinearGradientBrush>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="Chrome" TargetType="Button">
+      <Setter Property="Foreground" Value="#9696A5"/>
+      <Setter Property="Width" Value="34"/>
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="B" CornerRadius="7" Background="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="B" Property="Background" Value="#262631"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+  <Border Margin="14" CornerRadius="16" BorderBrush="#2A2A36" BorderThickness="1">
+    <Border.Background>
+      <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#16161E" Offset="0"/>
+        <GradientStop Color="#0D0D12" Offset="1"/>
+      </LinearGradientBrush>
+    </Border.Background>
+    <Border.Effect>
+      <DropShadowEffect BlurRadius="22" ShadowDepth="0" Opacity="0.55" Color="Black"/>
+    </Border.Effect>
+    <StackPanel Margin="30,14,30,24">
+      <Grid x:Name="Header" Background="Transparent" Margin="0,0,0,18">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Viewbox x:Name="Logo" Height="26" Margin="0,2,10,0">
+            <Canvas Width="148" Height="125">
+              <Canvas>
+                <Canvas.Clip><RectangleGeometry Rect="0,0,148,72"/></Canvas.Clip>
+                <Ellipse Canvas.Left="14" Canvas.Top="0" Width="87" Height="87" Fill="White"/>
+                <Ellipse Canvas.Left="82.8" Canvas.Top="12" Width="47.4" Height="47.4" Fill="White"/>
+                <Rectangle Canvas.Left="0" Canvas.Top="30" Width="148" Height="42" RadiusX="21" RadiusY="21" Fill="White"/>
+              </Canvas>
+              <Polygon Points="66.5,63 94.5,63 83.5,84 101.5,84 61.5,125 74.5,96 54.5,96" Fill="White"/>
+            </Canvas>
+          </Viewbox>
+          <TextBlock Text="EmberStorm" Foreground="#EBEBF5" FontSize="16" FontWeight="Bold" FontStyle="Italic" VerticalAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button x:Name="MinButton" Style="{StaticResource Chrome}" ToolTip="Minimize">
+            <Rectangle Width="11" Height="1.4" Fill="#9696A5"/>
+          </Button>
+          <Button x:Name="XButton" Style="{StaticResource Chrome}" ToolTip="Close">
+            <Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="#9696A5" StrokeThickness="1.4"/>
+          </Button>
+        </StackPanel>
+      </Grid>
+      <TextBlock x:Name="Title" Foreground="#F2F2FA" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap" FontFamily="Segoe UI Variable Display, Segoe UI"/>
+      <TextBlock x:Name="Sub" Foreground="#9696A5" FontSize="14" TextWrapping="Wrap" Margin="0,6,0,20" LineHeight="20"/>
+      <StackPanel x:Name="Steps" Margin="0,0,0,18"/>
+      <StackPanel x:Name="ProgressPanel" Margin="0,2,0,4">
+        <Grid Margin="0,0,0,10">
+          <TextBlock x:Name="Status" Foreground="#EBEBF5" TextWrapping="Wrap" Margin="0,0,70,0" LineHeight="20"/>
+          <TextBlock x:Name="Percent" Foreground="#9696A5" HorizontalAlignment="Right" VerticalAlignment="Bottom" FontWeight="SemiBold"/>
+        </Grid>
+        <Border x:Name="Track" Height="8" CornerRadius="4" Background="#24242E" ClipToBounds="True">
+          <Grid HorizontalAlignment="Left">
+            <Border x:Name="Fill" CornerRadius="4" Width="0">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                  <GradientStop Color="#5E9BFF" Offset="0"/>
+                  <GradientStop Color="#9A86FF" Offset="1"/>
+                </LinearGradientBrush>
+              </Border.Background>
+            </Border>
+            <Border x:Name="Shine" Width="90" CornerRadius="4" HorizontalAlignment="Left">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                  <GradientStop Color="#00FFFFFF" Offset="0"/>
+                  <GradientStop Color="#66FFFFFF" Offset="0.5"/>
+                  <GradientStop Color="#00FFFFFF" Offset="1"/>
+                </LinearGradientBrush>
+              </Border.Background>
+              <Border.RenderTransform><TranslateTransform x:Name="ShineMove" X="0"/></Border.RenderTransform>
+            </Border>
+          </Grid>
+        </Border>
+      </StackPanel>
+      <Border x:Name="Card" CornerRadius="12" Padding="18,14" Margin="0,16,0,0" BorderThickness="1" Visibility="Collapsed">
+        <ScrollViewer MaxHeight="380" VerticalScrollBarVisibility="Auto">
+          <StackPanel x:Name="CardBody"/>
+        </ScrollViewer>
+      </Border>
+      <StackPanel x:Name="Page" Visibility="Collapsed" Margin="0,4,0,0"/>
+      <TextBox x:Name="Details" Visibility="Collapsed" Height="200" Margin="0,16,0,0" IsReadOnly="True"
+               Background="#0A0A0E" Foreground="#C8C8D2" BorderBrush="#2A2A36" Padding="8"
+               FontFamily="Cascadia Mono, Consolas" FontSize="12" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+      <Grid Margin="0,22,0,0">
+        <TextBlock VerticalAlignment="Center">
+          <Hyperlink x:Name="Toggle" Foreground="#7F7F90" TextDecorations="{x:Null}">Show details</Hyperlink>
+        </TextBlock>
+        <StackPanel x:Name="Buttons" Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button x:Name="ActButton" Style="{StaticResource Primary}" Visibility="Collapsed"/>
+          <Button x:Name="OpenButton" Style="{StaticResource Primary}" Visibility="Collapsed" Content="Open EmberStorm"/>
+          <Button x:Name="CloseButton" Style="{StaticResource Btn}" Content="Cancel"/>
+        </StackPanel>
+        <StackPanel x:Name="PageButtons" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed"/>
+      </Grid>
+    </StackPanel>
+  </Border>
+</Window>
+'@
+    $window = [Windows.Markup.XamlReader]::Parse($xaml)
     $g = @{
-        Running = $true
-        Closed  = $false
-        OpenUrl = ''
-        Steps   = @()
-        Current = 0
+        Window   = $window
+        Running  = $true
+        Closed   = $false
+        OpenUrl  = ''
+        ShowLog  = $false
+        Steps    = @()
+        Current  = 0
         Expanded = $false
+        Progress = 0.0
+        Lo       = 0.0
+        Hi       = 0.02
+        Phase    = 0.0
+        Tick     = [DateTime]::Now
+        Choice   = $null
+        StepRows = @()
+    }
+    foreach ($name in 'Header', 'Logo', 'Title', 'Sub', 'Steps', 'ProgressPanel', 'Status', 'Percent', 'Track', 'Fill', 'Shine',
+            'ShineMove', 'Card', 'CardBody', 'Page', 'Details', 'Toggle', 'Buttons', 'ActButton', 'OpenButton', 'CloseButton',
+            'PageButtons', 'MinButton', 'XButton') {
+        $g[$name] = $window.FindName($name)
+    }
+    $g.Title.Text = $Heading
+    $g.Sub.Text = $Subheading
+    foreach ($stepName in $StepNames) {
+        $row = New-Object System.Windows.Controls.StackPanel
+        $row.Orientation = 'Horizontal'
+        $row.Margin = '0,4,0,4'
+        $mark = New-Object System.Windows.Controls.Border
+        $mark.Width = 22; $mark.Height = 22; $mark.CornerRadius = 11; $mark.Margin = '0,0,12,0'
+        $glyph = New-Object System.Windows.Controls.TextBlock
+        $glyph.HorizontalAlignment = 'Center'; $glyph.VerticalAlignment = 'Center'
+        $glyph.FontFamily = 'Segoe UI Symbol'; $glyph.FontSize = 12; $glyph.FontWeight = 'Bold'
+        $mark.Child = $glyph
+        $label = New-Object System.Windows.Controls.TextBlock
+        $label.VerticalAlignment = 'Center'
+        $label.Text = $stepName
+        $label.Tag = $stepName
+        [void]$row.Children.Add($mark)
+        [void]$row.Children.Add($label)
+        [void]$g.Steps.Children.Add($row)
+        $g.StepRows += , @{ Mark = $mark; Glyph = $glyph; Label = $label }
     }
 
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'EmberStorm Setup'
-    $form.StartPosition = 'CenterScreen'
-    $form.FormBorderStyle = 'FixedSingle'
-    $form.MaximizeBox = $false
-    $form.AutoScaleMode = 'Dpi'
-    $form.Font = New-GuiFont 10
-    $form.BackColor = $script:Ui.Bg
-    $form.ForeColor = $script:Ui.Text
-    $form.ClientSize = New-Object System.Drawing.Size(640, 552)
-    $g.Form = $form
-
-    # The cloud, drawn: the setup a person sees should look like what it
-    # installs.
-    $logo = New-Object System.Windows.Forms.Panel
-    $logo.Location = New-Object System.Drawing.Point(24, 18)
-    $logo.Size = New-Object System.Drawing.Size(48, 42)
-    $logo.BackColor = $script:Ui.Bg
-    $logo.Add_Paint({ param($sender, $e) Draw-Cloud $e.Graphics 1 1 40 $script:Ui.Text })
-    $form.Controls.Add($logo)
-
-    $title = New-Object System.Windows.Forms.Label
-    $title.Text = $Heading
-    $title.Font = New-GuiFont 16 'Bold'
-    $title.ForeColor = $script:Ui.Text
-    $title.Location = New-Object System.Drawing.Point(80, 16)
-    $title.Size = New-Object System.Drawing.Size(536, 36)
-    $form.Controls.Add($title)
-    $g.Title = $title
-
-    $sub = New-Object System.Windows.Forms.Label
-    $sub.Text = $Subheading
-    $sub.ForeColor = $script:Ui.Dim
-    $sub.Location = New-Object System.Drawing.Point(80, 54)
-    $sub.Size = New-Object System.Drawing.Size(536, 44)
-    $form.Controls.Add($sub)
-    $g.Sub = $sub
-
-    for ($i = 0; $i -lt $StepNames.Count; $i++) {
-        $label = New-Object System.Windows.Forms.Label
-        $label.Location = New-Object System.Drawing.Point(24, (104 + $i * 28))
-        $label.Size = New-Object System.Drawing.Size(592, 26)
-        $label.Tag = $StepNames[$i]
-        $form.Controls.Add($label)
-        $g.Steps += $label
-    }
-
-    $status = New-Object System.Windows.Forms.Label
-    $status.Location = New-Object System.Drawing.Point(24, 222)
-    $status.Size = New-Object System.Drawing.Size(520, 44)
-    $status.AutoEllipsis = $true
-    $status.ForeColor = $script:Ui.Text
-    $form.Controls.Add($status)
-    $g.Status = $status
-
-    $percent = New-Object System.Windows.Forms.Label
-    $percent.Location = New-Object System.Drawing.Point(548, 246)
-    $percent.Size = New-Object System.Drawing.Size(68, 20)
-    $percent.TextAlign = 'MiddleRight'
-    $percent.ForeColor = $script:Ui.Dim
-    $form.Controls.Add($percent)
-    $g.Percent = $percent
-
-    # A bar of the setup's own, in the app's blue: how far along the whole
-    # setup is, from what each step reports (bytes downloaded, images
-    # fetched) and, where a step cannot say, creeping on steadily so it never
-    # sits still (Set-GuiStep, Set-GuiStepProgress). Moving to the end of
-    # each step's share, never past it.
-    $g.Progress = 0.0
-    $g.Lo = 0.0
-    $g.Hi = 0.02
-    $g.Phase = 0.0
-    $g.Tick = [DateTime]::Now
-    $bar = New-Object System.Windows.Forms.Panel
-    $bar.Location = New-Object System.Drawing.Point(24, 270)
-    $bar.Size = New-Object System.Drawing.Size(592, 10)
-    $bar.BackColor = $script:Ui.Bg
-    $bar.Add_Paint({
-        param($sender, $e)
-        $w = $script:Gui
-        $gr = $e.Graphics
-        $gr.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $width = $sender.Width; $height = $sender.Height
-        $track = New-Object System.Drawing.SolidBrush $script:Ui.Panel
-        $gr.FillRectangle($track, 0, 0, $width, $height)
-        $fill = New-Object System.Drawing.SolidBrush $script:Ui.Accent
-        $done = [Math]::Max(0.0, [Math]::Min(1.0, $w.Progress))
-        $gr.FillRectangle($fill, 0, 0, [int]($width * $done), $height)
-        # A soft light running along the filled part: it moves while
-        # anything is happening, however slowly the bar itself does.
-        if ($w.Running -and $done -gt 0) {
-            $shine = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(70, 255, 255, 255))
-            $x = ($w.Phase % 1.0) * ($width * $done + 80) - 80
-            $gr.FillRectangle($shine, [int][Math]::Max(0, $x), 0, [int][Math]::Max(0, [Math]::Min(80, $width * $done - $x)), $height)
-            $shine.Dispose()
-        }
-        $track.Dispose(); $fill.Dispose()
-    })
-    $form.Controls.Add($bar)
-    $g.Bar = $bar
-
-    $timer = New-Object System.Windows.Forms.Timer
-    $timer.Interval = 40
-    $timer.Add_Tick({
-        $w = $script:Gui
-        if (-not $w -or -not $w.Running) { return }
-        $now = [DateTime]::Now
-        $dt = ($now - $w.Tick).TotalSeconds
-        $w.Tick = $now
-        # Creeping toward the end of this step's share - never reaching it -
-        # so a step that cannot measure itself (an install, a start) still
-        # moves; about two thirds of the way in three minutes.
-        $target = $w.Lo + ($w.Hi - $w.Lo) * 0.97
-        if ($w.Progress -lt $target) { $w.Progress += ($target - $w.Progress) * [Math]::Min(1.0, $dt / 180.0) }
-        $w.Phase += $dt / 1.6
-        $w.Percent.Text = "$([int]([Math]::Floor($w.Progress * 100)))%"
-        $w.Bar.Invalidate()
-    })
-    $timer.Start()
-    $g.Timer = $timer
-
-    $message = New-Object System.Windows.Forms.RichTextBox
-    $message.Location = New-Object System.Drawing.Point(24, 298)
-    $message.Size = New-Object System.Drawing.Size(592, 192)
-    $message.ReadOnly = $true
-    $message.BackColor = $script:Ui.Panel
-    $message.ForeColor = $script:Ui.Text
-    $message.BorderStyle = 'None'
-    $message.ScrollBars = 'Vertical'
-    $message.DetectUrls = $true
-    $message.TabStop = $false
-    $message.Visible = $false
-    $message.Add_LinkClicked({ param($s, $e) try { Start-Process $e.LinkText } catch { } })
-    $form.Controls.Add($message)
-    $g.Message = $message
-
-    $toggle = New-Object System.Windows.Forms.LinkLabel
-    $toggle.LinkColor = $script:Ui.Dim
-    $toggle.ActiveLinkColor = $script:Ui.Accent
-    $toggle.Text = 'Show details'
-    $toggle.Location = New-Object System.Drawing.Point(24, 510)
-    $toggle.Size = New-Object System.Drawing.Size(200, 24)
-    $form.Controls.Add($toggle)
-    $g.Toggle = $toggle
-
-    $open = New-Object System.Windows.Forms.Button
-    $open.Text = 'Open EmberStorm'
-    $open.Location = New-Object System.Drawing.Point(344, 504)
-    $open.Size = New-Object System.Drawing.Size(160, 34)
-    $open.Visible = $false
-    Set-PrimaryButton $open
-    $open.Add_Click({
+    $g.Header.Add_MouseLeftButtonDown({ try { $script:Gui.Window.DragMove() } catch { } })
+    $g.MinButton.Add_Click({ $script:Gui.Window.WindowState = 'Minimized' })
+    $g.XButton.Add_Click({ $script:Gui.Window.Close() })
+    $g.CloseButton.Add_Click({ $script:Gui.Window.Close() })
+    $g.OpenButton.Add_Click({
         if ($script:Gui.ShowLog) {
             Protect-SetupLog
             # Explorer with the file selected: the thing to send, found.
@@ -549,59 +596,24 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
             Start-Process $script:Gui.OpenUrl
         }
     })
-    $form.Controls.Add($open)
-    $g.Open = $open
-
-    $close = New-Object System.Windows.Forms.Button
-    $close.Text = 'Cancel'
-    $close.Location = New-Object System.Drawing.Point(516, 504)
-    $close.Size = New-Object System.Drawing.Size(100, 34)
-    $close.FlatStyle = 'Flat'
-    $close.FlatAppearance.BorderSize = 0
-    $close.BackColor = $script:Ui.Panel
-    $close.ForeColor = $script:Ui.Text
-    $close.Add_Click({ $script:Gui.Form.Close() })
-    $form.Controls.Add($close)
-    $g.Close = $close
-
-    $details = New-Object System.Windows.Forms.TextBox
-    $details.Multiline = $true
-    $details.ReadOnly = $true
-    $details.ScrollBars = 'Vertical'
-    $details.Font = New-GuiFont 9 'Regular' 'Consolas'
-    $details.BackColor = [System.Drawing.Color]::FromArgb(24, 24, 24)
-    $details.ForeColor = [System.Drawing.Color]::Gainsboro
-    $details.Location = New-Object System.Drawing.Point(24, 552)
-    $details.Size = New-Object System.Drawing.Size(592, 220)
-    $details.Visible = $false
-    $details.MaxLength = 0
-    $form.Controls.Add($details)
-    $g.Details = $details
-
-    $toggle.Add_LinkClicked({
+    $g.Toggle.Add_Click({
         $w = $script:Gui
         $w.Expanded = -not $w.Expanded
-        $w.Details.Visible = $w.Expanded
-        $w.Toggle.Text = if ($w.Expanded) { 'Hide details' } else { 'Show details' }
-        $height = if ($w.Expanded) { 788 } else { 552 }
-        $w.Form.ClientSize = New-Object System.Drawing.Size(640, $height)
-        if ($w.Expanded) {
-            $w.Details.SelectionStart = $w.Details.TextLength
-            $w.Details.ScrollToCaret()
-        }
+        $w.Details.Visibility = if ($w.Expanded) { 'Visible' } else { 'Collapsed' }
+        $w.Toggle.Inlines.Clear()
+        $w.Toggle.Inlines.Add($(if ($w.Expanded) { 'Hide details' } else { 'Show details' }))
+        if ($w.Expanded) { $w.Details.ScrollToEnd() }
     })
 
     # Closing while it works asks first, and means it: the setup stops. What
     # was downloaded is kept, so running it again carries on from there.
-    $form.Add_FormClosing({
+    $window.Add_Closing({
         param($sender, $e)
         if ($script:Gui.Running) {
-            $answer = [System.Windows.Forms.MessageBox]::Show($sender,
+            $answer = [System.Windows.MessageBox]::Show($sender,
                 "EmberStorm is still being set up.`r`n`r`nStop now? Anything already downloaded is kept, and running the setup again carries on from there.",
-                'EmberStorm Setup',
-                [System.Windows.Forms.MessageBoxButtons]::YesNo,
-                [System.Windows.Forms.MessageBoxIcon]::Warning)
-            if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) {
+                'EmberStorm Setup', 'YesNo', 'Warning')
+            if ($answer -ne 'Yes') {
                 $e.Cancel = $true
                 return
             }
@@ -611,44 +623,109 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
         $script:Gui.Closed = $true
     })
 
+    # The bar: each step's share filled from what it reports, creeping on
+    # where nothing can be measured, a light running along it.
+    $timer = New-Object System.Windows.Threading.DispatcherTimer
+    $timer.Interval = [TimeSpan]::FromMilliseconds(33)
+    $timer.Add_Tick({
+        $w = $script:Gui
+        if (-not $w) { return }
+        $now = [DateTime]::Now
+        $dt = ($now - $w.Tick).TotalSeconds
+        $w.Tick = $now
+        if ($w.Running) {
+            $target = $w.Lo + ($w.Hi - $w.Lo) * 0.97
+            if ($w.Progress -lt $target) { $w.Progress += ($target - $w.Progress) * [Math]::Min(1.0, $dt / 180.0) }
+            $w.Phase += $dt / 1.8
+            $w.Percent.Text = "$([int]([Math]::Floor($w.Progress * 100)))%"
+        }
+        $width = $w.Track.ActualWidth * [Math]::Max(0.0, [Math]::Min(1.0, $w.Progress))
+        $w.Fill.Width = $width
+        $w.Shine.Visibility = if ($w.Running -and $width -gt 20) { 'Visible' } else { 'Collapsed' }
+        $w.ShineMove.X = (($w.Phase % 1.0) * ($width + 90)) - 90
+        $w.Shine.Clip = New-Object System.Windows.Media.RectangleGeometry (New-Object System.Windows.Rect ([Math]::Max(0, -$w.ShineMove.X)), 0, ([Math]::Max(0, $width - [Math]::Max(0, $w.ShineMove.X))), 8)
+    })
+    $timer.Start()
+    $g.Timer = $timer
+
     $script:Gui = $g
     Set-GuiStepMarks
     # Shown twice, and the first is not a mistake. This process was started
     # hidden (so its console never appears), and Windows applies "hidden" to
     # the first window a process shows - which here is this one, since the
-    # console belongs to another process. Shown once, the setup ran with its
-    # window invisible; checked with a probe started the same way: shown once,
-    # not visible; hidden and shown again, visible.
-    $form.Show()
-    $form.Hide()
-    $form.Show()
-    $form.Activate()
+    # console belongs to another process.
+    $window.Show()
+    $window.Hide()
+    $window.Show()
+    [void]$window.Activate()
     Update-Gui
+    # The taskbar's picture: the cloud, drawn from the window's own logo.
+    try {
+        $bmp = New-Object System.Windows.Media.Imaging.RenderTargetBitmap 64, 64, 96, 96, ([System.Windows.Media.PixelFormats]::Pbgra32)
+        $visual = New-Object System.Windows.Media.DrawingVisual
+        $dc = $visual.RenderOpen()
+        $dc.DrawRoundedRectangle((New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.Color]::FromRgb(14, 14, 18))), $null, (New-Object System.Windows.Rect 0, 0, 64, 64), 14, 14)
+        $brush = New-Object System.Windows.Media.VisualBrush $g.Logo
+        $dc.DrawRectangle($brush, $null, (New-Object System.Windows.Rect 8, 12, 48, 41))
+        $dc.Close()
+        $bmp.Render($visual)
+        $window.Icon = $bmp
+    } catch { }
+}
+
+# Update-Gui lets the window draw and answer while the setup works on: every
+# wait and every line docker prints comes through here.
+function Update-Gui {
+    if (-not $script:Gui) { return }
+    try {
+        $frame = New-Object System.Windows.Threading.DispatcherFrame
+        $null = [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
+            [System.Windows.Threading.DispatcherPriority]::Background,
+            [System.Windows.Threading.DispatcherOperationCallback] { param($f) $f.Continue = $false; return $null },
+            $frame)
+        [System.Windows.Threading.Dispatcher]::PushFrame($frame)
+    } catch { }
+}
+
+function New-WpfBrush([string]$Hex) {
+    return New-Object System.Windows.Media.SolidColorBrush ([System.Windows.Media.ColorConverter]::ConvertFromString($Hex))
 }
 
 # Set-GuiStepMarks draws each step as done, current or still to come.
 function Set-GuiStepMarks([switch]$Failed) {
     $w = $script:Gui
-    $done = [string][char]0x2714
-    $now = [string][char]0x25B6
-    $todo = [string][char]0x25CB
-    $bad = [string][char]0x2716
-    for ($i = 0; $i -lt $w.Steps.Count; $i++) {
-        $label = $w.Steps[$i]
+    for ($i = 0; $i -lt $w.StepRows.Count; $i++) {
+        $row = $w.StepRows[$i]
         $n = $i + 1
+        $row.Label.Text = $row.Label.Tag
         if ($n -lt $w.Current) {
-            $label.Text = "  $done   $($label.Tag)"
-            $label.ForeColor = $script:Ui.Good
-            $label.Font = New-GuiFont 10
+            $row.Mark.Background = New-WpfBrush '#1F4A35'
+            $row.Mark.BorderThickness = 0
+            $row.Glyph.Text = [string][char]0x2713
+            $row.Glyph.Foreground = New-WpfBrush '#4CC38A'
+            $row.Label.Foreground = New-WpfBrush '#B9B9C6'
+            $row.Label.FontWeight = 'Normal'
         } elseif ($n -eq $w.Current) {
-            $mark = if ($Failed) { $bad } else { $now }
-            $label.Text = "  $mark   $($label.Tag)"
-            $label.ForeColor = if ($Failed) { $script:Ui.Bad } else { $script:Ui.Accent }
-            $label.Font = New-GuiFont 10 'Bold'
+            if ($Failed) {
+                $row.Mark.Background = New-WpfBrush '#4A1E22'
+                $row.Glyph.Text = [string][char]0x2715
+                $row.Glyph.Foreground = New-WpfBrush '#FF7070'
+                $row.Label.Foreground = New-WpfBrush '#FF8A8A'
+            } else {
+                $row.Mark.Background = New-WpfBrush '#1C2E4E'
+                $row.Glyph.Text = [string][char]0x25CF
+                $row.Glyph.Foreground = New-WpfBrush '#7DB4FF'
+                $row.Label.Foreground = New-WpfBrush '#F2F2FA'
+            }
+            $row.Mark.BorderThickness = 0
+            $row.Label.FontWeight = 'SemiBold'
         } else {
-            $label.Text = "  $todo   $($label.Tag)"
-            $label.ForeColor = $script:Ui.Faint
-            $label.Font = New-GuiFont 10
+            $row.Mark.Background = [System.Windows.Media.Brushes]::Transparent
+            $row.Mark.BorderBrush = New-WpfBrush '#3A3A48'
+            $row.Mark.BorderThickness = 1.5
+            $row.Glyph.Text = ''
+            $row.Label.Foreground = New-WpfBrush '#6A6A7A'
+            $row.Label.FontWeight = 'Normal'
         }
     }
 }
@@ -656,37 +733,38 @@ function Set-GuiStepMarks([switch]$Failed) {
 # Set-GuiStep moves the window on to "Step N of M - what it is doing".
 function Set-GuiStep([string]$Text) {
     if (-not $script:Gui) { return }
+    $w = $script:Gui
     if ($Text -match 'Step (\d+) of \d+ - (.+)$') {
         $n = [int]$Matches[1]
-        if ($n -ge 1 -and $n -le $script:Gui.Steps.Count) {
-            $script:Gui.Steps[$n - 1].Tag = $Matches[2]
-            $script:Gui.Current = $n
+        if ($n -ge 1 -and $n -le $w.StepRows.Count) {
+            $w.StepRows[$n - 1].Label.Tag = $Matches[2]
+            $w.Current = $n
             # Each step's share of the bar, by how long it really takes on a
             # fresh PC: getting Docker, the folder and the questions, the
             # long download, starting up.
             $shares = @{ 1 = @(0.0, 0.24); 2 = @(0.24, 0.30); 3 = @(0.30, 0.92); 4 = @(0.92, 0.99) }
             if ($shares.ContainsKey($n)) {
-                $script:Gui.Lo = $shares[$n][0]
-                $script:Gui.Hi = $shares[$n][1]
-                if ($script:Gui.Progress -lt $script:Gui.Lo) { $script:Gui.Progress = $script:Gui.Lo }
+                $w.Lo = $shares[$n][0]
+                $w.Hi = $shares[$n][1]
+                if ($w.Progress -lt $w.Lo) { $w.Progress = $w.Lo }
             }
         }
     }
     # A new step is a new stage, and what the last one said to do is over.
-    $script:Gui.Message.Visible = $false
-    $script:Gui.Status.Text = ''
+    $w.Card.Visibility = 'Collapsed'
+    $w.Status.Text = ''
     Set-GuiStepMarks
     Update-Gui
 }
 
-# Set-GuiStatus is the one line under the steps saying what is happening now.
+# Set-GuiStatus is the one line above the bar saying what is happening now.
 function Set-GuiStatus([string]$Text, [string]$Kind = 'Note') {
     if (-not $script:Gui) { return }
     $script:Gui.Status.Text = $Text.Trim()
-    $script:Gui.Status.ForeColor = switch ($Kind) {
-        'Good' { $script:Ui.Good }
-        'Important' { $script:Ui.Warn }
-        default { $script:Ui.Text }
+    $script:Gui.Status.Foreground = switch ($Kind) {
+        'Good' { New-WpfBrush '#4CC38A' }
+        'Important' { New-WpfBrush '#F0A848' }
+        default { New-WpfBrush '#EBEBF5' }
     }
     Update-Gui
 }
@@ -704,62 +782,175 @@ function Set-GuiStepProgress([double]$Fraction) {
 function Add-GuiDetail([string]$Text) {
     $box = $script:Gui.Details
     $box.AppendText($Text)
+    if ($script:Gui.Expanded) { $box.ScrollToEnd() }
     Update-Gui
 }
 
-# Set-GuiMessage shows a callout - what to click in Docker's windows, the setup
-# code - as a panel in the window. A line starting with "*" is the thing
-# itself, an address or a code, and is drawn large.
+# New-GuiLine is one line of a card or a page: words, with any web address a
+# link to open.
+function New-GuiLine([string]$Text, [double]$Size = 14, [string]$Color = '#D8D8E2', [string]$Weight = 'Normal') {
+    $block = New-Object System.Windows.Controls.TextBlock
+    $block.TextWrapping = 'Wrap'
+    $block.FontSize = $Size
+    $block.FontWeight = $Weight
+    $block.Foreground = New-WpfBrush $Color
+    $block.LineHeight = $Size * 1.45
+    $rest = $Text
+    while ($rest -match '(https?://\S+|\b(?:[a-z0-9-]+\.)+(?:com|app|dev|net)/\S*)') {
+        $at = $rest.IndexOf($Matches[1])
+        if ($at -gt 0) { $block.Inlines.Add($rest.Substring(0, $at)) }
+        $address = $Matches[1]
+        $link = New-Object System.Windows.Documents.Hyperlink
+        $link.Inlines.Add($address)
+        $link.Foreground = New-WpfBrush '#8DBBFF'
+        $link.Tag = if ($address -match '^https?://') { $address } else { "https://$address" }
+        $link.Add_Click({ param($s) try { Start-Process $s.Tag } catch { } })
+        $block.Inlines.Add($link)
+        $rest = $rest.Substring($at + $address.Length)
+    }
+    if ($rest) { $block.Inlines.Add($rest) }
+    return $block
+}
+
+# Set-GuiMessage shows a callout - what to know about Docker, the setup code,
+# what went wrong - as a card in the window. A line starting with "*" is the
+# thing itself, an address or a code: drawn large, and selectable to copy.
 function Set-GuiMessage([string]$Title, [string[]]$Lines, [string]$Color = 'Yellow') {
     if (-not $script:Gui) { return }
-    $box = $script:Gui.Message
-    $box.BackColor = switch ($Color) {
-        'Cyan' { [System.Drawing.Color]::FromArgb(20, 34, 52) }
-        'Green' { [System.Drawing.Color]::FromArgb(18, 42, 30) }
-        'Red' { [System.Drawing.Color]::FromArgb(56, 22, 24) }
-        default { [System.Drawing.Color]::FromArgb(50, 42, 18) }
+    $w = $script:Gui
+    $look = switch ($Color) {
+        'Cyan' { @('#13213A', '#25406B', '#8DBBFF') }
+        'Green' { @('#11281E', '#22573D', '#5FD39C') }
+        'Red' { @('#33161A', '#6A2B30', '#FF8A8A') }
+        default { @('#2B2513', '#5A4B1F', '#F0C060') }
     }
-    $box.ForeColor = $script:Ui.Text
-    $box.Clear()
-    $box.SelectionFont = New-GuiFont 11 'Bold'
-    $box.AppendText("$Title`n")
+    $w.Card.Background = New-WpfBrush $look[0]
+    $w.Card.BorderBrush = New-WpfBrush $look[1]
+    $w.CardBody.Children.Clear()
+    [void]$w.CardBody.Children.Add((New-GuiLine $Title 15 $look[2] 'SemiBold'))
+    # The messages are written for a console, broken into short lines; in the
+    # card a sentence runs on as a paragraph. Indented lines (a list, steps)
+    # and the large "*" lines keep their own.
+    $joined = New-Object System.Collections.Generic.List[string]
     foreach ($line in $Lines) {
-        if ($line.StartsWith('*')) {
-            # Large for the thing itself - a code, an address. A whole
-            # sentence at that size is shouting, so a long one is only bold.
-            $thing = $line.Substring(1).Trim()
-            $size = if ($thing.Length -le 44) { 14 } else { 10 }
-            $box.SelectionFont = New-GuiFont $size 'Bold'
-            $box.AppendText($thing + "`n")
+        $last = if ($joined.Count) { $joined[$joined.Count - 1] } else { $null }
+        if ($null -ne $last -and $last -ne '' -and -not $last.StartsWith('*') -and -not $last.StartsWith(' ') -and
+            $line -ne '' -and -not $line.StartsWith('*') -and -not $line.StartsWith(' ') -and
+            $last -notmatch '[:.!?]$') {
+            $joined[$joined.Count - 1] = "$last $line"
         } else {
-            $box.SelectionFont = New-GuiFont 10
-            $box.AppendText("$line`n")
+            $joined.Add($line)
         }
     }
-    $box.SelectionStart = 0
-    $box.ScrollToCaret()
-    $box.Visible = $true
+    foreach ($line in $joined) {
+        if ($line.StartsWith('*')) {
+            $thing = $line.Substring(1).Trim()
+            $box = New-Object System.Windows.Controls.TextBox
+            $box.Text = $thing
+            $box.IsReadOnly = $true
+            $box.BorderThickness = 0
+            $box.Background = [System.Windows.Media.Brushes]::Transparent
+            $box.Foreground = New-WpfBrush '#FFFFFF'
+            $box.FontWeight = 'SemiBold'
+            $box.TextWrapping = 'Wrap'
+            $box.Margin = '0,4,0,4'
+            # A code large; an address smaller, on one line; a sentence plain.
+            if ($thing.Length -le 30) {
+                $box.FontSize = 22
+                $box.FontFamily = 'Cascadia Mono, Consolas'
+            } elseif ($thing.Length -le 56 -and $thing -notmatch '\s') {
+                $box.FontSize = 16
+                $box.FontFamily = 'Cascadia Mono, Consolas'
+            } else {
+                $box.FontSize = 14
+            }
+            [void]$w.CardBody.Children.Add($box)
+        } elseif ($line -eq '') {
+            $gap = New-Object System.Windows.Controls.Border
+            $gap.Height = 8
+            [void]$w.CardBody.Children.Add($gap)
+        } else {
+            [void]$w.CardBody.Children.Add((New-GuiLine $line 14))
+        }
+    }
+    $w.Card.Visibility = 'Visible'
     Update-Gui
 }
 
-# Expand-GuiMessage gives the panel the room the progress line had, once there
-# is no more progress to show - the finished box carries the code, a link and
-# the phone address, and scrolling to find any of them is a poor last screen.
+# Expand-GuiMessage is the end: no more progress to show, the card is what
+# is left to read.
 function Expand-GuiMessage {
     $w = $script:Gui
-    $w.Status.Visible = $false
-    $w.Bar.Visible = $false
-    $w.Percent.Visible = $false
-    $w.Message.Location = New-Object System.Drawing.Point(24, 222)
-    $w.Message.Size = New-Object System.Drawing.Size(592, 268)
+    $w.ProgressPanel.Visibility = 'Collapsed'
+    $w.Steps.Margin = '0,0,0,4'
+}
+
+# Show-GuiPage asks a question as a page in this window - the library, the
+# network, keeping it available - and waits for one of its buttons, whose
+# label it returns. Content is what the page shows; Buttons, right to left as
+# read, the last the one to press. What was showing comes back after.
+function Show-GuiPage($Content, [string[]]$Buttons, [string]$Primary = '') {
+    $w = $script:Gui
+    $wasProgress = $w.ProgressPanel.Visibility
+    $wasCard = $w.Card.Visibility
+    $w.ProgressPanel.Visibility = 'Collapsed'
+    $w.Card.Visibility = 'Collapsed'
+    $w.Page.Children.Clear()
+    [void]$w.Page.Children.Add($Content)
+    $w.Page.Visibility = 'Visible'
+    $w.PageButtons.Children.Clear()
+    if (-not $Primary) { $Primary = $Buttons[$Buttons.Count - 1] }
+    foreach ($label in $Buttons) {
+        $b = New-Object System.Windows.Controls.Button
+        $b.Content = $label
+        $b.Tag = $label
+        $b.Style = $w.Window.FindResource($(if ($label -eq $Primary) { 'Primary' } else { 'Btn' }))
+        $b.Add_Click({ param($s) $script:Gui.Choice = $s.Tag })
+        if ($label -eq $Primary) { $b.IsDefault = $true }
+        [void]$w.PageButtons.Children.Add($b)
+    }
+    $w.Buttons.Visibility = 'Collapsed'
+    $w.PageButtons.Visibility = 'Visible'
+    $w.Choice = $null
+    if ($w.Window.WindowState -eq 'Minimized') { $w.Window.WindowState = 'Normal' }
+    [void]$w.Window.Activate()
+    while ($null -eq $w.Choice -and $w.Window.IsVisible) {
+        Update-Gui
+        Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds 30
+    }
+    $w.Page.Visibility = 'Collapsed'
+    $w.PageButtons.Visibility = 'Collapsed'
+    $w.Buttons.Visibility = 'Visible'
+    $w.ProgressPanel.Visibility = $wasProgress
+    $w.Card.Visibility = $wasCard
+    return $w.Choice
+}
+
+# New-GuiPageText is a page's heading and words, ready for more below them.
+function New-GuiPageText([string]$Heading, [string[]]$Lines) {
+    $panel = New-Object System.Windows.Controls.StackPanel
+    [void]$panel.Children.Add((New-GuiLine $Heading 18 '#F2F2FA' 'SemiBold'))
+    $gap = New-Object System.Windows.Controls.Border
+    $gap.Height = 6
+    [void]$panel.Children.Add($gap)
+    foreach ($line in $Lines) {
+        if ($line -eq '') {
+            $g2 = New-Object System.Windows.Controls.Border
+            $g2.Height = 8
+            [void]$panel.Children.Add($g2)
+        } else {
+            [void]$panel.Children.Add((New-GuiLine $line 14 '#B9B9C6'))
+        }
+    }
+    return $panel
 }
 
 # Wait-GuiClosed keeps the window up until the person closes it.
 function Wait-GuiClosed {
-    $script:Gui.Form.Activate()
-    while (-not $script:Gui.Closed -and $script:Gui.Form.Visible) {
-        [System.Windows.Forms.Application]::DoEvents()
-        Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds 50
+    [void]$script:Gui.Window.Activate()
+    while (-not $script:Gui.Closed -and $script:Gui.Window.IsVisible) {
+        Update-Gui
+        Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds 40
     }
     # The relaunched copy is its own temporary file; it has been read.
     if ($PSCommandPath -and ([IO.Path]::GetFileName($PSCommandPath) -like 'soundstorm-setup-*.ps1')) {
@@ -771,19 +962,17 @@ function Complete-Gui([string]$Heading, [string]$Subheading, [string]$OpenUrl) {
     if (-not $script:Gui) { return }
     $w = $script:Gui
     $w.Running = $false
-    $w.Current = $w.Steps.Count + 1
-    Set-GuiStepMarks
     $w.Progress = 1.0
-    $w.Percent.Text = ''
+    $w.Current = $w.StepRows.Count + 1
+    Set-GuiStepMarks
     $w.Title.Text = $Heading
-    $w.Title.ForeColor = $script:Ui.Good
+    $w.Title.Foreground = New-WpfBrush '#5FD39C'
     $w.Sub.Text = $Subheading
-    $w.Status.Text = ''
     Expand-GuiMessage
     $w.OpenUrl = $OpenUrl
-    $w.Open.Visible = [bool]$OpenUrl
-    $w.Close.Text = 'Close'
-    $w.Form.AcceptButton = if ($OpenUrl) { $w.Open } else { $w.Close }
+    $w.OpenButton.Visibility = if ($OpenUrl) { 'Visible' } else { 'Collapsed' }
+    $w.OpenButton.IsDefault = [bool]$OpenUrl
+    $w.CloseButton.Content = 'Close'
     Wait-GuiClosed
 }
 
@@ -791,11 +980,9 @@ function Stop-Gui([string]$Text, $Action = $null) {
     $w = $script:Gui
     $w.Running = $false
     Set-GuiStepMarks -Failed
-    $w.Percent.Text = ''
     $w.Title.Text = 'EmberStorm could not finish'
-    $w.Title.ForeColor = $script:Ui.Bad
+    $w.Title.Foreground = New-WpfBrush '#FF8A8A'
     $w.Sub.Text = 'Nothing is lost - running the setup again carries on from where it stopped.'
-    $w.Status.Text = ''
     Expand-GuiMessage
     $lines = @($Text -split "`r?`n" | ForEach-Object { $_ -replace '^  ', '' })
     if ($Text -notmatch [regex]::Escape($script:SetupLog)) {
@@ -803,19 +990,16 @@ function Stop-Gui([string]$Text, $Action = $null) {
     }
     Set-GuiMessage 'What went wrong' $lines 'Red'
     $w.ShowLog = $true
-    $w.Open.Text = 'Show log file'
-    $w.Open.Visible = $true
-    $w.Close.Text = 'Close'
+    $w.OpenButton.Content = 'Show log file'
+    $w.OpenButton.Style = $w.Window.FindResource('Btn')
+    $w.OpenButton.Visibility = 'Visible'
+    $w.CloseButton.Content = 'Close'
     if ($Action) {
-        $act = New-Object System.Windows.Forms.Button
-        $act.Text = $Action.Label
-        $act.Location = New-Object System.Drawing.Point(152, 504)
-        $act.Size = New-Object System.Drawing.Size(180, 34)
-        $act.Tag = $Action.Run
-        Set-PrimaryButton $act
-        $act.Add_Click({ param($sender) & $sender.Tag })
-        $w.Form.Controls.Add($act)
-        $w.Form.AcceptButton = $act
+        $w.ActButton.Content = $Action.Label
+        $w.ActButton.Tag = $Action.Run
+        $w.ActButton.Add_Click({ param($s) & $s.Tag })
+        $w.ActButton.Visibility = 'Visible'
+        $w.ActButton.IsDefault = $true
     }
     Wait-GuiClosed
 }
@@ -1000,6 +1184,16 @@ function Confirm-DockerGuide {
         } catch { }
         return
     }
+    if ($script:Gui) {
+        $page = New-GuiPageText 'Docker will ask one thing' @(
+            'EmberStorm runs inside a free program called Docker Desktop. It is already on this PC but has not been opened yet, so when setup starts it, Docker opens a window asking you to accept its terms:',
+            '',
+            '    Subscription Service Agreement  ->  click Accept',
+            '',
+            'That is the only thing to click: setup skips Docker''s sign-in and questions for you, and no Docker account is needed. Stay at the computer until Docker''s window appears, then come back here - setup carries on by itself.')
+        [void](Show-GuiPage $page @('I understand'))
+        return
+    }
     Note "A window has opened: read it, then click I understand."
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'EmberStorm - Docker will ask one thing'
@@ -1100,17 +1294,11 @@ function Stop-ForRestart([string]$Text) {
 # the whole setup for one was a dead end. $false where no window can be shown.
 function Confirm-TryAgain([string]$What) {
     if (-not $script:Gui) { return $false }
-    $owner = New-TopmostOwner
-    try {
-        $answer = [System.Windows.Forms.MessageBox]::Show($owner,
-            "Windows asked for permission to $What, and it was not given. EmberStorm cannot be set up without it.`r`n`r`nAsk again? Choose Yes, then Yes when Windows asks.",
-            'EmberStorm - permission needed',
-            [System.Windows.Forms.MessageBoxButtons]::YesNo,
-            [System.Windows.Forms.MessageBoxIcon]::Warning)
-    } finally {
-        $owner.Dispose()
-    }
-    return ($answer -eq [System.Windows.Forms.DialogResult]::Yes)
+    $page = New-GuiPageText 'Windows needs your permission' @(
+        "Windows asked for permission to $What, and it was not given. EmberStorm cannot be set up without it.",
+        '',
+        'Choose Ask again, then Yes when Windows asks.')
+    return ((Show-GuiPage $page @('Stop the setup', 'Ask again')) -eq 'Ask again')
 }
 
 # Save-EmberStormLog puts EmberStorm's own recent log into the setup log, so
@@ -2637,6 +2825,7 @@ function Select-LibraryLocation([string]$Default, [string]$Intro = '') {
             $suggested = $true
         }
     }
+    if ($script:Gui) { return (Select-LibraryInWindow $Default $Intro $drives $suggested) }
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
         [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -2741,6 +2930,51 @@ function Select-LibraryLocation([string]$Default, [string]$Intro = '') {
     }
     if ($chosen -eq $Default -and -not $suggested) { return $null }
     return $chosen
+}
+
+# Select-LibraryInWindow is the library question as a page of the setup
+# window: the folder, the drives' free space, a different folder chosen in
+# Windows' own folder picker. The same answers as Select-LibraryLocation.
+function Select-LibraryInWindow([string]$Default, [string]$Intro, $Drives, [bool]$Suggested) {
+    $path = $Default
+    $problem = ''
+    while ($true) {
+        $heading = if ($Intro) { $Intro } else { 'Your music, films and books will be kept here:' }
+        $lines = @()
+        $page = New-GuiPageText 'Where should your library go?' @($heading)
+        $box = New-Object System.Windows.Controls.Border
+        $box.CornerRadius = 9
+        $box.Background = New-WpfBrush '#1E1E28'
+        $box.BorderBrush = New-WpfBrush '#33334A'
+        $box.BorderThickness = 1
+        $box.Padding = '12,9'
+        $box.Margin = '0,10,0,10'
+        $box.Child = (New-GuiLine $path 15 '#FFFFFF' 'SemiBold')
+        [void]$page.Children.Add($box)
+        [void]$page.Children.Add((New-GuiLine 'A film collection can need hundreds of GB. To keep it on another drive - an external one, say - choose a folder there now. Moving it later means moving every file.' 13 '#9696A5'))
+        if ($Drives.Count -gt 1) {
+            $gap = New-Object System.Windows.Controls.Border
+            $gap.Height = 8
+            [void]$page.Children.Add($gap)
+            foreach ($drive in @($Drives | Sort-Object FreeSpace -Descending | Select-Object -First 6)) {
+                $label = if ($drive.VolumeName) { " ($($drive.VolumeName))" } else { '' }
+                [void]$page.Children.Add((New-GuiLine "$($drive.DeviceID)$label   $(Format-Size $drive.FreeSpace) free of $(Format-Size $drive.Size)" 13 '#7F7F90'))
+            }
+        }
+        if ($problem) { [void]$page.Children.Add((New-GuiLine $problem 13 '#FF8A8A')) }
+        $choice = Show-GuiPage $page @('Choose a different folder...', 'Continue')
+        if ($choice -ne 'Choose a different folder...') { break }
+        $browser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $browser.Description = 'Choose where EmberStorm keeps your music, films and books. A folder called EmberStorm is made inside the one you pick.'
+        $browser.ShowNewFolderButton = $true
+        if ($browser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $resolved = Resolve-LibraryChoice $browser.SelectedPath
+            if ($resolved.Path) { $path = $resolved.Path; $problem = '' } else { $problem = $resolved.Problem }
+        }
+        $browser.Dispose()
+    }
+    if ($path -eq $Default -and -not $Suggested) { return $null }
+    return $path
 }
 
 # Read-LibraryLocation is the same question in the console, for a machine that
@@ -2895,6 +3129,31 @@ function Confirm-AlwaysOn {
         if ($line -and $line -match '0x([0-9a-fA-F]+)' -and [Convert]::ToInt32($Matches[1], 16) -eq 0) { $sleepsNow = $false }
     } catch { }
 
+    $choices = @{}
+    if ($script:Gui) {
+        $page = New-GuiPageText 'Keep EmberStorm available' @('It can only be reached while this PC is on and awake. To keep it that way:')
+        $checks = @{}
+        $addCheck = {
+            param($key, $text, $hint, $checked)
+            $c = New-Object System.Windows.Controls.CheckBox
+            $c.IsChecked = $checked
+            $c.Margin = '0,14,0,0'
+            $c.Foreground = New-WpfBrush '#F2F2FA'
+            $c.VerticalContentAlignment = 'Top'
+            $stack = New-Object System.Windows.Controls.StackPanel
+            $stack.Margin = '6,-2,0,0'
+            [void]$stack.Children.Add((New-GuiLine $text 15 '#F2F2FA' 'SemiBold'))
+            [void]$stack.Children.Add((New-GuiLine $hint 13 '#9696A5'))
+            $c.Content = $stack
+            [void]$page.Children.Add($c)
+            $checks[$key] = $c
+        }
+        if ($sleepsNow) { & $addCheck 'awake' 'Stay awake while plugged in' 'Asleep, nothing can reach it. The screen still turns off as usual.' $true }
+        if ($laptop) { & $addCheck 'lid' 'Keep running with the lid closed (while plugged in)' 'On battery, closing the lid still puts it to sleep.' $true }
+        & $addCheck 'signin' 'Sign in to Windows by itself after a restart' 'EmberStorm starts once Windows is signed in. After a power cut or an update restart, this signs in for you - but then anyone who switches this PC on gets into this Windows account. Best only for a PC kept just for EmberStorm.' $false
+        [void](Show-GuiPage $page @('Continue'))
+        foreach ($key in $checks.Keys) { $choices[$key] = [bool]$checks[$key].IsChecked }
+    } else {
     Note "A window has opened asking how to keep EmberStorm available."
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'EmberStorm - keep it available'
@@ -2961,19 +3220,21 @@ function Confirm-AlwaysOn {
     } finally {
         $form.Dispose()
     }
+    foreach ($key in $boxes.Keys) { $choices[$key] = [bool]$boxes[$key].Checked }
+    }
 
-    if ($boxes.ContainsKey('awake') -and $boxes['awake'].Checked) {
+    if ($choices['awake']) {
         $okAwake = ((Invoke-Native $powercfg @('/change', 'standby-timeout-ac', '0')).ExitCode -eq 0)
         $null = Invoke-Native $powercfg @('/change', 'hibernate-timeout-ac', '0')
         if ($okAwake) { Good "This PC stays awake while it is plugged in." }
         else { Note "Could not change the sleep setting. Set Sleep to Never in Windows Settings, System, Power." }
     }
-    if ($boxes.ContainsKey('lid') -and $boxes['lid'].Checked) {
+    if ($choices['lid']) {
         $okLid = ((Invoke-Native $powercfg @('/setacvalueindex', 'SCHEME_CURRENT', 'SUB_BUTTONS', 'LIDACTION', '0')).ExitCode -eq 0)
         $null = Invoke-Native $powercfg @('/setactive', 'SCHEME_CURRENT')
         if ($okLid) { Good "Closing the lid no longer sleeps it while plugged in." }
     }
-    if ($boxes['signin'].Checked) { Enable-AutoSignIn }
+    if ($choices['signin']) { Enable-AutoSignIn }
 }
 
 # Enable-AutoSignIn has Windows sign in by itself when the PC starts, by
@@ -2983,6 +3244,17 @@ function Confirm-AlwaysOn {
 # sign-in methods; a setting shows it again. The person unticks it and types
 # their password - Windows asks, in its own window.
 function Enable-AutoSignIn {
+    if ($script:Gui) {
+        $page = New-GuiPageText 'Signing in by itself' @(
+            'Windows will ask for permission, then open its own User Accounts window. In it:',
+            '',
+            '1.  Untick "Users must enter a user name and password to use this computer".',
+            '2.  Click OK.',
+            '3.  Type your Windows password twice and click OK. For a Microsoft account, its password - not the PIN.',
+            '',
+            'If your account has no password, Windows already signs in by itself: just close that window.')
+        [void](Show-GuiPage $page @('Continue'))
+    } else {
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
         $owner = New-TopmostOwner
@@ -2996,6 +3268,7 @@ function Enable-AutoSignIn {
             $owner.Dispose()
         }
     } catch { }
+    }
     $script = @'
 $ErrorActionPreference = 'SilentlyContinue'
 $key = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device'
@@ -3035,6 +3308,14 @@ function Test-DownloadRoom {
 # Confirm-HomeNetwork asks the network question in a Yes/No window, falling
 # back to the console only where no window can be shown. Returns $true for yes.
 function Confirm-HomeNetwork([string]$NetworkName) {
+    if ($script:Gui) {
+        $page = New-GuiPageText 'Is this your home network?' @(
+            "Windows is treating the network this PC is on (""$NetworkName"") as public - the setting for cafes and airports - so your phone, TV and other computers cannot reach EmberStorm.",
+            '',
+            'Yes: EmberStorm marks it as private so your other devices can connect. Windows will ask for permission.',
+            'No: nothing is changed.')
+        return ((Show-GuiPage $page @('No', 'Yes, it is my home network')) -like 'Yes*')
+    }
     $text = "Windows is treating the network this PC is on (""$NetworkName"") as public - the setting for cafes and airports - so your phone, TV and other computers cannot reach EmberStorm.`r`n`r`nIs this your own home network?`r`n`r`nYes: EmberStorm marks it as private so your other devices can connect. Windows will ask for permission.`r`nNo: nothing is changed."
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
