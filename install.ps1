@@ -608,7 +608,7 @@ function Complete-Gui([string]$Heading, [string]$Subheading, [string]$OpenUrl) {
     Wait-GuiClosed
 }
 
-function Stop-Gui([string]$Text) {
+function Stop-Gui([string]$Text, $Action = $null) {
     $w = $script:Gui
     $w.Running = $false
     Set-GuiStepMarks -Failed
@@ -626,6 +626,16 @@ function Stop-Gui([string]$Text) {
     $w.Open.Text = 'Show log file'
     $w.Open.Visible = $true
     $w.Close.Text = 'Close'
+    if ($Action) {
+        $act = New-Object System.Windows.Forms.Button
+        $act.Text = $Action.Label
+        $act.Location = New-Object System.Drawing.Point(152, 504)
+        $act.Size = New-Object System.Drawing.Size(180, 34)
+        $act.Tag = $Action.Run
+        $act.Add_Click({ param($sender) & $sender.Tag })
+        $w.Form.Controls.Add($act)
+        $w.Form.AcceptButton = $act
+    }
     Wait-GuiClosed
 }
 
@@ -663,6 +673,7 @@ function ConvertTo-ArgumentList($Bound) {
 #
 # The copy it runs is its own temporary file, because the file this run came
 # from may be a downloaded copy its parent is about to delete.
+$script:BoundArgs = $PSBoundParameters
 $script:WindowWanted = (-not $Launch) -and (-not $Console) -and ($env:SOUNDSTORM_CONSOLE -ne '1') -and [Environment]::UserInteractive
 if ($script:WindowWanted -and $env:SOUNDSTORM_WINDOW -ne '1' -and $PSCommandPath) {
     $canShow = $false
@@ -848,15 +859,77 @@ function Confirm-DockerGuide {
 # a desktop shortcut with a minimized window, so console text is written where
 # nobody will ever see it - the failure just looks like clicking the icon did
 # nothing at all.
-function Stop-With($text) {
+function Stop-With($text, $Action = $null) {
     Write-Host ""
     Write-Host "  EmberStorm could not finish." -ForegroundColor Red
     Write-Host ""
     Write-Host $text
     Write-Host ""
     if ($Launch) { Show-Problem $text }
-    if ($script:Gui) { Stop-Gui $text }
+    if ($script:Gui) { Stop-Gui $text $Action }
     exit 1
+}
+
+# Register-Resume has Windows start this setup once more, by itself, the next
+# time this person signs in: a fresh PC usually needs a restart part way
+# (Windows Subsystem for Linux, Docker, or virtualization switched on in the
+# BIOS), and people restarted and then never knew to run it again. The copy
+# it starts is kept in the person's own folder (the file this run came from
+# may be a temporary one) and is named so it fetches the newest setup first.
+# Returns $true once arranged.
+$script:ResumeKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce'
+function Register-Resume {
+    if ($Launch -or -not $PSCommandPath) { return $false }
+    try {
+        $folder = Join-Path $env:LOCALAPPDATA 'EmberStorm'
+        New-Item -ItemType Directory -Force -Path $folder | Out-Null
+        $copy = Join-Path $folder 'soundstorm-install.ps1'
+        if ($PSCommandPath -ne $copy) { Copy-Item -LiteralPath $PSCommandPath $copy -Force }
+        $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $arguments = @(ConvertTo-ArgumentList $script:BoundArgs) -join ' '
+        $command = "`"$powershellExe`" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$copy`" $arguments"
+        if (-not (Test-Path $script:ResumeKey)) { New-Item -Path $script:ResumeKey -Force | Out-Null }
+        Set-ItemProperty -Path $script:ResumeKey -Name 'EmberStormSetup' -Value $command.Trim() -ErrorAction Stop
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+# Clear-Resume takes that back: a setup run by hand meanwhile does not want a
+# second one starting at the next sign-in.
+function Clear-Resume {
+    Remove-ItemProperty -Path $script:ResumeKey -Name 'EmberStormSetup' -ErrorAction SilentlyContinue
+}
+
+# Stop-ForRestart is a stop whose cure is a restart: arranged to carry on by
+# itself afterwards, with a button that restarts now.
+function Stop-ForRestart([string]$Text) {
+    $after = if (Register-Resume) {
+        "`n`n  After the restart, sign in and the setup carries on by itself."
+    } else { '' }
+    Stop-With ($Text + $after) @{
+        Label = 'Restart now'
+        Run   = { Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\shutdown.exe') -ArgumentList '/r', '/t', '0' -WindowStyle Hidden }
+    }
+}
+
+# Confirm-TryAgain asks, after Windows' permission question was refused or
+# dismissed, whether to ask again - most often it was a misclick, and stopping
+# the whole setup for one was a dead end. $false where no window can be shown.
+function Confirm-TryAgain([string]$What) {
+    if (-not $script:Gui) { return $false }
+    $owner = New-TopmostOwner
+    try {
+        $answer = [System.Windows.Forms.MessageBox]::Show($owner,
+            "Windows asked for permission to $What, and it was not given. EmberStorm cannot be set up without it.`r`n`r`nAsk again? Choose Yes, then Yes when Windows asks.",
+            'EmberStorm - permission needed',
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Warning)
+    } finally {
+        $owner.Dispose()
+    }
+    return ($answer -eq [System.Windows.Forms.DialogResult]::Yes)
 }
 
 # Save-EmberStormLog puts EmberStorm's own recent log into the setup log, so
@@ -1457,7 +1530,9 @@ function Set-LanAccess([string]$Address, [int]$Port) {
 
     Note "Letting other devices on your home network reach EmberStorm."
     if (-not (Test-Administrator)) { Important "Windows will ask for permission - click Yes." }
-    $code = Enable-LanAccess $Port $network.InterfaceIndex $makePrivate
+    do {
+        $code = Enable-LanAccess $Port $network.InterfaceIndex $makePrivate
+    } while ($null -eq $code -and (Confirm-TryAgain 'let your other devices reach EmberStorm'))
     if ($null -eq $code) {
         Important "Permission was not given, so other devices still cannot reach it."
         return 'refused'
@@ -1682,7 +1757,9 @@ function Install-WSL {
     # --no-distribution because Docker brings its own. Without it Windows also
     # fetches Ubuntu: a gigabyte, several more minutes, and a first-run prompt
     # asking for a Linux username that nobody here will ever use again.
-    $code = Invoke-Elevated (Get-WslPath) @('--install', '--no-distribution')
+    do {
+        $code = Invoke-Elevated (Get-WslPath) @('--install', '--no-distribution')
+    } while ($null -eq $code -and (Confirm-TryAgain 'install Windows Subsystem for Linux'))
 
     if ($null -eq $code) {
         Stop-With @"
@@ -1705,15 +1782,12 @@ function Install-WSL {
         return
     }
 
-    Stop-With @"
+    Stop-ForRestart @"
   Windows Subsystem for Linux has to be there before Docker can run, and it
   is not finished yet.
 
-  This nearly always just needs a restart:
-
-    1. Restart the PC.
-    2. Run this setup again - it picks up where it left off, and nothing
-       you have already downloaded is lost.
+  This nearly always just needs a restart: Restart now, below. The setup
+  picks up where it left off, and nothing already downloaded is lost.
 
   If it stops here a second time, switch it on by hand:
 
@@ -1724,15 +1798,12 @@ function Install-WSL {
 }
 
 function Install-Docker {
+    # No winget - often so on a brand-new Windows until the Store has updated
+    # itself: Docker's own installer straight from Docker, with the same
+    # switches (a dead end before, pointing at a website).
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Stop-With @"
-  EmberStorm needs Docker Desktop, and this PC does not have the installer
-  tool (winget) that would fetch it automatically.
-
-  Install Docker Desktop from here, then run this again:
-
-    https://www.docker.com/products/docker-desktop/
-"@
+        Install-DockerDirect
+        return
     }
 
     Note "Docker Desktop is not installed. Getting it now."
@@ -1785,6 +1856,61 @@ function Install-Docker {
     Stop-ForDockerInstall $code
 }
 
+# Install-DockerDirect fetches Docker Desktop's installer from Docker itself
+# and runs it as administrator, quiet and with its terms accepted - the same
+# switches winget hands it.
+function Install-DockerDirect {
+    Note "Docker Desktop is not installed. Getting it from Docker now."
+    Note "This is a big download and takes a few minutes."
+    $script:dockerInstalledNow = $true
+    Show-DockerGuide -FirstRun
+    Hide-DockerDashboard -Quiet
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+    $url = "https://desktop.docker.com/win/main/$arch/Docker%20Desktop%20Installer.exe"
+    $installer = Join-Path $env:TEMP 'EmberStorm-Docker-Installer.exe'
+    $curl = Join-Path $env:SystemRoot 'System32\curl.exe'
+    $download = Start-Process -FilePath $curl -ArgumentList '-fsSL', '--retry', '3', '-o', "`"$installer`"", $url `
+        -WindowStyle Hidden -PassThru
+    $null = Wait-ProcessPumped $download
+    if ($download.ExitCode -ne 0 -or -not (Test-Path $installer) -or (Get-Item $installer).Length -lt 10MB) {
+        Stop-With @"
+  Docker Desktop could not be downloaded (curl exit code: $($download.ExitCode)).
+
+  Check the internet connection and run the setup again - or install
+  Docker Desktop yourself from here and then run the setup again:
+
+    https://www.docker.com/products/docker-desktop/
+"@
+    }
+    Important "Windows will ask for permission to install it - click Yes."
+    $process = $null
+    do {
+        try {
+            $process = Start-Process -FilePath $installer -ArgumentList 'install', '--quiet', '--accept-license' `
+                -Verb RunAs -WindowStyle Hidden -PassThru -ErrorAction Stop
+        } catch {
+            $process = $null
+        }
+    } while (-not $process -and (Confirm-TryAgain 'install Docker Desktop'))
+    if (-not $process) {
+        Stop-With @"
+  Installing Docker Desktop needs permission, and that was refused or
+  canceled.
+
+  Run the setup again and choose Yes when Windows asks.
+"@
+    }
+    $null = Wait-ProcessPumped $process
+    Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+    Refresh-Path
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        Good "Docker Desktop installed."
+        Hide-DockerDashboard
+        return
+    }
+    Stop-ForDockerInstall $process.ExitCode
+}
+
 # Invoke-WingetDocker runs winget with these arguments, elevated when the setup
 # is not, and answers its exit code.
 function Invoke-WingetDocker([string[]]$wingetArgs) {
@@ -1806,8 +1932,16 @@ function Invoke-WingetDocker([string[]]$wingetArgs) {
             # so the one with spaces in it (--override's) is quoted here; the
             # call above quotes it itself.
             $quoted = $wingetArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
-            $process = Start-Process -FilePath $winget -ArgumentList $quoted `
-                -Verb RunAs -WindowStyle Hidden -PassThru -ErrorAction Stop
+            $process = $null
+            do {
+                try {
+                    $process = Start-Process -FilePath $winget -ArgumentList $quoted `
+                        -Verb RunAs -WindowStyle Hidden -PassThru -ErrorAction Stop
+                } catch {
+                    $process = $null
+                }
+            } while (-not $process -and (Confirm-TryAgain 'install Docker Desktop'))
+            if (-not $process) { throw 'permission refused' }
             # Waited on here rather than with -Wait, which would freeze the
             # setup window for the minutes Docker Desktop takes to install.
             $null = Wait-ProcessPumped $process
@@ -1827,12 +1961,12 @@ function Invoke-WingetDocker([string[]]$wingetArgs) {
 }
 
 function Stop-ForDockerInstall($code) {
-    Stop-With @"
-  Docker Desktop did not finish installing. (winget exit code: $code)
+    Stop-ForRestart @"
+  Docker Desktop did not finish installing. (exit code: $code)
 
   This is usually one of two things:
 
-    * it needs a restart to finish - restart the PC, then run this again
+    * it needs a restart to finish - Restart now, below
     * Windows features for virtualization are off - Docker Desktop will say
       so if you open it from the Start menu
 
@@ -1886,7 +2020,7 @@ function Test-Virtualization {
 # The one failure this script cannot work around, so it gets the whole recipe
 # rather than a line saying to go and look it up.
 function Stop-ForVirtualization {
-    Stop-With @"
+    $text = @"
   This PC has hardware virtualization turned off, and Docker cannot run
   without it. Nothing has been installed.
 
@@ -1904,6 +2038,35 @@ function Stop-ForVirtualization {
   To check it worked: Ctrl+Shift+Esc, the Performance tab, click CPU, and
   read the Virtualization line on the right.
 "@
+    # The steps kept where they can be read again: they are gone from the
+    # screen the moment the PC restarts into its BIOS.
+    $saved = ''
+    try {
+        $desktop = [Environment]::GetFolderPath('Desktop')
+        $file = Join-Path $desktop 'EmberStorm - turn on virtualization.txt'
+        [IO.File]::WriteAllText($file, ($text -replace "`r?`n", "`r`n"))
+        $saved = "`n`n  These steps are saved on your desktop too, to read again."
+    } catch { }
+    $resume = if (Register-Resume) {
+        "`n  Once it is on, sign in again and the setup carries on by itself."
+    } else { '' }
+    $intro = "`n`n  Restart into BIOS setup, below, takes this PC straight into its setup"
+    $intro += "`n  screen on most PCs - then follow steps 2 and 3."
+    Stop-With ($text + $intro + $saved + $resume) @{
+        Label = 'Restart into BIOS setup'
+        Run   = {
+            try {
+                # /fw restarts into the firmware's own setup screen; it needs
+                # administrator, so Windows asks.
+                Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\shutdown.exe') `
+                    -ArgumentList '/r', '/fw', '/t', '0' -Verb RunAs -WindowStyle Hidden -ErrorAction Stop
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "This PC could not be restarted straight into its setup screen. Restart it yourself and press the setup key as it starts - usually Del or F2.",
+                    'EmberStorm') | Out-Null
+            }
+        }
+    }
 }
 
 # Start-Docker launches Docker Desktop and waits for its engine.
@@ -1991,12 +2154,11 @@ function Initialize-Docker {
     }
     Refresh-Path
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-        Stop-With @"
+        Stop-ForRestart @"
   Docker Desktop is installed but Windows has not picked it up in this
   window yet.
 
-  Restart the PC and run the setup again - a fresh Docker install usually
-  wants one anyway.
+  A fresh Docker install usually wants a restart anyway: Restart now, below.
 "@
     }
     if (-not (Test-DockerRunning)) { Start-Docker }
@@ -2206,6 +2368,21 @@ function New-TopmostOwner {
 # the fallback for a machine that cannot show a window.
 function Select-LibraryLocation([string]$Default, [string]$Intro = '') {
     $drives = Get-LocalDrives
+    # A small system drive beside a roomier one - a mini PC's built-in 64GB
+    # and its big drive, say: the roomier one is shown, and taken if the
+    # window is just closed. A film collection fills a small C: and then
+    # Windows with it.
+    $suggested = $false
+    if (-not $Intro -and $Default -match '^([A-Za-z]:)') {
+        $here = @($drives | Where-Object { $_.DeviceID -eq $Matches[1].ToUpper() }) | Select-Object -First 1
+        $roomiest = @($drives | Where-Object { $_.DriveType -eq 3 } | Sort-Object FreeSpace -Descending) | Select-Object -First 1
+        if ($here -and $roomiest -and $roomiest.DeviceID -ne $here.DeviceID -and
+            $here.FreeSpace -lt 100GB -and $roomiest.FreeSpace -gt 2 * $here.FreeSpace -and $roomiest.FreeSpace -gt 100GB) {
+            $Intro = "$($here.DeviceID) has only $(Format-Size $here.FreeSpace) free, so your music, films and books will be kept on $($roomiest.DeviceID), which has $(Format-Size $roomiest.FreeSpace):"
+            $Default = Join-Path ($roomiest.DeviceID + '\') 'EmberStorm'
+            $suggested = $true
+        }
+    }
     try {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
         [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -2306,7 +2483,7 @@ function Select-LibraryLocation([string]$Default, [string]$Intro = '') {
     } finally {
         $form.Dispose()
     }
-    if ($chosen -eq $Default) { return $null }
+    if ($chosen -eq $Default -and -not $suggested) { return $null }
     return $chosen
 }
 
@@ -3216,6 +3393,10 @@ if ($Launch) {
 }
 
 # --- installing -----------------------------------------------------------------
+
+# Run now, by hand or after a restart: nothing is to start again at the next
+# sign-in unless this run arranges it.
+if (-not $Launch) { Clear-Resume }
 
 $firstInstall = -not (Test-Path (Join-Path $Dir 'docker-compose.yml'))
 try { [IO.File]::WriteAllText($script:SetupLog, '') } catch { }
