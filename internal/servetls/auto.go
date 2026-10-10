@@ -119,6 +119,10 @@ type autoCert struct {
 	// checkEvery: the name service could not say whether remote access works,
 	// and half a day is too long to leave that unanswered.
 	recheckSoon bool
+	// unreachableTries counts the checks in a row that found a remote name
+	// that had been working not reachable: it is kept, and checked again
+	// soon, for a few tries before being dropped.
+	unreachableTries int
 
 	// refusedSince is when the name service first refused this install's
 	// registration (401) without a success since; zero while it answers.
@@ -543,6 +547,7 @@ func (a *autoCert) step(ctx context.Context) error {
 			publicName = name
 			a.mu.Lock()
 			a.clearedPublic = ""
+			a.unreachableTries = 0
 			a.mu.Unlock()
 			domains = append(domains, name)
 		case !definite && had != "":
@@ -562,6 +567,18 @@ func (a *autoCert) step(ctx context.Context) error {
 			// Never published, and the service could not be asked: try again
 			// soon rather than at the next half-day check.
 			a.log.Warn("could not check remote access with the name service; trying again soon")
+			a.mu.Lock()
+			a.recheckSoon = true
+			a.mu.Unlock()
+		case had != "" && a.takeUnreachableTry():
+			// Working until now, and not reachable on one check: seen right
+			// after a restart (2026-10-10), the router's port just opened.
+			// Dropped at once, phones away from home lost the server for the
+			// half day until the next check. Kept, and checked again soon, a
+			// few times before it is believed.
+			publicName = had
+			domains = append(domains, had)
+			a.log.Warn("remote access was not reachable just now; keeping the away name and checking again soon")
 			a.mu.Lock()
 			a.recheckSoon = true
 			a.mu.Unlock()
@@ -716,6 +733,21 @@ func (a *autoCert) publishRemote(ctx context.Context, reg names.Registration) (n
 		a.log.Info("remote access is reachable over IPv6", "name", n)
 	}
 	return name, definite
+}
+
+// unreachableRetries is how many checks in a row may find a working away
+// name unreachable before it is dropped, a few minutes apart.
+const unreachableRetries = 3
+
+// takeUnreachableTry uses up one of those checks, false once none are left.
+func (a *autoCert) takeUnreachableTry() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.unreachableTries >= unreachableRetries {
+		return false
+	}
+	a.unreachableTries++
+	return true
 }
 
 // remoteNameIn finds the remote name in a certificate this install already
