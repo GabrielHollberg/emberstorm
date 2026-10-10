@@ -3823,7 +3823,7 @@ function Enable-AutoSignIn {
             '',
             "!1.  First, click your own name in the list: $me",
             '      Windows signs in as whichever name is highlighted - with any other, it fails at every start.',
-            '2.  Untick "Users must enter a user name and password to use this computer".',
+            '!2.  Then untick "Users must enter a user name and password to use this computer".',
             '3.  Click OK.',
             '4.  Type your Windows password twice and click OK. For a Microsoft account, its password - not the PIN.',
             '',
@@ -3835,7 +3835,7 @@ function Enable-AutoSignIn {
         $owner = New-TopmostOwner
         try {
             [void][System.Windows.Forms.MessageBox]::Show($owner,
-                "Windows will now ask for permission, then open its own User Accounts window.`r`n`r`nIn it:`r`n  1. FIRST, click your own name in the list: $me`r`n     (Windows signs in as whichever name is highlighted.)`r`n  2. Untick ""Users must enter a user name and password to use this computer"".`r`n  3. Click OK.`r`n  4. Type your Windows password twice and click OK. (For a Microsoft account, its password - not the PIN.)`r`n`r`nIf your account has no password, Windows already signs in by itself: just close that window.",
+                "Windows will now ask for permission, then open its own User Accounts window.`r`n`r`nIn it:`r`n  1. FIRST, click your own name in the list: $me`r`n     (Windows signs in as whichever name is highlighted.)`r`n  2. THEN untick ""Users must enter a user name and password to use this computer"".`r`n  3. Click OK.`r`n  4. Type your Windows password twice and click OK. (For a Microsoft account, its password - not the PIN.)`r`n`r`nIf your account has no password, Windows already signs in by itself: just close that window.",
                 'EmberStorm - signing in by itself',
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Information)
