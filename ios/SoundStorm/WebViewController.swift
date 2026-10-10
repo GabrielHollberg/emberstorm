@@ -22,6 +22,8 @@ final class WebViewController: UIViewController {
     private var pendingInvite: String?
     private let scanner = CodeScanner()
     private let volumeKeys = VolumeKeys()
+    /// Handing shared files to the page, tried until it takes them.
+    private var sharedTries: Task<Void, Never>?
     #if DEBUG
     private var audioTested = false
     #endif
@@ -85,6 +87,11 @@ final class WebViewController: UIViewController {
 
         webView = WKWebView(frame: view.bounds, configuration: config)
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        // Files shared from another app (Share > EmberStorm) wait until the app
+        // is opened: handed to the page then.
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.handShared() }
+        }
         webView.navigationDelegate = self
         webView.uiDelegate = self
         // The page lays itself out under the status bar and home indicator
@@ -858,6 +865,61 @@ extension WebViewController: WKNavigationDelegate {
         return .allow
     }
 
+    // MARK: Shared from another app
+
+    /// Share > EmberStorm (the Share extension): what is waiting is handed to
+    /// the page's own review, as Add media's picked files are, once somebody
+    /// is signed in - the page says whether it took them, and is asked again
+    /// every few seconds for a minute after it loads (it signs in after).
+    private func handShared() {
+        sharedTries?.cancel()
+        SharedInbox.sweep(keeping: FileUploads.shared.waitingFiles)
+        guard !SharedInbox.readyShares().isEmpty else { return }
+        sharedTries = Task {
+            for _ in 0..<20 {
+                if await offerShared() { return }
+                try? await Task.sleep(for: .seconds(3))
+                if Task.isCancelled { return }
+            }
+        }
+    }
+
+    /// One try: every ready share moved to "taken" and handed over together;
+    /// put back if the page does not take them.
+    private func offerShared() async -> Bool {
+        let shares = SharedInbox.readyShares()
+        guard !shares.isEmpty else { return true }
+        var moved: [(from: URL, to: URL)] = []
+        var files: [FileUploads.Picked] = []
+        for share in shares {
+            guard let to = SharedInbox.markTaken(share) else { continue }
+            moved.append((share, to))
+            for file in SharedInbox.files(in: to) {
+                let attrs = try? FileManager.default.attributesOfItem(atPath: file.path)
+                let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
+                let modified = ((attrs?[.modificationDate] as? Date) ?? Date()).timeIntervalSince1970 * 1000
+                files.append(FileUploads.Picked(id: UUID().uuidString.lowercased(), name: file.lastPathComponent,
+                                                size: size, modified: modified, file: file.path))
+            }
+        }
+        guard !files.isEmpty else { return true }
+        FileUploads.shared.register(files)
+        let list = files.map { ["id": $0.id, "name": $0.name, "size": $0.size, "lastModified": $0.modified] as [String: Any] }
+        let took: Bool
+        if let data = try? JSONSerialization.data(withJSONObject: list), let json = String(data: data, encoding: .utf8) {
+            let answer = try? await webView.evaluateJavaScript(
+                "(typeof window.__soundstormShared === 'function' && window.__soundstormShared(\(json))) === true")
+            took = answer as? Bool == true
+        } else {
+            took = false
+        }
+        if !took {
+            FileUploads.shared.forget(files.map(\.id))
+            for m in moved { try? FileManager.default.moveItem(at: m.to, to: m.from) }
+        }
+        return took
+    }
+
     /// A new page (a reload, the move to the secure name, a server changed):
     /// the volume buttons go back to the phone. Left on, they kept turning a
     /// TV the new page knew nothing of, and the phone's own volume stayed
@@ -867,6 +929,7 @@ extension WebViewController: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        handShared()
         // What the server calls itself now, for the list of servers (the
         // owner may have renamed it since).
         let server = self.server
@@ -962,11 +1025,25 @@ extension WebViewController: WKUIDelegate {
     /// app is not on screen, or another dialog is up - it answers at once as
     /// Cancel would (`otherwise`): a question never shown never answered,
     /// and the page's confirm() waited for ever.
-    private func show(_ alert: UIAlertController, otherwise: @escaping () -> Void) {
+    /// Another dialog up, or one still closing (the page asking twice in a
+    /// row): it waits for it, a few seconds at most, rather than answering
+    /// Cancel straight away - which turned down a question nobody saw.
+    private func show(_ alert: UIAlertController, otherwise: @escaping () -> Void, tries: Int = 0) {
         var top: UIViewController = self
         while let next = top.presentedViewController { top = next }
-        guard view.window != nil, !(top is UIAlertController), !top.isBeingDismissed else {
+        guard view.window != nil else {
             otherwise()
+            return
+        }
+        if top is UIAlertController || top.isBeingDismissed || top.isBeingPresented {
+            guard tries < 20 else {
+                otherwise()
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self else { return otherwise() }
+                self.show(alert, otherwise: otherwise, tries: tries + 1)
+            }
             return
         }
         top.present(alert, animated: true)
