@@ -18,7 +18,41 @@ LABEL=SSDATA
 log() { echo "soundstorm-storage: $*"; }
 
 mkdir -p "$MNT" /run/soundstorm
-rm -f /run/soundstorm/no-data-drive
+rm -f /run/soundstorm/no-data-drive /run/soundstorm/storage-problem
+
+# A failure here stops Docker, and so EmberStorm (this unit is RequiredBy
+# docker.service): said in a file the box's screen shows (screen.sh), where
+# it used to say "starting..." for ever (the blind reviews, 2026-10-10). The
+# caretaker - the power button - does not need Docker, so it still works.
+problem() {
+	printf '%s\n' "$*" > /run/soundstorm/storage-problem
+	log "$*"
+	exit 1
+}
+storage_failed() {
+	code=$?
+	[ "$code" -eq 0 ] && return
+	[ -s /run/soundstorm/storage-problem ] ||
+		printf '%s\n' "Something went wrong preparing the storage drive. Switch the box off and on again; if this stays, contact support." > /run/soundstorm/storage-problem
+}
+trap storage_failed EXIT
+
+# The drive this box had, by its UUID in fstab. Once a box has had a data
+# drive it never goes on without it: a drive that died, came loose or showed
+# up late used to leave the box starting afresh on its system disk - "set up
+# your new EmberStorm", the household's accounts and media seemingly gone, and
+# anybody with the sticker's code able to claim it (the blind reviews).
+had=$(awk -v m="$MNT" '$2 == m && $1 ~ /^UUID=/ {sub(/^UUID=/, "", $1); print $1; exit}' /etc/fstab)
+if [ -n "$had" ] && ! mountpoint -q "$MNT"; then
+	udevadm settle 2>/dev/null || true
+	for _ in $(seq 1 45); do
+		[ -e "/dev/disk/by-uuid/$had" ] && break
+		sleep 2
+	done
+	[ -e "/dev/disk/by-uuid/$had" ] ||
+		problem "The box's storage drive is not responding. Switch the box off and on again; if this stays, contact support. Nothing has been erased."
+	mount "$MNT" || problem "The box's storage drive could not be opened. Switch the box off and on again; if this stays, contact support. Nothing has been erased."
+fi
 
 mounted() { mountpoint -q "$MNT"; }
 
@@ -75,7 +109,9 @@ if ! mounted; then
 			case "$name" in zram* | loop* | sr* | mmcblk*boot*) continue ;; esac
 			if blank "$name"; then
 				log "preparing /dev/$name as the data drive"
-				mkfs.btrfs -q -L "$LABEL" "/dev/$name"
+				# -K: no discard of the whole disk first, which on a big
+				# drive can take minutes and outlast the unit's start.
+				mkfs.btrfs -q -K -L "$LABEL" "/dev/$name"
 				udevadm settle
 				dev=/dev/$name
 				break

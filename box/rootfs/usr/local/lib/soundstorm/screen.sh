@@ -38,25 +38,42 @@ setting() {
 # A string field from a JSON answer, or nothing. The answers are the
 # server's own and flat; this is not a JSON reader and need not be.
 field() {
-	printf '%s' "$1" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"
+	printf '%s' "$1" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | tr -d '[:cntrl:]'
 }
 
-# The box's address on the home network: the first one that is not
-# Docker's own.
+# The box's address on the home network: the one its route out leaves
+# from, as prepare.sh takes it - never one of Docker's own networks (the
+# box's fixed 10.231.x ones were shown, with their QR code, when the cable
+# was out: the blind reviews, 2026-10-10). Nothing, with no network.
 address() {
-	for a in $(hostname -I 2>/dev/null); do
-		case "$a" in
-		172.1[7-9].* | 172.2[0-9].* | 172.3[01].* | *:*) ;;
-		*) echo "$a"; return ;;
-		esac
-	done
+	ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p' | head -n 1
+}
+
+# The name the box is really announced by: avahi gives a second box on one
+# network "soundstorm-2.local", and the hostname alone sent people to the
+# first box (the blind reviews).
+announced() {
+	n=$(busctl call org.freedesktop.Avahi / org.freedesktop.Avahi.Server GetHostNameFqdn 2>/dev/null | sed -n 's/^s "\(.*\)"$/\1/p')
+	echo "${n:-$(hostname).local}"
 }
 
 draw() {
 	health=$(curl -fsS -m 3 "http://127.0.0.1:$port/healthz" 2>/dev/null || true)
 	ip=$(address)
-	local_name="$(hostname).local"
+	local_name=$(announced)
 	printf '\033[2J\033[H\n'
+	# The storage drive missing or failing: EmberStorm is not started at all
+	# (storage.sh), and this is the only place that can say so.
+	if [ -s /run/soundstorm/storage-problem ]; then
+		printf '   EmberStorm cannot start\n\n'
+		fold -s -w 60 /run/soundstorm/storage-problem | tr -d '\033' | sed 's/^/   /'
+		printf '\n   To switch the box off, press the power button twice.\n'
+		return
+	fi
+	if [ -e /run/soundstorm/no-data-drive ]; then
+		printf '   Note: no storage drive was found, so everything is kept on\n'
+		printf '   the small built-in one. Contact support.\n\n'
+	fi
 	if [ -z "$health" ]; then
 		printf '   EmberStorm is starting...\n\n'
 		printf '   The first start takes a few minutes. This screen\n'
