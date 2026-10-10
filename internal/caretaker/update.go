@@ -284,6 +284,11 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
+	// Checked again here: a release found before its expiry and installed
+	// after it is past (the box's blind security review).
+	if time.Now().After(m.Expires) {
+		return u.fail(errors.New("this release has expired"), "That update is too old to install. The box will look for a newer one.")
+	}
 	u.set(func(s *Status) { s.State = "updating"; s.Message = "Downloading EmberStorm " + m.Version })
 
 	before, _ := u.health(ctx)

@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GabrielHollberg/soundstorm/internal/auth"
@@ -38,13 +39,24 @@ func (s *Server) caretakerCall(ctx context.Context, method, path string, body, o
 	if s.caretakerSocket == "" {
 		return 0, errNoCaretaker
 	}
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			var d net.Dialer
-			return d.DialContext(ctx, "unix", s.caretakerSocket)
-		}},
-	}
+	// One client for every call, and no connection kept open after one: a
+	// client made per call left its connection idle in a pool nothing
+	// closed, in EmberStorm and in the caretaker alike, on an endpoint
+	// anyone at home can ask (the box's blind security review).
+	s.caretakerOnce.Do(func() {
+		socket := s.caretakerSocket
+		s.caretakerClient = &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					var d net.Dialer
+					return d.DialContext(ctx, "unix", socket)
+				},
+			},
+		}
+	})
+	client := s.caretakerClient
 	var reader io.Reader
 	if body != nil {
 		data, _ := json.Marshal(body)
@@ -82,7 +94,7 @@ func (s *Server) buttonOpen(ctx context.Context) bool {
 func (s *Server) handleResetButton(w http.ResponseWriter, r *http.Request) {
 	// box: there is a button to press at all, for the sign-in screen's hint.
 	out := map[string]any{"open": false, "box": s.caretakerSocket != ""}
-	if s.caretakerSocket != "" && fromHomeNetwork(r) && s.auth.HasAccount() && s.buttonOpen(r.Context()) {
+	if s.caretakerSocket != "" && s.homeConnection(r) && s.auth.HasAccount() && s.buttonOpen(r.Context()) {
 		for _, u := range s.store.Users() {
 			if u.IsOwner() {
 				out["open"], out["owner"] = true, u.Name
@@ -96,7 +108,7 @@ func (s *Server) handleResetButton(w http.ResponseWriter, r *http.Request) {
 // no old one, while the button's window is open - once, and only from the
 // home network: never through the away-from-home name.
 func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request) {
-	if names.IsAwayName(requestHostname(r)) || !fromHomeNetwork(r) || !s.buttonOpen(r.Context()) {
+	if names.IsAwayName(requestHostname(r)) || !s.homeConnection(r) || !s.buttonOpen(r.Context()) {
 		writeError(w, http.StatusForbidden, "Press the power button on the box five times quickly, then try again within 15 minutes.")
 		return
 	}
@@ -152,6 +164,68 @@ func fromHomeNetwork(r *http.Request) bool {
 	}
 	a = a.Unmap()
 	return a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast()
+}
+
+// homeConnection is fromHomeNetwork, and on a box also not relayed from
+// inside Docker's own networks. On a box a connection from the home network
+// keeps its own address; one from the address of a network this container
+// is on was relayed - an IPv6 connection through Docker's proxy (the
+// container's networks have no IPv6, so every one arrives from the
+// gateway), or Tailscale's sidecar - and may come from anywhere (the box's
+// blind security review). Off a box, Docker Desktop gives every connection
+// the gateway's address, so there the check stays as it was.
+func (s *Server) homeConnection(r *http.Request) bool {
+	if !fromHomeNetwork(r) {
+		return false
+	}
+	if s.caretakerSocket == "" {
+		return true
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	a, err := netip.ParseAddr(host)
+	if err != nil {
+		return false
+	}
+	a = a.Unmap()
+	if a.IsLoopback() {
+		return true
+	}
+	for _, p := range ownNetworks() {
+		if p.Contains(a) {
+			return false
+		}
+	}
+	return true
+}
+
+// ownNetworks are the networks this process's interfaces are on, loopback
+// aside.
+var ownNetworks = sync.OnceValue(func() []netip.Prefix {
+	var out []netip.Prefix
+	addrs, _ := net.InterfaceAddrs()
+	for _, a := range addrs {
+		n, ok := a.(*net.IPNet)
+		if !ok || n.IP.IsLoopback() {
+			continue
+		}
+		if p, err := netip.ParsePrefix(n.String()); err == nil {
+			out = append(out, p.Masked())
+		}
+	}
+	return out
+})
+
+// DELETE /api/reset: an erase still waiting for the box's power button is
+// taken back (owner).
+func (s *Server) handleCancelReset(w http.ResponseWriter, r *http.Request) {
+	if status, err := s.caretakerCall(r.Context(), http.MethodPost, "/reset/cancel", nil, nil); err != nil || status != http.StatusOK {
+		writeError(w, http.StatusBadGateway, "The box could not be asked. Do not press its power button; the erase is cancelled by itself after ten minutes.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"cancelled": true})
 }
 
 // GET /api/reset/summary: what an erase would delete, to say before asking.

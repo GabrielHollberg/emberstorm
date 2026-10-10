@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -156,6 +157,34 @@ func TestTheButtonsResetIsOnlyFromHome(t *testing.T) {
 		if got := fromHomeNetwork(r); got != home {
 			t.Errorf("%s: from home %v, want %v", addr, got, home)
 		}
+	}
+}
+
+// On a box, a connection from one of the container's own networks was
+// relayed (Docker's proxy for IPv6, Tailscale's sidecar) and is not taken
+// for the home network; off a box it is, as Docker Desktop gives every
+// connection such an address.
+func TestARelayedConnectionIsNotFromHomeOnABox(t *testing.T) {
+	nets := ownNetworks()
+	if len(nets) == 0 {
+		t.Skip("no network here")
+	}
+	relayed := nets[0].Addr().Next()
+	if !relayed.IsPrivate() {
+		t.Skip("this network is not a private one")
+	}
+	r := httptest.NewRequest(http.MethodPost, "/api/reset/owner-password", nil)
+	r.RemoteAddr = netip.AddrPortFrom(relayed, 40000).String()
+	box := &Server{caretakerSocket: "/run/x"}
+	if box.homeConnection(r) {
+		t.Errorf("%s, relayed, was taken for home on a box", relayed)
+	}
+	if !(&Server{}).homeConnection(r) {
+		t.Errorf("%s was refused off a box", relayed)
+	}
+	r.RemoteAddr = "127.0.0.1:5000"
+	if !box.homeConnection(r) {
+		t.Error("the box itself was refused")
 	}
 }
 

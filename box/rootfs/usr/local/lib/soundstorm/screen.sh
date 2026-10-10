@@ -9,6 +9,10 @@
 # Run by soundstorm-screen.service on tty1, in place of the login prompt,
 # and redrawn when anything on it changes (checked every few seconds).
 set -u
+# A keyboard plugged into the box cannot stop or freeze the screen: Ctrl-C
+# restarted it, and Ctrl-Z stopped it for good (the box's blind review).
+trap '' INT QUIT TSTP
+stty -isig 2>/dev/null || true
 
 env=/opt/soundstorm/.env
 port=8099
@@ -16,6 +20,8 @@ port=8099
 # "<code> <until>". Never asked of its socket, which the app's container
 # shares.
 buttoncode=/var/lib/soundstorm-caretaker/button-code
+# An erase asked for in the app, waiting for five presses: "<until>".
+erasewait=/var/lib/soundstorm-caretaker/erase-waiting
 
 # Big letters, where the font is there (console-setup-linux), and no kernel
 # messages written over the screen.
@@ -38,7 +44,7 @@ setting() {
 # A string field from a JSON answer, or nothing. The answers are the
 # server's own and flat; this is not a JSON reader and need not be.
 field() {
-	printf '%s' "$1" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | tr -d '[:cntrl:]'
+	printf '%s' "$1" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | LC_ALL=C tr -cd '[:print:]' | cut -c1-80
 }
 
 # The box's address on the home network: the one its route out leaves
@@ -115,7 +121,17 @@ draw() {
 			case "$c" in [0-9][0-9][0-9][0-9][0-9][0-9]) ;; *) c= ;; esac
 			[ -n "$c" ] && [ "${until:-0}" -gt "$(date +%s)" ] 2>/dev/null && bcode=$c
 		fi
-		if [ -n "$bcode" ]; then
+		ewait=
+		if [ -r "$erasewait" ]; then
+			read -r eu <"$erasewait" || true
+			[ "${eu:-0}" -gt "$(date +%s)" ] 2>/dev/null && ewait=1
+		fi
+		if [ -n "$ewait" ]; then
+			printf '\n   ERASING THIS BOX WAS ASKED FOR IN THE APP.\n'
+			printf '   Pressing the power button five times now erases\n'
+			printf '   everything on it. To keep it, do not press the button:\n'
+			printf '   it is cancelled by itself within ten minutes.\n'
+		elif [ -n "$bcode" ]; then
 			printf '\n   The power button was pressed. To choose a new password,\n'
 			printf '   open the sign-in screen and type this code:\n\n'
 			printf '      %s %s\n\n' "$(printf %s "$bcode" | cut -c1-3)" "$(printf %s "$bcode" | cut -c4-6)"

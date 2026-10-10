@@ -123,7 +123,7 @@ func (s *Server) handlePendingSignIn(w http.ResponseWriter, r *http.Request) {
 		// Only at home: the code is on the box's sticker, and anybody who
 		// once saw it, with a password, would otherwise get past approval
 		// from anywhere (the thirteenth security pass).
-		home := !names.IsAwayName(requestHostname(r)) && fromHomeNetwork(r)
+		home := !names.IsAwayName(requestHostname(r)) && s.homeConnection(r)
 		if !home || s.approvalCode == "" || given == "" || subtle.ConstantTimeCompare([]byte(given), []byte(s.approvalCode)) != 1 {
 			p.mu.Unlock()
 			writeError(w, http.StatusForbidden, "that is not the setup code")

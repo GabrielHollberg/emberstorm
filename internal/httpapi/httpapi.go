@@ -198,6 +198,8 @@ type Server struct {
 	// caretakerSocket is the box caretaker's socket (reset.go); empty off a
 	// box.
 	caretakerSocket string
+	caretakerOnce   sync.Once
+	caretakerClient *http.Client
 
 	// uploads counts each account's in-flight uploads; see takeUploadSlot.
 	uploadsMu sync.Mutex
@@ -653,6 +655,7 @@ func (s *Server) Routes() http.Handler {
 	owner.HandleFunc("DELETE /api/invites/{id}", s.handleCancelInvite)
 	owner.HandleFunc("GET /api/reset/summary", s.handleResetSummary)
 	owner.HandleFunc("POST /api/reset", s.handleReset)
+	owner.HandleFunc("DELETE /api/reset", s.handleCancelReset)
 	owner.HandleFunc("GET /api/drives", s.handleDrives)
 	owner.HandleFunc("GET /api/drives/import", s.handleDriveImportStatus)
 	owner.HandleFunc("POST /api/drives/import/stop", s.handleDriveImportStop)
