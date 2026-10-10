@@ -133,6 +133,80 @@ Web changes for the phone apps always go to main, never into an app's folder.
 - Never print credentials. Commits end with the Co-Authored-By line the
   session is given; never put a model name in a commit.
 
+## Catching the Mac and Linux up (written 2026-10-10, from the PC)
+
+A whole day on the Windows setup and the web app (see "Installing, updating,
+removing" and the welcome under "Nothing found, said plainly"). One list of
+what is left for the other platforms, so nothing is lost in the long notes
+below; tick items off here.
+
+**Nothing to do: the web changes reach the iPhone app by themselves** (it
+shows the page): the welcome one step at a time with the address first, the
+"drop files on any EmberStorm screen" wording, Add your music no longer ticked
+by the starter library. The offer to install EmberStorm as an app is never
+shown inside the phone apps (`window.soundstormApp`).
+
+**For the Mac: the iPhone and Apple TV apps** - open items gathered from the
+sections below, newest first:
+1. **The audiobook's place, saved by the app** (2026-10-09, "An audiobook's
+   place, wherever it was listened to"): take `soundstormApp.place` in
+   `pageScript` and PUT `{seconds, duration, finished}` every ten seconds while
+   playing and on pause, end and stop - Android 0.54 does. Without it an hour
+   listened with the screen off is an hour back on the next device.
+2. **Photo backup checks only what is new** (2026-10-09, "And each run checks
+   only what is new"): the folder marker (`GET /api/photos/backup/marker`),
+   assets confirmed kept with their `modificationDate`, a full check daily or
+   when the marker moves - as Android 0.53.
+3. **The bug review's list** (2026-10-09, "For the Mac, from this review
+   (iPhone and Apple TV)"): the TV's `moveServer` copying the
+   `__Host-soundstorm_session` cookie too; backup's export error cleared after
+   a run gets through; `FileUploads` sending each job to its own server; Up next
+   not saving the next episode as finished; a book's place not saved as 0 before
+   its resume lands; `VolumeKeys` off when the page goes; the background task
+   scheduled again; leftover backup copies and the restore race.
+4. Older and still open: a Share extension (as Android's Share > EmberStorm);
+   the iPhone's `confirm()` while something is presented.
+
+**Mac and Linux installer (`install.sh`) against today's Windows setup** -
+what Windows does that `install.sh` does not yet:
+1. **Mark an install as installed** (`SOUNDSTORM_INSTALLED=1` in `.env` once
+   EmberStorm has started and answered). Today a compose file means "update",
+   so a first install stopped during the download is an update next time and
+   skips the sleep question and the room check.
+2. **Shortcuts with the cloud.** None are made: a Mac gets no app to click, a
+   Linux desktop no launcher. Mac: an EmberStorm app in ~/Applications that
+   starts Docker Desktop if needed and opens the address (the `-Launch` of the
+   Windows setup), with the cloud as its icon (an .icns drawn by
+   `scripts/make-icons.py`); Linux: `~/.local/share/applications/emberstorm.desktop`
+   and the icon. Then the finish says how to keep it (Keep in Dock; add to
+   favourites) as Windows says Pin to taskbar.
+3. **`?here=server`** on the address it opens (`open_browser`) and on the new
+   app's, so the server's own computer gets no "install as an app" offer.
+4. **Uninstalling leaves only what the person keeps**: asked first, as Windows
+   asks - keep a copy of the accounts (ticked), remove Docker (unticked; the
+   Mac's Docker Desktop has its own uninstall in the app, Linux's Docker is the
+   system's - leave it, say so), put back the sleep setting it changed (Mac
+   `pmset -c sleep` and `autorestart`, recorded before changing them in a file
+   like Windows' `changes.json`; Linux the GNOME setting and logind's lid); the
+   app or launcher removed; an install folder left empty removed.
+5. **Docker's data with the library** (Windows: the library's internal drive,
+   never a removable one). Linux: `data-root` in `/etc/docker/daemon.json`
+   before Docker first starts, when the setup installs Docker and the library
+   is on another internal disk; the room check on that disk. Mac: Docker
+   Desktop's disk can only be moved in its settings, which macOS guards (the
+   privacy prompt seen 2026-10-08) - leave it, and check room in the home
+   folder as now.
+6. Not needed there: the window freezing, WSL and its welcome, Docker's desktop
+   icon, the Settings, Apps entry.
+**Who does what:** the PC writes these in `install.sh` and tests the Linux half
+in containers or the box's VM; the Mac then runs the whole install on a Mac -
+never done end to end yet - and fixes what only a Mac shows (pmset, the app,
+Docker Desktop's first start).
+
+**And the website and apps on a Mac**: Safari on a Mac offers no install
+question to a page; it has File > Add to Dock. The install offer could say so
+there as it says Share > Add to Home Screen on an iPhone (the PC, in app.js).
+
 ## For the Mac, now (2026-10-08, from the PC)
 
 *(All done on the Mac, 2026-10-08: the git email is GitHub's private address;
