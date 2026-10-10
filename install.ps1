@@ -1450,6 +1450,21 @@ function Get-DockerPrivateBlocks {
 # in: EmberStorm's Allow rule is there for this port, and nothing blocks
 # Docker's listener on Private. Readable without administrator, which is what
 # keeps an update from asking for permission every time.
+# DockerRuleName names the rules the setup gives Docker's backend ahead of its
+# first start (Enable-LanAccess).
+$script:DockerRuleName = 'EmberStorm - Docker Desktop Backend'
+
+# Test-DockerRulesReady says whether Docker's backend already has a rule, so
+# Windows will not ask about it.
+function Test-DockerRulesReady {
+    try {
+        return @(Get-NetFirewallApplicationFilter -ErrorAction Stop |
+            Where-Object { $_.Program -like '*\com.docker.backend.exe' }).Count -gt 0
+    } catch {
+        return $false
+    }
+}
+
 function Test-LanAccessReady([int]$Port) {
     try {
         $ours = @(Get-NetFirewallRule -DisplayName $script:LanRuleName -ErrorAction Stop |
@@ -1493,6 +1508,19 @@ try {
         if (`$profiles -match 'Any|Public') { `$keep += 'Public' }
         if (`$keep.Count) { Set-NetFirewallRule -Name `$rule.Name -Profile (`$keep -join ',') } else { Disable-NetFirewallRule -Name `$rule.Name }
     }
+    # Docker's backend given its answer before it first listens, so Windows
+    # shows no "allow Docker Desktop Backend?" alert: allowed on Private,
+    # blocked on Public - what the alert's own default would have made.
+    try {
+        `$backend = Get-ChildItem -Path (Join-Path `$env:ProgramFiles 'Docker') -Recurse -Filter 'com.docker.backend.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (`$backend) {
+            Get-NetFirewallRule -DisplayName '$($script:DockerRuleName)*' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+            New-NetFirewallRule -DisplayName '$($script:DockerRuleName) (private)' -Direction Inbound -Action Allow ``
+                -Program `$backend.FullName -Profile Private,Domain | Out-Null
+            New-NetFirewallRule -DisplayName '$($script:DockerRuleName) (public)' -Direction Inbound -Action Block ``
+                -Program `$backend.FullName -Profile Public | Out-Null
+        }
+    } catch { }
     exit 0
 } catch {
     exit 1
@@ -2614,6 +2642,66 @@ function Show-TailscaleDialog {
         $form.Dispose()
     }
     return $key
+}
+
+# Confirm-StayAwake offers to keep a plugged-in PC from sleeping: asleep, it
+# answers nobody, and Windows' default puts a PC to sleep after half an hour
+# untouched - a server the phone could reach only after somebody moved the
+# mouse (2026-10-09). Asked, never assumed: on a laptop carried about it is
+# the wrong answer. Only the plugged-in timeouts change; on battery Windows
+# keeps its own.
+function Confirm-StayAwake {
+    try {
+        $battery = @(Get-CimInstance Win32_Battery -ErrorAction Stop)
+    } catch {
+        $battery = @()
+    }
+    $standby = $null
+    try {
+        $out = & (Join-Path $env:SystemRoot 'System32\powercfg.exe') /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>$null
+        $line = @($out | Where-Object { $_ -match 'Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)' }) | Select-Object -First 1
+        if ($line -and $line -match '0x([0-9a-fA-F]+)') { $standby = [Convert]::ToInt32($Matches[1], 16) }
+    } catch { }
+    if ($standby -eq 0) { return }   # already never sleeps when plugged in
+    $what = if ($battery.Count) { 'This laptop goes to sleep' } else { 'This PC goes to sleep' }
+    $text = "$what when it is left alone for a while, and asleep, EmberStorm cannot be reached - your phone and TV would find nothing until somebody wakes it.`r`n`r`nKeep it awake while it is plugged in?`r`n`r`nThe screen still turns off. You can change this any time in Windows Settings, System, Power."
+    try {
+        Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
+        $owner = New-TopmostOwner
+        try {
+            $answer = [System.Windows.Forms.MessageBox]::Show($owner, $text, 'EmberStorm - keep this PC awake?',
+                [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+        } finally {
+            $owner.Dispose()
+        }
+        if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) { Note "Leaving the sleep settings as they are."; return }
+    } catch {
+        return
+    }
+    $powercfg = Join-Path $env:SystemRoot 'System32\powercfg.exe'
+    $ok = ((Invoke-Native $powercfg @('/change', 'standby-timeout-ac', '0')).ExitCode -eq 0)
+    $null = Invoke-Native $powercfg @('/change', 'hibernate-timeout-ac', '0')
+    if ($ok) { Good "This PC stays awake while it is plugged in." }
+    else { Note "Could not change the sleep setting. Set Sleep to Never in Windows Settings, System, Power." }
+}
+
+# Test-DownloadRoom stops before the long download when the drive Docker keeps
+# it on has too little room, saying how much and what to do.
+function Test-DownloadRoom {
+    try {
+        $root = [IO.Path]::GetPathRoot($env:LOCALAPPDATA)
+        $free = (New-Object IO.DriveInfo $root).AvailableFreeSpace
+    } catch {
+        return
+    }
+    if ($free -ge 20GB) { return }
+    Stop-With @"
+  EmberStorm's programs need about 20 GB free on $($root.TrimEnd('\')), where Docker
+  keeps them, and it has $(Format-Size $free).
+
+  Free some space there - Settings, System, Storage shows what is using it -
+  then run the setup again. Your library can still go on another drive.
+"@
 }
 
 # Confirm-HomeNetwork asks the network question in a Yes/No window, falling
@@ -3798,6 +3886,19 @@ if (-not $NoTailscale) {
 $composeArgs = @()
 if ($useTailscale) { $composeArgs = @('--profile', 'tailscale') }
 
+# Asked before the long download, not after it: people are at the screen
+# now, and were not twenty minutes later. Opening the network also gives
+# Docker's own firewall rules ahead of its first start, so Windows' "allow
+# Docker Desktop Backend?" alert never appears (2026-10-09).
+$lan = Get-LanAddress
+$lanAccess = Set-LanAccess $lan ([int]$port)
+if (-not $upgrade) { Confirm-StayAwake }
+
+# Room for the download, on the drive Docker keeps it on (its disk lives in
+# the person's own folder, on C: unless moved): a full drive failed part way
+# with an error from Docker that nobody could read.
+if (-not $upgrade) { Test-DownloadRoom }
+
 if ($upgrade) {
     Step "Step 3 of 4 - Checking for a newer version"
 } else {
@@ -3840,7 +3941,7 @@ if ($pull.ExitCode -ne 0 -and $upgrade) {
 }
 
 Step "Step 4 of 4 - Starting EmberStorm"
-if ($firstInstall) {
+if ($firstInstall -and -not (Test-DockerRulesReady)) {
     # The dialog appears the moment the port is first published, i.e. during
     # the next command, and its default answer is the one that shuts phones
     # out on a network Windows thinks is public.
@@ -3878,8 +3979,6 @@ if (-not $NoShortcuts) {
 
 # The waiting happens before anything says "finished". It used to come after
 # "Opening it now", which then sat for up to 45 seconds with nothing opening.
-$lan = Get-LanAddress
-$lanAccess = Set-LanAccess $lan ([int]$port)
 $secure = ''
 if ($tlsMode -eq 'auto') {
     Note "Finishing up: getting a secure address for phones and other devices."
@@ -4056,5 +4155,5 @@ if ($movedFrom) {
 if ($upgrade) {
     Complete-Gui 'EmberStorm is up to date' 'It is running. Your library, accounts and settings are as they were.' $openUrl
 } else {
-    Complete-Gui 'EmberStorm is ready' 'It is installed and running, and starts by itself when you turn the PC on.' $openUrl
+    Complete-Gui 'EmberStorm is ready' 'It is installed and running. It starts by itself when you sign in to this PC - after a restart or a power cut, sign in and it comes back.' $openUrl
 }
