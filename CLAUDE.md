@@ -5128,6 +5128,14 @@ the library folder's shortcut keeps the folder icon. **Plain bitmaps inside**
 Windows' own icon reader at 48px. Checked: a shortcut made with it, and Windows
 reading the icon at 16, 32, 48 and 256. Not seen: on the test box's desktop.
 
+**Signing in by itself names the account to click, first and bold** (2026-10-10,
+the test box, twice: Windows signs in as whichever name is highlighted in
+netplwiz, a half-made account from Windows' own setup was, and every start
+said "wrong password"). Step 1 is now "First, click your own name in the list:
+<user name>" (a Microsoft account's said to be listed by its email), in bright
+bold (`New-GuiPageText` draws a line starting with "!" so). Checked: the page
+drawn.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
