@@ -331,7 +331,16 @@ decided past the first test unit.
   Checked in the VM against a test channel with a development key: a good
   release installed in 30s; a broken one (SoundStorm's image swapped for
   another) was undone after its ten minutes - the snapshot put back as the
-  volumes, the old images running, all 9 sources again. **The real release
+  volumes, the old images running, all 9 sources again. **Old versions are
+  removed after an update** (2026-10-10, found asking whether C: and D:
+  matter on the box - they do not, as the data drive holds every data
+  folder): nothing took an update's old images away, so the 64GB eMMC would
+  fill over a year or two of updates. Once an update is in and healthy,
+  images of the box's own repositories that neither the running release, the
+  one before it nor a container uses are removed (`pruneImages`; none when
+  Docker cannot say what is in use). Checked: a pretend box through three
+  updates (`TestOldVersionsAreRemovedAfterAnUpdate`), and Docker's own output
+  on this PC matching what the code reads. Not run in the VM. **The real release
   key is not made yet**: whoever holds it can update every box, and losing it
   means no box can be updated again - it must live off this repository, and
   be backed up, before the first box ships. Not built: Settings > Updates in
