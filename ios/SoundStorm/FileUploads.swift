@@ -75,6 +75,10 @@ final class FileUploads: NSObject {
         var dest: String?
         var error: String?
         let file: String
+        /// The server this file goes to - its own, not the queue's latest: a
+        /// server switched while files were still going sent the rest there.
+        /// Missing in a queue from before, which falls back to the queue's.
+        var server: String?
     }
 
     private struct Queue: Codable {
@@ -201,7 +205,7 @@ final class FileUploads: NSObject {
             found.append(Job(id: id, name: p.name, size: p.size, path: j["path"] as? String ?? p.name,
                              kind: j["kind"] as? String ?? "", group: j["group"] as? String ?? "",
                              conflict: j["conflict"] as? String ?? "", as: j["as"] as? String ?? "",
-                             taken: (j["taken"] as? NSNumber)?.int64Value ?? 0, state: "waiting", file: p.file))
+                             taken: (j["taken"] as? NSNumber)?.int64Value ?? 0, state: "waiting", file: p.file, server: server))
         }
         // A batch that has finished is replaced; one still going is added to.
         let keep = queue.jobs.filter { $0.state == "waiting" }
@@ -274,13 +278,21 @@ final class FileUploads: NSObject {
     /// Hands iOS every waiting file it does not have yet - while charging, if
     /// that was asked for (a background session cannot wait for power, so
     /// this waits, and goes when the phone is plugged in).
+    /// One handing-over at a time: two at once (the page asking while the
+    /// charger was plugged in) both found a file not yet with iOS and handed
+    /// it over twice.
+    private var resuming: Task<Void, Never>?
+
     func resume() {
-        guard !queue.stop, !queue.server.isEmpty, let server = URL(string: queue.server) else { return }
+        guard !queue.stop, !queue.server.isEmpty else { return }
         if charging && ![.charging, .full].contains(UIDevice.current.batteryState) {
             UIDevice.current.isBatteryMonitoringEnabled = true
             return
         }
-        Task {
+        let previous = resuming
+        resuming = Task {
+            await previous?.value
+            guard !queue.stop else { return }
             // What iOS still has from before (a relaunch).
             for session in sessions {
                 for task in await session.allTasks where task.state == .running || task.state == .suspended {
@@ -288,6 +300,7 @@ final class FileUploads: NSObject {
                 }
             }
             for job in queue.jobs where job.state == "waiting" && !inFlight.contains(job.id) {
+                guard let server = URL(string: job.server ?? queue.server) else { continue }
                 guard FileManager.default.fileExists(atPath: job.file) else {
                     finish(job.id, state: "failed", dest: nil, error: "the file can no longer be read")
                     continue
@@ -303,6 +316,9 @@ final class FileUploads: NSObject {
                 } catch {
                     return // not known yet: the page asking again tries again
                 }
+                // Still waiting, and still not with iOS, after the wait above.
+                guard !queue.stop, !inFlight.contains(job.id),
+                      queue.jobs.contains(where: { $0.id == job.id && $0.state == "waiting" }) else { continue }
                 let task = (wifiOnly ? wifiNetwork : anyNetwork).uploadTask(with: request, fromFile: URL(fileURLWithPath: job.file))
                 task.taskDescription = job.id
                 inFlight.insert(job.id)
