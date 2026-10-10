@@ -3361,7 +3361,7 @@ function Select-LibraryInWindow([string]$Default, [string]$Intro, $Drives, [bool
             $gap2.Height = 8
             [void]$page.Children.Add($gap2)
             if ($planned) {
-                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data - about 20 GB at first, growing with your library - goes on $([IO.Path]::GetPathRoot($planned).TrimEnd('\')) too, in $planned." 13 '#B9B9C6'))
+                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data (about 20 GB at first, growing with your library) is kept on $([IO.Path]::GetPathRoot($planned).TrimEnd('\')) too." 13 '#B9B9C6'))
                 if ($systemFree -ge 25GB) {
                     $keepOnC = New-Object System.Windows.Controls.CheckBox
                     $keepOnC.IsChecked = [bool]$script:DockerOnSystem

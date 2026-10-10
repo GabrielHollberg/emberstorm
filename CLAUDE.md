@@ -5034,18 +5034,25 @@ small "Starting EmberStorm" window would help); the finish card is full on
 a first install; updates unsigned from main; Windows' prompts name Windows
 PowerShell (only an EmberStorm program of its own could change that).
 
-**Docker's data on a second drive when C: is small** (2026-10-10, the first
-try on the test box: Windows on its 64GB eMMC left 8GB, and the room check
-stopped though a 1TB drive sat beside it). When Docker is still to be
-installed and C: has under 25GB free, its data goes on the roomiest other
-internal NTFS drive with 20GB free (`Get-DockerDataRoot`,
-`<drive>\EmberStorm-Docker`), given to Docker's installer as
-`--wsl-default-data-root`; C: then needs only 5GB, for Docker itself. A
-Docker already installed keeps its data where it is. Checked: the choice on
-this PC's drives (the internal one with room, USB sticks passed over), the
-elevated script with the option parsing. **Not checked**: Docker's installer
-taking the option (from Docker's documented install options) - the box is
-the test.
+**Docker's data goes with the library** (2026-10-10, the owner's design, after
+the test box's 64GB C: had 8GB left beside a 1TB drive). EmberStorm's own data
+(Docker's: about 20GB at first, growing with the library - thumbnails, the
+media servers' databases) goes on the library's drive when that drive is
+another one inside the PC (`<drive>\EmberStorm-Docker`, Docker's installer's
+`--wsl-default-data-root`), so everything is where the person chose and C:
+does not slowly fill; on C: with the library there; never on a drive that
+can be unplugged (USB, SD or FireWire by how Windows says it is connected -
+many USB disks call themselves fixed; `Test-InternalDrive`): with the library
+external, C:, or the roomiest internal drive when C: is short. The library
+page says where it goes and, when C: has 25GB, offers **Keep EmberStorm's own
+data on C: instead**; kept across a restart and Try again. The room check
+runs after the library question, on the drives things will really use (C:
+needing only 5GB for Docker itself when its data goes elsewhere). A Docker
+already installed keeps its data where it is (Docker's own settings can move
+it). Checked: the rules on this PC's drives (two internal NVMe and two USB
+correctly told apart, seven cases), the page drawn, the elevated script with
+the option parsing. **Not checked**: Docker's installer taking the option -
+the box is the test.
 
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
