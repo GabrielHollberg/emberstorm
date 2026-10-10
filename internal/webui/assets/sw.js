@@ -104,20 +104,53 @@ function offlineStartAllowed(request, url) {
     && /\.(?:emberstorm\.app|soundstorm\.dev)$/.test(url.hostname);
 }
 
+// A server switched off answers "no"; one unplugged, or a home address seen
+// from another network, often answers nothing at all, and the request waits
+// for minutes. With a kept copy to fall back on, an answer that has not
+// begun within a few seconds counts as none: the app with what is
+// downloaded, not a black screen waiting (the owner's report, 2026-10-09: the
+// server's cable out, the phone app went black and never opened). Only the
+// start of the answer is timed - a slow link still starts within this - and
+// with nothing kept the request waits as long as it takes.
+// Once one request has given up, the next half minute's take their kept
+// copies at once: the page's own files each waited their six seconds too.
+const GIVE_UP_MS = 6000;
+let silentUntil = 0;
+
+function fetchOrGiveUp(request) {
+  if (Date.now() < silentUntil) return Promise.reject(new Error('no answer'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      silentUntil = Date.now() + 30000;
+      reject(new Error('no answer'));
+    }, GIVE_UP_MS);
+    fetch(request).then(
+      response => { clearTimeout(timer); silentUntil = 0; resolve(response); },
+      err => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (offlineStartAllowed(event.request, url)) {
-    event.respondWith(fetch(event.request).catch(async () => {
+    event.respondWith((async () => {
       const cache = await caches.open(OFFLINE_SHELL);
-      return (await cache.match('/')) || Response.error();
-    }));
+      const shell = await cache.match('/');
+      try {
+        return await (shell ? fetchOrGiveUp(event.request) : fetch(event.request));
+      } catch {
+        return shell || Response.error();
+      }
+    })());
     return;
   }
   if (!handles(event.request, url)) return;
 
   event.respondWith((async () => {
     try {
-      const response = await fetch(event.request);
+      const kept = await caches.match(event.request);
+      const response = await (kept ? fetchOrGiveUp(event.request) : fetch(event.request));
       // Only a real answer is worth keeping. Caching a 404 or a redirect to
       // the login gate would survive the thing that caused it.
       if (response && response.ok && response.type === 'basic') {
