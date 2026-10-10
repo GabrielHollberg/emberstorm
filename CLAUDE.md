@@ -5107,6 +5107,16 @@ install) there is still no entry: Docker is in Settings, Apps on its own.
 Checked: the four cases of the entry and the install mark on a throwaway
 key, the setup in a scratch folder. Not seen: an uninstall of a stopped setup.
 
+**The finish waits for the click** (2026-10-10, the owner's choices after the
+test box): with the window, the browser no longer opens by itself - the window
+comes to the front saying "Click Open EmberStorm below" (Enter works), so
+nothing pops up for somebody who stepped away and the button has a purpose; a
+console run still opens it. The window comes to the front when it finishes or
+stops, as for a question, but is not pinned on top: pinned, it would cover
+netplwiz, the folder picker and the browser through a half-hour download. The
+desktop's folder shortcut is **EmberStorm library** (was "EmberStorm media",
+removed on update). Checked: the finished screen drawn with the new words.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
