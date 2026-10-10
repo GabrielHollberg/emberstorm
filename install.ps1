@@ -2659,6 +2659,13 @@ function Install-DockerDirect {
     }
     Important "Windows will ask for permission to install it - click Yes."
     $source = [Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($installer)
+    $dataRootArg = ''
+    $dataRoot = Get-DockerDataRoot
+    if ($dataRoot) {
+        New-Item -ItemType Directory -Force -Path $dataRoot -ErrorAction SilentlyContinue | Out-Null
+        $dataRootArg = ", '--wsl-default-data-root=$([Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($dataRoot))'"
+        Note "Docker's downloads and data will be kept in $dataRoot."
+    }
     $elevated = @"
 `$ErrorActionPreference = 'Stop'
 `$env:PSModulePath = "`$PSHOME\Modules"
@@ -2675,7 +2682,7 @@ try {
     Copy-Item -LiteralPath '$source' -Destination `$exe
     `$sig = Get-AuthenticodeSignature -LiteralPath `$exe
     if (`$sig.Status -ne 'Valid' -or "`$(`$sig.SignerCertificate.Subject)" -notmatch '(^|, )O=Docker Inc,') { exit 77 }
-    `$p = Start-Process -FilePath `$exe -ArgumentList 'install', '--quiet', '--accept-license' -PassThru
+    `$p = Start-Process -FilePath `$exe -ArgumentList 'install', '--quiet', '--accept-license'$dataRootArg -PassThru
     `$p.WaitForExit()
     Remove-Item -LiteralPath `$dir -Recurse -Force -ErrorAction SilentlyContinue
     exit `$p.ExitCode
@@ -3759,6 +3766,35 @@ exit 0
 
 # Test-DownloadRoom stops before the long download when the drive Docker keeps
 # it on has too little room, saying how much and what to do.
+# Get-DockerDataRoot answers where Docker should keep its downloads and data
+# when the system drive is short of room and Docker is still to be installed:
+# a folder on the roomiest other NTFS drive inside the PC, or $null to leave
+# them where Docker puts them. A mini PC with Windows on a 64GB drive has a
+# few GB left after Windows, and stopped there though a 1TB drive sat beside
+# it (the first try on the test box, 2026-10-10). Docker's installer takes
+# the folder as --wsl-default-data-root.
+function Get-DockerDataRoot {
+    if ($script:DockerDataRootAsked) { return $script:DockerDataRoot }
+    $script:DockerDataRootAsked = $true
+    $script:DockerDataRoot = $null
+    if (Get-Command docker -ErrorAction SilentlyContinue) { return $null }
+    try {
+        $system = [IO.Path]::GetPathRoot($env:LOCALAPPDATA)
+        if ((New-Object IO.DriveInfo $system).AvailableFreeSpace -ge 25GB) { return $null }
+        $best = $null
+        foreach ($drive in Get-LocalDrives) {
+            if ($drive.DriveType -ne 3) { continue }
+            $root = "$($drive.DeviceID)\"
+            if ($root -ieq $system) { continue }
+            $info = New-Object IO.DriveInfo $root
+            if ($info.DriveFormat -ne 'NTFS' -or $info.AvailableFreeSpace -lt 20GB) { continue }
+            if (-not $best -or $info.AvailableFreeSpace -gt $best.AvailableFreeSpace) { $best = $info }
+        }
+        if ($best) { $script:DockerDataRoot = Join-Path $best.RootDirectory.FullName 'EmberStorm-Docker' }
+    } catch { }
+    return $script:DockerDataRoot
+}
+
 function Test-DownloadRoom([long]$Need = 20GB) {
     try {
         $root = [IO.Path]::GetPathRoot($env:LOCALAPPDATA)
@@ -3766,13 +3802,31 @@ function Test-DownloadRoom([long]$Need = 20GB) {
     } catch {
         return
     }
+    # Docker's data on another drive: that drive needs the room for the
+    # downloads, and this one only enough for Docker itself.
+    $elsewhere = Get-DockerDataRoot
+    if ($elsewhere) {
+        $other = [IO.Path]::GetPathRoot($elsewhere)
+        if ($free -ge 5GB) {
+            Note "C: is short of room, so Docker will keep EmberStorm's downloads on $($other.TrimEnd('\'))."
+            return
+        }
+        Stop-With @"
+  Docker needs about 5 GB free on $($root.TrimEnd('\')) to install itself, and it has $(Format-Size $free).
+  (Its downloads will go on $($other.TrimEnd('\')), which has room.)
+
+  Free some space there - Settings, System, Storage shows what is using it -
+  then run the setup again.
+"@
+    }
     if ($free -ge $Need) { return }
     Stop-With @"
   EmberStorm's programs need about $([int]($Need / 1GB)) GB free on $($root.TrimEnd('\')), where Docker
   keeps them, and it has $(Format-Size $free).
 
   Free some space there - Settings, System, Storage shows what is using it -
-  then run the setup again. Your library can still go on another drive.
+  then run the setup again. (A second drive inside the PC with 20 GB free
+  would take Docker's downloads instead.)
 "@
 }
 

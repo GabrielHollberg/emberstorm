@@ -5034,6 +5034,19 @@ small "Starting EmberStorm" window would help); the finish card is full on
 a first install; updates unsigned from main; Windows' prompts name Windows
 PowerShell (only an EmberStorm program of its own could change that).
 
+**Docker's data on a second drive when C: is small** (2026-10-10, the first
+try on the test box: Windows on its 64GB eMMC left 8GB, and the room check
+stopped though a 1TB drive sat beside it). When Docker is still to be
+installed and C: has under 25GB free, its data goes on the roomiest other
+internal NTFS drive with 20GB free (`Get-DockerDataRoot`,
+`<drive>\EmberStorm-Docker`), given to Docker's installer as
+`--wsl-default-data-root`; C: then needs only 5GB, for Docker itself. A
+Docker already installed keeps its data where it is. Checked: the choice on
+this PC's drives (the internal one with room, USB sticks passed over), the
+elevated script with the option parsing. **Not checked**: Docker's installer
+taking the option (from Docker's documented install options) - the box is
+the test.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
