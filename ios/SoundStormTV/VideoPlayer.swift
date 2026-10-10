@@ -232,6 +232,11 @@ final class VideoSession: Identifiable {
 
     func playNow(_ next: Item) {
         countdown?.cancel()
+        // The last episode's player item goes first: left in, its end - the
+        // moment it stopped at - was saved as the next episode's place while
+        // that one loaded, and the next episode showed as watched.
+        player.pause()
+        player.replaceCurrentItem(with: nil)
         item = next
         Task { await start() }
     }

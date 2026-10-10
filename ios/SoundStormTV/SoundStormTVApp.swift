@@ -206,9 +206,18 @@ final class AppModel {
     /// across, the saved address replaced, and the app opened there.
     private func moveServer(from old: URL, to new: URL) {
         let store = HTTPCookieStorage.shared
-        for cookie in store.cookies(for: old) ?? [] {
+        let cookies = store.cookies(for: old) ?? []
+        let names = Set(cookies.map(\.name))
+        for cookie in cookies where !names.contains("__Host-" + cookie.name) {
+            // Over TLS the server reads only its __Host- names (the thirteenth
+            // pass), so a sign-in carried off a plain address under the plain
+            // name was not a sign-in there at all: renamed on the way.
+            var name = cookie.name
+            if new.scheme == "https", ["soundstorm_session", "soundstorm_device", "soundstorm_profiles"].contains(name) {
+                name = "__Host-" + name
+            }
             var props: [HTTPCookiePropertyKey: Any] = [
-                .name: cookie.name, .value: cookie.value, .domain: new.host() ?? "",
+                .name: name, .value: cookie.value, .domain: new.host() ?? "",
                 .path: "/", .secure: "TRUE",
             ]
             if let expires = cookie.expiresDate { props[.expires] = expires }
