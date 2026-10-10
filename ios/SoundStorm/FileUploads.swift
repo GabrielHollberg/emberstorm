@@ -151,6 +151,21 @@ final class FileUploads: NSObject {
         picker.start(over: host)
     }
 
+    /// Files the app did not pick itself (shared from another app), made
+    /// readable and sendable as if picked; `forget` undoes it.
+    func register(_ files: [Picked]) {
+        for f in files { picked[f.id] = f }
+    }
+
+    func forget(_ ids: [String]) {
+        for id in ids { picked[id] = nil }
+    }
+
+    /// The files still waiting to be sent, by path: kept by any sweep.
+    var waitingFiles: Set<String> {
+        Set(queue.jobs.filter { $0.state == "waiting" }.map(\.file))
+    }
+
     /// A piece of a picked file, for the page: its sample for spotting copies,
     /// its ends for naming a different one, a zip's table of contents, an
     /// import's piece. At most 16MB at once.

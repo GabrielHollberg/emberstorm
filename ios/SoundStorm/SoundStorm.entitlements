@@ -16,5 +16,11 @@
 		<string>applinks:*.net.emberstorm.app</string>
 		<string>applinks:names.emberstorm.app</string>
 	</array>
+	<!-- The folder the app shares with its Share extension (Share > EmberStorm):
+	     files shared from another app wait there until the app is opened. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dev.soundstorm.app</string>
+	</array>
 </dict>
 </plist>
