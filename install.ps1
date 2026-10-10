@@ -2668,7 +2668,21 @@ function Install-DockerDirect {
     $dataRootArg = ''
     $dataRoot = Get-DockerDataRoot
     if ($dataRoot) {
+        # Made at a drive's root, it would take the drive's permissions, which
+        # let other accounts on the PC in: it holds EmberStorm's accounts and
+        # the media servers' databases, so it is this person's alone - and
+        # never a folder somebody else made there first.
+        if ((Test-Path -LiteralPath $dataRoot) -and -not (Test-OwnedByMe $dataRoot)) {
+            Stop-With @"
+  A folder called $dataRoot is already there and belongs to another
+  account on this PC, so EmberStorm's own data was not put in it.
+
+  Remove or rename that folder, then run the setup again.
+"@
+        }
         New-Item -ItemType Directory -Force -Path $dataRoot -ErrorAction SilentlyContinue | Out-Null
+        $null = Protect-PrivateFolder $dataRoot
+        Save-SetupChange 'dockerData' $dataRoot
         $dataRootArg = ", '--wsl-default-data-root=$([Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($dataRoot))'"
         Note "Docker's downloads and data will be kept in $dataRoot."
     }
@@ -3360,8 +3374,12 @@ function Select-LibraryInWindow([string]$Default, [string]$Intro, $Drives, [bool
             $gap2 = New-Object System.Windows.Controls.Border
             $gap2.Height = 8
             [void]$page.Children.Add($gap2)
+            $plannedRoot = if ($planned) { [IO.Path]::GetPathRoot($planned) } else { '' }
+            $pathRoot = ''
+            try { $pathRoot = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($path)) } catch { }
             if ($planned) {
-                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data (about 20 GB at first, growing with your library) is kept on $([IO.Path]::GetPathRoot($planned).TrimEnd('\')) too." 13 '#B9B9C6'))
+                $where = if ($plannedRoot -ieq $pathRoot) { "on $($plannedRoot.TrimEnd('\')) too" } else { "on $($plannedRoot.TrimEnd('\')), inside this PC, as $($system.TrimEnd('\')) is short of room" }
+                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data (about 20 GB at first, growing with your library) is kept $where." 13 '#B9B9C6'))
                 if ($systemFree -ge 25GB) {
                     $keepOnC = New-Object System.Windows.Controls.CheckBox
                     $keepOnC.IsChecked = [bool]$script:DockerOnSystem
@@ -3842,9 +3860,9 @@ function Get-DockerDataRoot {
         if ($script:DockerOnSystem -or $env:EMBERSTORM_DOCKER_C -eq '1') {
             if ($systemFree -ge 25GB) { return $null }
         }
-        if ($libraryRoot -ieq $system) { return $null }
-        if (Test-InternalDrive $libraryRoot) { return (Join-Path $libraryRoot 'EmberStorm-Docker') }
-        # The library on a drive that can be unplugged: Docker stays inside.
+        if ($libraryRoot -ine $system -and (Test-InternalDrive $libraryRoot)) { return (Join-Path $libraryRoot 'EmberStorm-Docker') }
+        # The library on C: or on a drive that can be unplugged: Docker stays
+        # on C: when it has room, else the roomiest drive inside the PC.
         if ($systemFree -ge 25GB) { return $null }
         $best = $null
         foreach ($drive in Get-LocalDrives) {
@@ -4617,6 +4635,16 @@ exit 0
                 $dockerOut = $false
                 Note "Docker Desktop could not be removed - remove it in Settings, Apps."
             }
+            # The folder this setup made for Docker's data on another drive:
+            # gone with Docker when nothing is left in it, else named at the end.
+            $dockerData = "$($changes['dockerData'])"
+            if ($dockerOut -and $dockerData -match '^[A-Za-z]:\\EmberStorm-Docker$' -and (Test-Path -LiteralPath $dockerData)) {
+                if (@(Get-ChildItem -LiteralPath $dockerData -Recurse -File -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+                    Remove-Item -LiteralPath $dockerData -Recurse -Force -ErrorAction SilentlyContinue
+                } else {
+                    $script:DockerDataLeft = $dockerData
+                }
+            }
         }
     }
 
@@ -4683,6 +4711,7 @@ exit 0
         }
         if ($dockerOut) {
             $lines += @('', 'Docker Desktop was removed too.')
+            if ($script:DockerDataLeft) { $lines += @('Its data is still in this folder - delete it to get the space back:', "*$($script:DockerDataLeft)") }
         } elseif ((Get-DockerDesktopPath) -and $askedDocker -and $stillRunning) {
             $lines += @('', 'Docker Desktop was not removed, as EmberStorm could not be stopped first.')
         } elseif ((Get-DockerDesktopPath) -and $askedDocker) {
