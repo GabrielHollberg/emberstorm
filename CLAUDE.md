@@ -3663,6 +3663,26 @@ when turned off.
   .dev, so plain http cannot be used for this): signed in, no downloads,
   network off, reopened - the app's own offline screen.
 
+**A server that answers nothing no longer leaves a black screen**
+(2026-10-09, the owner's report: the server's cable out, the Android app went
+from its opening screen to black and never opened). A server switched off
+says no at once; one unplugged - or a home address seen from elsewhere -
+often says nothing, and every request waited minutes: the service worker's
+page load before falling back to the kept copy, the page's own files, and
+the page's first `/api/session`. Now, with a kept copy to fall back on, an
+answer not begun within six seconds counts as none (`fetchOrGiveUp` in
+sw.js; only the start of the answer is timed, so a slow link is unaffected,
+and with nothing kept a request waits as before), the next half minute's take
+their kept copies at once (`silentUntil`), and the page's first session check
+gives up after five seconds when there are downloads (`boot`, after `await
+null` - the downloads are read further down the file). Checked with
+`scripts/smoke/offlineopen.js`: a TLS stand-in at test.home.emberstorm.app
+in front of the test server, signed in, a song downloaded, then every
+connection taken and never answered - the app opened on the downloaded song
+in 11 seconds (20 before `silentUntil`). Not tried on a phone; the iPhone app
+has no service worker (WKWebView), so offline there is still its own
+"can't reach" screen.
+
 ## Favorites and playlists
 
 Per person, and kept by SoundStorm (`internal/collections`) rather than by

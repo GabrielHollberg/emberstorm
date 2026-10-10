@@ -6114,7 +6114,21 @@ async function moveToSecureName(name) {
 }
 
 (async function boot() {
-  const { ok, body, offline } = await api('/api/session');
+  // Given up after a few seconds when there are downloads to open instead:
+  // an unplugged server answers nothing, and this waited for minutes on a
+  // black screen (the owner's report, 2026-10-09).
+  // After the rest of this file has run: what is downloaded is read further
+  // down, and before it hasDownloads() threw.
+  await null;
+  let gaveUp = null;
+  try {
+    if (hasDownloads()) {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 5000);
+      gaveUp = controller.signal;
+    }
+  } catch { /* nothing kept */ }
+  const { ok, body, offline } = await api('/api/session', gaveUp ? { signal: gaveUp } : {});
   if (ok && body) {
     // Moving keeps the whole address, setup code included; staying is when
     // it can come out of the address.
