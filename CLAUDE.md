@@ -4719,6 +4719,49 @@ staying away on a fresh PC, auto sign-in end to end, the bar through a real
 download. Seen: the main window part way, the always-on and library windows,
 drawn on this PC and captured; Docker's progress lines read from samples.
 
+**The window rebuilt in WPF** (2026-10-09, the owner: it "looks old, plain
+text", with empty space at its foot): `New-SetupWindow` and the functions
+around it (`Set-GuiStep`, `Set-GuiStatus`, `Set-GuiStepProgress`,
+`Set-GuiMessage`, `Complete-Gui`, `Stop-Gui`, `Update-Gui` - the same names
+the rest of the setup always called) are WPF now, part of Windows' .NET
+Framework, nothing compiled or installed: a borderless window with rounded
+corners and a title bar of its own (drag, minimize, close), the cloud drawn
+from the logo's own shapes (and as the taskbar picture), steps with markers,
+a gradient bar with a light running along it and the percentage, rounded
+cards whose console-width lines run on as paragraphs (codes large and
+selectable, addresses one line), and a window that sizes itself to what it
+shows. **The questions are pages of this window** (`Show-GuiPage`,
+`New-GuiPageText`): the library (`Select-LibraryInWindow`, Windows' own folder
+picker for another folder), the home network, keeping it available, a
+refused permission's Ask again, Docker's one click, the auto sign-in steps -
+so, going to plan, a person sees this one window, Windows' permission
+prompts, and Windows' own sign-in window if they chose it. The old Windows
+Forms dialogs stay only for a run with no window (the console). Checked: each
+screen drawn on this PC and looked at (part way, the library and always-on
+pages, finished with a code, an error with Restart now); and the real
+installer run in a scratch folder, which opened the new window and stopped
+on "already installed in another folder", writing nothing.
+
+**Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
+
+| | Windows | Mac | Linux |
+|---|---|---|---|
+| Back after a restart, nobody signed in | only with auto sign-in (offered) | no - Docker Desktop needs a sign-in; the finish says how to turn on automatic login | yes: Docker is a system service, `restart: unless-stopped` |
+| Kept from sleeping | asked, with the lid on laptops | asked (`pmset -c sleep 0`), and starts again after a power cut (`pmset autorestart 1`); a MacBook still sleeps lid-closed without a screen | asked on a laptop or a GNOME desktop (`gsettings`, logind lid on mains from the next start); a plain server is not asked |
+| Power-cut advice | finish screen, desktops | done by `pmset` | finish, desktops |
+| Room for the download | 20GB, a plain stop | 20GB in the home folder | 20GB where Docker keeps images |
+| Carries on after a restart | yes, by itself | never needs one | never needs one |
+| Progress | window, percentage, MB and GB | terminal lines, images counted | the same |
+
+**And a stop where there was no terminal**: "is there a terminal to ask?" was
+`{ : </dev/tty; }`, and `:` is a special built-in, whose redirection failing
+ends a POSIX shell outright - so with no terminal at all (automation, a
+remote command without one) the installer stopped instead of taking the
+default. Now `( : </dev/tty )`, in a subshell. Shown in busybox and dash.
+Checked in containers: the questions' defaults, the room check passing and
+stopping at 5GB, no question on a machine with no battery or desktop. Not
+tried: a real Mac, a real Linux laptop.
+
 **No console stays open, from the double-click on.** The setup file hands
 straight to PowerShell started minimized and hidden, and closes - it does not
 even download: the hidden PowerShell saves the installer to a file and starts
