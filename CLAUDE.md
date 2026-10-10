@@ -4655,6 +4655,31 @@ fallback - each with the password asked once, Docker working in the same
 run, a second run asking nothing. openSUSE and Alpine are written, not
 tried.
 
+**Fewer dead ends** (2026-10-09, the owner's asking, before trying the
+setup on the test box's fresh Windows):
+- **It carries on by itself after a restart.** A stop whose cure is a restart
+  (WSL not finished, Docker not finished or not yet seen, virtualization
+  off) has Windows start the setup once more at the next sign-in
+  (`Register-Resume`: HKCU RunOnce, a copy kept as
+  `%LOCALAPPDATA%\EmberStorm\soundstorm-install.ps1`, which fetches the newest
+  setup first), and a **Restart now** button (`Stop-ForRestart`). Any setup
+  run takes the entry back first (`Clear-Resume`).
+- **Virtualization off: Restart into BIOS setup**, a button (`shutdown /r
+  /fw`, administrator), and the steps saved on the desktop to read again.
+- **No winget** (a brand-new Windows before the Store updates itself): Docker
+  Desktop's installer straight from Docker, the same quiet switches
+  (`Install-DockerDirect`), where it was a dead end pointing at a website.
+- **A permission question refused** (WSL, Docker, opening the network):
+  asked whether to ask again (`Confirm-TryAgain`), where it stopped the setup.
+- **A small system drive beside a bigger one** (a 64GB C: and a 1TB D:): the
+  library window suggests the bigger one, and closing the window takes it.
+Checked: parses in Windows PowerShell 5.1, plain ASCII; the resume entry
+written with its command and taken back, the library suggestion (and none
+when C: is roomy) through the real functions with stand-in drives; Docker's
+direct link answers (a 635MB installer). Not seen: a real restart carrying
+on, the BIOS restart, the new buttons on screen, Docker installed without
+winget.
+
 **No console stays open, from the double-click on.** The setup file hands
 straight to PowerShell started minimized and hidden, and closes - it does not
 even download: the hidden PowerShell saves the installer to a file and starts
