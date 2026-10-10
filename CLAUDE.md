@@ -387,7 +387,8 @@ decided past the first test unit.
   on update), the local CA's name, Navidrome's `SoundStorm listening`
   transcoding, AudioMuse's cron name, the backends' account names, and every
   lowercase id. The setup file is `EmberStorm-Setup.cmd` (renamed 2026-10-08;
-  v0.11.0 carries both names, so old links still download). **The repository is github.com/GabrielHollberg/emberstorm** (renamed
+  only that name is on the release now - old download links
+  need not keep working, the owner's call, 2026-10-10). **The repository is github.com/GabrielHollberg/emberstorm** (renamed
   2026-10-08; GitHub forwards the old name - raw files, the API and release
   downloads checked - so installers and setup files already out keep working.
   Never make a new repository called soundstorm: it would end the forwarding).
