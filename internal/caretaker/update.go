@@ -112,6 +112,8 @@ type Updater struct {
 	run  Runner
 	http *http.Client
 	log  *slog.Logger
+	// output runs a command and answers what it printed (images.go).
+	output Output
 	// snapshots says whether the volumes can be snapshotted (btrfs).
 	snapshots func(string) bool
 
@@ -126,6 +128,7 @@ func New(cfg Config, log *slog.Logger) *Updater {
 	u := &Updater{
 		cfg:       cfg.Defaults(),
 		run:       execRunner,
+		output:    execOutput,
 		http:      &http.Client{Timeout: 30 * time.Second},
 		log:       log,
 		snapshots: isBtrfs,
@@ -339,13 +342,17 @@ func (u *Updater) Update(ctx context.Context, m *Manifest) error {
 		u.saveBaseline(h.Sources)
 	}
 
-	if cur := u.Status().Current; cur != nil {
+	cur := u.Status().Current
+	if cur != nil {
 		_ = u.save("previous.json", cur)
 	}
 	if err := u.save("current.json", m); err != nil {
 		u.log.Warn("could not record the version", "err", err)
 	}
 	u.pruneSnapshots(ctx, snap)
+	if n := u.pruneImages(ctx, m, cur, previous); n > 0 {
+		u.log.Info("removed old versions", "images", n)
+	}
 	u.set(func(s *Status) {
 		s.Current = m
 		s.Available = nil

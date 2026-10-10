@@ -68,7 +68,12 @@ the stack, snapshots the `volumes` subvolume, writes `compose.images.yml`
 and starts it; if SoundStorm does not answer healthy with as many sources as
 before within ten minutes, the snapshot is put back in place of the volumes
 and the old images file, and the box is told "went back to the version you
-had". The newest snapshot is kept for going back by hand. It checks three
+had". The newest snapshot is kept for going back by hand. Once an update is in and healthy, old versions' images
+are removed (`internal/caretaker/images.go`): kept are the release running,
+the one before it (one step back, like the snapshot) and anything a container
+still uses, and only images of repositories the box's releases have used are
+ever touched - the 64GB system disk holds Docker's images, and every update
+left the old ones behind. It checks three
 minutes after start and every six hours, and installs at night (2-5am)
 unless the owner turned Auto off. SoundStorm will reach it through
 `/run/soundstorm-caretaker/caretaker.sock` (`GET /status`, `POST /check`,
