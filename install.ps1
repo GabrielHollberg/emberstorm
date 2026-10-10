@@ -5901,6 +5901,10 @@ if ($phoneAddress -and $lanAccess -in @('public', 'refused', 'failed')) {
     $phoneLines = @('', 'On your phone, TV or another computer on the same Wi-Fi:', "*  $phoneAddress")
 }
 $phoneLines += @('', 'To add your music, films and books: drop them in the "EmberStorm library" folder on your desktop, or use Add media in EmberStorm''s Settings.')
+# Windows lets no installer pin to the taskbar; one right-click does.
+if (-not $upgrade -and -not $NoShortcuts) {
+    $phoneLines += @('', 'To keep EmberStorm on the taskbar: in the Start menu, right-click EmberStorm and choose Pin to taskbar.')
+}
 if ($useTailscale -and $tailnet) {
     $phoneLines += @('', 'Away from home, on a device signed in to Tailscale:', "*  $tailnet")
 }

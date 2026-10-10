@@ -674,6 +674,7 @@ header {
   padding: 16px 18px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 .backup-ask h2 { margin: 0 0 6px; font-size: 17px; }
+@media (min-width: 900px) { #install-offer { left: auto; right: 24px; bottom: 24px; width: 380px; } }
 .backup-ask-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
 
 .remote-switch {

@@ -11985,6 +11985,7 @@ async function renderWelcome(opts = {}) {
   if (!me || !me.owner || TV || state.offline || (state.prefs && state.prefs.welcomeDone)) {
     state.welcomeShown = false;
     show($('welcome'), false);
+    offerInstall();
     return;
   }
   const [session, users, players, library, drives] = await Promise.all([
@@ -12065,6 +12066,7 @@ async function renderWelcome(opts = {}) {
     state.welcomeShown = false;
     show($('welcome'), false);
     savePrefs({ welcomeDone: true });
+    offerInstall();
     return;
   }
   WELCOME.at = next.key;
@@ -12192,6 +12194,67 @@ $('welcome-skip-all').addEventListener('click', () => {
   state.welcomeShown = false;
   show($('welcome'), false);
   savePrefs({ welcomeDone: true });
+  offerInstall();
+});
+
+// Installing EmberStorm as an app, offered once on each browser (the owner's
+// asking, 2026-10-10): its own window and icon, pinned to the taskbar or the
+// home screen. Chrome and Edge hand the page their install question
+// (beforeinstallprompt) to ask when it chooses; Safari on an iPhone or iPad
+// has none, so there the card says how. Never in the phone apps, on a TV, in
+// an app already installed, or before the owner's welcome is through; and
+// once answered on a device - installed or not now - never there again.
+const INSTALL = { prompt: null, key: 'soundstorm-install-offered' };
+function installedApp() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: window-controls-overlay)').matches
+    || navigator.standalone === true;
+}
+function installApple() {
+  return /iPhone|iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+window.addEventListener('beforeinstallprompt', (event) => {
+  // Kept to ask with the card - unless already asked here, when the
+  // browser's own ways (its address bar's install button) are left alone.
+  if (localStorage.getItem(INSTALL.key)) return;
+  event.preventDefault();
+  INSTALL.prompt = event;
+  offerInstall();
+});
+window.addEventListener('appinstalled', () => {
+  localStorage.setItem(INSTALL.key, 'installed');
+  show($('install-offer'), false);
+});
+function offerInstall() {
+  if (!state.me || TV || window.soundstormApp || installedApp() || state.offline) return;
+  if (localStorage.getItem(INSTALL.key) || state.welcomeShown) return;
+  const apple = installApple() && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
+  if (!INSTALL.prompt && !apple) return;
+  const where = touchScreen() ? (/iPad|Tablet/.test(navigator.userAgent) ? 'tablet' : 'phone') : 'computer';
+  $('install-offer-title').textContent = `Install EmberStorm on this ${where}?`;
+  $('install-offer-text').textContent = INSTALL.prompt
+    ? (where === 'computer'
+      ? 'It opens in a window of its own with the EmberStorm icon - pin it to the taskbar and it is one click away.'
+      : 'It goes on your home screen with the EmberStorm icon, and opens like any app.')
+    : 'Tap the Share button at the bottom of Safari, then Add to Home Screen. It opens like any app, with the EmberStorm icon.';
+  $('install-offer-yes').textContent = INSTALL.prompt ? 'Install' : 'Got it';
+  show($('install-offer'), true);
+}
+$('install-offer-no').addEventListener('click', () => {
+  localStorage.setItem(INSTALL.key, 'declined');
+  show($('install-offer'), false);
+});
+$('install-offer-yes').addEventListener('click', async () => {
+  localStorage.setItem(INSTALL.key, 'asked');
+  show($('install-offer'), false);
+  const asked = INSTALL.prompt;
+  INSTALL.prompt = null;
+  if (!asked) return;
+  try {
+    await asked.prompt();
+    const choice = await asked.userChoice;
+    if (choice && choice.outcome === 'accepted') localStorage.setItem(INSTALL.key, 'installed');
+  } catch { /* the browser said no to asking again */ }
 });
 // Files dropped while the welcome shows are the media step done: the drop's
 // own sheet takes over.
