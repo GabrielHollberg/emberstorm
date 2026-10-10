@@ -810,6 +810,23 @@ the server's text. Checked: the screen's two storage states drawn in a
 container, recognising a box that has had a drive. Not checked: in the VM
 with the drive taken away.
 
+**Updates and resets survive a power cut** (`pending.go`). Each is written
+down (`pending.json` in the caretaker's state, with the images file from
+before as `images.previous.yml`) before anything stops, and taken away when
+it is over; at the next start the caretaker finishes it before anything
+else. An update whose new images were written is kept if EmberStorm comes up
+healthy on it (held to the sources last seen, or any with none recorded),
+else put back - the old images, and the volumes from the snapshot, including
+when the cut came mid-rollback with the volumes already set aside. A reset
+is simply done again from the start, as somebody asked for it. A snapshot
+never goes onto a folder already there (btrfs would put the copy inside it,
+and a rollback would have put back a folder holding the volumes): a name of
+its own then. Every step has a time limit - a download 30 minutes, stopping
+5, starting 15 - where a hung one held the box "updating" for good, with no
+reset or next update able to begin. Checked: the caretaker's tests (an update
+cut short kept, one undone after a second cut in its rollback, a reset done
+again, the snapshot's name). Not checked: a real power cut in the VM.
+
 ## The decision that shapes everything
 
 That request sounds like "build a media server". It is not, and the difference

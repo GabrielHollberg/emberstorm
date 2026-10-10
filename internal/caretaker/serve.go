@@ -187,7 +187,10 @@ func (u *Updater) Serve(ctx context.Context, socket string) error {
 		<-ctx.Done()
 		_ = srv.Close()
 	}()
-	go u.schedule(ctx)
+	go func() {
+		u.recoverPending(ctx)
+		u.schedule(ctx)
+	}()
 	go u.watchButton(ctx)
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
