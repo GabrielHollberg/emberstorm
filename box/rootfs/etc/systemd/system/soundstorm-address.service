@@ -1,0 +1,8 @@
+[Unit]
+Description=EmberStorm follows the box's address on the home network
+After=soundstorm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/soundstorm/address.sh
+TimeoutStartSec=15min

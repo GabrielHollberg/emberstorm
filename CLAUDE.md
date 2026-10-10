@@ -827,6 +827,34 @@ reset or next update able to begin. Checked: the caretaker's tests (an update
 cut short kept, one undone after a second cut in its rollback, a reset done
 again, the snapshot's name). Not checked: a real power cut in the VM.
 
+**The box keeps up with its network, and its build has what real hardware
+needs.** `address.sh` (`soundstorm-address.timer`, each minute) starts
+EmberStorm again on the box's new address when the router hands it another -
+it was written only at start, so every phone's saved name pointed at the old
+one until the box was switched off and on - never during an update or reset
+(`pending.json`), and under `up.sh`'s lock, which now keeps the caretaker and
+it from starting and stopping the stack at once. It also keeps avahi to the
+port the home network is on (`allow-interfaces`), as it announced
+soundstorm.local with Docker's 10.231.x addresses too. Looked at in Debian's
+base image rather than guessed: it already has the full kernel (not the cloud
+one, which lacks eMMC and Intel graphics drivers), `MODULES=most`, Secure
+Boot's shim with the `EFI/BOOT` fallback, netplan bringing up any `en*`/`eth*`
+port by DHCP, the clock synced (timesyncd) and security updates on. Added:
+`non-free-firmware` with Intel's microcode and graphics firmware and
+Realtek's (a network chip on many mini PCs); waiting for any one port, not
+all (two ports and one cable held start-up two minutes); Debian's security
+updates at 00:30-01:30 (the owner's choice: at night, before the caretaker's
+2-5 window), restarting at 05:30 only when one needs it (a kernel);
+Ctrl-Alt-Del on a plugged-in keyboard does nothing. And `prepare.sh` no
+longer swallows a failure to read `.env`, which would have written it again
+with one setting and lost the box's secrets. Checked: the address check in a
+Debian container (address changed and EmberStorm started, nothing the second
+time, nothing during an update, avahi's setting), `set_env` refusing an
+unreadable `.env`, `build.sh`'s syntax. Not checked: an image built with them
+(the firmware packages' names are trixie's), nor in the VM. The box's clock
+is UTC, so those hours are UTC until the owner's time zone is set (a
+before-selling item).
+
 ## The decision that shapes everything
 
 That request sounds like "build a media server". It is not, and the difference

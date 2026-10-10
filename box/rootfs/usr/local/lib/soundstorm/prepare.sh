@@ -16,7 +16,12 @@ get_env() { sed -n "s/^$1=//p" .env | tail -1; }
 set_env() {
 	case "$2" in *"
 "*) echo "prepare: refusing a value with a line break for $1" >&2; exit 1 ;; esac
-	grep -v "^$1=" .env > .env.new || true
+	# grep says 1 when it keeps no line (the setting was the only one), 2 when
+	# it could not read: never the second, or .env would be written with this
+	# one setting alone and the box's secrets lost.
+	rc=0
+	grep -v "^$1=" .env > .env.new || rc=$?
+	[ "$rc" -le 1 ] || { echo "prepare: could not read .env" >&2; rm -f .env.new; exit 1; }
 	printf '%s=%s\n' "$1" "$2" >> .env.new
 	mv .env.new .env
 }
