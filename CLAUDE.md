@@ -5065,6 +5065,17 @@ Docker already installed, moves and imports (a Docker already there keeps
 its data where it is). Checked: the rules with C: roomy and short, the lock
 on a test folder, the setup in a scratch folder.
 
+**The window no longer freezes on a quiet step** (2026-10-10, the test box: the
+bar sat still for 20-30 seconds and the window could not be dragged, reading as
+broken). A command that prints nothing for a while - `docker info` while Docker
+starts, `wsl --version`, checking the 600MB installer's signature - held the one
+thread the window draws on. `Invoke-Pumped` runs such work on a second
+PowerShell and keeps the window answering meanwhile; `Invoke-Native` (output
+captured) and the signature check go through it. Checked on this PC: 50 window
+updates through a silent 3-second command, its exit code, output and folder
+right, a missing program a failure, Docker's signature read. Not seen: on the
+test box.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
