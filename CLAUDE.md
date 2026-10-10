@@ -4851,6 +4851,56 @@ from main; the setup file's second download before the window shows (the
 signed .exe replaces it); undoing the power and sign-in changes on uninstall;
 Docker's data on a bigger drive when C: is small; a visible keyboard focus.
 
+**A second blind review (2026-10-10)**: security, bugs, and one reviewer
+walking six real runs through the code (a fresh 64GB mini PC needing a
+restart, every permission refused once, an update, a standard account with
+a parent's password, uninstall with Docker closed, a double double-click).
+Several were in the first review's own fixes. Fixed:
+
+- **The library chosen before a restart was lost**, and media went to the
+  small C: - the resumed copy put it in `$Library`, but the work is done by
+  the script it hands over to or the window it relaunches; it is now taken
+  from the environment, which they all inherit.
+- **After a restart, "click Accept in Docker"** waited on a window that never
+  comes (the setup had accepted the terms): `EMBERSTORM_DOCKER_OURS` in
+  resume.env.
+- **Every home administrator was taken for a standard account**:
+  `WindowsIdentity.Groups` leaves out deny-only groups, which is how
+  Administrators shows in an unelevated token - so an extra permission
+  prompt and a needless restart, and a folder owned by Administrators
+  refused. `Test-AdminAccount` reads the token's claims (`denyonlysid`
+  included). Checked on this PC: the old test said no, the new one yes.
+- **Docker always from Docker's own installer** (signature-checked twice):
+  winget ran as administrator from the person's own folder, and on a standard
+  account its per-user copy failed under the parent's password and was shown
+  as "permission refused". Waited on with `WaitForExit`, not `-Wait` (which
+  also waits for whatever the installer starts).
+- **A failed import could never be finished** (already installed, data
+  there): `SOUNDSTORM_IMPORTING` marks an import under way, which carries on.
+- **The library**: a chosen folder was never made private (it was made just
+  before the check); a folder another account made ahead under the suggested
+  name is refused; an empty one is locked too.
+- **The move folder** is locked before anything is written in it, and a drive
+  that cannot be locked (a USB stick) is said plainly.
+- **An update stopped from the window** puts the compose file that names what
+  is downloaded back (the next start asked for versions never downloaded).
+- Smaller: the network question's refusal page says Skip this (it skips, it
+  never stopped) and the question says private also shares files and
+  printers; the firewall alert's "Allow access" only on the home network; a
+  full disk is not blamed on the internet; `-NoBrowser` honoured; Try again
+  keeps a Tailscale key; the console fallback lets go of the one-at-a-time
+  lock first; auto sign-in checks it is for this person's account; no line
+  break reaches .env, and a network name loses `#` and quotes.
+
+Checked: parses, plain ASCII; the administrator test on this PC; the window
+drawn; the real setup in a scratch folder (stopped on "already installed in
+another folder", nothing written). **Not checked**: a fresh PC, a standard
+account, a restart carrying on. **Left**: Docker's data always on C: (with a
+small C:, Docker's disk could be moved before its first start); the first
+seconds after the double-click show nothing (the signed .exe); uninstall
+leaves Docker running if it started it; a refused firewall cleanup on
+uninstall is not said; updates unsigned from main.
+
 **Mac and Linux, set beside Windows** (`install.sh`, 2026-10-09):
 
 | | Windows | Mac | Linux |
