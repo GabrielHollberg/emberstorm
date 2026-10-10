@@ -37,8 +37,8 @@ import (
 // part, and what the recipient already has is skipped.
 
 const (
-	maxSendItems   = 500
-	maxPendingTo   = 100 // waiting sends one person may have
+	maxSendItems = 500
+	maxPendingTo = 100 // waiting sends one person may have
 	// maxPendingFrom is how many sends one person may have waiting for
 	// others: on a drive where a link cannot be made each is a whole copy,
 	// counted against nobody's photo space (the thirteenth security pass).
