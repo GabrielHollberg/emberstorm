@@ -36,8 +36,9 @@ from a USB stick:
 
 makes `out/emberstorm-installer.img`; write it to a stick of 16GB or more with
 balenaEtcher or Rufus (DD mode), plug it into the box with the network cable
-and a monitor, and start it from the stick (its boot menu key at power-on, often F7 or F11 - not yet checked on the ME Mini
-for the boot menu). what it is doing, takes about ten minutes, and
+and a monitor, and start it from the stick (the boot menu key at power-on,
+often F7 or F11 - not yet checked on the ME Mini). It shows what it is
+doing, takes about ten minutes, and
 switches off; take the stick out and switch on. The storage drive is kept
 (putting a box right) unless the stick was made with `FACTORY=1`, which
 wipes it so the box starts new. To try it in the VM, make the stick with
