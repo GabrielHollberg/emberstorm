@@ -4673,12 +4673,28 @@ setup on the test box's fresh Windows):
   asked whether to ask again (`Confirm-TryAgain`), where it stopped the setup.
 - **A small system drive beside a bigger one** (a 64GB C: and a 1TB D:): the
   library window suggests the bigger one, and closing the window takes it.
+- **The questions before the long download**: the home-network question
+  (and its permission) comes before the 12GB, not after - people are at the
+  screen then - and, while opening the network, Docker's backend gets its
+  own firewall rules (allowed on Private, blocked on Public, as the alert's
+  default would), so Windows' "allow Docker Desktop Backend?" alert does not
+  appear (`DockerRuleName`, `Test-DockerRulesReady`; the callout about it
+  only when it still can).
+- **Keep this PC awake?** asked once on a first install, unless it already
+  never sleeps plugged in (`Confirm-StayAwake`: `powercfg` plugged-in sleep
+  and hibernate to never; battery untouched) - asleep, nothing reaches it.
+- **Room for the download**: 20GB free where Docker keeps it (the person's
+  own folder's drive), or a plain stop saying so (`Test-DownloadRoom`).
+- The finished screen says it starts when somebody signs in to the PC, not
+  "when you turn it on" - Docker Desktop runs only once signed in.
 Checked: parses in Windows PowerShell 5.1, plain ASCII; the resume entry
 written with its command and taken back, the library suggestion (and none
 when C: is roomy) through the real functions with stand-in drives; Docker's
-direct link answers (a 635MB installer). Not seen: a real restart carrying
-on, the BIOS restart, the new buttons on screen, Docker installed without
-winget.
+direct link answers (a 635MB installer). The administrator script for the network
+decoded and parsed with Docker's rules in it; the plugged-in sleep setting
+read on this PC. Not seen: a real restart carrying on, the BIOS restart, the
+new buttons on screen, Docker installed without winget, the firewall alert
+staying away on a fresh PC.
 
 **No console stays open, from the double-click on.** The setup file hands
 straight to PowerShell started minimized and hidden, and closes - it does not
