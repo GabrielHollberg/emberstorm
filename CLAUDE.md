@@ -4921,7 +4921,9 @@ each its own choice and shown only when the setup changed it (an install
 from before the record: only when still exactly as EmberStorm leaves it,
 put back to Windows' usual): **Remove Docker Desktop**, **Let this PC sleep
 when idle again**, **Put the lid setting back**, **Ask for a password at
-sign-in again**, **Keep a copy of your accounts** - all ticked, Cancel
+sign-in again**, **Keep a copy of your accounts** - Docker, sleep and the
+lid unticked (somebody may use them for other things: left unless asked,
+the owner's call), the password and the copy ticked, Cancel
 stops. Always: EmberStorm's own programs taken out of Docker even when Docker
 is kept (12GB that stayed), and the setup's own folder in AppData. Left on
 purpose: Windows Subsystem for Linux (part of Windows) and the network's
