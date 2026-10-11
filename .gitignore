@@ -63,4 +63,4 @@ android/.idea/
 # A YubiKey's public key as box/yubikey.py setup writes it; the ones boxes
 # trust are copied into box/release.pub.
 box/release-*.pub
-cmd/emberstorm-setup/EmberStorm-Setup.exe
+cmd/emberstorm-setup/EmberStorm.exe
