@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.cmd"><strong>⬇ Download for Windows</strong></a>
+  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.exe"><strong>⬇ Download for Windows</strong></a>
   &nbsp;·&nbsp;
   <a href="#mac">Mac</a> ·
   <a href="#linux">Linux</a>
@@ -130,9 +130,12 @@ then, an iPhone uses the web app.
 
 ### Windows
 
-1. **[Download EmberStorm-Setup.cmd](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.cmd)**
-2. **Right-click** the downloaded file → **Properties** → tick **Unblock** at the bottom → **OK**
-3. **Double-click** it.
+1. **[Download EmberStorm-Setup.exe](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.exe)**
+2. **Double-click** it.
+
+It is signed, so Windows lets it run. While the signature is new to
+Windows, it may still show **Windows protected your PC**: click **More info**,
+then **Run anyway**.
 
 A setup window walks you through the rest. Expect **10 to 30 minutes**, mostly
 downloading, and keep the window open until it says it's finished. Along the way:

@@ -27,11 +27,11 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
 ## Windows
 
 1. Go to the README on GitHub as a stranger would, and click the
-   **Download EmberStorm-Setup.cmd** link.
+   **Download EmberStorm-Setup.exe** link.
    - Did the browser warn about the download? What did it say, and what did
      you have to click?
-2. Follow the README's steps exactly: **Properties → Unblock**, then
-   double-click.
+2. Follow the README's steps exactly: double-click it (and, if Windows
+   says it protected your PC, More info → Run anyway).
    - Was Unblock there? Did anything open if you skipped it?
 3. The setup window. Note:
    - How long until the window appeared.
