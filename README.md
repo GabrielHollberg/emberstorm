@@ -116,7 +116,7 @@ but yourself, and nothing to set up by hand.
 | --- | --- |
 | **Computer** | Windows 10 or 11, a Mac, or Linux, left switched on while you use it |
 | **Memory** | 16 GB recommended (it runs several media servers; photo search alone wants several GB) |
-| **Disk** | About 20 GB for EmberStorm itself, plus room for your media |
+| **Disk** | About 30 GB for EmberStorm itself, plus room for your media |
 | **Internet** | For the first install (a large download); afterwards it runs at home |
 
 Phones, tablets and other computers need nothing installed: they use EmberStorm
