@@ -124,19 +124,21 @@ EOF
 PANEL='<rect x="-0.15" y="-0.15" width="2.8" height="2.8" rx="0.52" fill="#000"/>'
 
 # card X Y N: the front of one 2.5" card with its top left at X,Y inches -
-# nothing but the QR code to the instructions page, as large as the card's
-# rounded corners allow (0.14" in: any less and the corner cuts into a finder
-# square), the cloud in its middle. White: the card's own edge is the code's
-# margin.
+# white: the logo and name across the top, the QR code to the instructions
+# page (the cloud in its middle), and "Setup instructions" under it. Named, so
+# nobody takes it for the label under the box, which is a QR code too.
 card() {
 	x=$1 y=$2 i=$3
 	echo "<g transform=\"translate($x $y)\">"
 	[ "$TEST" = 1 ] && echo '<rect width="2.5" height="2.5" rx="0.375" fill="none" stroke="#999" stroke-width="0.01"/>'
 	cat <<EOF
-<image x="0.14" y="0.14" width="2.22" height="2.22" href="data:image/svg+xml;base64,$CARD_QR"/>
-<rect x="0.959" y="0.97" width="0.582" height="0.56" rx="0.1" fill="#fff"/>
+<text x="0.74" y="0.39" font-size="0.21" font-weight="900" font-style="italic">EmberStorm</text>
+<image x="0.45" y="0.5" width="1.6" height="1.6" href="data:image/svg+xml;base64,$CARD_QR"/>
+<rect x="1.04" y="1.1" width="0.42" height="0.4" rx="0.07" fill="#fff"/>
+<text x="1.25" y="2.34" font-size="0.17" font-weight="bold" text-anchor="middle">Setup instructions</text>
 EOF
-	cloud 1.023 1.058 0.454 "#000" "q$i"
+	cloud 0.37 0.17 0.3 "#000" "t$i"
+	cloud 1.0865 1.162 0.327 "#000" "q$i"
 	echo '</g>'
 }
 
