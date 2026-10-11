@@ -608,10 +608,10 @@ class MainActivity : Activity() {
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle("Set up your EmberStorm")
-            .setMessage("Type the setup code printed on the sticker on the box, or scan its QR code.")
+            .setMessage("Type the setup code from the label on the back of the box, or scan its QR code.")
             .setView(pad)
             .setPositiveButton("Continue", null)
-            .setNeutralButton("Scan the sticker", null)
+            .setNeutralButton("Scan the label", null)
             .setNegativeButton("Cancel", null)
             .create()
         dialog.setOnShowListener {

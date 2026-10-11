@@ -145,7 +145,7 @@ func (s *Server) handleResetOwnerPassword(w http.ResponseWriter, r *http.Request
 		code = code[:64]
 	}
 	if status, err := s.caretakerCall(r.Context(), http.MethodPost, "/button/claim", map[string]string{"code": code}, nil); err != nil || status != http.StatusOK {
-		writeError(w, http.StatusForbidden, "That is not the setup code on the box's sticker, or the code on its screen.")
+		writeError(w, http.StatusForbidden, "That is not the setup code on the label on the back of the box, or the code on its screen.")
 		return
 	}
 	owner, err := s.auth.SetOwnerPassword(body.Password)

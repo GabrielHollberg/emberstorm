@@ -32,15 +32,15 @@ next step is making sure a stranger's first hour goes well.
 ## 2. EmberStorm on a box
 
 A small computer with EmberStorm already on it, for people leaving the cloud:
-plug it into power and the router, scan the code on the sticker, make an
+plug it into power and the router, scan the code on its back, make an
 account. The system image and its signed, self-reverting updates work in a
 virtual machine; a test unit is next. See [`box/README.md`](../box/README.md).
 
 - **On real hardware:** the image written to the box, the power button's
   password reset (pressed five times), Start over and Erase everything, and
   bringing media in from a USB drive.
-- **Setting up from the sticker:** a setup code made when the box is prepared
-  and printed on it. (The phone apps' "We found your new EmberStorm - Set it
+- **Setting up from the label:** a setup code made when the box is prepared
+  and printed on the label on its back. (The phone apps' "We found your new EmberStorm - Set it
   up" is built, on Android and iPhone.)
 - **Backups to a USB drive:** nightly once one is plugged in, with the app
   saying plainly when there is no backup or one has not run.

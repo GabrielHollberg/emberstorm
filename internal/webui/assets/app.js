@@ -676,7 +676,7 @@ function showGate(hasAccount, setupCodeRequired) {
       if (!ok || !body || $('gate-form').dataset.mode !== 'login') return;
       show($('gate-button-hint'), Boolean(body.box) && !body.open);
       if (body.open) {
-        $('gate-button-text').textContent = `The power button on the box was pressed. Choose a new password for ${body.owner}. Type the setup code from the box's sticker - or, with a screen plugged into the box, the code it shows:`;
+        $('gate-button-text').textContent = `The power button on the box was pressed. Choose a new password for ${body.owner}. Type the setup code from the label on the back of the box - or, with a screen plugged into the box, the code it shows:`;
         show($('gate-button'), true);
       }
     });
@@ -1177,19 +1177,19 @@ function renderAccount() {
     show($('box-time-block'), box);
     show($('box-off-block'), box);
     if (box) showBoxTimeZone();
-    // The box's serial, as on its sticker: what support asks for.
+    // The box's serial, as on its label: what support asks for.
     const unit = ok && body && body.boxUnit;
     show($('box-unit'), Boolean(unit));
     if (unit) $('box-unit').textContent = `This box's serial number: ${unit}`;
-    // Its setup code, as on the label under the box: kept here for when the
+    // Its setup code, as on the label on the back of the box: kept here for when the
     // label is lost, and said beside Start over, which needs it again.
     const code = ok && body && body.boxSetupCode;
     const grouped = code ? String(code).toUpperCase().replace(/(.{4})(?=.)/g, '$1 ') : '';
     show($('box-code'), Boolean(code));
     show($('box-reset-code'), Boolean(code));
     if (code) {
-      $('box-code').textContent = `Its setup code: ${grouped} (also on the label under the box)`;
-      $('box-reset-code').textContent = `Your setup code is ${grouped}. After Start over you need it to set the box up again - write it down if the label under the box is hard to read.`;
+      $('box-code').textContent = `Its setup code: ${grouped} (also on the label on the back of the box)`;
+      $('box-reset-code').textContent = `Your setup code is ${grouped}. After Start over you need it to set the box up again - write it down if the label on the back of the box is hard to read.`;
     }
   });
 }

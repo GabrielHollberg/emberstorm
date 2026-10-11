@@ -214,7 +214,7 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
     /// already in, from the address).
     private func setUp(_ server: ServerDiscovery.Found) {
         let ask = UIAlertController(title: "Set up your new EmberStorm",
-                                    message: "The setup code is on the sticker on the bottom of the box.",
+                                    message: "The setup code is on the label on the back of the box.",
                                     preferredStyle: .alert)
         ask.addAction(UIAlertAction(title: "Scan the code", style: .default) { [weak self] _ in
             guard let self else { return }
@@ -229,7 +229,7 @@ final class ConnectViewController: UIViewController, UITextFieldDelegate {
     }
 
     private func typeCode(_ server: ServerDiscovery.Found, note: String?) {
-        let ask = UIAlertController(title: "Setup code", message: note ?? "As printed on the sticker. Capitals and dashes do not matter.",
+        let ask = UIAlertController(title: "Setup code", message: note ?? "As printed on the label on the back of the box. Capitals and dashes do not matter.",
                                     preferredStyle: .alert)
         ask.addTextField { field in
             field.autocapitalizationType = .allCharacters

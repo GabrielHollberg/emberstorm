@@ -2,7 +2,7 @@
 # Print sheets for the boxes, made for the Avery sheets the owner chose:
 #
 #   labels  Avery 64510 - 2" x 2" waterproof film, 12 a sheet (3 x 4): the
-#           label under each box, its own setup code as a QR code
+#           label on the back of each box, its own setup code as a QR code
 #           (http://soundstorm.local/?setup=CODE, which the app's scanner and
 #           a phone's camera both take), the code, and the serial.
 #   cards   Avery 35703 - 2.5" x 2.5" rounded cards, 9 a sheet (3 x 3): the
@@ -126,7 +126,7 @@ PANEL='<rect x="-0.15" y="-0.15" width="2.8" height="2.8" rx="0.52" fill="#000"/
 # card X Y N: the front of one 2.5" card with its top left at X,Y inches -
 # white: the logo and name across the top, the QR code to the instructions
 # page (the cloud in its middle), and "Setup instructions" under it. Named, so
-# nobody takes it for the label under the box, which is a QR code too.
+# nobody takes it for the label on the back of the box, a QR code too.
 card() {
 	x=$1 y=$2 i=$3
 	echo "<g transform=\"translate($x $y)\">"
