@@ -146,7 +146,19 @@ $RawBase    = "https://raw.githubusercontent.com/$Repo/$Branch"
 # through the API (whose answer is fresh), and the branch URL is only the
 # fallback when the API cannot be asked. Not on -Launch: opening the app must
 # not wait on GitHub.
-if (-not $Launch -and -not $env:SOUNDSTORM_COMPOSE_URL -and -not $env:SOUNDSTORM_SCRIPT_URL) {
+# A signed release (EmberStorm.exe checked every file against the list the
+# release key signed, internal/desktoprelease) is in SOUNDSTORM_RELEASE_DIR:
+# then the compose file, this script and the icon come from there and nothing
+# is downloaded from the branch. Downloads from the branch are left only for a
+# checkout being tried (and the move rehearsals' own addresses).
+$ReleaseDir = $null
+if ($env:SOUNDSTORM_RELEASE_DIR -and (Test-Path -LiteralPath (Join-Path $env:SOUNDSTORM_RELEASE_DIR 'docker-compose.yml'))) {
+    $ReleaseDir = $env:SOUNDSTORM_RELEASE_DIR
+}
+# Set when an update could not reach the signed release: then nothing is
+# downloaded at all, and what is here is kept.
+$NoFetch = $false
+if (-not $Launch -and -not $ReleaseDir -and -not $env:SOUNDSTORM_COMPOSE_URL -and -not $env:SOUNDSTORM_SCRIPT_URL) {
     try {
         $commit = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/commits/$Branch" `
             -Headers @{ 'User-Agent' = 'soundstorm-installer'; 'Accept' = 'application/vnd.github+json' } `
@@ -185,45 +197,64 @@ $Dir       = if ($env:SOUNDSTORM_DIR) { $env:SOUNDSTORM_DIR }
              else { Join-Path $env:USERPROFILE 'EmberStorm' }
 $FirstPort = if ($env:SOUNDSTORM_PORT) { [int]$env:SOUNDSTORM_PORT } else { 8099 }
 
-# Updating runs the newest installer, not the one saved last time.
+# Updating runs the newest signed release, never the branch.
 #
-# "Update EmberStorm" runs the copy of this script saved beside the install,
-# and the setup file runs whatever it just downloaded - so each update used to
-# run the *previous* version's logic, and a fix to the installer itself only
-# took effect on the update after the one that fetched it. So a saved or
-# downloaded copy fetches the newest script and, when it differs, hands over to
-# it with the same arguments. Only those two copies: a checkout being tested
-# runs as it is. SOUNDSTORM_FRESH stops the new copy doing the same again.
-$selfName = if ($PSCommandPath) { [IO.Path]::GetFileName($PSCommandPath) } else { '' }
-if (-not $Launch -and $env:SOUNDSTORM_FRESH -ne '1' -and
-    ($selfName -eq 'soundstorm.ps1' -or $selfName -eq 'soundstorm-install.ps1')) {
-    $fresh = Join-Path $env:TEMP "soundstorm-fresh-$PID.ps1"
-    $handOver = $false
+# "Update EmberStorm", the move, Tailscale and the restart's carry-on run the
+# copy of this script saved earlier. It used to fetch the newest script from
+# the branch and run it - so whoever could change the branch (a stolen token,
+# a taken-over account) ran code on every install's next update. Now it hands
+# over to EmberStorm.exe - the copy kept in the install folder, or else the
+# newest from the release - only once Windows says it is signed by EmberStorm's
+# certificate; that program fetches the release the YubiKey signed and checks
+# every file before running it. Offline, it carries on with this copy and
+# downloads nothing. Not for -Launch (nothing is fetched) nor -Uninstall
+# (which must work as it is), nor a checkout being tried.
+function Test-OurSignature([string]$Path) {
     try {
-        Invoke-WebRequest -Uri $ScriptUrl -OutFile $fresh -UseBasicParsing -TimeoutSec 30
-        $newText = [IO.File]::ReadAllText($fresh)
-        $oldText = [IO.File]::ReadAllText($PSCommandPath)
-        $handOver = ($newText -ne $oldText -and $newText -match 'SOUNDSTORM_FRESH')
-    } catch {
-        # Offline, or GitHub unreachable: carry on with this copy, which is
-        # what would have happened before.
-    }
-    if ($handOver) {
-        # Outside the try above on purpose: a failure inside the new copy must
-        # end here, not fall back to running this old one as well.
-        $env:SOUNDSTORM_FRESH = '1'
-        $code = 1
+        $sig = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop
+        return ($sig.Status -eq 'Valid' -and
+                "$($sig.SignerCertificate.Subject)" -match 'CN=Open Source Developer Gabriel Hollberg(,|$)')
+    } catch { return $false }
+}
+$selfName = if ($PSCommandPath) { [IO.Path]::GetFileName($PSCommandPath) } else { '' }
+if (-not $Launch -and -not $Uninstall -and -not $ReleaseDir -and $env:SOUNDSTORM_FRESH -ne '1' -and
+    ($selfName -eq 'soundstorm.ps1' -or $selfName -eq 'soundstorm-install.ps1')) {
+    $launcher = Join-Path $Dir 'EmberStorm.exe'
+    if (-not ((Test-Path -LiteralPath $launcher) -and (Test-OurSignature $launcher))) {
+        $launcher = Join-Path $env:TEMP "EmberStorm-update-$PID.exe"
         try {
-            & $fresh @PSBoundParameters
-            $code = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-        } catch {
-            Write-Host "  $($_.Exception.Message)" -ForegroundColor Red
-        } finally {
-            Remove-Item -LiteralPath $fresh -Force -ErrorAction SilentlyContinue
+            Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest/download/EmberStorm.exe" `
+                -OutFile $launcher -UseBasicParsing -TimeoutSec 120
+        } catch { }
+        if (-not ((Test-Path -LiteralPath $launcher) -and (Test-OurSignature $launcher))) {
+            Remove-Item -LiteralPath $launcher -Force -ErrorAction SilentlyContinue
+            $launcher = $null
         }
-        exit $code
     }
-    Remove-Item -LiteralPath $fresh -Force -ErrorAction SilentlyContinue
+    if ($launcher) {
+        # The arguments as the launcher hands them on (ConvertTo-ArgumentList,
+        # further down, is not defined yet at this point).
+        $handArgs = @()
+        foreach ($key in $PSBoundParameters.Keys) {
+            $value = $PSBoundParameters[$key]
+            if ($key -eq 'AuthKey') { $env:SOUNDSTORM_TS_KEY = "$value"; continue }
+            if ($value -is [System.Management.Automation.SwitchParameter]) {
+                if ($value.IsPresent) { $handArgs += "-$key" }
+            } else {
+                $text = "$value" -replace '"', ''
+                if ($text.EndsWith('\')) { $text += '\' }
+                $handArgs += "-$key"
+                $handArgs += ('"' + $text + '"')
+            }
+        }
+        # Marked as handed over, so a launcher from before signed releases
+        # (which fetched this script again) cannot hand back round in a loop.
+        $env:SOUNDSTORM_FRESH = '1'
+        if ($handArgs.Count -gt 0) { Start-Process -FilePath $launcher -ArgumentList $handArgs }
+        else { Start-Process -FilePath $launcher }
+        exit 0
+    }
+    $NoFetch = $true
 }
 
 # --- the setup window -----------------------------------------------------------
@@ -4899,6 +4930,24 @@ function Write-MoveLaunchers([string]$Folder) {
         ('start "" /min "%PS%" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$ProgressPreference = ' + $q + 'SilentlyContinue' + $q + '; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $f = Join-Path $env:TEMP ' + $q + 'soundstorm-install.ps1' + $q + '; try { Invoke-WebRequest -UseBasicParsing -Uri $env:SOUNDSTORM_SETUP_URL -OutFile $f } catch { Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show(' + $q + 'EmberStorm could not download its installer. Check the internet connection and try again.' + $q + ', ' + $q + 'EmberStorm Setup' + $q + '); exit 1 }; $env:SOUNDSTORM_WINDOW = ' + $q + '1' + $q + '; $q = [char]34; Start-Process -FilePath (Join-Path $PSHOME ' + $q + 'powershell.exe' + $q + ') -WindowStyle Hidden -ArgumentList (' + $q + '-NoProfile -ExecutionPolicy Bypass -STA -File ' + $q + ' + $q + $f + $q + ' + $q + ' -Import ' + $q + ' + $q + $env:HERE + $q)"'),
         'exit /b 0'
     ) -join "`r`n"
+    # With the signed EmberStorm.exe kept beside the install, the move carries
+    # a copy and the launcher runs it: what it installs is then the signed
+    # release, checked, never the branch.
+    $exe = Join-Path $Dir 'EmberStorm.exe'
+    if ((Test-Path -LiteralPath $exe) -and (Test-OurSignature $exe)) {
+        try {
+            Copy-Item -Force -LiteralPath $exe (Join-Path $Folder 'EmberStorm.exe')
+            $cmd = @(
+                '@echo off',
+                'rem Installs EmberStorm on this computer from the move folder this file is in.',
+                'setlocal',
+                'set "HERE=%~dp0"',
+                'set "HERE=%HERE:~0,-1%"',
+                'start "" "%HERE%\EmberStorm.exe" -Import "%HERE%"',
+                'exit /b 0'
+            ) -join "`r`n"
+        } catch { }
+    }
     [IO.File]::WriteAllText((Join-Path $Folder 'Install EmberStorm here.cmd'), "$cmd`r`n", (New-Object Text.ASCIIEncoding))
 }
 
@@ -5354,7 +5403,33 @@ if ($Import) {
 }
 
 $upgrade = (Test-InstalledHere) -and $env:SOUNDSTORM_FORCE -ne '1'
-if ($upgrade) {
+# Never back to an older release than the one installed: an old one, though
+# signed, could bring back what a later one fixed. Each release has a serial,
+# kept in .env once installed.
+$releaseSerial = 0
+if ($ReleaseDir -and "$env:SOUNDSTORM_RELEASE_SERIAL" -match '^[0-9]{1,12}$') { $releaseSerial = [long]$env:SOUNDSTORM_RELEASE_SERIAL }
+if ($upgrade -and $releaseSerial -gt 0) {
+    $had = "$(Get-EnvSetting 'SOUNDSTORM_RELEASE_SERIAL')"
+    if ($had -match '^[0-9]{1,12}$' -and [long]$had -gt $releaseSerial) {
+        Stop-With "  This is an older release of EmberStorm ($env:SOUNDSTORM_RELEASE_VERSION) than the one installed, so it was not installed.`n`n  Download EmberStorm again from emberstorm.app and run it."
+    }
+}
+if ($ReleaseDir) {
+    # Checked against the signed list by EmberStorm.exe; the one here is kept
+    # until the new versions are downloaded, as below.
+    if ($upgrade) {
+        Note "Already installed here - updating it instead."
+        if (Test-Path -LiteralPath 'docker-compose.yml') { Copy-Item -Force -LiteralPath 'docker-compose.yml' 'docker-compose.yml.old' }
+    }
+    Copy-Item -Force -LiteralPath (Join-Path $ReleaseDir 'docker-compose.yml') 'docker-compose.yml.new'
+    Move-Item -Force 'docker-compose.yml.new' 'docker-compose.yml'
+    if ($upgrade) { Note "Got the list of the newest versions." }
+} elseif ($NoFetch) {
+    if ($upgrade) { Note "Already installed here - could not reach EmberStorm's signed release, so keeping what is here." }
+    elseif (-not (Test-Path -LiteralPath 'docker-compose.yml')) {
+        Stop-With "  Could not download EmberStorm. Check the internet connection and try again."
+    }
+} elseif ($upgrade) {
     Note "Already installed here - updating it instead."
     # The current compose file too: an update used to keep the one it was
     # installed with, so containers added since and the hardening in it
@@ -5387,19 +5462,39 @@ if ($upgrade) {
 
 # A copy of this script lives beside the install, so the desktop shortcut has
 # something to run and updating later needs no web address.
-try {
-    Invoke-WebRequest -Uri $ScriptUrl -OutFile 'soundstorm.ps1' -UseBasicParsing
-} catch {
-    if ($PSCommandPath -and (Test-Path $PSCommandPath)) {
+if ($ReleaseDir -or $NoFetch) {
+    if ($PSCommandPath -and (Test-Path $PSCommandPath) -and $PSCommandPath -ne (Join-Path $Dir 'soundstorm.ps1')) {
         Copy-Item $PSCommandPath 'soundstorm.ps1' -Force
+    }
+} else {
+    try {
+        Invoke-WebRequest -Uri $ScriptUrl -OutFile 'soundstorm.ps1' -UseBasicParsing
+    } catch {
+        if ($PSCommandPath -and (Test-Path $PSCommandPath)) {
+            Copy-Item $PSCommandPath 'soundstorm.ps1' -Force
+        }
+    }
+}
+# The signed program updates come back through (above): the release's own
+# copy, checked with the rest, else the one this setup was started from.
+if ($ReleaseDir) {
+    $launcherFrom = Join-Path $ReleaseDir 'EmberStorm.exe'
+    if (-not (Test-Path -LiteralPath $launcherFrom)) { $launcherFrom = $env:SOUNDSTORM_LAUNCHER }
+    if ($launcherFrom -and (Test-Path -LiteralPath $launcherFrom) -and $launcherFrom -ne (Join-Path $Dir 'EmberStorm.exe')) {
+        try { Copy-Item -Force -LiteralPath $launcherFrom (Join-Path $Dir 'EmberStorm.exe') } catch { Note "Could not keep a copy of EmberStorm.exe for updates." }
     }
 }
 # The cloud for the shortcuts and the Settings, Apps entry: they run
 # PowerShell, and showed its icon, which said nothing about EmberStorm (the
 # owner, 2026-10-10). Without it they still work, with PowerShell's.
 try {
-    Invoke-WebRequest -Uri $IconUrl -OutFile 'emberstorm.ico.new' -UseBasicParsing
-    if ((Get-Item 'emberstorm.ico.new').Length -gt 1000) { Move-Item -Force 'emberstorm.ico.new' 'emberstorm.ico' }
+    if ($ReleaseDir) {
+        $releaseIcon = Join-Path $ReleaseDir 'emberstorm.ico'
+        if (Test-Path -LiteralPath $releaseIcon) { Copy-Item -Force -LiteralPath $releaseIcon 'emberstorm.ico.new' }
+    } elseif (-not $NoFetch) {
+        Invoke-WebRequest -Uri $IconUrl -OutFile 'emberstorm.ico.new' -UseBasicParsing
+    }
+    if ((Test-Path 'emberstorm.ico.new') -and (Get-Item 'emberstorm.ico.new').Length -gt 1000) { Move-Item -Force 'emberstorm.ico.new' 'emberstorm.ico' }
 } catch { }
 Remove-Item -LiteralPath 'emberstorm.ico.new' -Force -ErrorAction SilentlyContinue
 
@@ -5781,6 +5876,11 @@ if ($lan -and $lanAccess -eq 'ready' -and -not (Test-LanAccessReady ([int]$port)
 }
 # Started and answering: installed, from now on an update.
 Set-EnvSetting 'SOUNDSTORM_INSTALLED' '1'
+# Which signed release this is, so an older one is never installed over it.
+if ($releaseSerial -gt 0) {
+    Set-EnvSetting 'SOUNDSTORM_RELEASE_SERIAL' "$releaseSerial"
+    Set-EnvSetting 'SOUNDSTORM_RELEASE_VERSION' "$env:SOUNDSTORM_RELEASE_VERSION"
+}
 # An import is over once it has started: the marks that let it carry on go.
 if ((Get-EnvSetting 'SOUNDSTORM_IMPORTING') -eq '1') {
     Set-EnvSetting 'SOUNDSTORM_IMPORTING' ''
