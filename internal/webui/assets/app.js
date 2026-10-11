@@ -1175,6 +1175,7 @@ function renderAccount() {
     show($('box-reset-block'), box);
     if (box) showResetWaiting();
     show($('box-time-block'), box);
+    show($('box-off-block'), box);
     if (box) showBoxTimeZone();
     // The box's serial, as on its sticker: what support asks for.
     const unit = ok && body && body.boxUnit;
@@ -1215,6 +1216,12 @@ async function showBoxTimeZone() {
   show(use, Boolean(mine && mine !== zone));
   use.textContent = `Use this device's: ${mine.replace(/_/g, ' ')}`;
 }
+$('box-off').addEventListener('click', async () => {
+  if (!confirm('Switch off the box? EmberStorm stops for everybody until its power button is pressed again.')) return;
+  const r = await api('/api/box/poweroff', { method: 'POST' });
+  if (!r.ok) { showToast((r.body && r.body.error) || 'Could not switch the box off.'); return; }
+  showToast('The box is switching off. It is safe to unplug once its light goes out.');
+});
 $('box-time-use').addEventListener('click', async () => {
   const r = await api('/api/box/timezone', { method: 'PUT', body: JSON.stringify({ zone: deviceTimeZone() }) });
   if (!r.ok) showToast((r.body && r.body.error) || 'Could not set the time zone.');

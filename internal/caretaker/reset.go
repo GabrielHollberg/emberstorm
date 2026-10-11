@@ -417,11 +417,13 @@ func (u *Updater) Pressed(ctx context.Context, n int) {
 		u.showButtonCode(u.button.code, u.button.until)
 		u.button.mu.Unlock()
 		u.log.Warn("the power button was pressed five times: the owner's password can be set for 15 minutes")
-	case n == 2:
-		u.log.Info("the power button was pressed twice: shutting down")
+	case n <= 2:
+		// One press (two as well, for anybody who learnt that): the box's
+		// button is not one pressed by accident (the owner's call).
+		u.log.Info("the power button was pressed: shutting down", "presses", n)
 		_ = u.run(ctx, "systemctl", "poweroff")
-	case n == 1:
-		u.log.Info("the power button was pressed once: press it twice to shut down")
+	default:
+		u.log.Info("the power button was pressed a few times: nothing (five set the owner's password)", "presses", n)
 	}
 }
 

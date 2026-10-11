@@ -62,6 +62,12 @@ func startCaretaker(t *testing.T) *fakeCaretaker {
 		c.mu.Unlock()
 		w.WriteHeader(http.StatusAccepted)
 	})
+	mux.HandleFunc("POST /poweroff", func(w http.ResponseWriter, r *http.Request) {
+		c.mu.Lock()
+		c.asked = append(c.asked, "poweroff")
+		c.mu.Unlock()
+		w.WriteHeader(http.StatusAccepted)
+	})
 	srv := &http.Server{Handler: mux}
 	go srv.Serve(ln)
 	t.Cleanup(func() { srv.Close() })
@@ -241,5 +247,26 @@ func TestOtherSitesCannotStartWorkByReading(t *testing.T) {
 		if w.Code != c.want {
 			t.Errorf("%s from %q: %d, want %d", c.path, c.site, w.Code, c.want)
 		}
+	}
+}
+
+// The owner switches the box off from the app, as one press of its button
+// does; a member cannot.
+func TestTheOwnerSwitchesTheBoxOff(t *testing.T) {
+	c := startCaretaker(t)
+	h := newHarness(t)
+	h.signUp(t)
+	h.addMember(t, "sam", "violet tractor glacier")
+	sam := h.asUser(t, "sam", "violet tractor glacier")
+	if resp, _ := sam.do(t, http.MethodPost, "/api/box/poweroff", ""); resp.StatusCode == http.StatusAccepted {
+		t.Fatal("a member switched the box off")
+	}
+	if resp, body := h.do(t, http.MethodPost, "/api/box/poweroff", ""); resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("the owner could not switch the box off: %d %s", resp.StatusCode, body)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.asked) != 1 || c.asked[0] != "poweroff" {
+		t.Fatalf("the caretaker was asked %v", c.asked)
 	}
 }

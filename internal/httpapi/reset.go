@@ -278,6 +278,20 @@ func (s *Server) handleBoxTimeZone(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"zone": answer.Zone})
 }
 
+// POST /api/box/poweroff: the box switched off (owner) - for moving it or
+// adding a drive - as one press of its power button does.
+func (s *Server) handleBoxPowerOff(w http.ResponseWriter, r *http.Request) {
+	code, err := s.caretakerCall(r.Context(), http.MethodPost, "/poweroff", nil, nil)
+	switch {
+	case err == nil && code == http.StatusAccepted:
+		writeJSON(w, http.StatusAccepted, map[string]bool{"switchingOff": true})
+	case code == http.StatusConflict:
+		writeError(w, http.StatusConflict, "The box is updating or resetting just now. Try again once it has finished.")
+	default:
+		writeError(w, http.StatusBadGateway, "The box could not be asked. Press its power button once instead.")
+	}
+}
+
 // DELETE /api/reset: an erase still waiting for the box's power button is
 // taken back (owner).
 func (s *Server) handleCancelReset(w http.ResponseWriter, r *http.Request) {

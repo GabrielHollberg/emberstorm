@@ -77,7 +77,7 @@ draw() {
 	if [ -s /run/soundstorm/storage-problem ]; then
 		printf '   EmberStorm cannot start\n\n'
 		fold -s -w 60 /run/soundstorm/storage-problem | tr -d '\033' | sed 's/^/   /'
-		printf '\n   To switch the box off, press the power button twice.\n'
+		printf '\n   To switch the box off, press the power button once.\n'
 		return
 	fi
 	if [ -e /run/soundstorm/no-data-drive ]; then
@@ -153,7 +153,7 @@ draw() {
 		else
 			printf '\n   Forgot the password? Press the power button on the box\n'
 			printf '   five times quickly, then choose a new one on the sign-in screen.\n'
-			printf '   To switch the box off, press the power button twice.\n'
+			printf '   To switch the box off, press the power button once.\n'
 		fi
 		;;
 	esac

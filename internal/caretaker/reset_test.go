@@ -130,17 +130,17 @@ func TestThePowerButtonCountsRuns(t *testing.T) {
 	if open, _ := b.u.buttonOpen(); open {
 		t.Fatal("many wrong codes did not close the window")
 	}
-	b.u.Pressed(ctx, 1)
+	b.u.Pressed(ctx, 3)
 	b.mu.Lock()
 	if len(b.ran) != 0 {
-		t.Fatalf("one press ran %v", b.ran)
+		t.Fatalf("three presses ran %v", b.ran)
 	}
 	b.mu.Unlock()
-	b.u.Pressed(ctx, 2)
+	b.u.Pressed(ctx, 1)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if len(b.ran) == 0 || b.ran[len(b.ran)-1] != "systemctl poweroff" {
-		t.Fatalf("two presses ran %v", b.ran)
+		t.Fatalf("one press ran %v", b.ran)
 	}
 }
 

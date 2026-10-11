@@ -83,6 +83,21 @@ func (u *Updater) Handler() http.Handler {
 		w.WriteHeader(http.StatusAccepted)
 		reply(w, u.Status())
 	})
+	// The box switched off from the app (the owner's), as one press of its
+	// button does - never in the middle of an update or a reset.
+	mux.HandleFunc("POST /poweroff", func(w http.ResponseWriter, r *http.Request) {
+		if !u.busy.TryLock() {
+			http.Error(w, ErrBusy.Error(), http.StatusConflict)
+			return
+		}
+		u.busy.Unlock()
+		u.log.Info("switching off, as asked in the app")
+		w.WriteHeader(http.StatusAccepted)
+		go func() {
+			time.Sleep(time.Second) // the answer reaches the app first
+			_ = u.run(context.Background(), "systemctl", "poweroff")
+		}()
+	})
 	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
 		reply(w, u.settings())
 	})
