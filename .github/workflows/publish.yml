@@ -225,17 +225,17 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Attach the Windows setup file to the release
+      - name: Make sure the tag has a release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # A tag can arrive with a release already made by hand, or on its
-          # own from `git push --tags`. Both have to end up with the asset.
+          # own from `git push --tags`. The Windows download, EmberStorm.exe,
+          # is signed by hand on the PC and attached then; the Mac's
+          # EmberStorm.dmg likewise from the Mac.
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             echo "No release for $GITHUB_REF_NAME yet - creating one."
             gh release create "$GITHUB_REF_NAME" \
-              --title "SoundStorm $GITHUB_REF_NAME" \
+              --title "EmberStorm $GITHUB_REF_NAME" \
               --generate-notes
           fi
-          gh release upload "$GITHUB_REF_NAME" EmberStorm-Setup.cmd --clobber
-          echo "Attached EmberStorm-Setup.cmd to $GITHUB_REF_NAME"
