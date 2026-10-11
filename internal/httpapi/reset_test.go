@@ -68,6 +68,50 @@ func startCaretaker(t *testing.T) *fakeCaretaker {
 		c.mu.Unlock()
 		w.WriteHeader(http.StatusAccepted)
 	})
+	// Updates: version 1 installed, 2 waiting once looked for.
+	auto, looked := true, false
+	status := func(w http.ResponseWriter) {
+		st := map[string]any{"state": "idle", "current": map[string]any{"version": "1", "serial": 1}}
+		if looked {
+			st["available"] = map[string]any{"version": "2", "serial": 2, "notes": "Faster."}
+		}
+		json.NewEncoder(w).Encode(st)
+	}
+	mux.HandleFunc("GET /status", func(w http.ResponseWriter, r *http.Request) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		status(w)
+	})
+	mux.HandleFunc("POST /check", func(w http.ResponseWriter, r *http.Request) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		looked = true
+		c.asked = append(c.asked, "check")
+		status(w)
+	})
+	mux.HandleFunc("POST /update", func(w http.ResponseWriter, r *http.Request) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if !looked {
+			http.Error(w, "no update is available", http.StatusConflict)
+			return
+		}
+		c.asked = append(c.asked, "update")
+		w.WriteHeader(http.StatusAccepted)
+	})
+	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		json.NewEncoder(w).Encode(map[string]bool{"auto": auto})
+	})
+	mux.HandleFunc("PUT /settings", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Auto bool }
+		json.NewDecoder(r.Body).Decode(&body)
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		auto = body.Auto
+		json.NewEncoder(w).Encode(map[string]bool{"auto": auto})
+	})
 	srv := &http.Server{Handler: mux}
 	go srv.Serve(ln)
 	t.Cleanup(func() { srv.Close() })
@@ -270,3 +314,42 @@ func TestTheOwnerSwitchesTheBoxOff(t *testing.T) {
 		t.Fatalf("the caretaker was asked %v", c.asked)
 	}
 }
+
+// Updates on a box from Settings: the owner sees the version, looks for one,
+// installs it now and turns automatic updates off; a member can do none of it.
+func TestTheOwnerUpdatesTheBox(t *testing.T) {
+	c := startCaretaker(t)
+	h := newHarness(t)
+	h.signUp(t)
+	h.addMember(t, "sam", "violet tractor glacier")
+	sam := h.asUser(t, "sam", "violet tractor glacier")
+	for _, try := range [][2]string{{http.MethodGet, "/api/box/updates"}, {http.MethodPost, "/api/box/updates/now"}, {http.MethodPost, "/api/box/updates/check"}} {
+		if resp, _ := sam.do(t, try[0], try[1], ""); resp.StatusCode < 400 {
+			t.Fatalf("a member could %s %s", try[0], try[1])
+		}
+	}
+	resp, body := h.do(t, http.MethodGet, "/api/box/updates", "")
+	if resp.StatusCode != http.StatusOK || !strings.Contains(squash(body), `"version":"1"`) || strings.Contains(squash(body), "available") || !strings.Contains(squash(body), `"auto":true`) {
+		t.Fatalf("status: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := h.do(t, http.MethodPost, "/api/box/updates/now", ""); resp.StatusCode != http.StatusConflict {
+		t.Fatalf("updating with nothing waiting answered %d", resp.StatusCode)
+	}
+	if resp, body := h.do(t, http.MethodPost, "/api/box/updates/check", ""); resp.StatusCode != http.StatusOK || !strings.Contains(squash(body), `"version":"2"`) || !strings.Contains(squash(body), "Faster.") {
+		t.Fatalf("check: %d %s", resp.StatusCode, body)
+	}
+	if resp, body := h.do(t, http.MethodPost, "/api/box/updates/now", ""); resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("update now: %d %s", resp.StatusCode, body)
+	}
+	if resp, body := h.do(t, http.MethodPut, "/api/box/updates/auto", `{"auto":false}`); resp.StatusCode != http.StatusOK || !strings.Contains(squash(body), `"auto":false`) {
+		t.Fatalf("auto off: %d %s", resp.StatusCode, body)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if strings.Join(c.asked, ",") != "check,update" {
+		t.Fatalf("the caretaker was asked %v", c.asked)
+	}
+}
+
+// squash is a JSON answer without its spaces and line breaks.
+func squash(b []byte) string { return strings.Join(strings.Fields(string(b)), "") }

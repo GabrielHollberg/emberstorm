@@ -654,6 +654,21 @@
         <p id="server-name-note" class="muted hidden" role="status"></p>
       </div>
 
+      <!-- Updates on a box (owner only): the version, what is waiting, and
+           Update now - else it installs by itself at night (boxupdates.go). -->
+      <div id="box-updates-block" class="account-section card hidden" data-hint="Version, and updating now" data-cat="devices" data-words="update updates version upgrade new release automatic">
+        <h2>Updates</h2>
+        <p id="box-updates-version"></p>
+        <p id="box-updates-waiting" class="hidden"></p>
+        <p id="box-updates-state" class="muted hidden"></p>
+        <div class="account-actions">
+          <button id="box-updates-check" type="button" class="ghost small">Check for updates</button>
+          <button id="box-updates-now" type="button" class="small hidden">Update now</button>
+        </div>
+        <label class="remote-switch"><input id="box-updates-auto" type="checkbox"><span>Update by itself at night</span></label>
+        <p class="muted">Every update is checked as signed by EmberStorm before it is installed, and put back by itself if EmberStorm does not start properly after it. While it updates, EmberStorm restarts once - a few minutes.</p>
+      </div>
+
       <!-- The box's time zone (on a box, owner only): its nightly updates and
            restarts keep to the owner's night (reset.go, caretaker timezone.go). -->
       <div id="box-time-block" class="account-section card hidden" data-hint="So updates happen at night" data-cat="devices" data-words="time zone clock night updates restart">

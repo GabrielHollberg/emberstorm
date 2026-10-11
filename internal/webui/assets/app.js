@@ -1176,7 +1176,8 @@ function renderAccount() {
     if (box) showResetWaiting();
     show($('box-time-block'), box);
     show($('box-off-block'), box);
-    if (box) showBoxTimeZone();
+    show($('box-updates-block'), box);
+    if (box) { showBoxTimeZone(); showBoxUpdates(); }
     // The box's serial, as on its label: what support asks for.
     const unit = ok && body && body.boxUnit;
     show($('box-unit'), Boolean(unit));
@@ -1221,6 +1222,95 @@ $('box-off').addEventListener('click', async () => {
   const r = await api('/api/box/poweroff', { method: 'POST' });
   if (!r.ok) { showToast((r.body && r.body.error) || 'Could not switch the box off.'); return; }
   showToast('The box is switching off. It is safe to unplug once its light goes out.');
+});
+// Updates on a box: which version, what is waiting, Update now. The box
+// installs by itself at night otherwise (the caretaker, between 2 and 5 in its
+// time zone). While it updates EmberStorm restarts, so the card keeps asking
+// until it answers again and says how it went.
+let boxUpdatesPolling = null;
+function renderBoxUpdates(d) {
+  const when = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+  $('box-updates-version').textContent = d.version
+    ? `EmberStorm ${d.version}${d.installed ? `, installed ${when(d.installed)}` : ''}.`
+    : 'The version on this box is not known yet.';
+  const waiting = d.available && d.state !== 'updating';
+  show($('box-updates-waiting'), Boolean(waiting));
+  if (waiting) {
+    $('box-updates-waiting').textContent = `EmberStorm ${d.available.version} is ready to install.` +
+      (d.available.notes ? ` ${d.available.notes}` : '');
+  }
+  show($('box-updates-now'), Boolean(waiting));
+  $('box-updates-auto').checked = d.auto !== false;
+  const state = $('box-updates-state');
+  let text = '';
+  if (d.state === 'updating') text = 'Updating now. EmberStorm restarts once - this page comes back by itself.';
+  else if (d.state === 'checking') text = 'Looking for updates...';
+  else if (d.state === 'rolled-back') text = 'The last update did not start properly, so the box went back to the version before. Nothing was lost.';
+  else if (d.state === 'failed') text = `The last update could not be installed.${d.message ? ` (${d.message})` : ''} The box carries on as it was.`;
+  else if (!d.available && d.lastCheck) text = `Up to date. Last looked ${when(d.lastCheck)}.`;
+  else if (!d.available) text = d.auto === false
+    ? 'Updates are installed only when you choose Update now.'
+    : 'The box looks for updates by itself and installs them at night.';
+  state.textContent = text;
+  show(state, Boolean(text));
+  $('box-updates-check').disabled = d.state === 'updating';
+}
+async function showBoxUpdates() {
+  const { ok, body } = await api('/api/box/updates');
+  if (ok && body) renderBoxUpdates(body);
+  return ok ? body : null;
+}
+// While an update runs: ask every five seconds; EmberStorm is away for a
+// while in the middle, which is expected.
+function followBoxUpdate() {
+  clearInterval(boxUpdatesPolling);
+  let away = false;
+  const started = Date.now();
+  boxUpdatesPolling = setInterval(async () => {
+    const r = await api('/api/box/updates');
+    if (!r.ok || !r.body) {
+      away = true;
+      const state = $('box-updates-state');
+      state.textContent = 'EmberStorm is restarting with the update...';
+      show(state, true);
+    } else {
+      renderBoxUpdates(r.body);
+      if (r.body.state !== 'updating' && (away || Date.now() - started > 20000)) {
+        clearInterval(boxUpdatesPolling);
+        if (r.body.state === 'updated' || (!r.body.available && r.body.state !== 'failed' && r.body.state !== 'rolled-back')) {
+          showToast(`Updated to EmberStorm ${r.body.version || ''}. Reloading...`);
+          setTimeout(() => location.reload(), 2000);
+        }
+      }
+    }
+    if (Date.now() - started > 30 * 60 * 1000) clearInterval(boxUpdatesPolling);
+  }, 5000);
+}
+$('box-updates-check').addEventListener('click', async () => {
+  const button = $('box-updates-check');
+  button.disabled = true;
+  const r = await api('/api/box/updates/check', { method: 'POST' });
+  button.disabled = false;
+  if (!r.ok || !r.body) { showToast((r.body && r.body.error) || 'Could not look for updates.'); return; }
+  renderBoxUpdates(r.body);
+  if (!r.body.available) showToast('EmberStorm is up to date.');
+});
+$('box-updates-now').addEventListener('click', async () => {
+  if (!confirm('Update now? EmberStorm restarts once, for everybody - a few minutes. Anything playing stops.')) return;
+  const r = await api('/api/box/updates/now', { method: 'POST' });
+  if (!r.ok) { showToast((r.body && r.body.error) || 'Could not start the update.'); return; }
+  show($('box-updates-now'), false);
+  show($('box-updates-waiting'), false);
+  $('box-updates-state').textContent = 'Updating now. EmberStorm restarts once - this page comes back by itself.';
+  show($('box-updates-state'), true);
+  followBoxUpdate();
+});
+$('box-updates-auto').addEventListener('change', async (e) => {
+  const want = e.target.checked;
+  const r = await api('/api/box/updates/auto', { method: 'PUT', body: JSON.stringify({ auto: want }) });
+  if (!r.ok) { e.target.checked = !want; showToast((r.body && r.body.error) || 'Could not change that.'); return; }
+  showToast(want ? 'The box will update itself at night.' : 'Updates will wait for you to choose Update now.');
+  showBoxUpdates();
 });
 $('box-time-use').addEventListener('click', async () => {
   const r = await api('/api/box/timezone', { method: 'PUT', body: JSON.stringify({ zone: deviceTimeZone() }) });
