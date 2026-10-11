@@ -41,3 +41,4 @@ box/rootfs/** text eol=lf
 
 # The fuzzer's saved inputs are read byte for byte by go test.
 **/testdata/fuzz/** -text
+*.syso binary

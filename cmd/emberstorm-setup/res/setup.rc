@@ -1,0 +1,28 @@
+// Numbers rather than winver.h: no C compiler is needed to build it.
+1 ICON "../../../emberstorm.ico"
+1 24 "setup.manifest"
+1 VERSIONINFO
+FILEVERSION 0,12,0,0
+PRODUCTVERSION 0,12,0,0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "EmberStorm"
+      VALUE "FileDescription", "EmberStorm Setup"
+      VALUE "FileVersion", "0.12.0"
+      VALUE "InternalName", "EmberStorm-Setup"
+      VALUE "LegalCopyright", "EmberStorm contributors, AGPL-3.0"
+      VALUE "OriginalFilename", "EmberStorm-Setup.exe"
+      VALUE "ProductName", "EmberStorm"
+      VALUE "ProductVersion", "0.12.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
