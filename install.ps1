@@ -3438,8 +3438,8 @@ function Select-LibraryInWindow([string]$Default, [string]$Intro, $Drives, [bool
             try { $pathRoot = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($path)) } catch { }
             if ($planned) {
                 $where = if ($plannedRoot -ieq $pathRoot) { "on $($plannedRoot.TrimEnd('\')) too" } else { "on $($plannedRoot.TrimEnd('\')), inside this PC, as $($system.TrimEnd('\')) is short of room" }
-                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data (about 20 GB at first, growing with your library) is kept $where." 13 '#B9B9C6'))
-                if ($systemFree -ge 25GB) {
+                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data (about 30 GB at first, growing with your library) is kept $where." 13 '#B9B9C6'))
+                if ($systemFree -ge 35GB) {
                     $keepOnC = New-Object System.Windows.Controls.CheckBox
                     $keepOnC.IsChecked = [bool]$script:DockerOnSystem
                     $keepOnC.Margin = '0,8,0,0'
@@ -3448,7 +3448,7 @@ function Select-LibraryInWindow([string]$Default, [string]$Intro, $Drives, [bool
                     [void]$page.Children.Add($keepOnC)
                 }
             } else {
-                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data - about 20 GB at first, growing with your library - is kept on $($system.TrimEnd('\')), inside this PC." 13 '#B9B9C6'))
+                [void]$page.Children.Add((New-GuiLine "EmberStorm's own data - about 30 GB at first, growing with your library - is kept on $($system.TrimEnd('\')), inside this PC." 13 '#B9B9C6'))
             }
         }
         if ($Drives.Count -gt 1) {
@@ -3911,7 +3911,7 @@ function Test-InternalDrive([string]$Root) {
 }
 
 # Get-DockerDataRoot answers where Docker should keep its downloads and data -
-# EmberStorm's own data, about 20GB at first and growing with the library
+# EmberStorm's own data, about 30GB at first and growing with the library
 # (thumbnails, the media servers' databases) - when Docker is still to be
 # installed: a folder on the library's drive when that drive is another one
 # inside the PC, so everything EmberStorm keeps is on the drive the person
@@ -3929,18 +3929,18 @@ function Get-DockerDataRoot {
         $library = if ($Library) { "$Library" } else { Get-LibraryPath }
         $libraryRoot = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($library))
         if ($script:DockerOnSystem -or $env:EMBERSTORM_DOCKER_C -eq '1') {
-            if ($systemFree -ge 25GB) { return $null }
+            if ($systemFree -ge 35GB) { return $null }
         }
         if ($libraryRoot -ine $system -and (Test-InternalDrive $libraryRoot)) { return (Join-Path $libraryRoot 'EmberStorm-Docker') }
         # The library on C: or on a drive that can be unplugged: Docker stays
         # on C: when it has room, else the roomiest drive inside the PC.
-        if ($systemFree -ge 25GB) { return $null }
+        if ($systemFree -ge 35GB) { return $null }
         $best = $null
         foreach ($drive in Get-LocalDrives) {
             $root = "$($drive.DeviceID)\"
             if ($root -ieq $system -or -not (Test-InternalDrive $root)) { continue }
             $info = New-Object IO.DriveInfo $root
-            if ($info.AvailableFreeSpace -lt 20GB) { continue }
+            if ($info.AvailableFreeSpace -lt 30GB) { continue }
             if (-not $best -or $info.AvailableFreeSpace -gt $best.AvailableFreeSpace) { $best = $info }
         }
         if ($best) { return (Join-Path $best.RootDirectory.FullName 'EmberStorm-Docker') }
@@ -3948,7 +3948,7 @@ function Get-DockerDataRoot {
     return $null
 }
 
-function Test-DownloadRoom([long]$Need = 20GB) {
+function Test-DownloadRoom([long]$Need = 30GB) {
     try {
         $root = [IO.Path]::GetPathRoot($env:LOCALAPPDATA)
         $free = (New-Object IO.DriveInfo $root).AvailableFreeSpace
@@ -3962,9 +3962,9 @@ function Test-DownloadRoom([long]$Need = 20GB) {
         $other = [IO.Path]::GetPathRoot($elsewhere)
         $otherFree = 0
         try { $otherFree = (New-Object IO.DriveInfo $other).AvailableFreeSpace } catch { }
-        if ($otherFree -lt 20GB) {
+        if ($otherFree -lt 30GB) {
             Stop-With @"
-  EmberStorm's own data needs about 20 GB free on $($other.TrimEnd('\')), and it has $(Format-Size $otherFree).
+  EmberStorm's own data needs about 30 GB free on $($other.TrimEnd('\')), and it has $(Format-Size $otherFree).
 
   Free some space there - Settings, System, Storage shows what is using it -
   or choose another drive for the library, then run the setup again.
@@ -3985,7 +3985,7 @@ function Test-DownloadRoom([long]$Need = 20GB) {
   keeps them, and it has $(Format-Size $free).
 
   Free some space there - Settings, System, Storage shows what is using it -
-  then run the setup again. (A second drive inside the PC with 20 GB free
+  then run the setup again. (A second drive inside the PC with 30 GB free
   would take Docker's downloads instead.)
 "@
 }
@@ -5240,9 +5240,11 @@ if ($firstInstall -and -not $installedElsewhere -and $env:EMBERSTORM_ASKED -eq '
         $script:LibraryAsked = $true
     }
     # Room where things will really go, once the library's drive is known
-    # (Docker's data goes with it). Docker Desktop itself wants about 5 GB
-    # more, when it is still to come.
-    Test-DownloadRoom $(if (Get-Command docker -ErrorAction SilentlyContinue) { 20GB } else { 25GB })
+    # (Docker's data goes with it). EmberStorm's programs are near 19 GB
+    # downloaded and more unpacked - 20 GB was found too little on a Mac
+    # (2026-10-10) - and Docker Desktop itself wants about 5 GB more, when
+    # it is still to come.
+    Test-DownloadRoom $(if (Get-Command docker -ErrorAction SilentlyContinue) { 30GB } else { 35GB })
     # The port it will most likely have (step 2 picks it again the same way;
     # a different one is opened after it starts).
     $earlyPort = $FirstPort

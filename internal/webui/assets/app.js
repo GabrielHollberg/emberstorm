@@ -12377,14 +12377,21 @@ function offerInstall() {
   if (!state.me || TV || window.soundstormApp || installedApp() || state.offline) return;
   if (localStorage.getItem(INSTALL.key) || state.welcomeShown) return;
   const apple = installApple() && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
-  if (!INSTALL.prompt && !apple) return;
+  // Safari on a Mac asks nothing either; it has File, Add to Dock (Sonoma
+  // and later). Chrome, Edge and Firefox on a Mac also say Safari, so
+  // they are told apart by their own names.
+  const macSafari = /Macintosh/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1)
+    && /Version\/\d+.*Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent);
+  if (!INSTALL.prompt && !apple && !macSafari) return;
   const where = touchScreen() ? (/iPad|Tablet/.test(navigator.userAgent) ? 'tablet' : 'phone') : 'computer';
   $('install-offer-title').textContent = `Install EmberStorm on this ${where}?`;
   $('install-offer-text').textContent = INSTALL.prompt
     ? (where === 'computer'
       ? 'It opens in a window of its own with the EmberStorm icon - pin it to the taskbar and it is one click away.'
       : 'It goes on your home screen with the EmberStorm icon, and opens like any app.')
-    : 'Tap the Share button at the bottom of Safari, then Add to Home Screen. It opens like any app, with the EmberStorm icon.';
+    : macSafari
+      ? 'In the menu bar at the top, choose File, then Add to Dock. It opens in a window of its own, with the EmberStorm icon in your Dock.'
+      : 'Tap the Share button at the bottom of Safari, then Add to Home Screen. It opens like any app, with the EmberStorm icon.';
   $('install-offer-yes').textContent = INSTALL.prompt ? 'Install' : 'Got it';
   show($('install-offer'), true);
 }
