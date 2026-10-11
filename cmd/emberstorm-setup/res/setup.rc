@@ -14,9 +14,9 @@ BEGIN
       VALUE "CompanyName", "EmberStorm"
       VALUE "FileDescription", "EmberStorm Setup"
       VALUE "FileVersion", "0.12.0"
-      VALUE "InternalName", "EmberStorm-Setup"
+      VALUE "InternalName", "EmberStorm"
       VALUE "LegalCopyright", "EmberStorm contributors, AGPL-3.0"
-      VALUE "OriginalFilename", "EmberStorm-Setup.exe"
+      VALUE "OriginalFilename", "EmberStorm.exe"
       VALUE "ProductName", "EmberStorm"
       VALUE "ProductVersion", "0.12.0"
     END

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.exe"><strong>⬇ Download for Windows</strong></a>
+  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.exe"><strong>⬇ Download for Windows</strong></a>
   &nbsp;·&nbsp;
   <a href="#mac">Mac</a> ·
   <a href="#linux">Linux</a>
@@ -130,7 +130,7 @@ then, an iPhone uses the web app.
 
 ### Windows
 
-1. **[Download EmberStorm-Setup.exe](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm-Setup.exe)**
+1. **[Download EmberStorm.exe](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.exe)**
 2. **Double-click** it.
 
 It is signed, so Windows lets it run. While the signature is new to

@@ -1,4 +1,4 @@
-// Command emberstorm-setup is EmberStorm-Setup.exe: what the Windows
+// Command emberstorm-setup is EmberStorm.exe: what the Windows
 // download is double-clicked as. It does what EmberStorm-Setup.cmd did - fetch
 // the installer (install.ps1) to a file and start it with its window - as a
 // program that can be signed. Smart App Control blocks a .cmd from the web by
@@ -11,7 +11,7 @@
 // says so in a message box, there being nothing else to say it in.
 //
 // Arguments are passed straight through to the installer, as the .cmd's were
-// (EmberStorm-Setup.exe -Console, -Uninstall ...).
+// (EmberStorm.exe -Console, -Uninstall ...).
 package main
 
 import (

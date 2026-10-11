@@ -27,7 +27,7 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
 ## Windows
 
 1. Go to the README on GitHub as a stranger would, and click the
-   **Download EmberStorm-Setup.exe** link.
+   **Download EmberStorm.exe** link.
    - Did the browser warn about the download? What did it say, and what did
      you have to click?
 2. Follow the README's steps exactly: double-click it (and, if Windows
