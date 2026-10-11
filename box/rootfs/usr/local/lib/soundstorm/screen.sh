@@ -29,13 +29,14 @@ erasewait=/var/lib/soundstorm-caretaker/erase-waiting
 # Big letters, where the font is there (console-setup-linux), and no kernel
 # messages written over the screen.
 fonts=/usr/share/consolefonts
-setfont $fonts/Lat15-TerminusBold32x16.psf.gz 2>/dev/null || true
-# The welcome and its QR code are about 30 lines: a smaller monitor gets
-# smaller letters rather than a QR code cut off at the foot.
-rows=$(stty size 2>/dev/null | cut -d" " -f1)
-if [ "${rows:-0}" -lt 32 ]; then
-	setfont $fonts/Lat15-TerminusBold24x12.psf.gz 2>/dev/null || setfont $fonts/Lat15-Terminus24x12.psf.gz 2>/dev/null || true
-fi
+# The welcome and its QR code are about 45 lines (the code is drawn a line
+# per row of it, below): the biggest letters that leave room, so a smaller
+# monitor gets smaller letters rather than a code cut off at the foot.
+for f in TerminusBold32x16 TerminusBold24x12 TerminusBold16; do
+	setfont $fonts/Lat15-$f.psf.gz 2>/dev/null || continue
+	rows=$(stty size 2>/dev/null | cut -d" " -f1)
+	[ "${rows:-0}" -ge 46 ] && break
+done
 dmesg -n 1 2>/dev/null || true
 setterm --cursor off 2>/dev/null || true
 
@@ -100,7 +101,10 @@ draw() {
 		printf '\n   Setup code:  %s\n\n' "$code"
 		printf '   Or scan this with a phone, or get the EmberStorm app.\n'
 		if [ -n "$code" ] && command -v qrencode >/dev/null; then
-			qrencode -t UTF8 -m 2 "http://${ip:-$local_name}/?setup=$code" 2>/dev/null | sed 's/^/   /'
+			# Coloured spaces, two to a square and a line to each row: the
+			# console's fonts have no half blocks, which drew the code as
+			# junk (seen on the first box).
+			qrencode -t ANSI -m 2 "http://${ip:-$local_name}/?setup=$code" 2>/dev/null | sed 's/^/   /'
 		fi
 		;;
 	*)
