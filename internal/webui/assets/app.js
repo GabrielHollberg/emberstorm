@@ -8129,6 +8129,29 @@ function placeMenu(menu, anchor) {
   menu.style.top = `${top + window.scrollY}px`;
 }
 
+// A tap outside an open menu only closes it (the owner, 2026-10-12: tapping
+// away from the picture's menu opened whatever was under the finger). Seen
+// first, on the way down, so nothing underneath ever hears the tap.
+const POPUPS = [
+  { id: 'me-menu', inside: '#me-menu, #me-btn', close: () => closeMeMenu() },
+  { id: 'item-menu', inside: '#item-menu, .item-more', close: () => closeItemMenu(), held: true },
+  { id: 'np-looks', inside: '#np-looks, #np-looks-btn', close: () => closeLooks() },
+  { id: 'np-chapters', inside: '#np-chapters, #np-chapters-btn', close: () => closeChapters() },
+  { id: 'np-speed-menu', inside: '#np-speed-menu, #np-speed', close: () => { show($('np-speed-menu'), false); $('np-speed').setAttribute('aria-expanded', 'false'); } },
+];
+window.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!target || !target.isConnected || !target.closest) return;
+  const open = POPUPS.filter((p) => $(p.id) && !$(p.id).classList.contains('hidden'));
+  if (!open.length) return;
+  // The lift that ends a hold landed where the menu it opened is not.
+  if (open.some((p) => p.held) && performance.now() - (state.heldAt || 0) < 700) return;
+  if (open.some((p) => target.closest(p.inside))) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+  for (const p of open) p.close();
+}, true);
 document.addEventListener('click', (event) => {
   const menu = $('item-menu');
   // The finger lifting at the end of a hold on Now Playing's cover lands on
