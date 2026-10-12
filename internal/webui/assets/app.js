@@ -157,6 +157,15 @@ async function openMeMenu() {
   $('me-menu-name').textContent = me.name;
   show($('me-picture-remove'), Boolean(me.picture));
   $('me-picture').textContent = me.picture ? 'Change picture' : 'Add a picture';
+  // Which server this is, and the way to another: the owner found Change
+  // server too deep in Settings (2026-10-12). Only the apps keep a list of
+  // servers; in a browser each server is its own address.
+  show($('me-server'), Boolean(window.soundstormApp));
+  api('/api/session').then(({ ok, body }) => {
+    const name = ok && body && body.serverName;
+    $('me-menu-server').textContent = name || '';
+    show($('me-menu-server'), Boolean(name));
+  });
   const holder = $('me-menu-people');
   holder.replaceChildren();
   show(menu, true);
@@ -211,6 +220,14 @@ $('me-other').addEventListener('click', async () => {
 $('me-settings').addEventListener('click', () => {
   closeMeMenu();
   selectTab('settings');
+});
+$('me-server').addEventListener('click', () => {
+  closeMeMenu();
+  window.webkit.messageHandlers.soundstorm.postMessage({ type: 'changeServer' });
+});
+$('me-signout').addEventListener('click', () => {
+  closeMeMenu();
+  $('logout').click();
 });
 $('me-picture').addEventListener('click', async () => {
   closeMeMenu();

@@ -4233,6 +4233,9 @@ html:not(.tv) #tabs [data-tab="settings"] { display: none; }
 .me-menu.hidden { display: none; }
 .me-menu .me-head { display: flex; align-items: center; gap: 10px; padding: 6px 8px 10px; }
 .me-menu .profile-avatar { width: 32px; height: 32px; font-size: 14px; }
+.me-menu .me-who { display: flex; flex-direction: column; min-width: 0; }
+.me-menu .me-who small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-menu .me-who small.hidden { display: none; }
 .me-menu > button, .me-person {
   display: flex; align-items: center; gap: 10px; width: 100%;
   min-height: 40px; padding: 6px 8px; border: none; border-radius: 8px;

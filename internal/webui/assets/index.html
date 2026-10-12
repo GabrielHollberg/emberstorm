@@ -176,13 +176,16 @@
       <button id="offline-server" class="ghost small hidden" type="button">Change server</button>
     </div>
     <div id="me-menu" class="me-menu hidden" role="menu" aria-label="You">
-      <div class="me-head"><span id="me-menu-avatar" class="profile-avatar"></span><b id="me-menu-name"></b></div>
+      <div class="me-head"><span id="me-menu-avatar" class="profile-avatar"></span><span class="me-who"><b id="me-menu-name"></b><small id="me-menu-server" class="hidden"></small></span></div>
       <div id="me-menu-people"></div>
       <button type="button" role="menuitem" id="me-other">Someone else</button>
       <hr>
       <button type="button" role="menuitem" id="me-picture">Change picture</button>
       <button type="button" role="menuitem" id="me-picture-remove" class="hidden">Remove picture</button>
       <button type="button" role="menuitem" id="me-settings">Settings</button>
+      <hr>
+      <button type="button" role="menuitem" id="me-server" class="hidden">Change server</button>
+      <button type="button" role="menuitem" id="me-signout">Sign out</button>
     </div>
 
     <nav id="filters" aria-label="Filter by kind">
