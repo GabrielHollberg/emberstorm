@@ -168,7 +168,8 @@ func TestTheMacAppHasTheReleaseKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src := string(swift)
+	// A Windows checkout writes it with CRLF.
+	src := strings.ReplaceAll(string(swift), "\r\n", "\n")
 	start := strings.Index(src, "static let keys: [String] = [")
 	end := strings.Index(src[start:], "]\n")
 	if start < 0 || end < 0 {
@@ -187,6 +188,44 @@ func TestTheMacAppHasTheReleaseKeys(t *testing.T) {
 	for i, k := range want {
 		if got[i] != base64.StdEncoding.EncodeToString(k) {
 			t.Fatalf("the Mac app's release key %d differs from box/release.pub: copy them over", i+1)
+		}
+	}
+}
+
+// The Linux updater install.sh leaves on a machine (emberstorm-update.sh)
+// checks releases with the same keys, written into install.sh: kept the same
+// as box/release.pub.
+func TestTheLinuxUpdaterHasTheReleaseKeys(t *testing.T) {
+	box, err := os.ReadFile("../../box/release.pub")
+	if err != nil {
+		t.Skip("no box/release.pub here")
+	}
+	sh, err := os.ReadFile("../../install.sh")
+	if err != nil {
+		t.Skip("no install.sh here")
+	}
+	want, err := ParseKeys(box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := strings.ReplaceAll(string(sh), "\r\n", "\n")
+	start := strings.Index(src, "KEYS='\n")
+	if start < 0 {
+		t.Fatal("no keys in install.sh's updater")
+	}
+	end := strings.Index(src[start+len("KEYS='\n"):], "'\n")
+	var got []string
+	for _, line := range strings.Split(src[start+len("KEYS='\n"):start+len("KEYS='\n")+end], "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			got = append(got, line)
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("install.sh's updater has %d release keys, box/release.pub %d: copy them over", len(got), len(want))
+	}
+	for i, k := range want {
+		if got[i] != base64.StdEncoding.EncodeToString(k) {
+			t.Fatalf("install.sh's updater's release key %d differs from box/release.pub: copy them over", i+1)
 		}
 	}
 }

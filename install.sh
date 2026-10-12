@@ -734,6 +734,74 @@ refresh_gateway() {
 ADDRESS_TAG='# soundstorm-address'
 # On a Mac, a LaunchAgent of this name does it instead (no crontab).
 ADDRESS_AGENT='dev.soundstorm.address'
+# The updater kept on a Linux machine (2026-10-12, the owner's asking: every
+# update checked against the release the YubiKey signed). This script arrives
+# from GitHub, so nothing in it can vouch for itself; what it leaves behind
+# can. emberstorm-update.sh holds the release keys (box/release.pub's, which
+# a test keeps the same) and, to update, downloads the newest release's list
+# (desktop.json), checks its signature with OpenSSL 3 (Ed25519), checks this
+# script and the compose file against the list, and only then runs them, as
+# EmberStorm.exe does on Windows and the Mac app on a Mac. Anything unsigned,
+# changed or older than what is installed is refused, and nothing is
+# installed. Not on a Mac: its app does this, and macOS's own openssl cannot
+# check Ed25519.
+UPDATER_NAME=emberstorm-update.sh
+install_updater() {
+	[ "$(uname -s)" = Linux ] || return 0
+	cat >"$DIR/$UPDATER_NAME" <<'UPDATER_EOF'
+#!/bin/sh
+# Updates EmberStorm from the newest release, but only one signed with
+# EmberStorm's release key: sh emberstorm-update.sh  (in the install folder).
+# Written by install.sh; the keys below are the release key and its backup.
+set -eu
+KEYS='
+Us4q2TEBfE4aRqv8cMYlHAjqpjKNAbKB9GYlGtNqlAM=
+uv0pqc/uvWPTSdkPt0PO/YEP2gA86Fy0jUnYyNsm8Xg=
+'
+BASE="https://github.com/${SOUNDSTORM_REPO:-GabrielHollberg/emberstorm}/releases/latest/download"
+here=$(cd "$(dirname "$0")" && pwd)
+die() { printf 'EmberStorm was not updated: %s\n' "$1" >&2; exit 1; }
+command -v curl >/dev/null 2>&1 || die "curl is needed to download the update."
+openssl version 2>/dev/null | grep -q '^OpenSSL [3-9]' || die "OpenSSL 3 is needed to check the update's signature."
+if command -v sha256sum >/dev/null 2>&1; then sha() { sha256sum "$1" | cut -d' ' -f1; }
+else sha() { shasum -a 256 "$1" | cut -d' ' -f1; }; fi
+unb64() { base64 -d 2>/dev/null || base64 -D; }
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+fetch() { curl -fsSL --proto '=https' --max-filesize 50000000 -o "$work/$1" "$BASE/$1" || die "could not download $1."; }
+fetch desktop.json
+fetch desktop.json.sig
+unb64 <"$work/desktop.json.sig" >"$work/sig.bin" || die "the signature could not be read."
+ok=""
+for key in $KEYS; do
+	# The key as OpenSSL reads it: Ed25519's 12 bytes of DER, then the key.
+	{ printf '\060\052\060\005\006\003\053\145\160\003\041\000'; printf '%s' "$key" | unb64; } >"$work/key.der"
+	{ echo '-----BEGIN PUBLIC KEY-----'; base64 <"$work/key.der"; echo '-----END PUBLIC KEY-----'; } >"$work/key.pem"
+	if openssl pkeyutl -verify -pubin -inkey "$work/key.pem" -rawin -in "$work/desktop.json" -sigfile "$work/sig.bin" >/dev/null 2>&1; then
+		ok=1
+		break
+	fi
+done
+[ -n "$ok" ] || die "the release is not signed with EmberStorm's release key."
+grep -q '"kind": "emberstorm-desktop"' "$work/desktop.json" || die "the release is not one for computers."
+version=$(sed -n 's/^  "version": "\([0-9][0-9A-Za-z.+-]*\)",$/\1/p' "$work/desktop.json")
+serial=$(sed -n 's/^  "serial": \([0-9][0-9]*\),$/\1/p' "$work/desktop.json")
+[ -n "$serial" ] || die "the release has no serial."
+listed() {
+	awk -v f="\"$1\": {" 'index($0, f) { getline; sub(/.*"sha256": "/, ""); sub(/".*/, ""); print; exit }' "$work/desktop.json"
+}
+for f in install.sh docker-compose.yml; do
+	want=$(listed "$f")
+	[ "${#want}" = 64 ] || die "the release does not list $f."
+	fetch "$f"
+	[ "$(sha "$work/$f")" = "$want" ] || die "$f is not the one the release signed."
+done
+SOUNDSTORM_RELEASE_DIR="$work" SOUNDSTORM_RELEASE_SERIAL="$serial" SOUNDSTORM_RELEASE_VERSION="$version" \
+	SOUNDSTORM_DIR="$here" SOUNDSTORM_FRESH=1 sh "$work/install.sh" "$@"
+UPDATER_EOF
+	chmod 755 "$DIR/$UPDATER_NAME"
+}
+
 install_address_watch() {
 	[ "$(uname -s)" = Darwin ] || command -v crontab >/dev/null 2>&1 || return 0
 	watch="$DIR/soundstorm-address.sh"
@@ -868,7 +936,7 @@ AGENT
 }
 
 remove_address_watch() {
-	rm -f "$DIR/soundstorm-address.sh"
+	rm -f "$DIR/soundstorm-address.sh" "$DIR/$UPDATER_NAME"
 	if [ "$(uname -s)" = Darwin ]; then
 		launchctl bootout "gui/$(id -u)/$ADDRESS_AGENT" 2>/dev/null || true
 		rm -f "$HOME/Library/LaunchAgents/$ADDRESS_AGENT.plist"
@@ -1294,6 +1362,21 @@ IMPORT=''
 NO_LIBRARY=''
 EXPORT=''
 MOVE_IMAGE='alpine:3'
+# An update on a machine that has the updater goes through it, so what runs
+# is the release the YubiKey signed, not this script as GitHub has it now
+# (the updater sets SOUNDSTORM_FRESH, so it does not come back round).
+# Uninstalling runs as it is.
+if [ -z "$RELEASE_DIR" ] && [ "${SOUNDSTORM_FRESH:-}" != 1 ] && [ -f "$DIR/$UPDATER_NAME" ]; then
+	handover=1
+	for a in "$@"; do
+		case "$a" in --uninstall|-u) handover="" ;; esac
+	done
+	if [ -n "$handover" ]; then
+		printf '==> Updating from the signed release (%s)\n' "$DIR/$UPDATER_NAME"
+		exec sh "$DIR/$UPDATER_NAME" "$@"
+	fi
+fi
+
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--uninstall|-u)
@@ -1628,6 +1711,7 @@ if [ -z "$(get_env SOUNDSTORM_UPNP_URL)" ]; then
 fi
 
 install_address_watch
+install_updater
 
 # Where the library lives: beside the install unless --library says otherwise,
 # which is how it goes on an external drive. Compose mounts every shelf from
@@ -1951,6 +2035,13 @@ if [ "$UPGRADE" != "1" ]; then
 		fi
 		;;
 	esac
+	say ""
+fi
+# How to update: through the updater left here, which installs only a
+# release signed with EmberStorm's release key.
+if [ -f "$DIR/$UPDATER_NAME" ]; then
+	note "To update later: sh \"$DIR/$UPDATER_NAME\" (it installs only releases"
+	note "signed by EmberStorm)."
 	say ""
 fi
 
