@@ -102,19 +102,28 @@ func (u *Updater) serveStarting(ctx context.Context) {
 		want := ok && p.Phase == "images"
 		switch {
 		case want && servers == nil:
+			var listeners []net.Listener
 			for _, addr := range u.cfg.StartingPorts {
 				ln, err := net.Listen("tcp", addr)
 				if err != nil {
 					continue // in use: EmberStorm, or anything else, has it
 				}
+				listeners = append(listeners, ln)
+			}
+			// Said before the first answer, never after: up.sh waits for this
+			// to go before starting EmberStorm, and a check right after the
+			// first answer found it not there yet (the image build, 2026-10-12).
+			if listeners != nil {
+				_ = os.MkdirAll(filepath.Dir(u.cfg.StartingOpen), 0o755)
+				_ = writeFile(u.cfg.StartingOpen, []byte("1\n"))
+			}
+			for _, ln := range listeners {
 				srv := &http.Server{Handler: u.startingHandler(), ReadHeaderTimeout: 5 * time.Second,
 					ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 10 * time.Second}
 				go func() { _ = srv.Serve(ln) }()
 				servers = append(servers, srv)
 			}
 			if servers != nil {
-				_ = os.MkdirAll(filepath.Dir(u.cfg.StartingOpen), 0o755)
-				_ = writeFile(u.cfg.StartingOpen, []byte("1\n"))
 				u.log.Info("answering while the box gets ready", "ports", len(servers))
 			}
 		case !want && servers != nil:
