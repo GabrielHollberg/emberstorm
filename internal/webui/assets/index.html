@@ -49,6 +49,7 @@
       </form>
       <button id="profiles-other" type="button" class="ghost">Someone else</button>
       <button id="profiles-cancel" type="button" class="ghost hidden">Back</button>
+      <button id="profiles-change-server" type="button" class="ghost app-change-server hidden">Change server</button>
     </div>
   </main>
 
@@ -121,6 +122,9 @@
       <button id="gate-submit" type="submit">Continue</button>
       <!-- On a TV: signed in from a phone instead of typing with a remote. -->
       <button id="gate-phone" type="button" class="ghost hidden">Sign in with your phone</button>
+      <!-- In the phone and TV apps: back to their list of servers, for somebody
+           at the wrong server's sign-in (app.js, window.soundstormApp). -->
+      <button id="gate-change-server" type="button" class="ghost app-change-server hidden">Change server</button>
       <div id="gate-link" class="gate-link hidden" role="status">
         <p>On a phone signed in to EmberStorm, scan this - or open EmberStorm on it
           and enter the code under Settings, <strong>Sign in a TV</strong>.</p>

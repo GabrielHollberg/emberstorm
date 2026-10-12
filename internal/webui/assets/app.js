@@ -1066,13 +1066,17 @@ $('logout').addEventListener('click', async () => {
 });
 
 // Inside the phone apps (ios/, android/), which set window.soundstormApp, the
-// app rather than the address bar decides which server this is - so Account
-// offers the way back to its connect screen. Signing in stays per server.
+// app rather than the address bar decides which server this is - so Account,
+// the sign-in screen and "Who's listening?" offer the way back to its list of
+// servers: somebody at the wrong server's sign-in had none (the owner,
+// 2026-10-11). Signing in stays per server.
 if (window.soundstormApp) {
-  show($('change-server'), true);
-  $('change-server').addEventListener('click', () => {
-    window.webkit.messageHandlers.soundstorm.postMessage({ type: 'changeServer' });
-  });
+  for (const id of ['change-server', 'gate-change-server', 'profiles-change-server']) {
+    show($(id), true);
+    $(id).addEventListener('click', () => {
+      window.webkit.messageHandlers.soundstorm.postMessage({ type: 'changeServer' });
+    });
+  }
 }
 
 /* -------------------------------------------------------------- app shell */
