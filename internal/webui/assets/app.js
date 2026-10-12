@@ -5253,7 +5253,7 @@ function reviewPlan(files, review) {
     // Closing the sheet (its X) is a Cancel too: left waiting, the drop never
     // finished and every later one was queued behind it for good (a review,
     // 2026-10-09).
-    const done = (d) => { INTAKE.reviewDone = null; host.replaceChildren(); resolve(d); };
+    const done = (d) => { INTAKE.reviewDone = null; host.replaceChildren(); intakeAsking(false); resolve(d); };
     INTAKE.reviewDone = done;
     const groupOf = (p) => p.group || p.path;
     const excluded = review.excluded;
