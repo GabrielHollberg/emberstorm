@@ -101,6 +101,11 @@ xcodebuild -exportArchive -archivePath /tmp/SoundStorm.xcarchive \
   -exportPath /tmp/SoundStorm-export -allowProvisioningUpdates
 ```
 
+With Xcode's sign-in lapsed ("Failed to Use Accounts"), the export works
+with the App Store Connect key instead - add `-authenticationKeyPath <the
+AuthKey .p8> -authenticationKeyID <its id> -authenticationKeyIssuerID <the
+issuer>` (the key the Mac app is notarized with; done so 2026-10-12).
+
 The build number is raised by the upload itself (`manageAppVersionAndBuildNumber`),
 so nobody edits it by hand. Apple takes 10-30 minutes to process a build
 before it shows in the TestFlight app. Uploads are internal-testing only
