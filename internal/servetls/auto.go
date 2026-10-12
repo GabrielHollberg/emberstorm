@@ -501,8 +501,22 @@ func (a *autoCert) step(ctx context.Context) error {
 	a.mu.RUnlock()
 	if chosen != "" && pointed != chosen {
 		if _, err := a.names.ClaimName(ctx, reg, chosen, "", ""); err != nil {
-			a.log.Warn("could not point the chosen name here; using the code's names", "name", chosen, "err", err)
-			chosen = ""
+			// A passing refusal (the DNS provider answering 502 just after a
+			// restart, 2026-10-12) must not drop the chosen name: it went from
+			// the certificate made next, and every device opening it got the
+			// local authority's certificate and an error page. Its names were
+			// made by an earlier claim and still lead here, so a certificate
+			// already carrying them keeps them; either way it is tried again
+			// soon rather than at the next half-day check.
+			a.mu.Lock()
+			a.recheckSoon = true
+			a.mu.Unlock()
+			if home, _ := a.chosenNames(reg); cert != nil && home != "" && leafHas(cert.Leaf, home) {
+				a.log.Warn("could not point the chosen name here just now; keeping it and trying again soon", "name", chosen, "err", err)
+			} else {
+				a.log.Warn("could not point the chosen name here; using the code's names for now", "name", chosen, "err", err)
+				chosen = ""
+			}
 		} else {
 			a.mu.Lock()
 			a.pointed = chosen
