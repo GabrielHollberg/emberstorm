@@ -130,7 +130,7 @@ then, an iPhone uses the web app.
 
 ### Windows
 
-1. **[Download EmberStorm.exe](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.exe)**
+1. **[Download EmberStorm for Windows](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.exe)**
 2. **Double-click** it.
 
 It is signed, so Windows lets it run. While the signature is new to
@@ -166,7 +166,7 @@ powershell -ExecutionPolicy Bypass -File "$env:TEMP\soundstorm.ps1"
 
 ### Mac
 
-1. **[Download EmberStorm for Mac](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.dmg)**.
+1. **[Download EmberStorm for Mac](https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.dmg)**
 2. Open it and drag **EmberStorm** into **Applications**.
 3. Open **EmberStorm** from Applications. It asks where your media goes and,
    when needed, whether to keep the Mac awake and your password (once, to install
