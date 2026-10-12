@@ -6484,11 +6484,41 @@ async function moveToSecureName(name) {
         + 'browser warns that the connection is not private, that is expected '
         + 'after EmberStorm is reinstalled: choose Advanced, then continue.';
     }
+    // In the phone apps (opened from the app's own copy of the page, with
+    // nothing downloaded yet): no browser warning to expect, and the way to
+    // another server is right here (the owner, 2026-10-12: never a dead end).
+    const inApp = Boolean(window.soundstormApp);
+    if (inApp) {
+      message.textContent = 'Cannot reach your EmberStorm right now.';
+      detail.textContent = navigator.onLine === false
+        ? 'This phone has no connection. Anything you download plays here without one.'
+        : 'Check that the computer or box running it is on and connected, then try again. '
+          + 'Anything you download plays here without a connection.';
+    }
     const again = document.createElement('button');
     again.type = 'button';
     again.textContent = 'Try again';
-    again.addEventListener('click', () => location.reload());
-    boot.append(message, detail, again);
+    again.addEventListener('click', () => reopenServer());
+    // One card, as the sign-in is (spread down the screen it read as broken).
+    const card = document.createElement('div');
+    card.className = 'card gate-card boot-card';
+    message.className = 'boot-title';
+    card.append(message, detail, again);
+    boot.append(card);
+    // Looked for again by itself; once it answers, the page starts afresh.
+    watchForServer(async () => {
+      const { ok } = await api('/api/session');
+      if (ok) reopenServer();
+      return !ok;
+    });
+    if (inApp) {
+      const change = document.createElement('button');
+      change.type = 'button';
+      change.className = 'ghost';
+      change.textContent = 'Change server';
+      change.addEventListener('click', () => window.webkit.messageHandlers.soundstorm.postMessage({ type: 'changeServer' }));
+      card.append(change);
+    }
   } else {
     message.textContent = 'EmberStorm is not responding.';
     boot.append(message);
@@ -11623,10 +11653,11 @@ const SHELL_FILES = [
   ...['view', 'epub', 'epubcfi', 'fixed-layout', 'overlayer', 'paginator', 'progress', 'search', 'text-walker']
     .map((m) => `/static/vendor/foliate-js/${m}.js`),
 ];
+// The phone apps keep their own copy of the page, fetched afresh each time it
+// opens - signed in or not, so a phone at the sign-in screen opens on it too
+// when the server cannot be reached - and show it then (KeptFiles).
+if (KEEPS && !KEPT_PAGE) window.soundstormApp.keep('shell', { urls: SHELL_FILES });
 async function keepShell() {
-  // The app keeps its own copy, fetched afresh each load, and opens it when
-  // the server cannot be reached.
-  if (KEEPS && !KEPT_PAGE) window.soundstormApp.keep('shell', { urls: SHELL_FILES });
   if (!('caches' in window)) return;
   try {
     const cache = await caches.open(OFFLINE_SHELL);
@@ -14485,6 +14516,11 @@ function enterOffline(atStart) {
   state.offline = true;
   document.body.classList.add('offline-mode');
   show($('offline-server'), Boolean(window.soundstormApp));
+  watchForServer(async () => {
+    if (!state.offline) return false;
+    await leaveOffline();
+    return state.offline;
+  });
   show($('tabs'), true);
   renderTabs();
   if (state.tab === 'settings' || !tabShelves(state.tab).length) selectTab('home');
@@ -14496,9 +14532,10 @@ async function leaveOffline() {
   if (!state.offline) return;
   const { ok } = await api('/api/session');
   if (!ok) return;
-  // Opened offline, the app never signed in: start it properly.
+  // Opened offline, the app never signed in: start it properly - the app
+  // loads its server afresh, where a reload would open its kept copy again.
   if (!state.me) {
-    location.reload();
+    reopenServer();
     return;
   }
   state.offline = false;
@@ -14513,6 +14550,34 @@ window.addEventListener('offline', () => {
   if (hasDownloads() && !$('app').classList.contains('hidden')) enterOffline();
 });
 window.addEventListener('online', () => { leaveOffline(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.offline) leaveOffline(); });
+
+// reopenServer starts the page again from the server: in the phone apps the
+// app loads it afresh (a reload would open the app's kept copy again).
+function reopenServer() {
+  if (window.soundstormApp && window.soundstormApp.keeps && !KEPT_PAGE) {
+    window.webkit.messageHandlers.soundstorm.postMessage({ type: 'retry' });
+  } else {
+    location.reload();
+  }
+}
+
+// watchForServer looks for the server again while offline, by itself: every
+// 15 seconds for the first two minutes, then once a minute, while the page is
+// looked at (the owner's asking, 2026-10-12). Coming back online, or the app
+// opened again, looks at once. Not from the iPhone app's own copy of the page,
+// which is on another address and cannot ask the server (the app does that).
+let serverWatch = 0;
+function watchForServer(back) {
+  if (serverWatch || KEPT_PAGE) return;
+  const started = Date.now();
+  const tick = async () => {
+    serverWatch = 0;
+    if (!document.hidden && await back() === false) return;
+    serverWatch = setTimeout(tick, Date.now() - started < 120000 ? 15000 : 60000);
+  };
+  serverWatch = setTimeout(tick, 15000);
+}
 
 async function showOfflineShelf(seq, query) {
   let kind = state.kind;

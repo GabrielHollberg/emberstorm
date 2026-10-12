@@ -1116,6 +1116,9 @@ class MainActivity : Activity() {
         when (message.optString("type")) {
             // Posted, so the web view is not torn down inside its own callback.
             "changeServer" -> content.post { showConnect(server) }
+            // The page found the server answering again (or Try again was
+            // pressed): load it afresh, past the app's kept copy.
+            "retry" -> content.post { load() }
             // The page let its loading screen go: the opening screen may too.
             "ready" -> content.post { markReady() }
             "media" -> MediaBridge.update(applicationContext, message)
@@ -1454,6 +1457,21 @@ class MainActivity : Activity() {
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (!request.isForMainFrame) return
+            mainFrameFailed(error.description?.toString() ?: "")
+        }
+
+        // A certificate the phone does not trust (the server's real one not
+        // there yet, or lapsed) never reaches onReceivedError: the web view
+        // showed its own bare error page, black with a small robot (the
+        // owner's report, 2026-10-12). The page is never loaded past it.
+        override fun onReceivedSslError(view: WebView, handler: android.webkit.SslErrorHandler, error: android.net.http.SslError) {
+            handler.cancel()
+            val main = runCatching { Uri.parse(error.url).host }.getOrNull() == server?.host
+            if (main) mainFrameFailed("The server's security certificate isn't trusted right now.")
+        }
+
+        private fun mainFrameFailed(detail: String) {
+            if (failure != null) return
             // A home name (<id>.home.emberstorm.app) cannot be reached away
             // from home; its away twin (<id>.net...) can, when remote access
             // is on. Tried once, without being saved.
@@ -1485,7 +1503,7 @@ class MainActivity : Activity() {
                 content.post { showWeb(home) }
                 return
             }
-            showFailure(error.description?.toString() ?: "")
+            showFailure(detail)
         }
 
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? =
@@ -1505,8 +1523,13 @@ class MainActivity : Activity() {
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
-            // Loaded: the next failure may try the away name again.
-            triedAway = false
+            // An error the page's service worker answered for (it fetched the
+            // page and failed, with nothing kept) comes as the web view's own
+            // error page with no onReceivedError: seen by its address.
+            view.evaluateJavascript("location.protocol") { proto ->
+                if (proto?.contains("chrome-error") == true) mainFrameFailed("The page could not be loaded.")
+                else triedAway = false
+            }
             CookieManager.getInstance().flush()
             mirrorCookies()
         }

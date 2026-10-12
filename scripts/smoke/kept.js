@@ -79,7 +79,7 @@ const BASE = process.env.SMOKE_URL || 'http://127.0.0.1:8296';
   await page.reload().catch(() => {});
   await page.waitForFunction(() => typeof state !== 'undefined' && state.offline, null, { timeout: 30000 }).catch(() => {});
   const offline = await page.evaluate(() => ({ offline: state.offline, downloads: hasDownloads(),
-    changeServer: !$('offline-server').classList.contains('hidden') }));
+    changeServer: !$('offline-server').classList.contains('hidden'), strip: getComputedStyle($('offline-strip')).display + ' ' + $('offline-strip').innerText.replace(/s+/g, ' ') }));
   console.log('opened offline:', JSON.stringify(offline));
   await page.evaluate((s) => playAudio(s), song);
   await page.waitForFunction(() => $('audio-player').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});

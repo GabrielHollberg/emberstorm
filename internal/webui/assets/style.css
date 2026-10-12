@@ -121,6 +121,10 @@ html:has(#boot:not(.hidden)), body:has(#boot:not(.hidden)) { overflow: hidden; }
 #boot:has(.boot-mark) { grid-template-rows: 1fr auto 1fr; }
 #boot:has(.boot-mark) .boot-mark { grid-row: 2; }
 #boot:has(.boot-mark) #boot-text { grid-row: 3; align-self: start; margin-top: 18px; }
+#boot .boot-card { display: flex; flex-direction: column; gap: 12px; width: min(420px, calc(100vw - 40px)); text-align: left; }
+#boot .boot-card .boot-title { font-size: 18px; color: var(--text); margin: 0; }
+#boot .boot-card .muted { margin: 0 0 6px; }
+#boot .boot-card button { width: 100%; }
 
 /* Spinner --------------------------------------------------------------- */
 
@@ -2846,6 +2850,12 @@ body:has(#reader-overlay:not(.hidden)) .dock {
 
 /* Offline: what needs the server steps aside. */
 body.offline-mode #tabs [data-tab="settings"] { display: none; }
+.offline-strip { display: none; }
+body.offline-mode .offline-strip {
+  display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 14px; font-size: 13px; color: var(--muted, #aab3c2); background: #121822;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: center;
+}
 body.offline-mode .item-more { display: none; }
 
 /* The downloaded badge: a small green tick in the cover's corner. */
