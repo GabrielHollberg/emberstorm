@@ -1812,35 +1812,50 @@ async function loadPeople() {
   const list = $('people-list');
   list.replaceChildren();
 
+  // Each person folds to their name, as the cards do, a tap opening their
+  // choices (the owner's asking, 2026-10-12); who is open stays open while
+  // the app is.
+  if (!state.peopleOpen) state.peopleOpen = new Set();
   for (const person of body.users || []) {
     const li = document.createElement('li');
+    li.className = 'person-row';
 
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'person-head';
     const name = document.createElement('span');
     name.className = 'person-name';
     name.textContent = person.name;
-
     const role = document.createElement('span');
     role.className = 'person-role';
     role.textContent = person.owner ? 'owner' : 'member';
-
     const spacer = document.createElement('span');
     spacer.className = 'person-spacer';
-
-    li.append(name, role);
+    head.append(name, role, spacer, icon('chevron'));
+    const choices = document.createElement('div');
+    choices.className = 'person-body';
+    const open = state.peopleOpen.has(person.id);
+    li.classList.toggle('folded', !open);
+    head.setAttribute('aria-expanded', String(open));
+    head.addEventListener('click', () => {
+      const now = li.classList.toggle('folded');
+      head.setAttribute('aria-expanded', String(!now));
+      if (now) state.peopleOpen.delete(person.id); else state.peopleOpen.add(person.id);
+    });
+    li.append(head, choices);
     // The owner always sees everything and cannot be narrowed, so there is
     // nothing to offer - a row of ticked boxes that refuse to be unticked
     // would be worse than none.
     if (person.owner) {
       const everything = document.createElement('span');
       everything.className = 'person-everything muted';
-      everything.textContent = 'every library';
-      li.append(everything);
+      everything.textContent = 'Sees every library';
+      choices.append(everything);
     } else {
-      li.append(libraryPicker(person));
+      choices.append(libraryPicker(person));
     }
-    li.append(spacer);
-    if (!person.owner) li.append(personPhotos(person));
-    if (!person.owner && state.voices && (state.voices.available || state.voices.ebooks)) li.append(personMakeBooks(person));
+    if (!person.owner) choices.append(personPhotos(person));
+    if (!person.owner && state.voices && (state.voices.available || state.voices.ebooks)) choices.append(personMakeBooks(person));
 
     // The owner is not removable and neither are you: the server refuses both,
     // and offering a button that always fails is worse than offering none.
@@ -1850,7 +1865,7 @@ async function loadPeople() {
       remove.type = 'button';
       remove.textContent = 'Remove';
       remove.addEventListener('click', () => removePerson(person));
-      li.append(remove);
+      choices.append(remove);
     }
     list.append(li);
   }

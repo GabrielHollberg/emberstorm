@@ -638,6 +638,13 @@ header {
   padding: 1px 8px;
 }
 .person-spacer { flex: 1; }
+#people-list li.person-row { display: block; padding: 0; }
+.person-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; background: none;
+  border: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 8px; }
+.person-head .icon-chevron { width: 16px; height: 16px; color: var(--muted); flex: none; transform: rotate(90deg); transition: transform 0.18s ease; }
+.person-row.folded .person-head .icon-chevron { transform: none; }
+.person-body { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 0 12px 12px; }
+.person-row.folded .person-body { display: none; }
 
 /* The shelves one person can see. Checkboxes rather than a multi-select,
    because five of them fit and a select hides the answer behind a click. */
