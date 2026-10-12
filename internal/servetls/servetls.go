@@ -140,6 +140,12 @@ type Config struct {
 	// remote access.
 	Port int
 
+	// OutsidePort, when set, is the router's outside port the owner forwarded
+	// by hand to Port, for a router without automatic forwarding where another
+	// server in the house already has Port (the owner's asking, 2026-10-12).
+	// Zero, or nil, is Port. An automatic mapping's own port wins over it.
+	OutsidePort func() int
+
 	// Gateway is the home router's LAN address, for opening the port
 	// automatically when remote access is on (see internal/portmap). The
 	// installer discovers it on the host and passes it in; the container cannot,
@@ -285,9 +291,19 @@ func (s *Server) ReleaseWebName(ctx context.Context, name string) error {
 // hold it: outside auto mode, or before the install has registered.
 var errNoNames = errors.New("this server has no web address yet; it needs automatic HTTPS and a moment after starting")
 
-// RemotePort is the port the world reaches this install on - the one to forward
-// by hand when the automatic methods cannot. Zero outside auto mode.
+// RemotePort is the port the world reaches this install on through the router:
+// the one the router granted automatically, else the one the owner forwarded by
+// hand (OutsidePort), else its own. Zero outside auto mode.
 func (s *Server) RemotePort() int {
+	if s == nil || s.auto == nil {
+		return 0
+	}
+	return s.auto.outsidePort()
+}
+
+// LocalPort is the port this install serves on the home network - what a hand
+// forward points at. Zero outside auto mode.
+func (s *Server) LocalPort() int {
 	if s == nil || s.auto == nil {
 		return 0
 	}
@@ -424,6 +440,7 @@ func loadAuto(cfg Config) (*Server, error) {
 		findable:      cfg.Findable,
 		webName:       cfg.WebName,
 		port:          cfg.Port,
+		outside:       cfg.OutsidePort,
 		kick:          make(chan struct{}, 1),
 		names:         &names.Client{Base: namesURL},
 		newACME: func(key *ecdsa.PrivateKey) issuer {
@@ -448,10 +465,14 @@ func loadAuto(cfg Config) (*Server, error) {
 	// not there to do it automatically.
 	if cfg.Port > 0 && (cfg.Gateway.IsValid() || internalClient.IsValid()) {
 		s.auto.portMapper = &portmap.Maintainer{
-			Gateway:        cfg.Gateway,
-			Proto:          portmap.TCP,
-			InternalPort:   uint16(cfg.Port),
-			ExternalPort:   uint16(cfg.Port),
+			Gateway:      cfg.Gateway,
+			Proto:        portmap.TCP,
+			InternalPort: uint16(cfg.Port),
+			ExternalPort: uint16(cfg.Port),
+			// Another server in the house may hold Port on the router (a box
+			// beside a computer install): then the next ports up, the away
+			// name carrying the one granted.
+			FallbackPorts:  20,
 			Lifetime:       2 * time.Hour,
 			InternalClient: internalClient,
 			UPnPLocation:   cfg.UPnPLocation,

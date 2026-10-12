@@ -95,9 +95,7 @@ object PhotoBackup {
             out += u
             val host = u.host ?: ""
             ServerAddress.awayHost(host)?.let { away ->
-                out += u.buildUpon().encodedAuthority(
-                    away + if (u.port != -1) ":${u.port}" else ""
-                ).build()
+                out += u.buildUpon().encodedAuthority(ServerAddress.awayAuthority(c, u, away)).build()
             }
         }
         // Only the server the person said yes to, and its away name: the

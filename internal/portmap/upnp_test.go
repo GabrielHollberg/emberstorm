@@ -2,6 +2,7 @@ package portmap
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -30,6 +31,7 @@ type fakeIGD struct {
 	lastExtPort   string
 	permanentOnly bool // first non-zero-lease AddPortMapping fails with 725
 	externalIP    string
+	taken         map[string]bool // outside ports another machine holds: 718
 }
 
 const igdDescription = `<?xml version="1.0"?>
@@ -98,7 +100,12 @@ func (f *fakeIGD) soap(w http.ResponseWriter, r *http.Request) {
 		f.lastClient = tagValue(body, "NewInternalClient")
 		f.lastExtPort = tagValue(body, "NewExternalPort")
 		permanentOnly := f.permanentOnly
+		taken := f.taken[f.lastExtPort]
 		f.mu.Unlock()
+		if taken {
+			writeFault(w, 718, "ConflictInMappingEntry")
+			return
+		}
 		if permanentOnly && lease != "0" {
 			writeFault(w, 725, "OnlyPermanentLeasesSupported")
 			return
@@ -403,5 +410,57 @@ func TestSilentPCPAndNATPMPLeaveTimeForUPnP(t *testing.T) {
 	}
 	if m.Method != "UPnP" {
 		t.Errorf("method = %q, want UPnP", m.Method)
+	}
+}
+
+// A second server in the house holds the usual outside port: the router says
+// 718, and the Maintainer asks for the ports above it in turn, then keeps
+// asking for the one it was given (the owner's asking, 2026-10-12).
+func TestATakenPortFallsBackToTheNextOne(t *testing.T) {
+	old := udpMethodBudget
+	udpMethodBudget = 50 * time.Millisecond
+	defer func() { udpMethodBudget = old }()
+	f := newFakeIGD(t)
+	f.taken = map[string]bool{"8099": true, "8100": true}
+	mt := &Maintainer{
+		Gateway: netip.MustParseAddr("127.0.0.1"), testServer: netip.MustParseAddrPort("127.0.0.1:9"),
+		Proto: TCP, InternalPort: 8099, ExternalPort: 8099, FallbackPorts: 10,
+		InternalClient: netip.MustParseAddr("192.168.1.50"), UPnPLocation: f.location,
+	}
+	m, err := mt.EnsureNow(context.Background())
+	if err != nil {
+		t.Fatalf("EnsureNow: %v", err)
+	}
+	if m.ExternalPort != 8101 || mt.OutsidePort() != 8101 {
+		t.Fatalf("outside port = %d (%d), want 8101", m.ExternalPort, mt.OutsidePort())
+	}
+	// A refresh asks for 8101 straight away, not the taken ones again.
+	f.mu.Lock()
+	f.adds = 0
+	f.mu.Unlock()
+	if _, err := mt.EnsureNow(context.Background()); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.adds != 1 || f.lastExtPort != "8101" {
+		t.Errorf("refresh made %d adds, last port %s; want one, for 8101", f.adds, f.lastExtPort)
+	}
+}
+
+// With every port up to the limit taken, it says so rather than going on.
+func TestEveryFallbackPortTaken(t *testing.T) {
+	old := udpMethodBudget
+	udpMethodBudget = 50 * time.Millisecond
+	defer func() { udpMethodBudget = old }()
+	f := newFakeIGD(t)
+	f.taken = map[string]bool{"8099": true, "8100": true, "8101": true}
+	mt := &Maintainer{
+		Gateway: netip.MustParseAddr("127.0.0.1"), testServer: netip.MustParseAddrPort("127.0.0.1:9"),
+		Proto: TCP, InternalPort: 8099, ExternalPort: 8099, FallbackPorts: 2,
+		InternalClient: netip.MustParseAddr("192.168.1.50"), UPnPLocation: f.location,
+	}
+	if _, err := mt.EnsureNow(context.Background()); !errors.Is(err, ErrPortTaken) {
+		t.Fatalf("err = %v, want ErrPortTaken", err)
 	}
 }

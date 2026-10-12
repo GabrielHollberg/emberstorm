@@ -248,7 +248,10 @@ func run(log *slog.Logger) error {
 		Findable: store.Findable,
 		WebName:  store.WebName,
 		Port:     publicPort,
-		Gateway:  gateway,
+		// A router outside port forwarded by hand, when another server in the
+		// house holds the usual one (Settings, Reach it from anywhere).
+		OutsidePort: store.RemoteOutsidePort,
+		Gateway:     gateway,
 		// UPnP fallback: the installer discovers the router's device-description
 		// URL on the host and passes it here, since SSDP cannot cross the Docker
 		// bridge from in here. Empty just means UPnP is tried by SSDP or skipped.
@@ -391,14 +394,23 @@ func run(log *slog.Logger) error {
 		RemoteStatus: func() httpapi.RemoteState {
 			method, mapped := tlsServer.RemoteMapping()
 			return httpapi.RemoteState{
-				Available: tlsServer.SupportsRemote(),
-				Enabled:   remoteEnabled(),
-				Name:      tlsServer.RemoteName(),
-				Port:      tlsServer.RemotePort(),
-				Mapped:    mapped,
-				Method:    method,
-				Upstream:  tlsServer.RemoteUpstream(),
+				Available:  tlsServer.SupportsRemote(),
+				Enabled:    remoteEnabled(),
+				Name:       tlsServer.RemoteName(),
+				Port:       tlsServer.RemotePort(),
+				Mapped:     mapped,
+				Method:     method,
+				Upstream:   tlsServer.RemoteUpstream(),
+				LocalPort:  tlsServer.LocalPort(),
+				OutsideSet: store.RemoteOutsidePort(),
 			}
+		},
+		SetRemoteOutsidePort: func(port int) error {
+			if err := store.SetRemoteOutsidePort(port); err != nil {
+				return err
+			}
+			tlsServer.Refresh()
+			return nil
 		},
 		SetRemoteAccess: func(on bool) error {
 			if err := store.SetRemoteAccess(on); err != nil {

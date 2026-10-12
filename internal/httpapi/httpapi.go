@@ -181,6 +181,7 @@ type Server struct {
 	remoteReach      func(nonce string) (string, bool)
 	remoteStatus     func() RemoteState
 	setRemoteAccess  func(bool) error
+	setRemoteOutside func(int) error
 	claimWebName     func(ctx context.Context, name, previous, code string) (string, error)
 	releaseWebName   func(ctx context.Context, name string) error
 	reannounce       func()
@@ -270,6 +271,10 @@ type Config struct {
 	// nudges the certificate loop to act on it. Owner-only at the handler.
 	SetRemoteAccess func(enabled bool) error
 
+	// SetRemoteOutsidePort records the router's outside port the owner
+	// forwarded by hand (0: the usual one) and nudges the certificate loop.
+	SetRemoteOutsidePort func(port int) error
+
 	// ClaimWebName and ReleaseWebName hold a chosen address at the name
 	// service (hollberg.soundstorm.dev); Reannounce sends the address again,
 	// so a change to whether soundstorm.dev may find the server takes effect
@@ -354,6 +359,11 @@ type RemoteState struct {
 	// mapped - remote access off, no method worked, or a hand-forwarded port.
 	Mapped bool
 	Method string
+	// LocalPort is the port the install serves on at home - what a hand
+	// forward points at, when Port (the router's outside port) differs from
+	// it. OutsideSet is the outside port the owner entered, 0 for none.
+	LocalPort  int
+	OutsideSet int
 }
 
 // New builds the HTTP server.
@@ -378,6 +388,7 @@ func New(cfg Config) *Server {
 		remoteReach:      cfg.RemoteReachability,
 		remoteStatus:     cfg.RemoteStatus,
 		setRemoteAccess:  cfg.SetRemoteAccess,
+		setRemoteOutside: cfg.SetRemoteOutsidePort,
 		claimWebName:     cfg.ClaimWebName,
 		releaseWebName:   cfg.ReleaseWebName,
 		reannounce:       cfg.Reannounce,
@@ -844,6 +855,14 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 			answer["id"] = id
 		}
 	}
+	// The router's outside port, when it is not this install's own (a second
+	// server in the house holds that one): the apps' away fallback goes to
+	// the away name on it. It is in the away address anyway.
+	if s.remoteStatus != nil {
+		if st := s.remoteStatus(); st.Enabled && st.Port != 0 && st.LocalPort != 0 && st.Port != st.LocalPort {
+			answer["awayPort"] = st.Port
+		}
+	}
 	writeJSON(w, http.StatusOK, answer)
 }
 
@@ -927,11 +946,19 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 // owner guard): it puts the whole server on, or off, the internet.
 func (s *Server) handleSetRemote(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Enabled bool `json:"enabled"`
+		Enabled *bool `json:"enabled"`
+		// OutsidePort: the router's outside port forwarded by hand to this
+		// install, for a router without automatic forwarding where another
+		// server holds the usual one; 0 puts it back to the usual.
+		OutsidePort *int `json:"outsidePort"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxCredentialBody))
-	if err := dec.Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "expected a JSON body with enabled")
+	if err := dec.Decode(&body); err != nil || (body.Enabled == nil && body.OutsidePort == nil) {
+		writeError(w, http.StatusBadRequest, "expected a JSON body with enabled or outsidePort")
+		return
+	}
+	if body.OutsidePort != nil && (*body.OutsidePort < 0 || *body.OutsidePort > 65535) {
+		writeError(w, http.StatusUnprocessableEntity, "a port is a number from 1 to 65535")
 		return
 	}
 	if s.remoteStatus == nil || s.setRemoteAccess == nil {
@@ -942,13 +969,27 @@ func (s *Server) handleSetRemote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusPreconditionFailed, "remote access needs auto HTTPS to be on")
 		return
 	}
-	if err := s.setRemoteAccess(body.Enabled); err != nil {
-		s.log.Error("set remote access", "err", err)
-		writeError(w, http.StatusInternalServerError, "could not change remote access")
-		return
-	}
 	user, _ := auth.FromContext(r.Context())
-	s.log.Info("remote access changed", "enabled", body.Enabled, "by", user.Name)
+	if body.OutsidePort != nil {
+		if s.setRemoteOutside == nil {
+			writeError(w, http.StatusNotImplemented, "remote access is not available")
+			return
+		}
+		if err := s.setRemoteOutside(*body.OutsidePort); err != nil {
+			s.log.Error("set remote outside port", "err", err)
+			writeError(w, http.StatusInternalServerError, "could not save the port")
+			return
+		}
+		s.log.Info("remote outside port changed", "port", *body.OutsidePort, "by", user.Name)
+	}
+	if body.Enabled != nil {
+		if err := s.setRemoteAccess(*body.Enabled); err != nil {
+			s.log.Error("set remote access", "err", err)
+			writeError(w, http.StatusInternalServerError, "could not change remote access")
+			return
+		}
+		s.log.Info("remote access changed", "enabled", *body.Enabled, "by", user.Name)
+	}
 	writeJSON(w, http.StatusOK, remoteJSON(s.remoteStatus()))
 }
 
@@ -963,6 +1004,10 @@ func remoteJSON(st RemoteState) map[string]any {
 		"reachable": st.Name != "",
 		"port":      st.Port,
 		"mapped":    st.Mapped,
+		"localPort": st.LocalPort,
+	}
+	if st.OutsideSet != 0 {
+		remote["outsidePort"] = st.OutsideSet
 	}
 	if st.Name != "" {
 		remote["name"] = st.Name

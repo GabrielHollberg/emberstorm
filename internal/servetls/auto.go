@@ -98,6 +98,8 @@ type autoCert struct {
 	// webName is the chosen name, "" for none (Config.WebName).
 	webName func() string
 	port    int
+	// outside is the owner's hand-forwarded outside port (Config.OutsidePort).
+	outside func() int
 
 	// kick nudges run to take a step at once, so a toggle takes effect now
 	// rather than at the next scheduled check. Buffered so a send never blocks.
@@ -382,7 +384,7 @@ func (a *autoCert) keepFindable(ctx context.Context) {
 		if a.webName != nil {
 			chosen = a.webName()
 		}
-		if err := a.names.Here(callCtx, reg, a.announce, a.port, findable, public, chosen); err != nil {
+		if err := a.names.Here(callCtx, reg, a.announce, a.port, a.awayPort(), findable, public, chosen); err != nil {
 			a.log.Debug("still here: the name service did not answer", "err", err)
 		}
 		cancel()
@@ -439,7 +441,7 @@ func (a *autoCert) step(ctx context.Context) error {
 	if a.webName != nil {
 		chosen = strings.ToLower(strings.TrimSpace(a.webName()))
 	}
-	given, err := a.names.Announce(ctx, reg, a.announce, a.port, findable, chosen)
+	given, err := a.names.Announce(ctx, reg, a.announce, a.port, a.awayPort(), findable, chosen)
 	if err != nil {
 		var se *names.StatusError
 		if errors.As(err, &se) && se.Status == 401 {
@@ -733,20 +735,49 @@ func (a *autoCert) step(ctx context.Context) error {
 // this install from the internet and could not reach it (424) - rather than
 // the service itself being unreachable, slow or busy, which proves nothing.
 func (a *autoCert) publishRemote(ctx context.Context, reg names.Registration) (name string, definite bool) {
-	if n, err := a.names.SetPublicVia(ctx, reg, a.port, "tcp4"); err != nil {
+	port := a.outsidePort()
+	if n, err := a.names.SetPublicVia(ctx, reg, port, "tcp4"); err != nil {
 		a.log.Info("remote access over IPv4 is not reachable", "err", err)
 		definite = verdict(err)
 	} else {
 		name = n
 		a.log.Info("remote access is reachable over IPv4", "name", n)
 	}
-	if n, err := a.names.SetPublicVia(ctx, reg, a.port, "tcp6"); err != nil {
+	if n, err := a.names.SetPublicVia(ctx, reg, port, "tcp6"); err != nil {
 		a.log.Debug("remote access over IPv6 is not reachable", "err", err)
 	} else {
 		name = n
 		a.log.Info("remote access is reachable over IPv6", "name", n)
 	}
 	return name, definite
+}
+
+// outsidePort is the port the internet reaches this install on through the
+// router: an automatic mapping's (which may be above port when another server
+// in the house holds port), else the owner's hand forward, else port. IPv6 has
+// no router in the way, but the same port is asked of it: the install answers
+// on its own port there, and the away name carries one port for both.
+func (a *autoCert) outsidePort() int {
+	if a.portMapper != nil {
+		if m, ok := a.portMapper.Current(); ok && m.ExternalPort != 0 {
+			return int(m.ExternalPort)
+		}
+	}
+	if a.outside != nil {
+		if p := a.outside(); p > 0 && p < 65536 {
+			return p
+		}
+	}
+	return a.port
+}
+
+// awayPort is outsidePort when it differs from port, else zero: what the name
+// service is told for a chosen name's visitors from away.
+func (a *autoCert) awayPort() int {
+	if p := a.outsidePort(); p != a.port {
+		return p
+	}
+	return 0
 }
 
 // unreachableRetries is how many checks in a row may find a working away

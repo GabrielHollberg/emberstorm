@@ -1514,7 +1514,7 @@ class MainActivity : Activity() {
                 awayFrom = s
                 mirrorCookies(s)
                 val away = s.buildUpon().encodedAuthority(
-                    awayHost + if (s.port != -1) ":${s.port}" else ""
+                    ServerAddress.awayAuthority(applicationContext, s, awayHost)
                 ).build()
                 recoveringUntil = android.os.SystemClock.uptimeMillis() + 5000
                 content.post { showWeb(away) }
@@ -1606,7 +1606,14 @@ class MainActivity : Activity() {
                     if (here != null && !offlineShell && here !in idsKnown) {
                         idsKnown.add(here)
                         Thread {
-                            ServerAddress.installIdAt(Uri.parse(here))?.let { KeptFiles.rememberId(applicationContext, here, it) }
+                            val health = ServerAddress.healthAt(Uri.parse(here)) ?: return@Thread
+                            val id = health.optString("id").takeIf { it.isNotEmpty() }
+                            if (id != null) KeptFiles.rememberId(applicationContext, here, id)
+                            // The away name's port, when another server in the
+                            // house holds the usual one on the router.
+                            val label = Uri.parse(here).host?.lowercase()?.substringBefore('.')
+                            ServerAddress.rememberAwayPort(applicationContext,
+                                listOfNotNull(label, id), health.optInt("awayPort", 0))
                         }.start()
                     }
                 }

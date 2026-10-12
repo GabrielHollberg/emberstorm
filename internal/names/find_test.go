@@ -98,13 +98,13 @@ func TestABrowserFindsTheServerOnItsOwnConnection(t *testing.T) {
 	elsewhere := from(base, "198.51.100.9")
 	theirs, _ := elsewhere.Register(ctx)
 
-	if _, err := home.Announce(ctx, mine, "192.168.0.50", 8099, true, ""); err != nil {
+	if _, err := home.Announce(ctx, mine, "192.168.0.50", 8099, 0, true, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := home.Announce(ctx, hidden, "192.168.0.20", 8099, false, ""); err != nil {
+	if _, err := home.Announce(ctx, hidden, "192.168.0.20", 8099, 0, false, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := elsewhere.Announce(ctx, theirs, "192.168.1.5", 8099, true, ""); err != nil {
+	if _, err := elsewhere.Announce(ctx, theirs, "192.168.1.5", 8099, 0, true, ""); err != nil {
 		t.Fatal(err)
 	}
 	got := foundURLs(t, base, "203.0.113.7")
@@ -116,7 +116,7 @@ func TestABrowserFindsTheServerOnItsOwnConnection(t *testing.T) {
 		t.Errorf("from a connection with no server found %v", got)
 	}
 	// Turned off in Settings: gone at the next announcement.
-	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, false, "")
+	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, 0, false, "")
 	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 0 {
 		t.Errorf("after turning finding off, found %v", got)
 	}
@@ -131,7 +131,7 @@ func TestAChosenNameLeadsToItsServer(t *testing.T) {
 	home := from(base, "203.0.113.7")
 	mine, _ := home.Register(ctx)
 	other, _ := home.Register(ctx)
-	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, true, "")
+	_, _ = home.Announce(ctx, mine, "192.168.0.50", 8099, 0, true, "")
 
 	url, err := home.ClaimName(ctx, mine, "TheHollbergs", "", "")
 	if err != nil || url != "https://thehollbergs.soundstorm.dev/" {
@@ -263,7 +263,7 @@ func TestStillHereRefillsTheFinding(t *testing.T) {
 	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 0 {
 		t.Fatalf("found %v before it said anything", got)
 	}
-	if err := home.Here(ctx, mine, "192.168.0.50", 8099, true, false, ""); err != nil {
+	if err := home.Here(ctx, mine, "192.168.0.50", 8099, 0, true, false, ""); err != nil {
 		t.Fatal(err)
 	}
 	if got := foundURLs(t, base, "203.0.113.7"); len(got) != 1 || got[0] != "https://"+mine.ID+".home.soundstorm.dev:8099/" {
@@ -272,7 +272,7 @@ func TestStillHereRefillsTheFinding(t *testing.T) {
 	if len(dns.records) != before {
 		t.Error("still here changed a DNS record")
 	}
-	if err := home.Here(ctx, mine, "8.8.8.8", 8099, true, false, ""); err == nil {
+	if err := home.Here(ctx, mine, "8.8.8.8", 8099, 0, true, false, ""); err == nil {
 		t.Error("a public address was taken")
 	}
 }

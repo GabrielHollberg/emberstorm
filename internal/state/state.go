@@ -488,6 +488,11 @@ type data struct {
 	// it in the app, their choice is what stands.
 	RemoteAccess *bool `json:"remoteAccess,omitempty"`
 
+	// RemoteOutsidePort is the router's outside port the owner forwarded by
+	// hand to this install, when another server in the house holds the usual
+	// one and the router does no automatic forwarding. Zero is the usual port.
+	RemoteOutsidePort int `json:"remoteOutsidePort,omitempty"`
+
 	// NotFindable is the owner turning off "Open my EmberStorm": the server
 	// stops telling the name service which port it serves, and soundstorm.dev
 	// no longer finds it from the home's internet connection. Absent is on.
@@ -1275,6 +1280,24 @@ func (s *Store) SetWebName(name string) error {
 		return nil
 	}
 	s.d.WebName = name
+	return s.save()
+}
+
+// RemoteOutsidePort is the owner's hand-forwarded outside port, 0 for none.
+func (s *Store) RemoteOutsidePort() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.d.RemoteOutsidePort
+}
+
+// SetRemoteOutsidePort records it; 0 for the usual port.
+func (s *Store) SetRemoteOutsidePort(port int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.d.RemoteOutsidePort == port {
+		return nil
+	}
+	s.d.RemoteOutsidePort = port
 	return s.save()
 }
 

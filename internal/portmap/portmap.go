@@ -54,6 +54,15 @@ const gatewayPort = 5351
 // check for it rather than logging it loudly.
 var ErrNoGateway = errors.New("portmap: no gateway configured")
 
+// ErrPortTaken is the router saying the outside port asked for is already
+// forwarded to another machine (UPnP's 718, ConflictInMappingEntry): a
+// second server in the house holding it. The Maintainer then asks for the
+// next port up (FallbackPorts).
+var ErrPortTaken = errors.New("portmap: the router already forwards that port to another machine")
+
+// upnpErrConflict is UPnP's ConflictInMappingEntry.
+const upnpErrConflict = 718
+
 // Mapping is a granted port forward. ExternalIP is filled in by PCP and UPnP,
 // which report the router's WAN address; NAT-PMP leaves it invalid (its own
 // external-address call is separate). nonce carries PCP's mapping nonce and igd
@@ -75,6 +84,7 @@ type target struct {
 	gateway        netip.AddrPort // PCP/NAT-PMP server; invalid disables both
 	internalClient netip.Addr     // UPnP forward-to address; invalid disables UPnP
 	upnpLocation   string         // configured IGD description URL; "" => SSDP discovery
+	upnpOnly       bool           // a fallback port: PCP and NAT-PMP already said no
 }
 
 // Map asks the router to forward externalPort to this host's internalPort,
@@ -117,8 +127,9 @@ var udpMethodBudget = 4 * time.Second // a variable only so a test can shorten i
 // one grants beside the first - leaving an entry the later delete never names.
 func mapTarget(ctx context.Context, t target, proto Protocol, internalPort, externalPort uint16, lifetime time.Duration, prev Mapping) (Mapping, error) {
 	var attempts []string
+	taken := false
 
-	if t.gateway.IsValid() {
+	if t.gateway.IsValid() && !t.upnpOnly {
 		nonce := prev.nonce
 		if prev.Method != "PCP" {
 			if _, err := rand.Read(nonce[:]); err != nil {
@@ -147,11 +158,16 @@ func mapTarget(ctx context.Context, t target, proto Protocol, internalPort, exte
 			return m, nil
 		} else {
 			attempts = append(attempts, err.Error())
+			var se *soapError
+			taken = asSOAPError(err, &se) && se.code == upnpErrConflict
 		}
 	}
 
 	if len(attempts) == 0 {
 		return Mapping{}, ErrNoGateway
+	}
+	if taken {
+		return Mapping{}, fmt.Errorf("%w (%s)", ErrPortTaken, strings.Join(attempts, "; "))
 	}
 	return Mapping{}, fmt.Errorf("no port-mapping protocol worked (%s)", strings.Join(attempts, "; "))
 }
@@ -190,8 +206,13 @@ type Maintainer struct {
 	Proto        Protocol
 	InternalPort uint16
 	ExternalPort uint16
-	Lifetime     time.Duration // requested lease; the router may grant less
-	Log          *slog.Logger
+	// FallbackPorts is how many ports above ExternalPort to try, one after
+	// another, when the router says ExternalPort is another machine's - a
+	// second server in the house (the owner's asking, 2026-10-12). The one
+	// granted is asked for first from then on. Zero tries none.
+	FallbackPorts int
+	Lifetime      time.Duration // requested lease; the router may grant less
+	Log           *slog.Logger
 
 	// InternalClient is the LAN address the router should forward to, for UPnP
 	// (the host's own address). Invalid disables UPnP. PCP and NAT-PMP do not
@@ -219,6 +240,23 @@ type Maintainer struct {
 	// failures counts refreshes failed in a row, for backing off and for
 	// warning once rather than every attempt.
 	failures int
+	// want is the outside port to ask for first: ExternalPort, or the
+	// fallback port the router last granted. Zero means ExternalPort.
+	want uint16
+}
+
+// OutsidePort is the port the internet reaches this machine on through the
+// router: the live mapping's, else the one last granted, else ExternalPort.
+func (mt *Maintainer) OutsidePort() uint16 {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	if mt.current != nil && mt.current.ExternalPort != 0 {
+		return mt.current.ExternalPort
+	}
+	if mt.want != 0 {
+		return mt.want
+	}
+	return mt.ExternalPort
 }
 
 // server is the gateway address to talk to: the test override if set, else the
@@ -350,7 +388,16 @@ func (mt *Maintainer) ensure(ctx context.Context) (Mapping, error) {
 	}
 	mt.mu.Unlock()
 
-	m, err := mapTarget(opCtx, t, mt.Proto, mt.InternalPort, mt.ExternalPort, mt.lease(), prev)
+	mt.mu.Lock()
+	want := mt.want
+	mt.mu.Unlock()
+	if want == 0 {
+		want = mt.ExternalPort
+	}
+	m, err := mapTarget(opCtx, t, mt.Proto, mt.InternalPort, want, mt.lease(), prev)
+	if errors.Is(err, ErrPortTaken) && mt.FallbackPorts > 0 {
+		m, err = mt.fallback(ctx, t, want, prev)
+	}
 	if err != nil {
 		// No longer known to be live, but last keeps it for drop.
 		mt.mu.Lock()
@@ -370,16 +417,48 @@ func (mt *Maintainer) ensure(ctx context.Context) (Mapping, error) {
 	}
 
 	mt.mu.Lock()
-	first := mt.current == nil
+	first := mt.current == nil || mt.current.ExternalPort != m.ExternalPort
 	mt.current = &m
 	mt.last = &m
 	mt.failures = 0
+	mt.want = m.ExternalPort
 	mt.mu.Unlock()
 	if first && mt.Log != nil {
 		mt.Log.Info("opened the port on the router", "method", m.Method,
 			"externalPort", m.ExternalPort, "lease", m.Lifetime.Round(time.Second))
 	}
 	return m, nil
+}
+
+// fallback asks for the ports above ExternalPort in turn (and ExternalPort
+// itself, when it was a fallback port that was refused), by UPnP alone: it was
+// UPnP that said the port was taken, and PCP and NAT-PMP have already had
+// their turn. Each try is a round trip on the home network, so all of them
+// fit in a minute.
+func (mt *Maintainer) fallback(ctx context.Context, t target, refused uint16, prev Mapping) (Mapping, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	t.upnpOnly = true
+	err := error(ErrPortTaken)
+	for i := 0; i <= mt.FallbackPorts; i++ {
+		port := mt.ExternalPort + uint16(i)
+		if port == refused || port < mt.ExternalPort {
+			continue
+		}
+		var m Mapping
+		m, err = mapTarget(ctx, t, mt.Proto, mt.InternalPort, port, mt.lease(), prev)
+		if err == nil {
+			if mt.Log != nil {
+				mt.Log.Info("the router already forwards the usual port to another machine; using another outside port",
+					"taken", refused, "outsidePort", m.ExternalPort)
+			}
+			return m, nil
+		}
+		if !errors.Is(err, ErrPortTaken) {
+			return Mapping{}, err
+		}
+	}
+	return Mapping{}, err
 }
 
 // drop removes the live mapping if there is one. Safe to call when none is held.

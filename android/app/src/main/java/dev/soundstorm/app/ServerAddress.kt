@@ -76,7 +76,11 @@ object ServerAddress {
         }
     }
 
-    fun installIdAt(base: Uri): String? {
+    fun installIdAt(base: Uri): String? =
+        healthAt(base)?.optString("id")?.takeIf { it.isNotEmpty() }
+
+    /** An address's `/healthz` answer, read with no cookies, or null. */
+    fun healthAt(base: Uri): org.json.JSONObject? {
         val conn = java.net.URL(base.buildUpon().path("/healthz").clearQuery().fragment(null).build().toString())
             .openConnection() as java.net.HttpURLConnection
         conn.setRequestProperty(WebCookies.NO_COOKIES, "1")
@@ -85,12 +89,36 @@ object ServerAddress {
         return try {
             if (conn.responseCode != 200) return null
             val body = capped(conn.inputStream, 64 * 1024)
-            org.json.JSONObject(body).optString("id").takeIf { it.isNotEmpty() }
+            org.json.JSONObject(body)
         } catch (e: Exception) {
             null
         } finally {
             conn.disconnect()
         }
+    }
+
+    /**
+     * The router's outside port for an install, when it is not the install's
+     * own: a second server in the house holds the usual one, so the away name
+     * is reached on another (`/healthz`'s awayPort). Kept by the name's first
+     * part and by install id; zero forgets it.
+     */
+    fun rememberAwayPort(context: Context, keys: List<String>, port: Int) {
+        val edit = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        for (k in keys) if (port in 1..65535) edit.putInt("awayPort:$k", port) else edit.remove("awayPort:$k")
+        edit.apply()
+    }
+
+    /** The authority of a home address's away twin: the away host, on the
+     *  install's remembered outside port, else the address's own. */
+    fun awayAuthority(context: Context, home: Uri, awayHost: String): String {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val label = home.host?.lowercase()?.substringBefore('.') ?: ""
+        val id = KeptFiles.idOf(context, home.toString())
+        val port = prefs.getInt("awayPort:$label", 0).takeIf { it > 0 }
+            ?: id?.let { prefs.getInt("awayPort:$it", 0).takeIf { p -> p > 0 } }
+            ?: home.port
+        return awayHost + if (port != -1) ":$port" else ""
     }
 
     private const val PREFS = "soundstorm"

@@ -1695,10 +1695,24 @@ function renderRemote(remote) {
     show(status, false);
     return;
   }
+  // The router's outside port, and this server's own: two servers in one
+  // house cannot both have the usual one from outside, so the second is given
+  // the next free port (by the router, or forwarded by hand).
+  const port = remote.port || 8099;
+  const local = remote.localPort || port;
+  const toThis = port === local ? `port ${port} (TCP) to this server`
+    : `outside port ${port} (TCP) to this server's port ${local}`;
+  const outside = $('remote-outside');
+  show(outside, !remote.mapped || Boolean(remote.outsidePort));
+  $('remote-outside-about').textContent = `Only one server can have port ${local} from outside. `
+    + `In your router's settings, forward another outside port - say ${local + 1} - to this server's `
+    + `port ${local}, and enter it here. Leave it empty for the usual port.`;
+  if (document.activeElement !== $('remote-outside-port')) $('remote-outside-port').value = remote.outsidePort || '';
   // On: say whether it actually worked, and if not, exactly what to do.
   if (remote.reachable) {
     status.textContent = remote.mapped
-      ? `Reachable. The port was opened automatically${remote.method ? ` (${remote.method})` : ''}.`
+      ? `Reachable. The port was opened automatically${remote.method ? ` (${remote.method})` : ''}`
+        + (port !== local ? `: another server here already has port ${local} on your router, so this one is reached on port ${port} from outside.` : '.')
       : 'Reachable.';
   } else if (remote.mapped) {
     status.textContent = 'Opening the door… the port was opened on your router; '
@@ -1713,7 +1727,6 @@ function renderRemote(remote) {
       + `works here instead: it connects your own devices privately, with nothing to open.`;
     show(howto, true);
   } else if (remote.upstream === 'router') {
-    const port = remote.port || 8099;
     status.textContent = `Your router is plugged into another router, often the box `
       + `from your internet provider, so opening a port on this one isn't enough. `
       + `Either set the provider's box to bridge mode, or forward port ${port} (TCP) `
@@ -1727,17 +1740,28 @@ function renderRemote(remote) {
     // automatic port opening (UPnP) switched off. Both ways out, in the order
     // most people find easier; the server asks the router again by itself
     // (backing off to an hour), and switching this off and on asks at once.
-    const port = remote.port || 8099;
     status.textContent = `Your router didn't open the door by itself - its automatic `
       + `port opening (called UPnP, "Universal Plug and Play", or NAT-PMP) is probably `
       + `turned off. Either: turn UPnP on in your router's settings, then switch this off `
-      + `and back on here; or, in your router's settings, forward port ${port} (TCP) to `
-      + `this server, then switch this off and on. Or use Tailscale, which needs neither.`;
+      + `and back on here; or, in your router's settings, forward ${toThis}, `
+      + `then switch this off and on. Or use Tailscale, which needs neither.`;
     show(howto, true);
   }
   show(status, true);
 }
 
+$('remote-outside-save').addEventListener('click', async () => {
+  const text = $('remote-outside-port').value.trim();
+  const outsidePort = text === '' ? 0 : Number(text);
+  if (!Number.isInteger(outsidePort) || outsidePort < 0 || outsidePort > 65535) {
+    note($('remote-note'), 'A port is a number from 1 to 65535.', true);
+    return;
+  }
+  const { ok, body } = await api('/api/remote', { method: 'PUT', body: JSON.stringify({ outsidePort }) });
+  note($('remote-note'), ok ? (outsidePort ? `Saved. Checking it can be reached on port ${outsidePort}...` : 'Saved: the usual port.')
+    : ((body && body.error) || 'Could not save it.'), !ok);
+  if (ok && body) renderRemote(body);
+});
 $('remote-toggle').addEventListener('change', async (event) => {
   const enabled = event.target.checked;
   if (enabled) state.remoteSince = Date.now();

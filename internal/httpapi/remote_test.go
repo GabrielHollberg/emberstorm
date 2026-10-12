@@ -8,6 +8,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ type remoteState struct {
 	mapped    bool
 	method    string
 	upstream  string
+	local     int   // the install's own port; port is the router's outside one
+	outside   int   // the owner's hand-forwarded outside port
 	setErr    error // when non-nil, SetRemoteAccess fails
 	sets      int   // how many times the toggle was actually applied
 }
@@ -64,14 +67,25 @@ func newRemoteHarness(t *testing.T, rs *remoteState) *harness {
 		Lyrics:           testLyrics(t),
 		RemoteStatus: func() RemoteState {
 			return RemoteState{
-				Available: rs.available,
-				Enabled:   rs.enabled,
-				Name:      rs.name,
-				Port:      rs.port,
-				Mapped:    rs.mapped,
-				Method:    rs.method,
-				Upstream:  rs.upstream,
+				Available:  rs.available,
+				Enabled:    rs.enabled,
+				Name:       rs.name,
+				Port:       rs.port,
+				Mapped:     rs.mapped,
+				Method:     rs.method,
+				Upstream:   rs.upstream,
+				LocalPort:  rs.local,
+				OutsideSet: rs.outside,
 			}
+		},
+		SetRemoteOutsidePort: func(port int) error {
+			rs.outside = port
+			if port != 0 {
+				rs.port = port
+			} else {
+				rs.port = rs.local
+			}
+			return nil
 		},
 		SetRemoteAccess: func(on bool) error {
 			if rs.setErr != nil {
@@ -242,5 +256,38 @@ func TestRemoteToggleRefusedWithoutAutoHTTPS(t *testing.T) {
 	}
 	if rs.sets != 0 {
 		t.Errorf("the setting was changed anyway: sets=%d", rs.sets)
+	}
+}
+
+// Two servers in one house: the owner enters the outside port forwarded by
+// hand, and the apps learn it from /healthz for their away fallback.
+func TestTheOwnerSetsTheOutsidePort(t *testing.T) {
+	rs := &remoteState{available: true, enabled: true, name: "abc.net.emberstorm.app", port: 8099, local: 8099}
+	h := newRemoteHarness(t, rs)
+	h.signUp(t)
+
+	resp, body := h.do(t, http.MethodPut, "/api/remote", `{"outsidePort":8100}`)
+	if resp.StatusCode != http.StatusOK || rs.outside != 8100 {
+		t.Fatalf("PUT outsidePort = %d %s; kept %d", resp.StatusCode, body, rs.outside)
+	}
+	var out struct {
+		Port        int `json:"port"`
+		LocalPort   int `json:"localPort"`
+		OutsidePort int `json:"outsidePort"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil || out.Port != 8100 || out.LocalPort != 8099 || out.OutsidePort != 8100 {
+		t.Fatalf("answer %s", body)
+	}
+	_, health := h.do(t, http.MethodGet, "/healthz", "")
+	if !strings.Contains(string(health), `"awayPort": 8100`) && !strings.Contains(string(health), `"awayPort":8100`) {
+		t.Errorf("healthz does not carry the outside port: %s", health)
+	}
+	if resp, _ := h.do(t, http.MethodPut, "/api/remote", `{"outsidePort":70000}`); resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Errorf("a port out of range = %d, want 422", resp.StatusCode)
+	}
+	h.do(t, http.MethodPut, "/api/remote", `{"outsidePort":0}`)
+	_, health = h.do(t, http.MethodGet, "/healthz", "")
+	if strings.Contains(string(health), "awayPort") {
+		t.Errorf("the usual port still reported an away port: %s", health)
 	}
 }

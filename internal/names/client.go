@@ -47,21 +47,24 @@ func (c *Client) SetAddress(ctx context.Context, reg Registration, ip string) er
 //
 // chosen is the chosen name the install holds ("" for none), so Open my
 // EmberStorm leads to it.
-func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port int, findable bool, chosen string) (string, error) {
+// awayPort is the port the internet reaches the install on through the router,
+// when not port itself (a second server in the house holds that one); zero is
+// the same.
+func (c *Client) Announce(ctx context.Context, reg Registration, ip string, port, awayPort int, findable bool, chosen string) (string, error) {
 	var out struct {
 		Name string `json:"name"`
 	}
 	err := c.do(ctx, http.MethodPut, "/v1/address", reg.Credential(),
-		map[string]any{"ip": ip, "port": port, "find": findable, "name": chosen}, &out)
+		map[string]any{"ip": ip, "port": port, "awayPort": awayPort, "find": findable, "name": chosen}, &out)
 	return out.Name, err
 }
 
 // Here tells the service the install is still here, for Open my EmberStorm
 // (the service keeps that in memory only, so a restart of it forgets until
 // told again). No DNS record changes.
-func (c *Client) Here(ctx context.Context, reg Registration, ip string, port int, findable, public bool, chosen string) error {
+func (c *Client) Here(ctx context.Context, reg Registration, ip string, port, awayPort int, findable, public bool, chosen string) error {
 	return c.do(ctx, http.MethodPut, "/v1/here", reg.Credential(),
-		map[string]any{"ip": ip, "port": port, "find": findable, "public": public, "name": chosen}, nil)
+		map[string]any{"ip": ip, "port": port, "awayPort": awayPort, "find": findable, "public": public, "name": chosen}, nil)
 }
 
 // ClaimName gives the install a chosen name (hollberg.soundstorm.dev),

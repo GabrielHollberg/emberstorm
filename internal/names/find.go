@@ -57,6 +57,7 @@ var (
 type found struct {
 	id     string
 	port   int
+	away   int // the router's outside port, when not port; 0 is port
 	lan    string
 	name   string // the install's chosen name, checked against its claim
 	public bool
@@ -74,7 +75,7 @@ func newFindIndex() *findIndex {
 	return &findIndex{byIP: map[string]map[string]*found{}, byID: map[string]string{}}
 }
 
-func (x *findIndex) note(conn, id string, port int, lan, name string, now time.Time) {
+func (x *findIndex) note(conn, id string, port, away int, lan, name string, now time.Time) {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	public := false
@@ -92,7 +93,7 @@ func (x *findIndex) note(conn, id string, port int, lan, name string, now time.T
 	if x.byIP[conn] == nil {
 		x.byIP[conn] = map[string]*found{}
 	}
-	x.byIP[conn][id] = &found{id: id, port: port, lan: lan, name: name, public: public, seen: now}
+	x.byIP[conn][id] = &found{id: id, port: port, away: away, lan: lan, name: name, public: public, seen: now}
 	x.byID[id] = conn
 	// A cap on the whole table: each entry is a live install, and the zone
 	// holds 2,500 at most, so this is only a backstop against a flood.
@@ -185,10 +186,13 @@ func (s *Server) findConn(r *http.Request) string { return s.clientNet(r) }
 // name is the chosen name the install says it has; it is kept only when the
 // install's claim to it checks out, so a page found by it leads to the right
 // server.
-func (s *Server) noteFind(r *http.Request, id string, allow bool, port int, lan, name string) {
+func (s *Server) noteFind(r *http.Request, id string, allow bool, port, away int, lan, name string) {
 	if !allow || port < 1 || port > 65535 {
 		s.find.forget(id)
 		return
+	}
+	if away < 1 || away > 65535 {
+		away = 0
 	}
 	name = strings.ToLower(strings.TrimSpace(name))
 	if name != "" {
@@ -200,7 +204,7 @@ func (s *Server) noteFind(r *http.Request, id string, allow bool, port int, lan,
 			name = ""
 		}
 	}
-	s.find.note(s.findConn(r), id, port, lan, name, time.Now())
+	s.find.note(s.findConn(r), id, port, away, lan, name, time.Now())
 }
 
 // lookupRate is how often one install may have a chosen name looked up at
@@ -629,7 +633,7 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 		// The same internet connection as the server: at home.
 		http.Redirect(w, r, s.chosenHomeURL(name, port), http.StatusFound)
 	case known && e.public:
-		http.Redirect(w, r, s.chosenRemoteURL(name, port), http.StatusFound)
+		http.Redirect(w, r, s.chosenRemoteURL(name, awayPort(e, port)), http.StatusFound)
 	case known:
 		chosenPage(w, http.StatusOK, "This EmberStorm is at home only",
 			"You seem to be away from the house it is in, and it is not set up to be reached from outside. Open it from home - or ask its owner to turn on Reach it from anywhere in Settings.",
@@ -640,6 +644,15 @@ func (s *Server) handleChosen(w http.ResponseWriter, r *http.Request, name strin
 			"Choose where you are, and EmberStorm opens the right address.",
 			[]link{{"At home, on its Wi-Fi", s.chosenHomeURL(name, port)}, {"Away from home", s.chosenRemoteURL(name, port)}})
 	}
+}
+
+// awayPort is the port a visitor from away reaches the install on: the
+// router's outside port when it said one, else its own.
+func awayPort(e found, port int) int {
+	if e.away != 0 {
+		return e.away
+	}
+	return port
 }
 
 type link struct{ label, href string }

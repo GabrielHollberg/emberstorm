@@ -637,6 +637,17 @@
              port to forward by hand. -->
         <p id="remote-status" class="muted hidden" role="status"></p>
         <p id="remote-note" class="muted hidden" role="status"></p>
+        <!-- Two servers in one house, a router that forwards nothing by itself:
+             only one can have the usual port from outside, so the other is
+             given another, forwarded by hand and entered here. -->
+        <details id="remote-outside" class="remote-outside hidden">
+          <summary>Another EmberStorm in this house already uses that port?</summary>
+          <p id="remote-outside-about" class="muted"></p>
+          <div class="inline-form">
+            <input id="remote-outside-port" type="text" inputmode="numeric" maxlength="5" placeholder="8100" aria-label="Outside port">
+            <button id="remote-outside-save" class="ghost small" type="button">Save</button>
+          </div>
+        </details>
         <!-- Shown when the router says no forward can work (carrier-grade NAT,
              double NAT): where Tailscale is set up, since it is the way in. -->
         <p id="remote-tailscale-howto" class="muted hidden">To set it up, open

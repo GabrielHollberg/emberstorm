@@ -4251,6 +4251,10 @@ html.tv .profiles-card:has(#profiles-secret:not(.hidden)) #profiles-secret { mar
 .me-menu .me-who { display: flex; flex-direction: column; min-width: 0; }
 .me-menu .me-who small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .me-menu .me-who small.hidden { display: none; }
+.remote-outside { margin-top: 10px; font-size: 14px; }
+.remote-outside summary { cursor: pointer; color: var(--muted); }
+.remote-outside.hidden { display: none; }
+.remote-outside input { width: 7em; }
 .me-picture-choices { display: flex; gap: 6px; padding: 0 8px 4px 20px; }
 .me-picture-choices.hidden { display: none; }
 .me-picture-choices button { flex: 1; min-height: 36px; border-radius: 10px; font-size: 14px; }

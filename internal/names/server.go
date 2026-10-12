@@ -331,6 +331,9 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 		// before sends neither, and is not findable.
 		Port int   `json:"port"`
 		Find *bool `json:"find"`
+		// AwayPort: the router's outside port, when not Port (a second
+		// server in the house holds that one). Zero or absent is Port.
+		AwayPort int `json:"awayPort"`
 		// Name: the chosen name the install holds, if any (checked).
 		Name string `json:"name"`
 	}
@@ -368,7 +371,7 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 			s.Log.Warn("clear other family", "id", id, "err", err)
 		}
 	}
-	s.noteFind(r, id, body.Find != nil && *body.Find, body.Port, addr.String(), body.Name)
+	s.noteFind(r, id, body.Find != nil && *body.Find, body.Port, body.AwayPort, addr.String(), body.Name)
 	s.Log.Info("address set", "id", id)
 	writeJSON(w, http.StatusOK, map[string]string{"name": s.NameFor(id), "ip": addr.String()})
 }
@@ -383,11 +386,12 @@ func (s *Server) handleAddress(w http.ResponseWriter, r *http.Request, id string
 // which sends a chosen name's visitors from away to the remote name.
 func (s *Server) handleHere(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
-		IP     string `json:"ip"`
-		Port   int    `json:"port"`
-		Find   bool   `json:"find"`
-		Public bool   `json:"public"`
-		Name   string `json:"name"`
+		IP       string `json:"ip"`
+		Port     int    `json:"port"`
+		AwayPort int    `json:"awayPort"`
+		Find     bool   `json:"find"`
+		Public   bool   `json:"public"`
+		Name     string `json:"name"`
 	}
 	if !readJSON(w, r, &body) {
 		return
@@ -401,7 +405,7 @@ func (s *Server) handleHere(w http.ResponseWriter, r *http.Request, id string) {
 		writeError(w, http.StatusTooManyRequests, "too often; try again later")
 		return
 	}
-	s.noteFind(r, id, body.Find, body.Port, addr.String(), body.Name)
+	s.noteFind(r, id, body.Find, body.Port, body.AwayPort, addr.String(), body.Name)
 	s.find.setPublic(id, body.Public)
 	w.WriteHeader(http.StatusNoContent)
 }
