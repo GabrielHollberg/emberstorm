@@ -16,7 +16,18 @@
 // as it did before. That is also why installing to a home screen from a phone
 // needs the installer's --https. localhost counts as secure either way, which
 // is why it works in development without it.
-if ('serviceWorker' in navigator) {
+// Not inside the phone apps (their user agent says SoundStormApp/), and one
+// registered there before is taken away: the apps keep their own copy of the
+// page and open it offline themselves (Android's KeptFiles, the iPhone's
+// KeptFiles.swift), and on Android the worker answered an offline page load
+// before the app could - with its error page, the black screen the owner kept
+// meeting with the internet off (2026-10-12). Downloads in web storage are
+// not the worker's and stay.
+if ('serviceWorker' in navigator && /SoundStormApp\//.test(navigator.userAgent)) {
+  navigator.serviceWorker.getRegistrations().then(function (all) {
+    all.forEach(function (r) { r.unregister(); });
+  }).catch(function () {});
+} else if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('/sw.js').catch(function () {
       // Offline start-up is a nicety. Nothing else depends on it.
