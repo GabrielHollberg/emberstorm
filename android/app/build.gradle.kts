@@ -10,8 +10,8 @@ android {
         applicationId = "dev.soundstorm.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 62
-        versionName = "0.62"
+        versionCode = 63
+        versionName = "0.63"
     }
 
     buildTypes {

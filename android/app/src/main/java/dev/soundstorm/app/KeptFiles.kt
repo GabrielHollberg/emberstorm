@@ -274,15 +274,30 @@ object KeptFiles {
         return if (ServerAddress.zoneOf(host) != null) host.substringBefore('.') else null
     }
 
-    /** An address of this install whose page is kept, if any. */
+    /**
+     * An address of this install whose page is kept, if any - one holding
+     * downloads first: the page is kept at every address it is opened on,
+     * and the downloads only under the one they were made on (the owner's
+     * phone opened an address with none, 2026-10-12).
+     */
     fun keptPageFor(context: Context, id: String): String? {
         val prefs = context.getSharedPreferences("kept", Context.MODE_PRIVATE)
+        var any: String? = null
         for ((k, v) in prefs.all) {
             if (!k.startsWith("id:") || v != id) continue
             val origin = prefs.getString("origin:" + k.removePrefix("id:"), null) ?: continue
-            if (hasShell(origin)) return origin
+            if (!hasShell(origin)) continue
+            if (hasDownloads(origin)) return origin
+            if (any == null) any = origin
         }
-        return null
+        return any
+    }
+
+    /** Whether the download list kept for this server lists anything. */
+    fun hasDownloads(origin: String): Boolean {
+        val site = site(origin) ?: return false
+        val text = runCatching { File(folder(site), "index.json").readText() }.getOrNull() ?: return false
+        return runCatching { (JSONObject(text).optJSONArray("groups")?.length() ?: 0) > 0 }.getOrDefault(false)
     }
 
     /** Whether the page's own files are kept for this server. */

@@ -1515,6 +1515,19 @@ class MainActivity : Activity() {
             // downloads, as the service worker does on a secure name.
             val origin = ServerAddress.current
             val home = awayFrom
+            // Another address of this install that holds the downloads wins
+            // over this one's copy with none.
+            val start = ServerAddress.saved(this@MainActivity)?.let(ServerAddress::origin)
+            val withDownloads = (start ?: origin)?.let { KeptFiles.idOf(this@MainActivity, it) }
+                ?.let { KeptFiles.keptPageFor(this@MainActivity, it) }?.takeIf { KeptFiles.hasDownloads(it) }
+            if (!offlineShell && withDownloads != null && withDownloads != origin &&
+                (origin == null || !KeptFiles.hasDownloads(origin))) {
+                awayFrom = null
+                offlineNext = true
+                recoveringUntil = android.os.SystemClock.uptimeMillis() + 5000
+                content.post { showWeb(Uri.parse(withDownloads)) }
+                return
+            }
             if (!offlineShell && s != null && origin != null && KeptFiles.hasShell(origin)) {
                 offlineNext = true
                 recoveringUntil = android.os.SystemClock.uptimeMillis() + 5000
@@ -1531,7 +1544,6 @@ class MainActivity : Activity() {
             // The address the page moved to when it was last reached (its
             // secure or chosen name), where its kept copy and downloads are -
             // or any other address of the same install with its page kept.
-            val start = ServerAddress.saved(this@MainActivity)?.let(ServerAddress::origin)
             val lives = start?.let { KeptFiles.livesAt(this@MainActivity, it) }?.takeIf { KeptFiles.hasShell(it) }
                 ?: (start ?: origin)?.let { KeptFiles.idOf(this@MainActivity, it) }?.let { KeptFiles.keptPageFor(this@MainActivity, it) }
             if (!offlineShell && lives != null && lives != origin && KeptFiles.hasShell(lives)) {
