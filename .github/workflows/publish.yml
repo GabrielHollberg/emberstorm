@@ -184,10 +184,17 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long
 
+      # Which commit and when, for Settings, About (internal/version).
+      - id: when
+        run: echo "date=$(git log -1 --format=%cI)" >> "$GITHUB_OUTPUT"
+
       - id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
+          build-args: |
+            BUILD_COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.when.outputs.date }}
           # arm64 matters more than usual here: a lot of the machines people
           # run a home media server on are a Raspberry Pi, a Synology, or an
           # Apple silicon Mac.

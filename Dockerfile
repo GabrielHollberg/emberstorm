@@ -13,8 +13,15 @@ WORKDIR /src
 # SoundStorm has no third-party dependencies, so there is nothing to download here -
 # the build is hermetic and offline, and there is no go.sum by design.
 COPY . .
+# Which commit this is and when it was made, shown to signed-in people in
+# Settings, About (internal/version). GitHub's workflow passes both; a local
+# build passes what its deploy command gives, else nothing.
+ARG BUILD_COMMIT=""
+ARG BUILD_DATE=""
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -trimpath -ldflags="-s -w" -o /out/soundstorm ./cmd/soundstorm
+    go build -trimpath \
+    -ldflags="-s -w -X github.com/GabrielHollberg/soundstorm/internal/version.Commit=${BUILD_COMMIT} -X github.com/GabrielHollberg/soundstorm/internal/version.Date=${BUILD_DATE}" \
+    -o /out/soundstorm ./cmd/soundstorm
 
 # Run stage: the binary, CA certificates, and nothing else.
 FROM alpine:3.24

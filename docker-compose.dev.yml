@@ -8,7 +8,13 @@
 
 services:
   soundstorm:
-    build: .
+    build:
+      context: .
+      # Settings, About shows them (internal/version); the deploy command
+      # sets both from git. Without them it says only "a local build".
+      args:
+        BUILD_COMMIT: ${SOUNDSTORM_BUILD_COMMIT:-}
+        BUILD_DATE: ${SOUNDSTORM_BUILD_DATE:-}
     image: soundstorm:dev
     environment:
       SOUNDSTORM_LOG_LEVEL: debug

@@ -1186,6 +1186,7 @@ function renderAccount() {
     show($('box-off-block'), box);
     show($('box-updates-block'), box);
     if (box) { showBoxTimeZone(); showBoxUpdates(); }
+    showBuild(ok && body && body.build);
     // The box's serial, as on its label: what support asks for.
     const unit = ok && body && body.boxUnit;
     show($('box-unit'), Boolean(unit));
@@ -11587,6 +11588,29 @@ function saveDownloadIndex() {
   } catch {
     // Storage full: the downloads still play this session.
   }
+}
+
+// Which build of EmberStorm this is, in Settings, About - for anyone signed
+// in to answer "which version are you on?" - and the phone app's own
+// version, which updates apart from the server.
+function showBuild(build) {
+  const lines = [];
+  if (build && build.commit) {
+    const when = build.date ? new Date(build.date) : null;
+    const day = when && !Number.isNaN(when.getTime())
+      ? when.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+      : '';
+    lines.push(day ? `This server: EmberStorm built ${day} (${build.commit})` : `This server: EmberStorm build ${build.commit}`);
+  } else {
+    lines.push('This server: a local build of EmberStorm');
+  }
+  const app = window.soundstormApp;
+  const appVersion = app && typeof app.appVersion === 'string' && /^[0-9][0-9A-Za-z.\-]{0,20}$/.test(app.appVersion) ? app.appVersion : '';
+  if (appVersion) {
+    const kind = app.platform === 'android' ? 'Android app' : 'app';
+    lines.push(`This ${TV ? 'TV' : 'phone'}'s ${kind}: ${appVersion}`);
+  }
+  $('about-build').textContent = lines.join('. ') + '.';
 }
 
 function hasDownloads() {

@@ -65,6 +65,7 @@ import (
 	"github.com/GabrielHollberg/soundstorm/internal/starter"
 	"github.com/GabrielHollberg/soundstorm/internal/state"
 	"github.com/GabrielHollberg/soundstorm/internal/stream"
+	"github.com/GabrielHollberg/soundstorm/internal/version"
 	"github.com/GabrielHollberg/soundstorm/internal/voices"
 	"github.com/GabrielHollberg/soundstorm/internal/webui"
 	"path/filepath"
@@ -900,6 +901,12 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 			if s.setupCode != "" {
 				answer["boxSetupCode"] = s.setupCode
 			}
+		}
+		// Which build this is, for Settings, About: to anyone signed in, so
+		// a family member can answer "which version are you on?", and never
+		// to anyone else (a version says which known bugs a server has).
+		if b := version.Current(); b.Commit != "" {
+			answer["build"] = b
 		}
 		// The looks' training mode, on the developer's install alone.
 		if s.trainingDir != "" {

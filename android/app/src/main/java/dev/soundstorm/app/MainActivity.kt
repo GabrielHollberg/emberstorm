@@ -881,6 +881,15 @@ class MainActivity : Activity() {
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(view, PageScript.SOURCE, setOf(origin))
+            // The app's own version, for Settings, About (it updates apart
+            // from the server). Only digits, letters and dots reach the page.
+            val appVersion = runCatching {
+                packageManager.getPackageInfo(packageName, 0).versionName
+            }.getOrNull()?.filter { it.isLetterOrDigit() || it == '.' }?.take(20).orEmpty()
+            if (appVersion.isNotEmpty()) {
+                WebViewCompat.addDocumentStartJavaScript(view,
+                    "if (window.soundstormApp) window.soundstormApp.appVersion = '$appVersion';", setOf(origin))
+            }
         }
         keptScript = null
         view.webViewClient = Client()
