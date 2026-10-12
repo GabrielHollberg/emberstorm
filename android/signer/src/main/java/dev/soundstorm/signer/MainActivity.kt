@@ -56,6 +56,10 @@ class MainActivity : Activity() {
     private lateinit var yubikit: YubiKitManager
     private lateinit var root: LinearLayout
     private var listening = false
+    // What to do with the YubiKey when it is next held to the phone: signing,
+    // once the PIN is in. Nothing else: a key held to the phone meanwhile is
+    // claimed and left alone, so Chrome never opens the link it carries.
+    private var onKey: ((SmartCardConnection) -> Unit)? = null
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -71,9 +75,34 @@ class MainActivity : Activity() {
         if (prefs.getString("pc", "").isNullOrEmpty()) showAddress() else showWaiting()
     }
 
+    // The app claims the YubiKey whenever it is on screen - not only once
+    // signing begins - and does not look for the link it carries (skipping
+    // the NDEF check): Chrome was taking the key, opening Yubico's page, and
+    // the app came back to "tag was lost".
+    override fun onResume() {
+        super.onResume()
+        startNfc()
+    }
+
     override fun onPause() {
         super.onPause()
         stopNfc()
+    }
+
+    private fun startNfc() {
+        if (listening) return
+        try {
+            yubikit.startNfcDiscovery(NfcConfiguration().skipNdefCheck(true).timeout(30_000), this) { device ->
+                val job = onKey ?: return@startNfcDiscovery
+                onKey = null
+                device.requestConnection(SmartCardConnection::class.java) { result ->
+                    runCatching { job(result.value) }.onFailure { e -> runOnUiThread { showWaiting(e.message ?: "The YubiKey could not be read.") } }
+                }
+            }
+            listening = true
+        } catch (_: NfcNotAvailable) {
+            listening = false
+        }
     }
 
     // --- screens -------------------------------------------------------------
@@ -166,31 +195,28 @@ class MainActivity : Activity() {
         root.removeAllViews()
         title("Hold your YubiKey to the back of the phone")
         text("Keep it there until this says it is signed - a few seconds.", muted = true)
-        button("Cancel", ghost = true) { stopNfc(); pin.fill(' '); showWaiting() }
-        try {
-            listening = true
-            yubikit.startNfcDiscovery(NfcConfiguration().timeout(30_000), this) { device ->
-                device.requestConnection(SmartCardConnection::class.java) { result ->
-                    val outcome = runCatching { sign(result.value, data, pin) }
-                    runOnUiThread {
-                        stopNfc()
-                        outcome.fold(
-                            onSuccess = { sig -> upload(name, sig) },
-                            onFailure = { e ->
-                                pin.fill(' ')
-                                val why = when (e) {
-                                    is InvalidPinException -> "Wrong PIN - ${e.attemptsRemaining} tries left before the key locks its PIN."
-                                    else -> e.message ?: "The YubiKey could not sign."
-                                }
-                                showWaiting(why)
-                            },
-                        )
-                    }
-                }
+        button("Cancel", ghost = true) { onKey = null; pin.fill(' '); showWaiting() }
+        if (!listening) startNfc()
+        if (!listening) {
+            pin.fill(' ')
+            showWaiting("NFC is not available: is it switched on in the phone's settings?")
+            return
+        }
+        onKey = { conn ->
+            val outcome = runCatching { sign(conn, data, pin) }
+            runOnUiThread {
+                outcome.fold(
+                    onSuccess = { sig -> upload(name, sig) },
+                    onFailure = { e ->
+                        pin.fill(' ')
+                        val why = when (e) {
+                            is InvalidPinException -> "Wrong PIN - ${e.attemptsRemaining} tries left before the key locks its PIN."
+                            else -> (e.message ?: "The YubiKey could not sign.") + " Hold the key still against the phone until it says signed."
+                        }
+                        showWaiting(why)
+                    },
+                )
             }
-        } catch (e: NfcNotAvailable) {
-            listening = false
-            showWaiting(if (e.isDisabled) "NFC is switched off: turn it on in the phone's settings." else "This phone has no NFC.")
         }
     }
 
