@@ -20,7 +20,7 @@ import WebKit
 @MainActor
 final class KeptFiles: NSObject {
     static let shared = KeptFiles()
-    static let scheme = "emberstorm-kept"
+    nonisolated static let scheme = "emberstorm-kept"
     nonisolated static let identifier = "dev.soundstorm.app.kept"
 
     /// One kept file: its name in the site's folder, its type, its size, and
@@ -336,6 +336,81 @@ final class KeptFiles: NSObject {
         guard let host = server.host(), let site = site(of: server) else { return nil }
         let port = site.split(separator: ":").last.map(String.init) ?? "443"
         return URL(string: "\(scheme)://\(host):\(port)/")
+    }
+
+    // MARK: Which install each address is (as Android 0.61-0.63)
+
+    /// The install each kept address belongs to: its /healthz id, noted as its
+    /// page loads, so a failure at one address can open the kept page of
+    /// another of the same server (the home name, the away name, a number).
+    func rememberId(_ page: URL, id: String) {
+        guard let site = Self.site(of: page), !id.isEmpty else { return }
+        var ids = UserDefaults.standard.dictionary(forKey: "keptIds") as? [String: String] ?? [:]
+        guard ids[site] != id else { return }
+        ids[site] = id
+        UserDefaults.standard.set(ids, forKey: "keptIds")
+    }
+
+    /// The install an address is: as remembered, else the code at the start
+    /// of an install's name.
+    nonisolated static func idOf(site: String) -> String? {
+        if let id = (UserDefaults.standard.dictionary(forKey: "keptIds") as? [String: String])?[site] { return id }
+        let host = String(site.split(separator: ":").first ?? "")
+        return ServerAddress.installName(host)?.label
+    }
+
+    /// Where the saved server's page was last kept from (its secure name,
+    /// most often, when the saved address is a number or the away name).
+    func livesAt(saved: URL, page: URL) {
+        guard let from = Self.site(of: saved), let at = Self.site(of: page), page.scheme != Self.scheme else { return }
+        var map = UserDefaults.standard.dictionary(forKey: "keptLivesAt") as? [String: String] ?? [:]
+        guard map[from] != at else { return }
+        map[from] = at
+        UserDefaults.standard.set(map, forKey: "keptLivesAt")
+    }
+
+    /// Every address something is kept for.
+    private func sites() -> [String] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: Self.root.path)) ?? []
+        return names.compactMap { name in
+            Self.origin(name).flatMap(Self.site(of:)).flatMap { Self.folder($0).lastPathComponent == name ? $0 : nil }
+        }
+    }
+
+    private func hasShell(site: String) -> Bool {
+        file(site: site, key: "/") != nil && file(site: site, key: "/static/app.js") != nil
+    }
+
+    /// Whether downloads are listed at an address (its index has a group).
+    func hasDownloads(site: String) -> Bool {
+        guard let data = try? Data(contentsOf: Self.folder(site).appending(path: "index.json")),
+              let index = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let groups = index["groups"] as? [Any] else { return false }
+        return !groups.isEmpty
+    }
+
+    /// The kept page to open with `failed` (and the saved `server`) out of
+    /// reach: of the same install, the address holding downloads first; else
+    /// the failed address's own, the saved one's, where its page was kept, or
+    /// any of the install's.
+    func keptPage(failed: URL, server: URL) -> URL? {
+        let here = Self.site(of: failed), saved = Self.site(of: server)
+        let id = here.flatMap(Self.idOf(site:)) ?? saved.flatMap(Self.idOf(site:))
+        let all = sites().filter(hasShell(site:))
+        let same = id.map { id in all.filter { Self.idOf(site: $0) == id } } ?? []
+        let lives = saved.flatMap { (UserDefaults.standard.dictionary(forKey: "keptLivesAt") as? [String: String])?[$0] }
+        if let here, hasDownloads(site: here), all.contains(here) { return Self.offlineAddress(site: here) }
+        if let withDownloads = same.first(where: hasDownloads(site:)) { return Self.offlineAddress(site: withDownloads) }
+        for site in [here, saved, lives].compactMap({ $0 }) where all.contains(site) {
+            return Self.offlineAddress(site: site)
+        }
+        return same.first.flatMap(Self.offlineAddress(site:))
+    }
+
+    nonisolated static func offlineAddress(site: String) -> URL? {
+        let parts = site.split(separator: ":")
+        guard parts.count == 2 else { return nil }
+        return URL(string: "\(scheme)://\(parts[0]):\(parts[1])/")
     }
 
     /// Picked up again at launch: downloads that finished while the app was

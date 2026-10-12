@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import Network
 
 /// The server's own web app, full screen. The page is the app: this only
 /// gives it what a browser tab would (dialogs, links out, recovering from a
@@ -89,7 +90,13 @@ final class WebViewController: UIViewController {
         // Files shared from another app (Share > EmberStorm) wait until the app
         // is opened: handed to the page then.
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.handShared() }
+            MainActor.assumeIsolated {
+                self?.handShared()
+                if self?.current.scheme == KeptFiles.scheme { self?.watchServer() }
+            }
+        }
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stopWatching() }
         }
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -209,8 +216,16 @@ final class WebViewController: UIViewController {
     /// the app's folder, on its downloads (the page takes the address as
     /// offline mode).
     private var triedKept = false
+    /// Looking for the server while the kept page shows.
+    private var watchTask: Task<Void, Never>?
+    private var watchSince = Date()
+    /// The kept page the app opened, which may be another of the install's
+    /// addresses than the saved one.
+    private var keptChosen: String?
+    private var pathMonitor: NWPathMonitor?
 
     private func load() {
+        stopWatching()
         failure.isHidden = true
         triedTwin = false
         triedKept = false
@@ -653,9 +668,15 @@ final class WebViewController: UIViewController {
         }
         // Out of reach with the page kept: the app opens on its downloads,
         // as Android's does from its service worker.
-        if !triedKept, error.domain == NSURLErrorDomain, KeptFiles.shared.hasShell(for: server),
-           let offline = KeptFiles.offlineAddress(for: server) {
+        // Looked for under any of the install's addresses, the one holding
+        // the downloads first (as Android 0.61-0.63): a certificate refused
+        // counts too, as it is in the same domain.
+        let failedAt = (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? current
+        if !triedKept, error.domain == NSURLErrorDomain, current.scheme != KeptFiles.scheme,
+           let offline = KeptFiles.shared.keptPage(failed: failedAt, server: server) {
             triedKept = true
+            watchSince = Date()
+            keptChosen = KeptFiles.site(of: offline)
             current = offline
             setScripts(for: offline)
             webView.load(URLRequest(url: offline))
@@ -716,7 +737,11 @@ final class WebViewController: UIViewController {
                let json = String(data: data, encoding: .utf8) {
                 webView.evaluateJavaScript("window.__soundstormPlayerLog && window.__soundstormPlayerLog(\(json)[0])")
             }
+        case "retry":
+            // The kept page's Try again: the server afresh, past the kept copy.
+            load()
         case "keep":
+            if body["cmd"] as? String == "shell" { KeptFiles.shared.livesAt(saved: server, page: current) }
             KeptFiles.shared.handle(body["cmd"] as? String ?? "", data: body["data"] as? [String: Any] ?? [:], page: current)
         case "audio":
             NativeAudio.shared.handle(body)
@@ -901,9 +926,11 @@ extension WebViewController: WKNavigationDelegate {
         // No target frame is a new window, which createWebViewWith decides
         // (only for a link somebody tapped) - not the page itself.
         let mainFrame = action.targetFrame?.isMainFrame ?? false
-        // The kept page of this server only, opened offline (KeptFiles).
+        // The kept page of this server only, opened offline (KeptFiles): its
+        // saved address's, or the one the app chose among the install's.
         if url.scheme == KeptFiles.scheme {
-            guard mainFrame, KeptFiles.site(of: url) == KeptFiles.site(of: server) else { return .cancel }
+            let site = KeptFiles.site(of: url)
+            guard mainFrame, site == KeptFiles.site(of: server) || (site != nil && site == keptChosen) else { return .cancel }
             current = url
             setScripts(for: url)
             return .allow
@@ -1042,6 +1069,18 @@ extension WebViewController: WKNavigationDelegate {
         }
         #endif
         handShared()
+        // On the kept page: the server is looked for until it answers.
+        if current.scheme == KeptFiles.scheme { watchServer() }
+        // Which install this address is, so a failure here can open the kept
+        // page of another of its addresses.
+        if current.scheme != KeptFiles.scheme {
+            let here = current
+            Task {
+                if let id = await ServerAddress.healthID(here) ?? ServerAddress.installName(here.host() ?? "")?.label {
+                    KeptFiles.shared.rememberId(here, id: id)
+                }
+            }
+        }
         // What the server calls itself now, for the list of servers (the
         // owner may have renamed it since).
         let server = self.server
@@ -1089,6 +1128,64 @@ extension WebViewController: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         showFailure(error)
     }
+
+    // MARK: Looking for the server while offline
+
+    /// While the kept page shows, the server is asked for every 15 seconds for
+    /// two minutes, then every minute, and at once on coming to the front or
+    /// the network changing; answering, it is opened. Not in the background.
+    func watchServer() {
+        watchTask?.cancel()
+        guard current.scheme == KeptFiles.scheme, UIApplication.shared.applicationState != .background else { return }
+        let addresses = [server] + [ServerAddress.twin(server, level: "net")].compactMap { $0 }.filter { $0 != server }
+        watchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                for address in addresses where await Self.answers(address) {
+                    guard !Task.isCancelled, let self, self.current.scheme == KeptFiles.scheme else { return }
+                    PlayerLog.add("server answers again: leaving the kept page")
+                    self.load()
+                    return
+                }
+                guard let self else { return }
+                let wait: Double = Date().timeIntervalSince(self.watchSince) < 120 ? 15 : 60
+                try? await Task.sleep(for: .seconds(wait))
+            }
+        }
+        if pathMonitor == nil {
+            let monitor = NWPathMonitor()
+            monitor.pathUpdateHandler = { [weak self] path in
+                guard path.status == .satisfied else { return }
+                Task { @MainActor in
+                    guard let self, self.current.scheme == KeptFiles.scheme else { return }
+                    self.watchServer()
+                }
+            }
+            monitor.start(queue: .main)
+            pathMonitor = monitor
+        }
+    }
+
+    func stopWatching() {
+        watchTask?.cancel()
+        watchTask = nil
+    }
+
+    /// The server's /healthz answering, asked with no cookies.
+    nonisolated private static func answers(_ server: URL) async -> Bool {
+        var request = URLRequest(url: server.appending(path: "healthz"))
+        request.timeoutInterval = 6
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.httpShouldHandleCookies = false
+        guard let (_, response) = try? await ServerAddress.smallData(request, session: watchSession) else { return false }
+        return (response as? HTTPURLResponse)?.statusCode == 200
+    }
+
+    nonisolated private static let watchSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        return URLSession(configuration: config)
+    }()
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         // iOS reclaims a background web view's memory by killing its page.
