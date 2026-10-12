@@ -18,5 +18,15 @@ case "$1" in
 stop) exec docker compose $files stop ;;
 # A reset's: the containers go, the volumes stay (never -v).
 down) exec docker compose $files down --remove-orphans ;;
-*) exec docker compose $files up -d --remove-orphans ;;
+*)
+	# The caretaker answers on EmberStorm's ports while the first start
+	# unpacks (caretaker starting.go), and lets go once images.sh says it is
+	# done: waited for, so EmberStorm finds its ports free.
+	n=0
+	while [ -e /run/soundstorm/starting-open ] && [ "$n" -lt 15 ]; do
+		sleep 1
+		n=$((n + 1))
+	done
+	exec docker compose $files up -d --remove-orphans
+	;;
 esac

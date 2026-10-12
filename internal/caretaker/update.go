@@ -66,6 +66,20 @@ type Config struct {
 	// would otherwise take the oldest release still signed - the twelfth
 	// security pass).
 	MinSerial int64
+	// FactoryMark is left by a factory stick: the box's first start is its
+	// test, and it is made new and switched off once it passes (factory.go).
+	// FactoryStatus is what the box's screen shows of it; FactorySources how
+	// many sources a whole box answers with.
+	FactoryMark    string
+	FactoryStatus  string
+	FactorySources int
+	// Progress is what the first start's unpacking says of itself
+	// (images.sh), for the box's screen and the phone's search (starting.go);
+	// StartingPorts are where a box getting ready answers until EmberStorm
+	// does, and StartingOpen says it is answering there.
+	Progress      string
+	StartingPorts []string
+	StartingOpen  string
 }
 
 // Defaults fills in the box's own paths for anything left empty.
@@ -89,6 +103,16 @@ func (c Config) Defaults() Config {
 	set(&c.LocalTime, "/etc/localtime")
 	set(&c.ManifestURL, "https://github.com/GabrielHollberg/soundstorm/releases/download/box-channel/manifest.json")
 	set(&c.HealthURL, "http://localhost:8099/healthz")
+	set(&c.FactoryMark, "/etc/soundstorm/factory-test")
+	set(&c.FactoryStatus, "/run/soundstorm/factory")
+	if c.FactorySources == 0 {
+		c.FactorySources = 9
+	}
+	set(&c.Progress, "/run/soundstorm/progress")
+	set(&c.StartingOpen, "/run/soundstorm/starting-open")
+	if c.StartingPorts == nil {
+		c.StartingPorts = []string{":8099", ":80"}
+	}
 	if c.HealthWait == 0 {
 		c.HealthWait = 10 * time.Minute
 	}

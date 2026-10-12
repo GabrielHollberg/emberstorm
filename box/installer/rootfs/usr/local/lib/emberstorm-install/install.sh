@@ -180,6 +180,10 @@ if [ "$ok" = 0 ] && [ -e "$P/factory" ]; then
 		END { printf "EM-%s-%s", substr(s, 1, 4), substr(s, 5, 4) }')
 	mkdir -p /mnt/box/etc/soundstorm
 	(umask 077 && printf 'SOUNDSTORM_SETUP_CODE=%s\nSOUNDSTORM_UNIT=%s\n' "$code" "$unit" >/mnt/box/etc/soundstorm/identity.env) || ok=1
+	# Its first start is its test, at the factory: once every part of
+	# EmberStorm runs, the caretaker makes it new and switches it off
+	# (caretaker factory.go), so the buyer's first start is a minute or two.
+	: >/mnt/box/etc/soundstorm/factory-test || ok=1
 	record=$(unit_record "$unit" "$code")
 	[ -f "$P/units.csv" ] || echo "$UNITS_HEADER" >"$P/units.csv"
 	echo "$record" >>"$P/units.csv"
@@ -218,7 +222,12 @@ if [ -n "$unit" ]; then
 	say "Serial:      $unit"
 	say "Setup code:  $(printf '%s' "$code" | sed 's/..../& /g')"
 	qrencode -t UTF8 -m 1 "http://soundstorm.local/?setup=$code" 2>/dev/null | sed 's/^/   /'
-	say "Kept on the stick's EMBERSTORM drive (units.csv). Switching off in 2 minutes."
+	say "Kept on the stick's EMBERSTORM drive (units.csv)."
+	say "Next: take the stick out, then switch the box on and open its BIOS"
+	say "setup (usually Delete as it starts). Set it to power on when power"
+	say "returns (Restore on AC Power Loss: Power On), then save and start."
+	say "It tests itself - about half an hour - and switches off when it"
+	say "passes. Then it is ready to pack. Switching off in 2 minutes."
 	sync
 	sleep 120
 else

@@ -67,6 +67,26 @@ announced() {
 	echo "${n:-$(hostname).local}"
 }
 
+# progress draws the first start's bar from what images.sh says
+# (/run/soundstorm/progress: phase, step, done, total), with dots moving so it
+# is seen to be working even while one big program takes a while.
+progress() {
+	f=/run/soundstorm/progress
+	[ -s "$f" ] || return 0
+	step=$(sed -n 's/^step=//p' "$f" | tr -cd '[:print:]' | cut -c1-60)
+	done_=$(sed -n 's/^done=//p' "$f" | tr -cd '0-9')
+	total=$(sed -n 's/^total=//p' "$f" | tr -cd '0-9')
+	pct=0
+	if [ -n "$total" ] && [ "$total" -gt 0 ]; then
+		pct=$(( ${done_:-0} * 100 / total ))
+	fi
+	[ "$pct" -gt 100 ] && pct=100
+	filled=$(( pct * 40 / 100 ))
+	bar=$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' $(( 40 - filled )) '' | tr ' ' '.')
+	dots=$(printf '%*s' $(( $(date +%s) / 3 % 4 )) '' | tr ' ' '.')
+	printf '   %s%s\n\n   [%s] %d%%\n\n' "${step:-Getting ready}" "$dots" "$bar" "$pct"
+}
+
 draw() {
 	health=$(curl -fsS -m 3 "http://127.0.0.1:$port/healthz" 2>/dev/null || true)
 	ip=$(address)
@@ -84,8 +104,18 @@ draw() {
 		printf '   Note: no storage drive was found, so everything is kept on\n'
 		printf '   the small built-in one. Contact support.\n\n'
 	fi
+	# At the factory: the first start is the box's test (caretaker
+	# factory.go), said above everything else.
+	if [ -s /run/soundstorm/factory ]; then
+		fold -s -w 60 /run/soundstorm/factory | tr -cd '[:print:]\n' | sed 's/^/   /'
+		printf '\n'
+	fi
+	# The caretaker answers for a box still getting ready (starting.go): that
+	# is not EmberStorm yet.
+	case "$health" in *'"status":"starting"'* | *'"status": "starting"'*) health= ;; esac
 	if [ -z "$health" ]; then
-		printf '   EmberStorm is starting...\n\n'
+		printf '   EmberStorm is getting ready...\n\n'
+		progress
 		printf '   The first start takes a few minutes. This screen\n'
 		printf '   changes by itself when it is ready.\n'
 		[ -n "$ip" ] || printf '\n   No network yet: is the cable plugged into your router?\n'

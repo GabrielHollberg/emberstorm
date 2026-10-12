@@ -531,8 +531,35 @@ class MainActivity : Activity() {
             if (found.isEmpty()) return
             // Something to tap: the keyboard put up for typing an address goes.
             if (field.text.isEmpty()) hideKeyboard(field)
-            val fresh = found.filter { !it.setUp }
+            val getting = found.filter { it.starting }
+            val fresh = found.filter { !it.setUp && !it.starting }
             val ready = found.filter { it.setUp }
+            // A new box still getting ready: seen at once, with how far it
+            // has got (its caretaker answers until EmberStorm can), turning
+            // into Set it up by itself.
+            if (getting.isNotEmpty()) {
+                nearby.addView(heading(if (getting.size == 1) "Your new EmberStorm is getting ready" else "New EmberStorms are getting ready"), fill(bottom = 10))
+                for (f in getting) {
+                    nearby.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                        max = 100
+                        progress = f.percent
+                        progressTintList = android.content.res.ColorStateList.valueOf(accent)
+                    }, fill(height = 12, bottom = 6))
+                    nearby.addView(TextView(this).apply {
+                        text = "${f.step ?: "Getting ready"} - ${f.percent}%"
+                        setTextColor(Color.WHITE)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                        gravity = Gravity.CENTER
+                    }, fill(bottom = 4))
+                    nearby.addView(TextView(this).apply {
+                        text = "The first start takes a few minutes. Keep this open - it carries on by itself."
+                        setTextColor(Color.argb(0x99, 0xeb, 0xeb, 0xf5))
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                        gravity = Gravity.CENTER
+                    }, fill(bottom = 4))
+                    nearby.addView(whereItIs(f), fill(bottom = 12))
+                }
+            }
             if (fresh.isNotEmpty()) {
                 nearby.addView(heading(if (fresh.size == 1) "We found your new EmberStorm" else "We found new EmberStorms - which is yours?"), fill(bottom = 10))
                 if (isTv) {
@@ -567,13 +594,41 @@ class MainActivity : Activity() {
             // On a TV the remote lands on the first button.
             if (isTv && servers.isEmpty()) (0 until nearby.childCount).map { nearby.getChildAt(it) }.firstOrNull { it is Button }?.requestFocus()
         }
-        fun search() {
+        // A box getting ready is asked again every few seconds by itself (not
+        // the whole network): its bar moves, and once EmberStorm answers the
+        // whole search runs again for its name and secure address. Between
+        // the box letting go of its port and EmberStorm taking it, nothing
+        // answers for a moment: it stays on screen as it was, a while.
+        var lastFound: List<ServerDiscovery.Found> = emptyList()
+        var quiet = 0
+        lateinit var search: () -> Unit
+        fun follow() {
+            val getting = lastFound.filter { it.starting }
+            if (getting.isEmpty() || screen != connectScreen) return
+            background.execute {
+                val now = getting.map { it to ServerDiscovery.probe(it.url) }
+                runOnUiThread {
+                    if (screen != connectScreen) return@runOnUiThread
+                    if (now.any { (_, n) -> n != null && !n.starting }) { search(); return@runOnUiThread }
+                    quiet = if (now.all { (_, n) -> n == null }) quiet + 1 else 0
+                    if (quiet > 60) { search(); return@runOnUiThread }
+                    lastFound = lastFound.map { f -> now.firstOrNull { it.first == f }?.second ?: f }
+                    showFound(lastFound)
+                    content.postDelayed({ follow() }, 3_000L)
+                }
+            }
+        }
+        search = {
             background.execute {
                 val found = ServerDiscovery.search().filter { it.url.host !in savedHosts }
                 runOnUiThread {
-                    if (screen != connectScreen) return@runOnUiThread
-                    showFound(found)
-                    content.postDelayed({ if (screen == connectScreen) search() }, if (found.isEmpty()) 10_000L else 30_000L)
+                    if (screen == connectScreen) {
+                        lastFound = found
+                        quiet = 0
+                        showFound(found)
+                        if (found.any { it.starting }) content.postDelayed({ follow() }, 3_000L)
+                        else content.postDelayed({ if (screen == connectScreen) search() }, if (found.isEmpty()) 10_000L else 30_000L)
+                    }
                 }
             }
         }

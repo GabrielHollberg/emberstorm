@@ -28,7 +28,15 @@ object ServerDiscovery {
      * EmberStorm", none until it has an owner), and whether it has an owner
      * yet - a new box has none, and is set up rather than signed in to.
      */
-    data class Found(val url: Uri, val name: String? = null, val setUp: Boolean = true) {
+    data class Found(
+        val url: Uri, val name: String? = null, val setUp: Boolean = true,
+        /**
+         * A new box still getting ready - its first start unpacking EmberStorm,
+         * answered for by the box's own caretaker (internal/caretaker
+         * starting.go): how far it has got, and what it is doing.
+         */
+        val starting: Boolean = false, val percent: Int = 0, val step: String? = null,
+    ) {
         /** What to call it on screen: its name, else the code of a home name. */
         val label: String get() = name ?: ServerAddress.homeCode(url.host) ?: url.host ?: url.toString()
     }
@@ -43,16 +51,35 @@ object ServerDiscovery {
         val pool = Executors.newFixedThreadPool(128)
         try {
             val answering = pool.invokeAll(hosts.map { host ->
-                Callable { "http://$host:$PORT".let { base -> health(base, 1200)?.let { base to it } } }
+                Callable { "http://$host:$PORT".let { base -> health(base, 1200, starting = true)?.let { base to it } } }
             }, 30, TimeUnit.SECONDS).mapNotNull { runCatching { it.get() }.getOrNull() }.sortedBy { it.first }
-            return answering.map { (plain, health) ->
-                Found(Uri.parse(secureName(plain) ?: "$plain/"),
-                    health.optString("name").trim().takeIf { it.isNotEmpty() }?.take(60),
-                    health.optBoolean("setUp", true))
-            }.distinctBy { it.url.toString() }.sortedBy { it.label }
+            return answering.map { (plain, health) -> found(plain, health) }
+                .distinctBy { it.url.toString() }.sortedBy { it.label }
         } finally {
             pool.shutdownNow()
         }
+    }
+
+    /**
+     * The one box at [url] asked again (a box getting ready, followed every few
+     * seconds until EmberStorm answers): as found, or null when nothing answers
+     * just now.
+     */
+    fun probe(url: Uri): Found? {
+        val plain = "http://${url.host}:$PORT"
+        val health = health(plain, 2000, starting = true) ?: return null
+        return found(plain, health)
+    }
+
+    private fun found(plain: String, health: JSONObject): Found {
+        if (health.optString("status") == "starting") {
+            return Found(Uri.parse("$plain/"), null, setUp = false, starting = true,
+                percent = health.optInt("percent", 0).coerceIn(0, 100),
+                step = health.optString("step").trim().take(80).takeIf { it.isNotEmpty() })
+        }
+        return Found(Uri.parse(secureName(plain) ?: "$plain/"),
+            health.optString("name").trim().takeIf { it.isNotEmpty() }?.take(60),
+            health.optBoolean("setUp", true))
     }
 
     private fun get(url: String, timeout: Int): String? = runCatching {
@@ -70,9 +97,14 @@ object ServerDiscovery {
     }.getOrNull()
 
     /** What /healthz says, when [base] is an EmberStorm answering; else null. */
-    private fun health(base: String, timeout: Int = 2000): JSONObject? {
+    private fun health(base: String, timeout: Int = 2000, starting: Boolean = false): JSONObject? {
         val body = get("$base/healthz", timeout) ?: return null
-        return runCatching { JSONObject(body).takeIf { it.optString("status") == "ok" && it.has("sources") } }.getOrNull()
+        return runCatching {
+            JSONObject(body).takeIf {
+                (it.optString("status") == "ok" && it.has("sources")) ||
+                    (starting && it.optString("status") == "starting" && it.optBoolean("starting"))
+            }
+        }.getOrNull()
     }
 
     private fun isEmberStorm(base: String, timeout: Int = 2000): Boolean = health(base, timeout) != null

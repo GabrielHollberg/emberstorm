@@ -42,6 +42,12 @@ var ErrBadMode = errors.New("a reset is start-over or erase")
 // Reset stops EmberStorm, empties what the mode takes away and starts it
 // again. One at a time, and never during an update.
 func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
+	return u.reset(ctx, mode, true)
+}
+
+// reset is Reset; start says whether EmberStorm is started again after - not
+// at the factory, which switches the box off instead (factory.go).
+func (u *Updater) reset(ctx context.Context, mode ResetMode, start bool) error {
 	if mode != ResetStartOver && mode != ResetErase {
 		return ErrBadMode
 	}
@@ -110,6 +116,11 @@ func (u *Updater) Reset(ctx context.Context, mode ResetMode) error {
 	// Everything taken away is gone now: starting again is all that is
 	// left, which a restart does by itself.
 	u.clearPending()
+	if !start {
+		u.set(func(s *Status) { s.State = "idle"; s.Message = "" })
+		u.log.Warn("the box was reset, not started again", "mode", mode)
+		return failed
+	}
 	if err := u.runFor(ctx, upTimeout, u.cfg.Up); err != nil {
 		u.set(func(s *Status) {
 			s.State = "failed"

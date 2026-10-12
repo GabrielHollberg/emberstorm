@@ -249,9 +249,17 @@ func (u *Updater) Serve(ctx context.Context, socket string) error {
 	}()
 	go func() {
 		u.recoverPending(ctx)
+		// At the factory, the first start is the box's test, then it is made
+		// new and switched off; no update is looked for meanwhile.
+		if u.factoryPending() {
+			if u.factoryTest(ctx) {
+				return
+			}
+		}
 		u.schedule(ctx)
 	}()
 	go u.watchButton(ctx)
+	go u.serveStarting(ctx)
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
