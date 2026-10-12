@@ -164,7 +164,12 @@ async function openMeMenu() {
   show(menu, true);
   // Under the circle, its right edge with the circle's.
   const at = $('me-btn').getBoundingClientRect();
-  if (at.width) menu.style.right = `${Math.max(12, innerWidth - at.right)}px`;
+  if (at.width) {
+    menu.style.right = `${Math.max(12, innerWidth - at.right)}px`;
+    // Just under the circle (the owner: it opened below the search box on a
+    // phone, whose header is two rows, and did not look like the circle's).
+    menu.style.top = `${Math.round(at.bottom + 6)}px`;
+  }
   $('me-btn').setAttribute('aria-expanded', 'true');
   const { ok, body } = await api('/api/session');
   const name = ok && body && body.serverName;
@@ -4862,6 +4867,7 @@ async function intake(dataTransfer) {
 async function runIntake(dataTransfer) {
   INTAKE.closed = false;
   show($('intake'), true);
+  intakeAsking(true);
   show($('intake-bar'), false);
   $('intake-list').replaceChildren();
   $('intake-questions').replaceChildren();
@@ -5832,6 +5838,20 @@ function bytes(n) {
 // has got (a tap brings it back); Stop lets the file being sent go and sends
 // no more - what has arrived stays.
 const INTAKE = { sending: false, stop: false, xhr: null, chipTimer: 0 };
+// While the sheet waits on the person - the plan, its questions, Add - it is
+// a dialog in the middle of the screen over a dimmed page (on a phone, the
+// bottom sheet over the dim): in a computer's corner it went unnoticed, and
+// people sat watching a page that was waiting on them (the owner,
+// 2026-10-12). Once files go up it steps back to the corner.
+function intakeAsking(on) {
+  $('intake').classList.toggle('asking', on);
+  show($('intake-veil'), on && shown('intake'));
+  if (on) $('intake').scrollTop = 0;
+}
+new MutationObserver(() => {
+  if (!shown('intake') && shown('intake-veil')) show($('intake-veil'), false);
+  else if (shown('intake') && $('intake').classList.contains('asking') && !shown('intake-veil')) show($('intake-veil'), true);
+}).observe($('intake'), { attributes: true, attributeFilter: ['class'] });
 function intakeChip(text, linger) {
   const chip = $('intake-chip');
   chip.textContent = text;
@@ -5913,6 +5933,7 @@ async function followAppUploads(sender = APP_SENDER) {
   if (appFollowing) return;
   appFollowing = true;
   INTAKE.sending = true;
+  intakeAsking(false);
   INTAKE.native = sender;
   INTAKE.stop = false;
   $('intake-close').textContent = 'Hide';
@@ -6086,6 +6107,7 @@ async function bringInDrive(id) {
     return;
   }
   show($('intake'), true);
+  intakeAsking(true);
   show($('intake-bar'), false);
   $('intake-list').replaceChildren();
   $('intake-questions').replaceChildren();
@@ -6197,6 +6219,7 @@ async function sendFiles(plan, dropped) {
   }
   show($('intake-bar'), true);
   INTAKE.sending = true;
+  intakeAsking(false);
   INTAKE.stop = false;
   $('intake-close').textContent = 'Hide';
   $('intake-stop').disabled = false;

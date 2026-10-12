@@ -476,7 +476,16 @@ header {
 #intake.hidden { display: none; }
 @media (min-width: 900px) {
   #intake { left: auto; right: 24px; bottom: 24px; width: 480px; border-radius: 16px; max-height: calc(100dvh - 48px); }
+  /* Waiting on the person: in the middle, larger (intakeAsking). */
+  #intake.asking {
+    inset: 0; margin: auto; width: min(640px, calc(100vw - 48px)); height: fit-content;
+    max-height: calc(100dvh - 80px); border-radius: 18px;
+  }
 }
+#intake.asking { animation: intake-in 0.22s ease-out; box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7); }
+@keyframes intake-in { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
+.intake-veil { position: fixed; inset: 0; z-index: 2147482979; background: rgba(0, 0, 0, 0.6); }
+.intake-veil.hidden { display: none; }
 #intake h2 { margin: 0 0 10px; font-size: 17px; }
 #intake-bar {
   height: 6px;
