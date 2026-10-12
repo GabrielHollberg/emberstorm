@@ -418,12 +418,41 @@ struct SettingsView: View {
                 .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.border, lineWidth: 2))
                 .padding(.top, 24)
                 .focusSection()
+                // About: which build the server and this app are, as the
+                // page's Settings, About says.
+                Text(aboutLine)
+                    .font(.system(size: 26))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.top, 10)
             }
             .padding(.horizontal, 156)
             .padding(.top, 30)
             .padding(.bottom, 60)
         }
         .scrollClipDisabled()
+        .task { build = try? await api.session().build }
+    }
+
+    @State private var build: API.Build?
+
+    private var aboutLine: String {
+        var lines: [String] = []
+        if let commit = build?.commit, !commit.isEmpty {
+            let iso = ISO8601DateFormatter()
+            if let date = build?.date.flatMap({ iso.date(from: $0) }) {
+                lines.append("This server: EmberStorm built \(date.formatted(date: .long, time: .omitted)) (\(commit))")
+            } else {
+                lines.append("This server: EmberStorm build \(commit)")
+            }
+        } else {
+            lines.append("This server: a local build of EmberStorm")
+        }
+        let info = Bundle.main.infoDictionary ?? [:]
+        let short = info["CFBundleShortVersionString"] as? String ?? ""
+        let number = info["CFBundleVersion"] as? String ?? ""
+        let app = number.isEmpty || number == short ? short : "\(short) (\(number))"
+        if !app.isEmpty { lines.append("This TV's app: \(app)") }
+        return lines.joined(separator: ". ") + "."
     }
 }
 

@@ -50,6 +50,13 @@ final class API {
         let serverName: String?
         /// The server's secure home name, offered while this is not on it.
         let secureName: String?
+        /// Which build the server is (to anyone signed in), for Settings.
+        let build: Build?
+    }
+
+    struct Build: Decodable {
+        let commit: String?
+        let date: String?
     }
 
     /// Whether new devices need approval (the owner's setting), known from

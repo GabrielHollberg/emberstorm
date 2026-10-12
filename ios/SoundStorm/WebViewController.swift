@@ -208,9 +208,22 @@ final class WebViewController: UIViewController {
         let content = webView.configuration.userContentController
         content.removeAllUserScripts()
         content.addUserScript(WKUserScript(source: Self.pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        content.addUserScript(WKUserScript(source: Self.versionScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         content.addUserScript(WKUserScript(source: KeptFiles.shared.pageScript(for: url, server: server),
                                            injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
+
+    /// The app's version for Settings, About ("This phone's app: 1.0-42"), as
+    /// Android sets it: digits, letters, dots and dashes only.
+    private static let versionScript: String = {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let short = info["CFBundleShortVersionString"] as? String ?? ""
+        let build = info["CFBundleVersion"] as? String ?? ""
+        var version = build.isEmpty || build == short ? short : short + "-" + build
+        version = String(version.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-") }.prefix(20))
+        guard !version.isEmpty else { return "" }
+        return "if (window.soundstormApp) window.soundstormApp.appVersion = '\(version)';"
+    }()
 
     /// Tried once a load: the server out of reach, its page kept - opened from
     /// the app's folder, on its downloads (the page takes the address as
