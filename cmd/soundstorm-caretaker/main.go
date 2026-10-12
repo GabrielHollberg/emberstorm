@@ -190,7 +190,19 @@ func manifest(args []string) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	return printJSON(m)
+	// Written compactly, never indented: the YubiKey signs the list's bytes
+	// themselves and takes about 3,000 at once (yubikit's 3,062-byte command,
+	// less its wrapping); indented, a box release of 14 programs was 3,135
+	// bytes and the signing app's YubiKey refused it.
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	if len(data) > 2900 {
+		return fmt.Errorf("the release list is %d bytes, more than the YubiKey signs at once (about 3,000): shorten the notes", len(data))
+	}
+	_, err = os.Stdout.Write(append(data, '\n'))
+	return err
 }
 
 func sign(args []string) error {
