@@ -50,6 +50,7 @@ DerivedData/
 android/.gradle/
 android/build/
 android/app/build/
+android/signer/build/
 android/local.properties
 android/.idea/
 *.iml

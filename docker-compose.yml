@@ -94,6 +94,7 @@ services:
       # Training the looks: for SoundStorm's developer only, never set on an
       # ordinary install (see internal/httpapi/training.go).
       SOUNDSTORM_TRAINING: ${SOUNDSTORM_TRAINING:-false}
+      SOUNDSTORM_SIGNING: ${SOUNDSTORM_SIGNING:-false}
       SOUNDSTORM_VOICES_URL: ${SOUNDSTORM_VOICES_URL:-http://kokoro:8880}
       SOUNDSTORM_WHISPER_URL: ${SOUNDSTORM_WHISPER_URL:-http://whisper:9000}
 

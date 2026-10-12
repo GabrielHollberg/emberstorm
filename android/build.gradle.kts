@@ -1,4 +1,4 @@
 plugins {
-    id("com.android.application") version "8.13.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    // Toolkit 9 compiles Kotlin itself: no separate Kotlin plugin.
+    id("com.android.application") version "9.4.1" apply false
 }

@@ -16,3 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "SoundStorm"
 include(":app")
+// The developer's own signing app (signer/): never published, installed on
+// their phone only.
+include(":signer")
