@@ -223,9 +223,12 @@ if [ -n "$unit" ]; then
 	say "Setup code:  $(printf '%s' "$code" | sed 's/..../& /g')"
 	qrencode -t UTF8 -m 1 "http://emberstorm.local/?setup=$code" 2>/dev/null | sed 's/^/   /'
 	say "Kept on the stick's EMBERSTORM drive (units.csv)."
-	say "Next: take the stick out, then switch the box on and open its BIOS"
-	say "setup (usually Delete as it starts). Set it to power on when power"
-	say "returns (Restore on AC Power Loss: Power On), then save and start."
+	# The BIOS path is the maker's own (their answer, 2026-10-12): State After
+	# G3 is the setting that makes a box start when it is plugged in.
+	say "Next: take the stick out, switch the box on and press Delete as it"
+	say "starts. Go to Chipset > PCH-IO Configuration > State After G3 and"
+	say "set it to S0 State (it then starts when power comes back). Press F4"
+	say "to save and start."
 	say "It tests itself - about half an hour - and switches off when it"
 	say "passes. Then it is ready to pack. Switching off in 2 minutes."
 	sync

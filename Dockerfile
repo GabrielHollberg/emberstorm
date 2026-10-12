@@ -42,10 +42,10 @@ COPY --from=build /out/soundstorm /usr/local/bin/soundstorm
 # Labels are what make the image show up with a description and a link back to
 # the source on GitHub's package page, which is the first thing anyone
 # installing this sees.
-LABEL org.opencontainers.image.title="SoundStorm" \
+LABEL org.opencontainers.image.title="EmberStorm" \
       org.opencontainers.image.description="One login and one search box over your whole media library." \
       org.opencontainers.image.source="https://github.com/GabrielHollberg/emberstorm" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="AGPL-3.0"
 
 USER soundstorm
 EXPOSE 8080

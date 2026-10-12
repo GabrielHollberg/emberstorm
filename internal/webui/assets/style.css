@@ -4643,3 +4643,27 @@ html.numbering-open { overflow: hidden; }
 .numbering-guide { color: var(--accent); font-size: 13px; }
 .numbering-guide.warn { color: #f5a524; }
 .numbering-row.guide-warn { outline: 1px solid rgba(245, 165, 36, 0.6); }
+
+/* A scrollbar to grab on the adding sheet and its lists (scrollHandles in
+   app.js): a slim bar in a wide strip a thumb can take, over the page. */
+.scroll-handle {
+  position: fixed; z-index: 2147482990; width: 22px;
+  touch-action: none; cursor: pointer;
+}
+.scroll-handle.hidden { display: none; }
+.scroll-handle::before {
+  content: ""; position: absolute; top: 0; bottom: 0; right: 4px; width: 4px;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.08);
+}
+.scroll-handle-thumb {
+  position: absolute; top: 0; right: 2px; width: 8px;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.45);
+  transition: width 0.15s ease, background 0.15s ease;
+}
+.scroll-handle.dragging .scroll-handle-thumb { width: 12px; background: var(--accent); }
+@media (hover: hover) {
+  .scroll-handle:hover .scroll-handle-thumb { width: 12px; background: var(--accent); }
+}
+/* Room for it, so it never sits over a part's Change button. */
+#intake { padding-right: 30px; }
+#intake-list, .intake-peek-list { padding-right: 24px; }

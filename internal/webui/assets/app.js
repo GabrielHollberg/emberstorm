@@ -5128,6 +5128,101 @@ $('intake-files-toggle').addEventListener('click', () => {
   $('intake-files-toggle').textContent = open ? 'Hide the files' : 'Show every file';
 });
 
+// A scrollbar to grab on the adding sheet and its lists (the owner, 2026-10-12:
+// a long drop took for ever to scroll through by swiping). The page hides
+// every scrollbar it draws, and a phone's own is not grabbable, so this is
+// one of ours: a thumb down the right edge of each list that scrolls, shown
+// only while it has more than fits, dragged with a finger or mouse, and a tap
+// on its track jumps there. Drawn over the page (fixed), so one way serves the
+// sheet itself and the lists inside it. Not on a TV (the remote scrolls).
+const scrollHandles = (() => {
+  if (TV) return { refresh() {} };
+  const SELECTOR = '#intake, #intake-list, #intake .intake-peek-list';
+  const handles = new Map();
+  let queued = false;
+
+  function make(box) {
+    const track = document.createElement('div');
+    track.className = 'scroll-handle hidden';
+    const thumb = document.createElement('div');
+    thumb.className = 'scroll-handle-thumb';
+    track.append(thumb);
+    document.body.append(track);
+    const h = { box, track, thumb, dragging: null };
+    const scrollTo = (clientY, grab) => {
+      const t = track.getBoundingClientRect();
+      const room = t.height - thumb.offsetHeight;
+      const range = box.scrollHeight - box.clientHeight;
+      if (room <= 0 || range <= 0) return;
+      const share = Math.min(1, Math.max(0, (clientY - t.top - grab) / room));
+      box.scrollTop = share * range;
+    };
+    track.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const r = thumb.getBoundingClientRect();
+      // Grabbed on the thumb it keeps where the finger took it; on the track
+      // the thumb's middle jumps to the finger.
+      const grab = e.clientY >= r.top && e.clientY <= r.bottom ? e.clientY - r.top : r.height / 2;
+      h.dragging = grab;
+      track.classList.add('dragging');
+      track.setPointerCapture(e.pointerId);
+      scrollTo(e.clientY, grab);
+    });
+    track.addEventListener('pointermove', (e) => {
+      if (h.dragging == null) return;
+      e.preventDefault();
+      scrollTo(e.clientY, h.dragging);
+    });
+    const let_go = () => { h.dragging = null; track.classList.remove('dragging'); };
+    track.addEventListener('pointerup', let_go);
+    track.addEventListener('pointercancel', let_go);
+    // The click a drag ends with must not reach the page under the sheet.
+    track.addEventListener('click', (e) => e.stopPropagation());
+    box.addEventListener('scroll', () => place(h), { passive: true });
+    return h;
+  }
+
+  function place(h) {
+    const { box, track, thumb } = h;
+    const r = box.getBoundingClientRect();
+    const range = box.scrollHeight - box.clientHeight;
+    // (getClientRects, not offsetParent: the sheet is fixed, which has none.)
+    const shown = r.height > 60 && range > 8 && box.getClientRects().length > 0;
+    track.classList.toggle('hidden', !shown);
+    if (!shown) return;
+    // Within the sheet, a list's thumb shows only where the list is on screen.
+    const sheet = $('intake').getBoundingClientRect();
+    const top = Math.max(r.top, box.id === 'intake' ? r.top : sheet.top) + 6;
+    const bottom = Math.min(r.bottom, box.id === 'intake' ? r.bottom : sheet.bottom) - 6;
+    if (bottom - top < 40) { track.classList.add('hidden'); return; }
+    track.style.top = `${top}px`;
+    track.style.height = `${bottom - top}px`;
+    track.style.left = `${r.right - 22}px`;
+    const height = Math.max(40, (bottom - top) * box.clientHeight / box.scrollHeight);
+    thumb.style.height = `${height}px`;
+    thumb.style.transform = `translateY(${((bottom - top) - height) * (box.scrollTop / range)}px)`;
+  }
+
+  function refresh() {
+    queued = false;
+    const boxes = new Set(document.querySelectorAll(SELECTOR));
+    for (const [box, h] of handles) {
+      if (!boxes.has(box) || !box.isConnected) { h.track.remove(); handles.delete(box); }
+    }
+    for (const box of boxes) {
+      if (!handles.has(box)) handles.set(box, make(box));
+      place(handles.get(box));
+    }
+  }
+  const soon = () => { if (!queued) { queued = true; requestAnimationFrame(refresh); } };
+  new MutationObserver(soon).observe($('intake'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+  window.addEventListener('resize', soon);
+  // The sheet scrolling moves the lists inside it.
+  $('intake').addEventListener('scroll', soon, { passive: true });
+  return { refresh: soon };
+})();
+
 function intakeLine(label, rest, extra) {
   const li = document.createElement('li');
   const name = document.createElement('strong');
