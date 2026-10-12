@@ -249,6 +249,7 @@
     <!-- Only when the library's disk is getting full: said before an upload
          fails on it, not after. -->
     <p id="space-warning" class="space-warning hidden" role="status"></p>
+    <p id="data-space-warning" class="space-warning hidden" role="status"></p>
 
     <!-- Provisioning progress. Visible until every shelf is ready, because
          until then an empty search result is expected rather than broken.
@@ -1360,7 +1361,9 @@
   </section>
 
   <!-- Somebody wants to play on this TV while it is in use (players.go). -->
-  <div id="player-ask" class="backup-ask hidden" role="dialog" aria-labelledby="player-ask-title">
+  <!-- Behind a question that waits on an answer (ASK_IDS in app.js). -->
+  <div id="ask-veil" class="ask-veil hidden"></div>
+  <div id="player-ask" class="backup-ask ask-center hidden" role="dialog" aria-labelledby="player-ask-title">
     <h2 id="player-ask-title">Let them play?</h2>
     <p id="player-ask-text" class="muted"></p>
     <div class="backup-ask-buttons">
@@ -1411,7 +1414,7 @@
 
   <!-- A new device waiting to sign in to this account (devices.go). -->
   <!-- A TV asking to be signed in from this phone (its code typed, or its QR scanned). -->
-  <div id="link-ask" class="backup-ask hidden" role="dialog" aria-labelledby="link-ask-title">
+  <div id="link-ask" class="backup-ask ask-center hidden" role="dialog" aria-labelledby="link-ask-title">
     <h2 id="link-ask-title">Sign in a TV?</h2>
     <p id="link-ask-text" class="muted"></p>
     <input id="link-ask-code" class="hidden" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9" placeholder="ABC-123" aria-label="The code on the TV">
@@ -1432,13 +1435,13 @@
   </div>
 
   <!-- A USB drive plugged into the box: what it is for (drives.go). -->
-  <div id="drive-ask" class="backup-ask hidden" role="dialog" aria-labelledby="drive-ask-title">
+  <div id="drive-ask" class="backup-ask ask-center hidden" role="dialog" aria-labelledby="drive-ask-title">
     <h2 id="drive-ask-title">A drive was plugged in</h2>
     <p id="drive-ask-text" class="muted"></p>
     <div id="drive-ask-buttons" class="drive-ask-buttons"></div>
   </div>
 
-  <div id="device-ask" class="backup-ask hidden" role="dialog" aria-labelledby="device-ask-title">
+  <div id="device-ask" class="backup-ask ask-center hidden" role="dialog" aria-labelledby="device-ask-title">
     <h2 id="device-ask-title">Allow a new device?</h2>
     <p id="device-ask-text" class="muted"></p>
     <div class="backup-ask-buttons">
@@ -1448,7 +1451,7 @@
   </div>
 
   <!-- Asked once, after signing in on a phone with the app. -->
-  <div id="backup-ask" class="backup-ask hidden" role="dialog" aria-labelledby="backup-ask-title">
+  <div id="backup-ask" class="backup-ask ask-center hidden" role="dialog" aria-labelledby="backup-ask-title">
     <h2 id="backup-ask-title">Back up this phone's photos?</h2>
     <p id="backup-ask-text" class="muted"></p>
     <div class="backup-ask-buttons">

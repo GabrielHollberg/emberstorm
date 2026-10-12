@@ -694,6 +694,16 @@ header {
   padding: 16px 18px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 .backup-ask h2 { margin: 0 0 6px; font-size: 17px; }
+/* A question that waits on an answer - a drive plugged in, a sign-in to
+   allow, the TV asked for, photo backup - comes over a dimmed page, in the
+   middle on a computer: along the foot it went unnoticed (the owner,
+   2026-10-12). The install offer, which asks nothing urgent, stays below. */
+.ask-veil { position: fixed; inset: 0; z-index: 89; background: rgba(0, 0, 0, 0.6); }
+.ask-veil.hidden { display: none; }
+.backup-ask.ask-center:not(.hidden) { animation: intake-in 0.22s ease-out; box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7); }
+@media (min-width: 700px) {
+  .backup-ask.ask-center { left: 0; right: 0; top: 0; bottom: 0; margin: auto; width: min(460px, calc(100vw - 48px)); height: fit-content; }
+}
 @media (min-width: 900px) { #install-offer { left: auto; right: 24px; bottom: 24px; width: 380px; } }
 .backup-ask-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
 

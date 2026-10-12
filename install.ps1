@@ -2333,6 +2333,29 @@ function Set-LanAccessRemembered([string]$Lan, [int]$Port) {
     return $result
 }
 
+# Show-LowDiskOnLaunch warns, when EmberStorm starts, that the drive Docker
+# keeps EmberStorm's own data on (its accounts and every media server's
+# database) is nearly full. Inside Docker the drive cannot be seen - Docker's
+# disk only says how far it could grow - so nothing in the app warned, and on
+# the PC running the owner's server C: reached zero bytes (2026-10-12). The
+# message closes by itself after two minutes, as at start-up nobody may be
+# there.
+function Show-LowDiskOnLaunch {
+    try {
+        $changes = Get-SetupChanges
+        $dataRoot = "$($changes['dockerData'])"
+        $drive = if ($dataRoot -match '^([A-Za-z]):\\') { $Matches[1] } else { ([Environment]::GetFolderPath('LocalApplicationData')).Substring(0, 1) }
+        $info = Get-PSDrive -Name $drive -PSProvider FileSystem -ErrorAction Stop
+        $freeGB = [math]::Round($info.Free / 1GB, 1)
+        if ($freeGB -ge 10) { return }
+        $text = "The $($drive.ToUpper()): drive, where EmberStorm keeps its own data, has only $freeGB GB free.`n`n" +
+            "When it is full, EmberStorm cannot save anything - signing in included - and may stop working. " +
+            "Free some space on $($drive.ToUpper()): soon (Windows Settings, System, Storage)."
+        $shell = New-Object -ComObject WScript.Shell
+        $shell.Popup($text, 120, 'EmberStorm', 48) | Out-Null
+    } catch { }
+}
+
 function Confirm-LanOnLaunch {
     $lan = Get-LanAddress
     if (-not $lan) { return }
@@ -5188,6 +5211,7 @@ if ($Launch) {
     Wait-ForEmberStorm $url
     # On a network Windows treats as public, other devices are kept out: ask.
     Confirm-LanOnLaunch
+    Show-LowDiskOnLaunch
     # At startup there is nobody watching yet, so the browser stays shut; the
     # desktop icon is what opens it.
     if (-not $NoBrowser) {

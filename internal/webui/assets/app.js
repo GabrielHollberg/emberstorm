@@ -234,6 +234,18 @@ $('me-picture-remove').addEventListener('click', async () => {
   renderMe();
 });
 
+// The dim behind any question waiting on an answer (the .ask-center cards):
+// seen from their classes, so no path that shows or hides one can forget it.
+const ASK_IDS = ['player-ask', 'link-ask', 'drive-ask', 'device-ask', 'backup-ask'];
+function syncAskVeil() {
+  const any = ASK_IDS.some((id) => $(id) && !$(id).classList.contains('hidden'));
+  if (any !== shown('ask-veil')) show($('ask-veil'), any);
+}
+{
+  const watch = new MutationObserver(syncAskVeil);
+  for (const id of ASK_IDS) if ($(id)) watch.observe($(id), { attributes: true, attributeFilter: ['class'] });
+}
+
 let profilePicked = null;
 function pickProfile(person) {
   profilePicked = person;
@@ -2479,6 +2491,19 @@ async function loadLibrary() {
     warning.classList.toggle('critical', space.level === 'critical');
   }
   show(warning, Boolean(space && space.level));
+  // The drive EmberStorm's own data is on (its accounts and every media
+  // server's database), when that is a drive of its own: full, nothing can
+  // be saved, signing in included.
+  const data = body.dataSpace;
+  const dataWarning = $('data-space-warning');
+  if (data && data.level) {
+    const left = formatBytes(data.free);
+    dataWarning.textContent = data.level === 'critical'
+      ? `The drive EmberStorm keeps its own data on is almost full: ${left} left. Free some space on it soon, or EmberStorm may stop working.`
+      : `The drive EmberStorm keeps its own data on is getting full: ${left} left.`;
+    dataWarning.classList.toggle('critical', data.level === 'critical');
+  }
+  show(dataWarning, Boolean(data && data.level));
 }
 
 // "Use on your phone or TV": the home address, and the away-from-home one when

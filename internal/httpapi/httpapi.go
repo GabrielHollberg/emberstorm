@@ -169,6 +169,7 @@ type Server struct {
 	reg              *source.Registry
 	store            *state.Store
 	library          *library.Library
+	stateDir         string // EmberStorm's own state folder, for its drive's space
 	auth             *auth.Manager
 	setup            *provision.Manager
 	proxy            *stream.Proxy
@@ -400,6 +401,7 @@ func New(cfg Config) *Server {
 		scrobble:         cfg.Scrobble,
 		beats:            newBeatStore(cfg.BeatsDir),
 		trainingDir:      cfg.TrainingDir,
+		stateDir:         cfg.StateDir,
 		deleted:          deletedPhotos{file: stateFile(cfg.StateDir, "photos-deleted.json")},
 		photoSendsRec:    photoSends{file: stateFile(cfg.StateDir, sendsStateFile)},
 		photoSharesRec:   photoShares{file: stateFile(cfg.StateDir, sharesStateFile)},
@@ -1572,7 +1574,8 @@ func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 		"shareURL": s.shareURL(r),
 		// How full the library's disk is, when it can be told: a warning
 		// before an upload fails on it, rather than after.
-		"space": spaceJSON(s.library),
+		"space":     spaceJSON(s.library),
+		"dataSpace": dataSpaceJSON(s.stateDir, s.library),
 		// The root as the user sees it, so the UI can name the one folder
 		// everything lives under without stitching it back together from the
 		// five paths below.
@@ -3081,6 +3084,24 @@ func spaceJSON(lib *library.Library) map[string]any {
 		"total": space.Total,
 		"level": string(space.Level),
 	}
+}
+
+// dataSpaceJSON is the drive EmberStorm's own data is on, when it is getting
+// full and is not the library's drive (whose warning already says it). On
+// Docker Desktop this is Docker's own disk, which grows as needed and so
+// never warns; there the Windows launcher looks at the real drive.
+func dataSpaceJSON(dir string, lib *library.Library) map[string]any {
+	if dir == "" {
+		return nil
+	}
+	space, ok := library.SpaceAt(dir)
+	if !ok || space.Level == library.SpaceFine {
+		return nil
+	}
+	if l, ok := lib.Space(); ok && l.Free == space.Free && l.Total == space.Total {
+		return nil
+	}
+	return map[string]any{"free": space.Free, "total": space.Total, "level": string(space.Level)}
 }
 
 // stateFile is a file in the state folder, or "" with none.

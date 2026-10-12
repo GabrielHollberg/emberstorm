@@ -59,20 +59,20 @@ up() {
   media
   docker network create "$NET" >/dev/null 2>&1 || true
   start() { docker start "$1" >/dev/null 2>&1 || return 1; }
-  start ss-smoke-db || docker run -d --name ss-smoke-db --network "$NET" -e POSTGRES_USER=postgres -e POSTGRES_DB=immich -e POSTGRES_PASSWORD=smoke \
+  start ss-smoke-db || docker run -d --restart unless-stopped --name ss-smoke-db --network "$NET" -e POSTGRES_USER=postgres -e POSTGRES_DB=immich -e POSTGRES_PASSWORD=smoke \
     -e POSTGRES_INITDB_ARGS=--data-checksums --shm-size 128m -v ss-smoke-imdb:/var/lib/postgresql/data \
     "$(pinned immich-database)" >/dev/null
-  start ss-smoke-redis || docker run -d --name ss-smoke-redis --network "$NET" "$(pinned immich-redis)" >/dev/null
+  start ss-smoke-redis || docker run -d --restart unless-stopped --name ss-smoke-redis --network "$NET" "$(pinned immich-redis)" >/dev/null
   sleep 5
-  start ss-smoke-immich || docker run -d --name ss-smoke-immich --network "$NET" -e DB_HOSTNAME=ss-smoke-db -e DB_USERNAME=postgres -e DB_DATABASE_NAME=immich \
+  start ss-smoke-immich || docker run -d --restart unless-stopped --name ss-smoke-immich --network "$NET" -e DB_HOSTNAME=ss-smoke-db -e DB_USERNAME=postgres -e DB_DATABASE_NAME=immich \
     -e DB_PASSWORD=smoke -e REDIS_HOSTNAME=ss-smoke-redis -e IMMICH_MACHINE_LEARNING_ENABLED=false \
     -v "$LIB/pictures:/pictures:ro" -v ss-smoke-imup:/data "$TOOLS" >/dev/null
-  start ss-smoke-jellyfin || docker run -d --name ss-smoke-jellyfin --network "$NET" -v "$LIB/movies:/media/movies:ro" -v "$LIB/tv:/media/tv:ro" \
+  start ss-smoke-jellyfin || docker run -d --restart unless-stopped --name ss-smoke-jellyfin --network "$NET" -v "$LIB/movies:/media/movies:ro" -v "$LIB/tv:/media/tv:ro" \
     -v ss-smoke-jf:/config "$(pinned jellyfin)" >/dev/null
-  start ss-smoke-navidrome || docker run -d --name ss-smoke-navidrome --network "$NET" -e ND_MUSICFOLDER=/music -e ND_DATAFOLDER=/data \
+  start ss-smoke-navidrome || docker run -d --restart unless-stopped --name ss-smoke-navidrome --network "$NET" -e ND_MUSICFOLDER=/music -e ND_DATAFOLDER=/data \
     -e ND_SUBSONIC_DEFAULTREPORTREALPATH=true -e ND_SCANINTERVAL=1m -e ND_ENABLEEXTERNALSERVICES=false -e ND_ENABLETRANSCODINGCONFIG=true \
     -v "$LIB/music:/music:ro" -v ss-smoke-nd:/data "$(pinned navidrome)" >/dev/null
-  start ss-smoke-app || docker run -d --name ss-smoke-app --network "$NET" -p "127.0.0.1:$PORT:8080" \
+  start ss-smoke-app || docker run -d --restart unless-stopped --name ss-smoke-app --network "$NET" -p "127.0.0.1:$PORT:8080" \
     -e SOUNDSTORM_SETUP_CODE=SMOKESETUP42 -e SOUNDSTORM_TLS=off -e SOUNDSTORM_STARTER_LIBRARY=false -e SOUNDSTORM_PORT=8080 \
     -e SOUNDSTORM_LIBRARY_DIR=/library -e SOUNDSTORM_NAVIDROME_URL=http://ss-smoke-navidrome:4533 \
     -e SOUNDSTORM_JELLYFIN_URL=http://ss-smoke-jellyfin:8096 -e SOUNDSTORM_JELLYFIN_MEDIA_PATH=/media/movies -e SOUNDSTORM_JELLYFIN_TV_PATH=/media/tv \
@@ -94,6 +94,13 @@ up() {
 
 update() {
   if ! docker inspect ss-smoke-app >/dev/null 2>&1; then up; fi
+  # Its media servers back on, and restarting by themselves from now on:
+  # after a restart of WSL they stayed off, and the app, started before them,
+  # had given up on them (2026-10-12). The app's restart below finds them.
+  for c in ss-smoke-db ss-smoke-redis ss-smoke-immich ss-smoke-jellyfin ss-smoke-navidrome ss-smoke-app; do
+    docker update --restart unless-stopped "$c" >/dev/null 2>&1 || true
+    docker start "$c" >/dev/null 2>&1 || true
+  done
   tmp=$(mktemp -d)
   docker cp soundstorm:/usr/local/bin/soundstorm "$(hostpath "$tmp")/soundstorm"
   docker cp "$(hostpath "$tmp")/soundstorm" ss-smoke-app:/usr/local/bin/soundstorm

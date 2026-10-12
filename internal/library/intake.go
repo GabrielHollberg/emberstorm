@@ -1760,6 +1760,18 @@ func (l *Library) Space() (Space, bool) {
 	return Space{Free: free, Total: total, Level: spaceLevel(free, total)}, true
 }
 
+// SpaceAt is Space for a folder outside the library: EmberStorm's own data
+// (its state and every media server's database), which on a box or a Linux
+// computer is on a drive of its own, filling up unseen (C: reached zero on
+// the PC running the owner's server, 2026-10-12).
+func SpaceAt(dir string) (Space, bool) {
+	free, total, ok := diskSize(dir)
+	if !ok || total == 0 {
+		return Space{}, false
+	}
+	return Space{Free: free, Total: total, Level: spaceLevel(free, total)}, true
+}
+
 func spaceLevel(free, total uint64) SpaceLevel {
 	switch {
 	case free < criticalFree:
