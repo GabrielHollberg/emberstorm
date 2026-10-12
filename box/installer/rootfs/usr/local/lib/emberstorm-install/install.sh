@@ -221,7 +221,7 @@ if [ -n "$unit" ]; then
 	# What goes on the sticker (box/sticker.sh makes it from units.csv).
 	say "Serial:      $unit"
 	say "Setup code:  $(printf '%s' "$code" | sed 's/..../& /g')"
-	qrencode -t UTF8 -m 1 "http://soundstorm.local/?setup=$code" 2>/dev/null | sed 's/^/   /'
+	qrencode -t UTF8 -m 1 "http://emberstorm.local/?setup=$code" 2>/dev/null | sed 's/^/   /'
 	say "Kept on the stick's EMBERSTORM drive (units.csv)."
 	say "Next: take the stick out, then switch the box on and open its BIOS"
 	say "setup (usually Delete as it starts). Set it to power on when power"

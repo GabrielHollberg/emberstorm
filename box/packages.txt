@@ -16,3 +16,4 @@ kbd
 console-setup-linux
 ntfs-3g
 systemd-zram-generator
+avahi-utils

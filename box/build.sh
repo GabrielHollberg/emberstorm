@@ -255,7 +255,7 @@ cp "$out/$IMG" "$disk"
 qemu-img resize -q "$disk" "$SIZE"
 # shellcheck disable=SC2086
 virt-customize -a "$disk" \
-	--hostname soundstorm \
+	--hostname emberstorm \
 	--run-command "sed -i 's/^Components: main\$/Components: main non-free-firmware/' /etc/apt/sources.list.d/*.sources" \
 	--install "$packages$ssh_pkg" \
 	--run-command 'growpart /dev/sda 1 && resize2fs /dev/sda1' \

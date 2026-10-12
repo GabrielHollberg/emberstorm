@@ -3,7 +3,7 @@
 #
 #   labels  Avery 64510 - 2" x 2" waterproof film, 12 a sheet (3 x 4): the
 #           label on the back of each box, its own setup code as a QR code
-#           (http://soundstorm.local/?setup=CODE, which the app's scanner and
+#           (http://emberstorm.local/?setup=CODE, which the app's scanner and
 #           a phone's camera both take), the code, and the serial.
 #   cards   Avery 35703 - 2.5" x 2.5" rounded cards, 9 a sheet (3 x 3): the
 #           card in every box, the same for all. Front: a QR code to
@@ -85,12 +85,12 @@ EOF
 # label X Y SERIAL CODE: one 2" label with its top left at X,Y inches, in
 # the card's look: nothing but a big QR code to set the box up, the cloud in
 # its middle (level H), and the setup code under it to type where nothing
-# can scan (a laptop at soundstorm.local). White kept round the code: the
+# can scan (a laptop at emberstorm.local). White kept round the code: the
 # box it goes on is black, and a code needs a margin to be found.
 label() {
 	x=$1 y=$2 serial=$3 code=$4
 	grouped=$(printf '%s' "$code" | tr a-f A-F | sed 's/..../& /g; s/ $//')
-	setup=$(qr "http://soundstorm.local/?setup=$code" H)
+	setup=$(qr "http://emberstorm.local/?setup=$code" H)
 	echo "<g transform=\"translate($x $y)\">"
 	[ "$TEST" = 1 ] && echo '<rect width="2" height="2" fill="none" stroke="#999" stroke-width="0.01"/>'
 	cat <<EOT

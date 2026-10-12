@@ -1,0 +1,11 @@
+[Unit]
+Description=EmberStorm: the box's network name (emberstorm)
+Before=avahi-daemon.service
+After=systemd-hostnamed.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/soundstorm/name.sh
+
+[Install]
+WantedBy=multi-user.target
