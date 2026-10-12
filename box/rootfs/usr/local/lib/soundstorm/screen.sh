@@ -91,6 +91,10 @@ draw() {
 	health=$(curl -fsS -m 3 "http://127.0.0.1:$port/healthz" 2>/dev/null || true)
 	ip=$(address)
 	local_name=$(announced)
+	# The box's own name (ownname.sh), when it has one: emberstorm.local may
+	# be another box's.
+	own=$(setting SOUNDSTORM_UNIT | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-')
+	case "$own" in em-????-????) local_name="$own.local" ;; esac
 	printf '\033[2J\033[H\n'
 	# The storage drive missing or failing: EmberStorm is not started at all
 	# (storage.sh), and this is the only place that can say so.

@@ -221,7 +221,7 @@ if [ -n "$unit" ]; then
 	# What goes on the sticker (box/sticker.sh makes it from units.csv).
 	say "Serial:      $unit"
 	say "Setup code:  $(printf '%s' "$code" | sed 's/..../& /g')"
-	qrencode -t UTF8 -m 1 "http://emberstorm.local/?setup=$code" 2>/dev/null | sed 's/^/   /'
+	qrencode -t UTF8 -m 1 "http://$(printf '%s' "$unit" | tr 'A-Z' 'a-z').local/?setup=$code" 2>/dev/null | sed 's/^/   /'
 	say "Kept on the stick's EMBERSTORM drive (units.csv)."
 	# The BIOS path is the maker's own (their answer, 2026-10-12): State After
 	# G3 is the setting that makes a box start when it is plugged in.

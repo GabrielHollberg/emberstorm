@@ -10,6 +10,7 @@ btrfs-progs
 ethtool
 cloud-guest-utils
 avahi-daemon
+avahi-utils
 curl
 qrencode
 kbd

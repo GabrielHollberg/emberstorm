@@ -1095,6 +1095,15 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	if s.setupCode == "" || subtle.ConstantTimeCompare([]byte(given), []byte(s.setupCode)) != 1 {
 		s.log.Warn("sign-up refused: wrong setup code", "remote", r.RemoteAddr)
 		msg := "that setup code is not right"
+		// On a box, the likeliest reason is a second box on the network: its
+		// label's code typed at emberstorm.local, which is whichever box took
+		// that name first (the owner's asking, 2026-10-12). Saying which box
+		// this is says where to go.
+		if boxSerial.MatchString(s.boxUnit) {
+			msg = "That code isn't for this box. Each EmberStorm's code works only on that box. " +
+				"If there is more than one on your network, scan the QR code on the back of the box " +
+				"you are setting up: it opens that box itself. (This one is " + strings.ToLower(s.boxUnit) + ".local.)"
+		}
 		if given == "" {
 			msg = "a setup code is needed to create the first account"
 		}
