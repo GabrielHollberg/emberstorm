@@ -151,18 +151,8 @@ downloading, and keep the window open until it says it's finished. Along the way
   If it asks **"Is this your home network?"**, click **Yes** at home, so your
   phone and TV can reach EmberStorm.
 
-When it's done, your browser opens EmberStorm and there's an EmberStorm icon on
-your desktop.
-
-<details>
-<summary><strong>Why the "Unblock" step?</strong></summary>
-
-Windows blocks *every* script downloaded from the internet ("An Application
-Control policy has blocked this file"). That is about the file type, not about
-EmberStorm, and ticking **Unblock** is how Windows lets you say you trust it.
-Skipping it is the most common reason nothing happens when you double-click.
-
-</details>
+When it's done, click **Open EmberStorm** in the setup window. There's an
+EmberStorm icon on your desktop for next time.
 
 <details>
 <summary>Rather paste a command? (PowerShell)</summary>
@@ -307,8 +297,9 @@ automatically.
 
 ## Troubleshooting
 
-**Nothing happens when I double-click the setup file.** Do the **Unblock** step
-(right-click → Properties → Unblock), then double-click again.
+**"Windows protected your PC" when I open the setup.** Click **More info**, then
+**Run anyway**. The setup is signed; Windows shows this while the signature is
+still new to it.
 
 **Setup says my computer can't run it (virtualization).** Docker needs
 virtualization switched on in your computer's BIOS/UEFI settings, usually called

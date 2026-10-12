@@ -18,8 +18,8 @@ next step is making sure a stranger's first hour goes well.
   Macs and Linux boxes, and fix whatever trips it.
 - **Signed apps and installer.** The Android app is signed with a test key;
   moving to a release key (one reinstall for everyone) is what the Play Store
-  needs. The Windows setup file is unsigned, which is why it needs the Unblock
-  step.
+  needs. The Windows setup (EmberStorm.exe) is signed; Windows may still warn
+  while the certificate is new to it.
 - **The App Store.** The iPhone and Apple TV apps are in testing (TestFlight);
   next is review and release.
 - **Real-world checks still owed:** the Plex playlist import against a real

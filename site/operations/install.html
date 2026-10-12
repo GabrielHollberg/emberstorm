@@ -48,10 +48,9 @@ leaves desktop, Start menu and start-up shortcuts instead of an address to remem
 <code>/releases/latest/download/EmberStorm.exe</code>, signed by hand on the PC and attached to the
 release. (Before it, a <code>.cmd</code> file was the download; it is no longer on the release.) A release asset is a real download, and the link always follows the newest release.</p>
 <div class="warn">Windows Smart App Control blocks any script downloaded from the web, by extension,
-whatever it contains: "Dangerous file extension from the web", with no Run anyway. It cannot be fixed
-inside the file. Right-click, Properties, <strong>Unblock</strong> clears the download mark, which is
-why that is the first step in the instructions. The real fixes, a signed program or a winget package,
-are still open.</div>
+whatever it contains, and an unsigned program outright. That is why the download is a program signed
+with a code-signing certificate rather than a script: nothing needs unblocking. While the certificate
+is new to Windows, SmartScreen may still say "Windows protected your PC" (More info, Run anyway).</div>
 <p>The setup file hands straight to a hidden PowerShell and closes. That PowerShell downloads
 <code>install.ps1</code> <em>to a file</em> and runs the file - never piping a download into
 PowerShell from memory, which is the classic malware pattern that Windows Defender blocks on sight.

@@ -32,7 +32,7 @@ commit, and the image it pulls (`:latest`) is built on every push to `main`.
      you have to click?
 2. Follow the README's steps exactly: double-click it (and, if Windows
    says it protected your PC, More info → Run anyway).
-   - Was Unblock there? Did anything open if you skipped it?
+   - Did Windows say it protected the PC, and did Run anyway get past it?
 3. The setup window. Note:
    - How long until the window appeared.
    - Each Windows permission prompt (Docker, WSL), and whether a **restart**
