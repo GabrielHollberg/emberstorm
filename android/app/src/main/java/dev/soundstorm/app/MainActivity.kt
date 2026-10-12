@@ -78,6 +78,13 @@ class MainActivity : Activity() {
     private var keptScript: androidx.webkit.ScriptHandler? = null
     /** Out of reach: the page's own kept files answer for the server (KeptFiles). */
     @Volatile private var offlineShell = false
+    /**
+     * While the app is opening the kept page (or the away twin) after a load
+     * failed: the same failed load reports again - its error page finishing -
+     * and taken for the recovery failing it covered the working kept page with
+     * the failure screen (the owner's report, 2026-10-12, 0.61).
+     */
+    private var recoveringUntil = 0L
     /** Addresses whose install id was asked for this run. */
     private val idsKnown = HashSet<String>()
     /** The next load is from the kept files (`offlineShell`). */
@@ -1500,6 +1507,7 @@ class MainActivity : Activity() {
                 val away = s.buildUpon().encodedAuthority(
                     awayHost + if (s.port != -1) ":${s.port}" else ""
                 ).build()
+                recoveringUntil = android.os.SystemClock.uptimeMillis() + 5000
                 content.post { showWeb(away) }
                 return
             }
@@ -1509,12 +1517,14 @@ class MainActivity : Activity() {
             val home = awayFrom
             if (!offlineShell && s != null && origin != null && KeptFiles.hasShell(origin)) {
                 offlineNext = true
+                recoveringUntil = android.os.SystemClock.uptimeMillis() + 5000
                 content.post { load() }
                 return
             }
             if (!offlineShell && home != null && KeptFiles.hasShell(ServerAddress.origin(home))) {
                 awayFrom = null
                 offlineNext = true
+                recoveringUntil = android.os.SystemClock.uptimeMillis() + 5000
                 content.post { showWeb(home) }
                 return
             }
@@ -1527,6 +1537,7 @@ class MainActivity : Activity() {
             if (!offlineShell && lives != null && lives != origin && KeptFiles.hasShell(lives)) {
                 awayFrom = null
                 offlineNext = true
+                recoveringUntil = android.os.SystemClock.uptimeMillis() + 5000
                 content.post { showWeb(Uri.parse(lives)) }
                 return
             }
@@ -1557,12 +1568,15 @@ class MainActivity : Activity() {
             // or by asking it - a script may not run there at all.
             val errorPage = url?.startsWith("chrome-error:") == true || view.url?.startsWith("chrome-error:") == true ||
                 view.title == "Webpage not available"
+            val recovering = android.os.SystemClock.uptimeMillis() < recoveringUntil
             if (errorPage) {
-                mainFrameFailed("The page could not be loaded.")
+                if (!recovering) mainFrameFailed("The page could not be loaded.")
                 return
             }
             view.evaluateJavascript("location.protocol") { proto ->
-                if (proto?.contains("chrome-error") == true) mainFrameFailed("The page could not be loaded.")
+                if (proto?.contains("chrome-error") == true) {
+                    if (android.os.SystemClock.uptimeMillis() >= recoveringUntil) mainFrameFailed("The page could not be loaded.")
+                }
                 else {
                     triedAway = false
                     // Which install this address is, for opening its kept page
