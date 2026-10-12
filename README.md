@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.exe"><strong>⬇ Download for Windows</strong></a>
-  &nbsp;·&nbsp;
-  <a href="#mac">Mac</a> ·
-  <a href="#linux">Linux</a>
+  <strong>Download:</strong>
+  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.exe"><strong>Windows</strong></a> ·
+  <a href="https://github.com/GabrielHollberg/emberstorm/releases/latest/download/EmberStorm.dmg"><strong>Mac</strong></a> ·
+  <a href="#linux"><strong>Linux</strong></a>
   &nbsp;·&nbsp;
   <a href="docs/guide.md">User guide</a>
   &nbsp;·&nbsp;
