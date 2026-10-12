@@ -690,6 +690,15 @@ function showGate(hasAccount, setupCodeRequired) {
   // A box: the power button is the way back in for a forgotten password.
   show($('gate-button'), false);
   show($('gate-button-hint'), false);
+  // Creating the first account on a box: the code is on the label, and the
+  // computer's places for it (the setup window, .env, the logs) only
+  // confuse somebody holding a box (the owner, 2026-10-12).
+  show($('setup-computer-help'), true);
+  if (!hasAccount) {
+    api('/api/reset/button').then(({ ok, body }) => {
+      if (ok && body && body.box && $('gate-form').dataset.mode === 'signup') show($('setup-computer-help'), false);
+    });
+  }
   if (hasAccount) {
     api('/api/reset/button').then(({ ok, body }) => {
       if (!ok || !body || $('gate-form').dataset.mode !== 'login') return;

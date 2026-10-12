@@ -80,6 +80,20 @@ home network back in through the public address. With a single public name, home
 those routers. The page already checks which name it can reach before moving, so it prefers whichever
 works.</div>
 
+<h3 id="two-servers">Two servers in one house</h3>
+<p>At home two installs never clash: a port belongs to each machine. From away they would, as a router
+sends one outside port to one machine and every install asks for its own port (8099). So when the router
+answers UPnP's <em>ConflictInMappingEntry</em> (718) - another machine holds that outside port - the
+install asks for the next ports up, one after another (twenty at most), and keeps asking for the one it
+was given (<code>portmap.Maintainer.FallbackPorts</code>; PCP and NAT-PMP pick a free port themselves).
+The home address keeps 8099; the outside port is what the names service probes, what the away address,
+invitations and the panel carry, and what a chosen name's visitors from away are sent to. <code>/healthz</code>
+says it (<code>awayPort</code>) so the apps' away fallback goes to it.</p>
+<p>A router with no automatic forwarding cannot be asked, so the panel has <strong>Another EmberStorm in
+this house already uses that port?</strong>: forward another outside port (say 8100) to this install's
+8099 on the router, and enter it there (<code>PUT /api/remote {"outsidePort": 8100}</code>). The panel's
+instructions name both ports. An automatic mapping's port wins over the one entered.</p>
+
 <h3 id="nat">When it cannot work: CGNAT and double NAT</h3>
 <p>The router's own WAN address says a lot, and <code>portmap</code> asks for it even when the port
 mapping <em>succeeded</em> - a router behind carrier-grade NAT opens the port without complaint, on an

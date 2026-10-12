@@ -375,8 +375,10 @@ household default can be changed too).
 - **Who's listening?** (profiles): a device can keep several people. Tick
   **Keep me on this device** when signing in (ticked already on a TV), and
   next time pick yourself instead of typing a password. A TV asks every time
-  it opens; elsewhere, tap your picture at the top right, or **Settings → On
-  this device → Switch person**. Set a PIN there and switching to you asks for it - without one, anybody at a
+  it opens; elsewhere, tap your picture at the top right and choose **Change
+  person** (that menu also has **Change server** in the phone apps, and
+  **Sign out**), or **Settings → On this device → Switch person**. Settings
+  itself is the last tab (on a TV, the top of the side bar). Set a PIN there and switching to you asks for it - without one, anybody at a
   device you're kept on can switch to you. The owner always needs their PIN,
   or their password if they have none. **Sign out** takes you off that device;
   a new password takes you off every device.
@@ -447,6 +449,12 @@ the link and people reach your sign-in page, with no app to install.
 - **Where forwarding is impossible**, because your provider shares one address
   between many homes (carrier-grade NAT), it says so and points you to
   Tailscale.
+- **Two EmberStorms in one house** (say a box and a computer) can both be
+  reached. The second gets the next outside port (8100 and up) by itself when
+  the router opens ports automatically, and its away address carries that
+  port. Without automatic port opening, forward another outside port to the
+  second one's 8099 by hand and enter it under **Another EmberStorm in this
+  house already uses that port?**
 - **Over IPv6** there would be nothing to forward, but that path is not
   switched on yet: today it is the IPv4 port above.
 
