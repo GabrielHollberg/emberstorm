@@ -74,6 +74,16 @@ class MainActivity : Activity() {
     private var safeScript: androidx.webkit.ScriptHandler? = null
     /** Set once the saved home name failed and its away twin was tried. */
     private var triedAway = false
+    /** The page's script saying what the app keeps for this server (KeptFiles). */
+    private var keptScript: androidx.webkit.ScriptHandler? = null
+    /** Out of reach: the page's own kept files answer for the server (KeptFiles). */
+    @Volatile private var offlineShell = false
+    /** The next load is from the kept files (`offlineShell`). */
+    private var offlineNext = false
+    /** The home name tried before its away twin: where the kept files are. */
+    private var awayFrom: Uri? = null
+    /** The page's keep messages, in order, off the main thread. */
+    private val keepIO = Executors.newSingleThreadExecutor()
     private val background = Executors.newSingleThreadExecutor()
 
     /** On a TV (Google TV, Android TV, Fire TV): the page lays itself out for
@@ -116,6 +126,26 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Downloads kept by the app (KeptFiles): its answers go to the page
+        // on the server they are for, and a change makes the page's script
+        // again, for the next load.
+        KeptFiles.init(applicationContext)
+        KeptFiles.answer = { site, json ->
+            runOnUiThread {
+                val here = ServerAddress.current?.let(KeptFiles::site)
+                if (here == site) webView?.evaluateJavascript("window.__soundstormKeep && window.__soundstormKeep($json)", null)
+            }
+        }
+        KeptFiles.changed = { site -> runOnUiThread { if (ServerAddress.current?.let(KeptFiles::site) == site) applyKept() } }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_BASIC_USAGE) &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST)) {
+            // The page's service worker asks for the page's files itself; the
+            // kept ones answer it too.
+            androidx.webkit.ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(object : androidx.webkit.ServiceWorkerClientCompat() {
+                override fun shouldInterceptRequest(request: WebResourceRequest): android.webkit.WebResourceResponse? =
+                    KeptFiles.intercept(request, ServerAddress.current, offlineShell)
+            })
+        }
         // Both bars hidden, everywhere (the owner's asking - the one thing
         // the installed web app could never do, as Chrome owns its bars): a
         // swipe in from an edge shows them for a moment, as in a game or a
@@ -213,6 +243,15 @@ class MainActivity : Activity() {
         return "(() => { const s = document.documentElement.style;" +
             " s.setProperty('--safe-top', '${v["t"] ?: 0}px'); s.setProperty('--safe-right', '${v["r"] ?: 0}px');" +
             " s.setProperty('--safe-bottom', '${v["b"] ?: 0}px'); s.setProperty('--safe-left', '${v["l"] ?: 0}px'); })();"
+    }
+
+    /** What the app keeps for this server, told to the page at its start. */
+    private fun applyKept() {
+        val view = webView ?: return
+        val origin = ServerAddress.current ?: return
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
+        keptScript?.remove()
+        keptScript = WebViewCompat.addDocumentStartJavaScript(view, KeptFiles.pageScript(origin), setOf(origin))
     }
 
     private fun applySafeArea() {
@@ -834,6 +873,7 @@ class MainActivity : Activity() {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(view, PageScript.SOURCE, setOf(origin))
         }
+        keptScript = null
         view.webViewClient = Client()
         view.webChromeClient = Chrome()
         content.addView(view, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -842,6 +882,7 @@ class MainActivity : Activity() {
         NativeAudio.attachView(view)
         safeScript = null
         applySafeArea()
+        applyKept()
         load()
     }
 
@@ -1046,6 +1087,8 @@ class MainActivity : Activity() {
     private fun load() {
         failure?.let { content.removeView(it) }
         failure = null
+        offlineShell = offlineNext
+        offlineNext = false
         server?.let { s ->
             val code = pendingLink
             pendingLink = null
@@ -1108,6 +1151,13 @@ class MainActivity : Activity() {
                 "window.__soundstormPlayerLog && window.__soundstormPlayerLog(" +
                     JSONObject.quote(PlayerLog.text(applicationContext)) + ")", null)
             "backup" -> backup(message.optString("cmd"), message.optJSONObject("options") ?: JSONObject())
+            // Downloads kept in the app's folder (KeptFiles), for this server only.
+            "keep" -> {
+                val origin = ServerAddress.current ?: return
+                val cmd = message.optString("cmd")
+                val data = message.optJSONObject("data") ?: JSONObject()
+                keepIO.execute { KeptFiles.handle(cmd, data, origin) }
+            }
         }
     }
 
@@ -1412,6 +1462,7 @@ class MainActivity : Activity() {
             val awayHost = ServerAddress.awayHost(host)
             if (s != null && awayHost != null && !triedAway) {
                 triedAway = true
+                awayFrom = s
                 mirrorCookies(s)
                 val away = s.buildUpon().encodedAuthority(
                     awayHost + if (s.port != -1) ":${s.port}" else ""
@@ -1419,8 +1470,26 @@ class MainActivity : Activity() {
                 content.post { showWeb(away) }
                 return
             }
+            // Out of reach with the page's own files kept: the app opens on its
+            // downloads, as the service worker does on a secure name.
+            val origin = ServerAddress.current
+            val home = awayFrom
+            if (!offlineShell && s != null && origin != null && KeptFiles.hasShell(origin)) {
+                offlineNext = true
+                content.post { load() }
+                return
+            }
+            if (!offlineShell && home != null && KeptFiles.hasShell(ServerAddress.origin(home))) {
+                awayFrom = null
+                offlineNext = true
+                content.post { showWeb(home) }
+                return
+            }
             showFailure(error.description?.toString() ?: "")
         }
+
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? =
+            KeptFiles.intercept(request, ServerAddress.current, offlineShell)
 
         // A form posted elsewhere, or a data: or blob: page, does not pass
         // through shouldOverrideUrlLoading: anything that is not the server

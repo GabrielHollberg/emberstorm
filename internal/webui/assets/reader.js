@@ -286,8 +286,12 @@ function bookParams(item) {
 const OFFLINE_CACHE = 'soundstorm-offline-v1';
 async function fetchOrKept(url) {
   // Downloaded: from the device, connection or not - quicker, and no data.
+  // In the phone apps the app keeps them in its own folder (app.js,
+  // keptMatch), which also looks in web storage.
   try {
-    const kept = await (await caches.open(OFFLINE_CACHE)).match(url);
+    const kept = window.soundstormKeptMatch
+      ? await window.soundstormKeptMatch(url)
+      : await (await caches.open(OFFLINE_CACHE)).match(url);
     if (kept) return kept;
   } catch {
     // no cache here; ask the server

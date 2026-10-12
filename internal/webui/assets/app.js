@@ -38,6 +38,9 @@ const state = {
 
 async function api(path, options = {}) {
   let resp;
+  // The iPhone app's offline copy of the page (KEPT_PAGE, declared further
+  // down, read only once the page runs): nothing to ask.
+  if (location.protocol === 'emberstorm-kept:') return { ok: false, status: 0, body: null, offline: true };
   try {
     const headers = options.body ? { 'Content-Type': 'application/json' } : {};
     // A command to another device says which device sent it, so the server
@@ -1071,8 +1074,8 @@ $('logout').addEventListener('click', async () => {
 // servers: somebody at the wrong server's sign-in had none (the owner,
 // 2026-10-11). Signing in stays per server.
 if (window.soundstormApp) {
-  for (const id of ['change-server', 'gate-change-server', 'profiles-change-server']) {
-    show($(id), true);
+  for (const id of ['change-server', 'gate-change-server', 'profiles-change-server', 'offline-server']) {
+    if (id !== 'offline-server') show($(id), true);
     $(id).addEventListener('click', () => {
       window.webkit.messageHandlers.soundstorm.postMessage({ type: 'changeServer' });
     });
@@ -1129,7 +1132,8 @@ async function showApp(me) {
   await Promise.all([loadPrefs(), loadMyArt()]);
   renderWelcome();
   setTimeout(prepareDownloads, 20000);
-  if (/\.(?:emberstorm\.app|soundstorm\.dev)$/.test(location.hostname)) keepShell();
+  setTimeout(moveDownloadsToApp, 45000);
+  if (KEEPS || /\.(?:emberstorm\.app|soundstorm\.dev)$/.test(location.hostname)) keepShell();
   refreshPairs();
   maybeShowHoldTip();
   askLinkFromAddress();
@@ -4122,7 +4126,8 @@ function playAudio(item, fromQueue) {
       startAt(preloaded, 0);
     } else if (isDownloaded(item)) {
       // From the device: through a tunnel, out of Wi-Fi range, on a plane.
-      offlineURL(item).then((url) => {
+      if (NATIVE_AUDIO && appKept(streamPath(item))) startAt(streamPath(item), 0);
+      else offlineURL(item).then((url) => {
         if (audio.item === item) startAt(url || playPath(item), 0);
       });
     } else {
@@ -4186,6 +4191,8 @@ async function loadPlayback(item) {
     if (!Array.isArray(info.tracks) && Array.isArray(dl.tracks)) info.tracks = dl.tracks;
     const map = {};
     for (const url of dl.files || []) {
+      // The app's own player plays its kept copy of a server address.
+      if (NATIVE_AUDIO && appKept(url)) continue;
       const local = await offlineURLFor(url);
       if (local) map[url] = local;
     }
@@ -10142,7 +10149,7 @@ const audioRecover = (() => {
     timer = 0;
     if (!playable()) return;
     const url = audio.currentURL;
-    const kept = audio.urlMap && audio.urlMap[url];
+    const kept = (audio.urlMap && audio.urlMap[url]) || (NATIVE_AUDIO && appKept(url));
     const again = kept || !/^(\/|https?:)/.test(url) ? url : `${url}${url.includes('?') ? '&' : '?'}retry=${tries}`;
     startAt(again, reached());
     audio.currentURL = url;
@@ -10747,10 +10754,13 @@ function nativeUpcoming() {
   }
   const out = [];
   for (const item of order) {
-    if (!item || item.kind !== 'music' || isDownloaded(item)) break;
+    if (!item || item.kind !== 'music') break;
+    // A song the app keeps is handed over too: its player plays the copy.
+    const here = isDownloaded(item) && appKept(streamPath(item));
+    if (isDownloaded(item) && !here) break;
     const art = (mediaArtwork(item)[0] || {}).src;
     out.push({
-      url: new URL(playPath(item), location.href).href,
+      url: new URL(here ? streamPath(item) : playPath(item), location.href).href,
       title: item.title || '',
       artist: (item.creators || []).join(', ') || item.subtitle || '',
       album: (item.extra && item.extra.album) || '',
@@ -11384,9 +11394,113 @@ const OFFLINE_CACHE = 'soundstorm-offline-v1';
 const OFFLINE_SHELL = 'soundstorm-offline-shell-v1';
 const DOWNLOADS_KEY = 'soundstorm-downloads';
 
+// Inside the phone apps the files and their list are kept by the app, in its
+// own folder, which the system never clears (the owner's rule, 2026-10-11: a
+// download is deleted by nobody but the person; web storage may be cleared
+// by iOS under pressure or after a while unused). The contract is in
+// CLAUDE.md, "Downloads kept by the apps": the app fetches each address
+// itself (`keep('add')`), answers through window.__soundstormKeep, says
+// where a kept file is read from (`keptURL`), and hands the list back at
+// start (`keptIndex`, `keptURLs`). Downloads made before, in web storage,
+// are still read from there; what was heard in songs stays there too (the
+// page makes it; it can be heard again). In a browser, nothing changes.
+const KEEPS = Boolean(window.soundstormApp && window.soundstormApp.keeps && typeof window.soundstormApp.keep === 'function');
+// Opened offline by the iPhone app from its own folder: another origin, with
+// no server behind it at all.
+const KEPT_PAGE = location.protocol === 'emberstorm-kept:';
+function keptKey(url) {
+  try {
+    const u = new URL(url, location.href);
+    return (u.pathname || '/') + u.search;
+  } catch {
+    return '';
+  }
+}
+const keptPaths = new Set(KEEPS && Array.isArray(window.soundstormApp.keptURLs)
+  ? window.soundstormApp.keptURLs.map(keptKey) : []);
+function appKept(url) {
+  return KEEPS && keptPaths.has(keptKey(url));
+}
+const keepJobs = new Map();
+let keepSeq = 0;
+window.__soundstormKeep = (answer) => {
+  const job = answer && keepJobs.get(answer.id);
+  if (!job) return;
+  if (answer.cmd === 'progress') {
+    if (job.progress) job.progress(answer);
+    return;
+  }
+  if (answer.cmd !== 'done') return;
+  keepJobs.delete(answer.id);
+  for (const url of answer.kept || []) keptPaths.add(keptKey(url));
+  if ((answer.failed || []).length) job.reject(new Error('not kept'));
+  else job.resolve();
+};
+// appKeep has the app fetch addresses into its folder; resolved once all are
+// there, rejected if any failed. One file at a time, as the page fetched
+// them: a film's pieces are made by the video server as they are asked for.
+function appKeep(urls, onProgress, shouldStop) {
+  return new Promise((resolve, reject) => {
+    const id = `keep-${Date.now().toString(36)}-${++keepSeq}`;
+    keepJobs.set(id, { resolve, reject, progress: onProgress });
+    window.soundstormApp.keep('add', { id, urls });
+    if (shouldStop) {
+      const watch = setInterval(() => {
+        if (!keepJobs.has(id)) clearInterval(watch);
+        else if (shouldStop()) {
+          clearInterval(watch);
+          keepJobs.delete(id);
+          window.soundstormApp.keep('stop', { id });
+          reject(new Error('stopped'));
+        }
+      }, 500);
+    }
+  });
+}
+// keptMatch is a downloaded file's bytes, from the app's folder or else web
+// storage; null when neither has it.
+async function keptMatch(url) {
+  if (appKept(url)) {
+    try {
+      const resp = await fetch(window.soundstormApp.keptURL(url));
+      if (resp.ok) return resp;
+    } catch { /* not there after all */ }
+  }
+  try {
+    if (!window.caches) return null;
+    return (await (await caches.open(OFFLINE_CACHE)).match(url)) || null;
+  } catch {
+    return null;
+  }
+}
+window.soundstormKeptMatch = keptMatch;
+// openDownloads stands where caches.open(OFFLINE_CACHE) stood: the same
+// match, put and delete, reaching the app's folder when the app keeps files.
+async function openDownloads() {
+  let cache = null;
+  try { if (window.caches) cache = await caches.open(OFFLINE_CACHE); } catch { /* none here */ }
+  return {
+    app: KEEPS,
+    match: (url) => keptMatch(url),
+    async put(url, resp) {
+      if (KEEPS) await appKeep([url]);
+      else await cache.put(url, resp);
+    },
+    async delete(url) {
+      if (cache) await cache.delete(url).catch(() => {});
+      if (KEEPS && keptPaths.delete(keptKey(url))) window.soundstormApp.keep('remove', { urls: [url] });
+    },
+    web: cache,
+  };
+}
+
 function loadDownloadIndex() {
   try {
-    const raw = JSON.parse(localStorage.getItem(DOWNLOADS_KEY) || 'null');
+    // The app's copy first; one made before the app kept downloads is in
+    // localStorage, and is handed to the app at the next save.
+    const fromApp = KEEPS && window.soundstormApp.keptIndex;
+    const raw = fromApp && fromApp.items && fromApp.groups ? fromApp
+      : JSON.parse(localStorage.getItem(DOWNLOADS_KEY) || 'null');
     if (raw && raw.items && raw.groups) {
       // Downloaded favorites were once a group named the British way.
       for (const g of raw.groups) {
@@ -11402,6 +11516,7 @@ function loadDownloadIndex() {
 state.downloads = loadDownloadIndex();
 
 function saveDownloadIndex() {
+  if (KEEPS) window.soundstormApp.keep('index', { index: state.downloads });
   try {
     localStorage.setItem(DOWNLOADS_KEY, JSON.stringify(state.downloads));
   } catch {
@@ -11433,9 +11548,13 @@ async function safeBlob(resp, type) {
 }
 
 async function offlineURL(item) {
+  // Kept by the app, a song or audiobook plays from its folder directly
+  // (byte ranges; no copy in memory).
+  if ((item.kind === 'music' || item.kind === 'audiobook') && appKept(streamPath(item))) {
+    return window.soundstormApp.keptURL(streamPath(item));
+  }
   try {
-    const cache = await caches.open(OFFLINE_CACHE);
-    const resp = await cache.match(streamPath(item));
+    const resp = await keptMatch(streamPath(item));
     // A PDF is opened in a frame: it is a PDF and nothing else.
     const pdf = String((item.extra && item.extra.format) || '').toLowerCase() === 'pdf';
     return resp ? URL.createObjectURL(await safeBlob(resp, pdf ? 'application/pdf' : '')) : '';
@@ -11448,7 +11567,8 @@ async function offlineArtURL(item) {
   const path = artPath(item);
   if (!path) return '';
   try {
-    const resp = await (await caches.open(OFFLINE_CACHE)).match(path);
+    if (appKept(path)) return window.soundstormApp.keptURL(path);
+    const resp = await keptMatch(path);
     return resp ? URL.createObjectURL(await resp.blob()) : '';
   } catch {
     return '';
@@ -11469,6 +11589,9 @@ const SHELL_FILES = [
     .map((m) => `/static/vendor/foliate-js/${m}.js`),
 ];
 async function keepShell() {
+  // The app keeps its own copy, fetched afresh each load, and opens it when
+  // the server cannot be reached.
+  if (KEEPS && !KEPT_PAGE) window.soundstormApp.keep('shell', { urls: SHELL_FILES });
   if (!('caches' in window)) return;
   try {
     const cache = await caches.open(OFFLINE_SHELL);
@@ -11485,21 +11608,15 @@ async function download(group, items, onProgress, shouldStop) {
   const songs = items.filter((it) => it && it.kind === 'music');
   if (!songs.length) return;
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  const cache = await caches.open(OFFLINE_CACHE);
+  const cache = await openDownloads();
   let done = 0;
   for (const song of songs) {
     if (shouldStop && shouldStop()) break;
     const key = selectionKey(song);
     if (!state.downloads.items[key]) {
       try {
-        const resp = await fetch(streamPath(song), { credentials: 'same-origin' });
-        if (!resp.ok) throw new Error(`status ${resp.status}`);
-        await cache.put(streamPath(song), resp);
-        const art = artPath(song);
-        if (art && !(await cache.match(art))) {
-          const artResp = await fetch(art, { credentials: 'same-origin' });
-          if (artResp.ok) await cache.put(art, artResp);
-        }
+        await keepURL(cache, streamPath(song));
+        await keepArt(cache, song);
         state.downloads.items[key] = song;
       } catch {
         continue; // one song failing does not stop the rest
@@ -11518,13 +11635,52 @@ async function download(group, items, onProgress, shouldStop) {
   prepareDownloads();
 }
 
+// moveDownloadsToApp hands downloads made before the app kept them - in web
+// storage, which iOS may clear - to the app: fetched again into its folder,
+// one file at a time, and taken out of web storage once there. Quietly, in
+// the background, while online and looked at.
+let movingDownloads = false;
+async function moveDownloadsToApp() {
+  if (!KEEPS || KEPT_PAGE || movingDownloads || !window.caches) return;
+  movingDownloads = true;
+  const rest = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    const web = await caches.open(OFFLINE_CACHE);
+    for (const item of Object.values(state.downloads.items)) {
+      if (!item) continue;
+      const dl = item.dl || {};
+      const urls = [...(dl.files || [streamPath(item)])];
+      const art = artPath(item);
+      if (art) urls.push(art);
+      const video = dl.video;
+      if (video && video.mode === 'hls') {
+        const playlist = await web.match(video.variant);
+        if (playlist) urls.unshift(...hlsParts(await playlist.text(), video.variant));
+      }
+      for (const url of urls) {
+        if (appKept(url) || !(await web.match(url))) continue;
+        while (document.hidden || state.offline) await rest(5000);
+        try {
+          await appKeep([url]);
+          await web.delete(url);
+        } catch { /* tried again next time the app opens */ }
+      }
+      await rest(500);
+    }
+  } catch {
+    // Web storage gone already: nothing to move.
+  } finally {
+    movingDownloads = false;
+  }
+}
+
 // removeDownload forgets a group, and deletes each song no other group needs.
 async function removeDownload(groupID) {
   const group = state.downloads.groups.find((g) => g.id === groupID);
   if (!group) return;
   state.downloads.groups = state.downloads.groups.filter((g) => g.id !== groupID);
   const stillNeeded = new Set(state.downloads.groups.flatMap((g) => g.keys));
-  const cache = await caches.open(OFFLINE_CACHE);
+  const cache = await openDownloads();
   for (const key of group.keys) {
     if (stillNeeded.has(key)) continue;
     const kept = state.downloads.items[key];
@@ -11535,7 +11691,7 @@ async function removeDownload(groupID) {
         if (playlist) for (const url of hlsParts(await playlist.text(), video.variant)) await cache.delete(url);
       }
       for (const url of (kept.dl && kept.dl.files) || [streamPath(kept)]) await cache.delete(url);
-      await cache.delete(heardURL(kept));
+      if (cache.web) await cache.web.delete(heardURL(kept)).catch(() => {});
     }
     delete state.downloads.items[key];
   }
@@ -11553,6 +11709,10 @@ async function clearDownloads() {
     // Places kept for downloaded books are this person's too.
     for (const key of Object.keys(localStorage)) {
       if (key.startsWith('soundstorm-pos:') || key.startsWith('soundstorm-read:') || key.startsWith('soundstorm-watch:')) localStorage.removeItem(key);
+    }
+    if (KEEPS) {
+      window.soundstormApp.keep('clear', {});
+      keptPaths.clear();
     }
     await caches.delete(OFFLINE_CACHE);
     await caches.delete(OFFLINE_SHELL);
@@ -13776,8 +13936,11 @@ document.addEventListener('click', () => {
 window.soundstormOfflineURL = (item) => offlineURL(item);
 
 async function offlineURLFor(url) {
+  // Kept by the app: read from its folder where it is (a film's pieces, an
+  // audiobook's files), not copied into memory.
+  if (appKept(url)) return window.soundstormApp.keptURL(url);
   try {
-    const resp = await (await caches.open(OFFLINE_CACHE)).match(url);
+    const resp = await keptMatch(url);
     return resp ? URL.createObjectURL(await resp.blob()) : '';
   } catch {
     return '';
@@ -13787,6 +13950,11 @@ async function offlineURLFor(url) {
 // keepURL fetches one address into the cache, streaming, and reports bytes as
 // they arrive, so a single 400MB audiobook file still shows progress.
 async function keepURL(cache, url, onBytes) {
+  if (cache.app) {
+    await appKeep([url]);
+    if (onBytes) onBytes(1, 1);
+    return;
+  }
   const resp = await fetch(url, { credentials: 'same-origin' });
   if (!resp.ok || !resp.body) throw new Error(`status ${resp.status}`);
   const total = Number(resp.headers.get('Content-Length')) || 0;
@@ -13839,14 +14007,14 @@ async function keepBook(cache, item, onProgress, skip) {
 async function keepArt(cache, item) {
   const art = artPath(item);
   if (!art) return [];
-  if (!(await cache.match(art))) await keepURL(cache, art).catch(() => {});
+  if (!appKept(art) && !(await cache.match(art))) await keepURL(cache, art).catch(() => {});
   return [art];
 }
 
 // downloadBook keeps one audiobook, ebook or document; onProgress gets 0-1.
 async function downloadBook(item, onProgress = () => {}, shouldStop, opts = {}) {
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  const cache = await caches.open(OFFLINE_CACHE);
+  const cache = await openDownloads();
   const key = selectionKey(item);
   let files = [];
   let tracks = null;
@@ -13915,7 +14083,7 @@ async function downloadPair(pair, onProgress = () => {}) {
     });
     const { ok, body } = await api(`/api/readalong?${params}`);
     if (ok && body && body.item) {
-      const cache = await caches.open(OFFLINE_CACHE);
+      const cache = await openDownloads();
       const files = await keepBook(cache, body.item, (p) => onProgress((step + p) / steps),
         (name) => name.startsWith('Audio/') || /\.(mp3|mp4|m4a|m4b|aac|ogg|opus)$/i.test(name));
       const syncedKey = selectionKey(body.item);
@@ -14216,7 +14384,7 @@ async function playKeptVideo(item, player) {
     player.play().catch(() => {});
     return true;
   }
-  const cache = await caches.open(OFFLINE_CACHE);
+  const cache = await openDownloads();
   const playlist = await cache.match(video.variant);
   if (!playlist) return false;
   const text = await playlist.text();
@@ -14281,6 +14449,7 @@ function enterOffline(atStart) {
   if (state.offline) return;
   state.offline = true;
   document.body.classList.add('offline-mode');
+  show($('offline-server'), Boolean(window.soundstormApp));
   show($('tabs'), true);
   renderTabs();
   if (state.tab === 'settings' || !tabShelves(state.tab).length) selectTab('home');
@@ -14299,6 +14468,7 @@ async function leaveOffline() {
   }
   state.offline = false;
   document.body.classList.remove('offline-mode');
+  show($('offline-server'), false);
   renderTabs();
   runSearch();
   showToast('Back online.');
@@ -14643,14 +14813,14 @@ async function removeItemDownload(item) {
   if (state.downloads.groups.some((g) => g.keys.includes(key))) return;
   const kept = state.downloads.items[key];
   if (kept) {
-    const cache = await caches.open(OFFLINE_CACHE);
+    const cache = await openDownloads();
     const video = kept.dl && kept.dl.video;
     if (video && video.mode === 'hls') {
       const playlist = await cache.match(video.variant);
       if (playlist) for (const url of hlsParts(await playlist.text(), video.variant)) await cache.delete(url);
     }
     for (const url of (kept.dl && kept.dl.files) || [streamPath(kept)]) await cache.delete(url);
-    await cache.delete(heardURL(kept));
+    if (cache.web) await cache.web.delete(heardURL(kept)).catch(() => {});
     delete state.downloads.items[key];
   }
   state.downloads.groups = state.downloads.groups.filter((g) => g.keys.length);
@@ -19372,8 +19542,8 @@ async function songBytes(item) {
   }
   // A downloaded song is read from the device: no network, and it works
   // offline.
-  if (window.caches && isDownloaded(item)) {
-    const kept = await caches.match(streamPath(item), { cacheName: OFFLINE_CACHE, ignoreSearch: true });
+  if (isDownloaded(item)) {
+    const kept = await keptMatch(streamPath(item));
     if (kept) return kept.arrayBuffer();
   }
   // Sent at full speed (listen=1 skips the away-from-home pace): about 3MB,

@@ -10,6 +10,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSourceBitmapLoader
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -47,11 +48,14 @@ class AudioService : MediaSessionService() {
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent("SoundStormApp/1")
             .setAllowCrossProtocolRedirects(false)
-        val signedIn: DataSource.Factory = ResolvingDataSource.Factory(http) { spec ->
+        KeptFiles.init(applicationContext)
+        val signedIn: DataSource.Factory = ResolvingDataSource.Factory(DefaultDataSource.Factory(this, http)) { spec ->
             // NativeAudio takes only the server's addresses; this is the
             // second look, for anything that reaches the player another way.
             if (!ServerAddress.isServer(this, spec.uri.toString())) throw java.io.IOException("not the server")
-            spec
+            // A downloaded song or audiobook, kept by the app (KeptFiles):
+            // played from its copy, connection or not.
+            KeptFiles.fileFor(spec.uri.toString())?.let { spec.withUri(android.net.Uri.fromFile(it)) } ?: spec
         }
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(signedIn))
