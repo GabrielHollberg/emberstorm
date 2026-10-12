@@ -3,8 +3,7 @@
 # emberstorm.local reaches it) - it was soundstorm before the rename, and a
 # box made then is renamed here at its next start, once (2026-10-12, the
 # owner's asking: his father's router listed "soundstorm"). Any other name
-# somebody gave the box is left alone. soundstorm.local still answers
-# (alias.sh), for the labels already printed with it.
+# somebody gave the box is left alone.
 set -eu
 [ "$(hostname)" = soundstorm ] || exit 0
 hostnamectl set-hostname emberstorm

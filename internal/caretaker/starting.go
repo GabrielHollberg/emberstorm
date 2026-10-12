@@ -21,7 +21,7 @@ import (
 // phone's search found nothing for up to half an hour and the box's screen
 // said only "starting". The caretaker runs from the first seconds, so it
 // answers there meanwhile - the phone's search (/healthz, status "starting",
-// with the share done and what it is doing) and a browser at emberstorm.local (or soundstorm.local)
+// with the share done and what it is doing) and a browser at emberstorm.local
 // (a page with the bar) - and lets go of the ports before EmberStorm starts
 // (images.sh says "starting"; up.sh waits for StartingOpen to go). Only while
 // there is unpacking to do, and only on a port free: a box already set up

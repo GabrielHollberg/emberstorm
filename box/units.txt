@@ -11,4 +11,3 @@ soundstorm-address.timer
 soundstorm-scrub.timer
 avahi-daemon.service
 soundstorm-name.service
-soundstorm-alias.service

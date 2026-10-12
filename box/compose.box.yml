@@ -70,7 +70,7 @@ volumes:
 # container's user is put in here whatever its image says.
 #
 # And port 80 beside SoundStorm's own, so a laptop with no app can open
-# http://soundstorm.local (avahi announces the box's name) with no port to type.
+# http://emberstorm.local (avahi announces the box's name) with no port to type.
 services:
   soundstorm:
     ports:

@@ -11,7 +11,7 @@ cd /opt/soundstorm
 lan=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p' | head -n 1)
 dev=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n 1)
 
-# avahi announces soundstorm.local on the home network's port alone: on every
+# avahi announces emberstorm.local on the home network's port alone: on every
 # interface it also answered with Docker's own addresses (10.231.x), which a
 # laptop may try first and never reach.
 if [ -n "$dev" ]; then
