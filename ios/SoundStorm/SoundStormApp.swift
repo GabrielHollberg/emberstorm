@@ -42,11 +42,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         PhotoBackup.shared.launched()
         // Files added that were still waiting carry on.
         FileUploads.shared.resume()
+        // Downloads that finished while the app was closed are moved in.
+        KeptFiles.shared.resume()
         return true
     }
 
     func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
                      completionHandler: @escaping () -> Void) {
+        if identifier == KeptFiles.identifier {
+            nonisolated(unsafe) let done = completionHandler
+            KeptFiles.shared.finishedEvents = { done() }
+            KeptFiles.shared.resume()
+            return
+        }
         if FileUploads.identifiers.contains(identifier) {
             // Files added, ended with the app closed: the sessions made again
             // to hear about them.

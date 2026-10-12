@@ -79,11 +79,10 @@ final class WebViewController: UIViewController {
         // window.soundstormApp tells the page it is inside this app, so it
         // can offer what only the app can do (see "Change server" in app.js).
         let content = config.userContentController
-        content.addUserScript(WKUserScript(
-            source: Self.pageScript,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true))
         content.add(MessageRelay(self), name: "soundstorm")
+        // Downloads kept by the app in its own folder (KeptFiles), read by the
+        // page at emberstorm-kept://.
+        config.setURLSchemeHandler(KeptScheme(), forURLScheme: KeptFiles.scheme)
 
         webView = WKWebView(frame: view.bounds, configuration: config)
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -113,6 +112,10 @@ final class WebViewController: UIViewController {
         view.addSubview(webView)
         holdOpeningScreen()
         NativeAudio.shared.webView = webView
+        KeptFiles.shared.answer = { [weak self] site, answer in
+            guard let self, KeptFiles.site(of: self.current) == site else { return }
+            self.callPage("__soundstormKeep", answer)
+        }
         NativeAudio.shared.isServer = { [weak self] url in self?.isServer(url) ?? false }
 
         failure.frame = view.bounds
@@ -163,10 +166,27 @@ final class WebViewController: UIViewController {
     /// the server there (SoundStormApp).
     var onMoved: ((URL) -> Void)?
 
+    /// The page's scripts for where it is about to be: the app's own, and
+    /// the downloads kept for that server only (KeptFiles).
+    private func setScripts(for url: URL) {
+        let content = webView.configuration.userContentController
+        content.removeAllUserScripts()
+        content.addUserScript(WKUserScript(source: Self.pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        content.addUserScript(WKUserScript(source: KeptFiles.shared.pageScript(for: url, server: server),
+                                           injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    }
+
+    /// Tried once a load: the server out of reach, its page kept - opened from
+    /// the app's folder, on its downloads (the page takes the address as
+    /// offline mode).
+    private var triedKept = false
+
     private func load() {
         failure.isHidden = true
         triedTwin = false
+        triedKept = false
         current = server
+        setScripts(for: server)
         AppChrome.shared.statusBarHidden = false
         var address = server
         if let code = pendingLink {
@@ -595,10 +615,21 @@ final class WebViewController: UIViewController {
            let twin = ServerAddress.twin(failed, level: "net"), ServerAddress.installName(failed.host() ?? "")?.level == "home" {
             triedTwin = true
             current = twin
+            setScripts(for: twin)
             Task {
                 await Self.mirrorCookies(from: failed, to: twin)
                 self.webView.load(URLRequest(url: twin))
             }
+            return
+        }
+        // Out of reach with the page kept: the app opens on its downloads,
+        // as Android's does from its service worker.
+        if !triedKept, error.domain == NSURLErrorDomain, KeptFiles.shared.hasShell(for: server),
+           let offline = KeptFiles.offlineAddress(for: server) {
+            triedKept = true
+            current = offline
+            setScripts(for: offline)
+            webView.load(URLRequest(url: offline))
             return
         }
         AppChrome.shared.statusBarHidden = false
@@ -652,6 +683,8 @@ final class WebViewController: UIViewController {
                let json = String(data: data, encoding: .utf8) {
                 webView.evaluateJavaScript("window.__soundstormPlayerLog && window.__soundstormPlayerLog(\(json)[0])")
             }
+        case "keep":
+            KeptFiles.shared.handle(body["cmd"] as? String ?? "", data: body["data"] as? [String: Any] ?? [:], page: current)
         case "audio":
             NativeAudio.shared.handle(body)
         case "media":
@@ -830,11 +863,19 @@ extension WebViewController: WKNavigationDelegate {
         // No target frame is a new window, which createWebViewWith decides
         // (only for a link somebody tapped) - not the page itself.
         let mainFrame = action.targetFrame?.isMainFrame ?? false
+        // The kept page of this server only, opened offline (KeptFiles).
+        if url.scheme == KeptFiles.scheme {
+            guard mainFrame, KeptFiles.site(of: url) == KeptFiles.site(of: server) else { return .cancel }
+            current = url
+            setScripts(for: url)
+            return .allow
+        }
         if mainFrame, await sameInstall(url) {
             // Followed for now, never saved: the address typed stays the one
             // the app starts from. Saving a name reached from a plain-http
             // page let someone on the same Wi-Fi pin the app to a server of
             // their own for good (the security review; Android the same).
+            if KeptFiles.site(of: url) != KeptFiles.site(of: current) { setScripts(for: url) }
             current = url
             return .allow
         }
@@ -929,6 +970,36 @@ extension WebViewController: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        #if DEBUG
+        // -keptTest YES: the downloads kept by the app, tried against a plain
+        // server of test files (/static/song.bin, /static/pic.svg; KeptFiles),
+        // logged as KEPTTEST - online it keeps and reads them, offline it
+        // reports the kept page.
+        if UserDefaults.standard.bool(forKey: "keptTest") {
+            webView.callAsyncJavaScript("""
+                const answers = []; window.__soundstormKeep = (a) => answers.push(a);
+                const app = window.soundstormApp || {};
+                const out = { at: location.protocol + '//' + location.host, keeps: app.keeps, keptURLs: (app.keptURLs || []).length, index: app.keptIndex };
+                if (location.protocol !== 'emberstorm-kept:') {
+                  app.keep('shell', { urls: ['/', '/static/app.js'] });
+                  app.keep('add', { id: 't', urls: ['/static/song.bin', '/static/pic.svg', '/nope-404', 'https://example.com/x'] });
+                  app.keep('index', { index: { groups: [{ id: 'g' }], items: {} } });
+                  for (let i = 0; i < 60 && !answers.some((a) => a.cmd === 'done'); i++) await new Promise((r) => setTimeout(r, 200));
+                  out.done = answers.find((a) => a.cmd === 'done');
+                  const orig = await (await fetch('/static/song.bin')).arrayBuffer();
+                  out.origLen = orig.byteLength;
+                }
+                const u = app.keptURL('/static/song.bin');
+                const whole = await fetch(u);
+                const wb = await whole.arrayBuffer();
+                const part = await fetch(u, { headers: { Range: 'bytes=100-199' } });
+                const pb = new Uint8Array(await part.arrayBuffer());
+                Object.assign(out, { url: u, status: whole.status, len: wb.byteLength, type: whole.headers.get('content-type'),
+                  range: part.status, rangeLen: pb.length, rangeFirst: pb[0], title: document.title });
+                return JSON.stringify(out);
+                """, arguments: [:], in: nil, in: .page) { r in NSLog("KEPTTEST %@", String(describing: r)) }
+        }
+        #endif
         handShared()
         // What the server calls itself now, for the list of servers (the
         // owner may have renamed it since).

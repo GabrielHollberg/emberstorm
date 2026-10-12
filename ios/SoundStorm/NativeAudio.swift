@@ -201,7 +201,8 @@ final class NativeAudio: NSObject {
     }
 
     private func allowed(_ value: Any?) -> URL? {
-        guard let s = value as? String, let url = URL(string: s), url.scheme == "http" || url.scheme == "https",
+        guard let s = value as? String, let url = URL(string: s),
+              url.scheme == "http" || url.scheme == "https" || url.scheme == KeptFiles.scheme,
               isServer(url) else { return nil }
         return url
     }
@@ -211,10 +212,17 @@ final class NativeAudio: NSObject {
     }
 
     private func makeItem(_ url: URL) async -> AVPlayerItem {
-        // The player does not read the web view's cookies: the session's are
-        // handed to it, as the Apple TV does.
-        let cookies = await cookies(for: url)
-        let asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
+        // A downloaded song plays from the app's own copy, online or not
+        // (KeptFiles) - never streamed again.
+        let asset: AVURLAsset
+        if let kept = KeptFiles.shared.file(for: url) {
+            asset = AVURLAsset(url: kept.url)
+        } else {
+            // The player does not read the web view's cookies: the session's
+            // are handed to it, as the Apple TV does.
+            let cookies = await cookies(for: url)
+            asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
+        }
         let item = AVPlayerItem(asset: asset)
         urls[ObjectIdentifier(item)] = url.absoluteString
         observations.append(item.observe(\.status) { [weak self] item, _ in
