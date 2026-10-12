@@ -147,7 +147,7 @@ function renderMe() {
     tvTab.replaceChildren(circle, label);
   }
   paintAvatar($('me-btn'), me);
-  $('me-btn').setAttribute('aria-label', `${me.name}: switch person, or Settings`);
+  $('me-btn').setAttribute('aria-label', `${me.name}: your picture, change person or server, sign out`);
 }
 async function openMeMenu() {
   const me = state.me;
@@ -155,45 +155,21 @@ async function openMeMenu() {
   const menu = $('me-menu');
   paintAvatar($('me-menu-avatar'), me);
   $('me-menu-name').textContent = me.name;
-  show($('me-picture-remove'), Boolean(me.picture));
-  $('me-picture').textContent = me.picture ? 'Change picture' : 'Add a picture';
+  $('me-picture').textContent = me.picture ? 'Your picture' : 'Add a picture';
+  show($('me-picture-choices'), false);
   // Which server this is, and the way to another: the owner found Change
   // server too deep in Settings (2026-10-12). Only the apps keep a list of
   // servers; in a browser each server is its own address.
   show($('me-server'), Boolean(window.soundstormApp));
-  api('/api/session').then(({ ok, body }) => {
-    const name = ok && body && body.serverName;
-    $('me-menu-server').textContent = name || '';
-    show($('me-menu-server'), Boolean(name));
-  });
-  const holder = $('me-menu-people');
-  holder.replaceChildren();
   show(menu, true);
   // Under the circle, its right edge with the circle's.
   const at = $('me-btn').getBoundingClientRect();
   if (at.width) menu.style.right = `${Math.max(12, innerWidth - at.right)}px`;
   $('me-btn').setAttribute('aria-expanded', 'true');
-  const { ok, body } = await api('/api/profiles');
-  const people = ((ok && body && body.people) || []).filter((p) => p.id !== me.id);
-  for (const person of people) {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.setAttribute('role', 'menuitem');
-    row.className = 'me-person';
-    const avatar = document.createElement('span');
-    avatar.className = 'profile-avatar';
-    paintAvatar(avatar, person);
-    const name = document.createElement('span');
-    name.textContent = person.name;
-    row.append(avatar, name);
-    row.addEventListener('click', () => {
-      closeMeMenu();
-      if (!person.needs) { switchProfile(person, {}); return; }
-      showProfiles(body);
-      pickProfile(person);
-    });
-    holder.append(row);
-  }
+  const { ok, body } = await api('/api/session');
+  const name = ok && body && body.serverName;
+  $('me-menu-server').textContent = name || '';
+  show($('me-menu-server'), Boolean(name));
 }
 function closeMeMenu() {
   show($('me-menu'), false);
@@ -210,16 +186,12 @@ document.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && shown('me-menu')) closeMeMenu();
 });
-$('me-other').addEventListener('click', async () => {
+// "Who's listening?": the others kept on this device, and Someone else to
+// sign in.
+$('me-person').addEventListener('click', async () => {
   closeMeMenu();
-  for (const id of ['app', 'tabs']) show($(id), false);
-  const { body } = await api('/api/session');
-  showGate(true, body && body.setupCodeRequired);
-  $('gate-keep').checked = true;
-});
-$('me-settings').addEventListener('click', () => {
-  closeMeMenu();
-  selectTab('settings');
+  const { ok, body } = await api('/api/profiles');
+  if (ok && body) showProfiles(body);
 });
 $('me-server').addEventListener('click', () => {
   closeMeMenu();
@@ -229,7 +201,17 @@ $('me-signout').addEventListener('click', () => {
   closeMeMenu();
   $('logout').click();
 });
-$('me-picture').addEventListener('click', async () => {
+// One button for the picture: no picture yet, it is chosen at once; with one,
+// Change and Remove open beneath it.
+$('me-picture').addEventListener('click', (event) => {
+  if (state.me && state.me.picture) {
+    event.stopPropagation();
+    show($('me-picture-choices'), !shown('me-picture-choices'));
+    return;
+  }
+  $('me-picture-change').click();
+});
+$('me-picture-change').addEventListener('click', async () => {
   closeMeMenu();
   const blob = await pickCoverImage();
   if (!blob) return;

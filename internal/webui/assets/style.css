@@ -4220,7 +4220,6 @@ html.tv .profiles-card:has(#profiles-secret:not(.hidden)) #profiles-secret { mar
 }
 .me-btn.hidden { display: none; }
 .me-btn:active { transform: scale(0.94); }
-html:not(.tv) #tabs [data-tab="settings"] { display: none; }
 .me-menu {
   position: fixed; z-index: 40;
   top: calc(var(--header-h, 66px) + 4px); right: calc(12px + var(--safe-right, 0px));
@@ -4236,6 +4235,9 @@ html:not(.tv) #tabs [data-tab="settings"] { display: none; }
 .me-menu .me-who { display: flex; flex-direction: column; min-width: 0; }
 .me-menu .me-who small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .me-menu .me-who small.hidden { display: none; }
+.me-picture-choices { display: flex; gap: 6px; padding: 0 8px 4px 20px; }
+.me-picture-choices.hidden { display: none; }
+.me-picture-choices button { flex: 1; min-height: 36px; border-radius: 10px; font-size: 14px; }
 .me-menu > button, .me-person {
   display: flex; align-items: center; gap: 10px; width: 100%;
   min-height: 40px; padding: 6px 8px; border: none; border-radius: 8px;
