@@ -241,6 +241,50 @@ object KeptFiles {
         return File(folder(site), e.optString("file")).takeIf { it.exists() }
     }
 
+    /**
+     * Where the page lives for a saved server (its secure or chosen name,
+     * which the app follows without saving): set when that page keeps its
+     * files, read when the saved address cannot be reached.
+     */
+    fun livesAt(context: Context, saved: String, at: String) {
+        if (saved == at) return
+        context.getSharedPreferences("kept", Context.MODE_PRIVATE).edit().putString("livesAt:$saved", at).apply()
+    }
+
+    fun livesAt(context: Context, saved: String): String? =
+        context.getSharedPreferences("kept", Context.MODE_PRIVATE).getString("livesAt:$saved", null)
+
+    /**
+     * Which install an address is (`/healthz`'s id), remembered whenever a
+     * page of it loads: an install answers at several names (its code's home
+     * and away names, a chosen name's two), and its kept copy and downloads
+     * are under whichever the page was on. Offline, any of them finds it.
+     */
+    fun rememberId(context: Context, origin: String, id: String) {
+        val site = site(origin) ?: return
+        context.getSharedPreferences("kept", Context.MODE_PRIVATE).edit()
+            .putString("id:$site", id).putString("origin:$site", origin).apply()
+    }
+
+    /** The install an address is: as remembered, else its code (the name's first part). */
+    fun idOf(context: Context, origin: String): String? {
+        val site = site(origin) ?: return null
+        context.getSharedPreferences("kept", Context.MODE_PRIVATE).getString("id:$site", null)?.let { return it }
+        val host = Uri.parse(origin).host?.lowercase() ?: return null
+        return if (ServerAddress.zoneOf(host) != null) host.substringBefore('.') else null
+    }
+
+    /** An address of this install whose page is kept, if any. */
+    fun keptPageFor(context: Context, id: String): String? {
+        val prefs = context.getSharedPreferences("kept", Context.MODE_PRIVATE)
+        for ((k, v) in prefs.all) {
+            if (!k.startsWith("id:") || v != id) continue
+            val origin = prefs.getString("origin:" + k.removePrefix("id:"), null) ?: continue
+            if (hasShell(origin)) return origin
+        }
+        return null
+    }
+
     /** Whether the page's own files are kept for this server. */
     fun hasShell(origin: String): Boolean {
         val site = site(origin) ?: return false

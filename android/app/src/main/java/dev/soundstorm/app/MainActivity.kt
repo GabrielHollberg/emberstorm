@@ -78,6 +78,8 @@ class MainActivity : Activity() {
     private var keptScript: androidx.webkit.ScriptHandler? = null
     /** Out of reach: the page's own kept files answer for the server (KeptFiles). */
     @Volatile private var offlineShell = false
+    /** Addresses whose install id was asked for this run. */
+    private val idsKnown = HashSet<String>()
     /** The next load is from the kept files (`offlineShell`). */
     private var offlineNext = false
     /** The home name tried before its away twin: where the kept files are. */
@@ -1160,6 +1162,13 @@ class MainActivity : Activity() {
                 val cmd = message.optString("cmd")
                 val data = message.optJSONObject("data") ?: JSONObject()
                 keepIO.execute { KeptFiles.handle(cmd, data, origin) }
+                // Where the page really lives for the server the app starts
+                // from: it moves itself to the install's secure (or chosen)
+                // name, which the app follows without saving, and its kept
+                // copy, downloads and list are that address's. Offline the app
+                // starts from the saved address, so it must know to open there
+                // (the owner's report, 2026-10-12: offline, no downloads).
+                if (cmd == "shell") ServerAddress.saved(this)?.let { KeptFiles.livesAt(this, ServerAddress.origin(it), origin) }
             }
         }
     }
@@ -1419,9 +1428,15 @@ class MainActivity : Activity() {
                     Thread {
                         val same = runCatching {
                             val here = ServerAddress.installIdAt(current)
-                            val there = java.net.InetAddress.getAllByName(target.host).map { it.hostAddress }.toSet()
+                            // Home names lead to the home address and away names
+                            // to the internet one, so the two are compared home
+                            // to home: from the code's away name at home, the
+                            // move to the chosen home name was refused and the
+                            // page sat on its loading screen for good (2026-10-12).
+                            val resolve = { h: String? -> h?.let { n -> runCatching { java.net.InetAddress.getAllByName(n).map { it.hostAddress } }.getOrDefault(emptyList()) } ?: emptyList() }
+                            val there = (resolve(target.host) + resolve(ServerAddress.twinHost(target.host))).toSet()
                             here != null && here == ServerAddress.installIdAt(target) &&
-                                java.net.InetAddress.getAllByName(currentHost).any { it.hostAddress in there }
+                                (resolve(currentHost) + resolve(ServerAddress.twinHost(currentHost))).any { it in there }
                         }.getOrDefault(false)
                         if (same) content.post { if (server == current) showWeb(target) }
                     }.start()
@@ -1503,6 +1518,18 @@ class MainActivity : Activity() {
                 content.post { showWeb(home) }
                 return
             }
+            // The address the page moved to when it was last reached (its
+            // secure or chosen name), where its kept copy and downloads are -
+            // or any other address of the same install with its page kept.
+            val start = ServerAddress.saved(this@MainActivity)?.let(ServerAddress::origin)
+            val lives = start?.let { KeptFiles.livesAt(this@MainActivity, it) }?.takeIf { KeptFiles.hasShell(it) }
+                ?: (start ?: origin)?.let { KeptFiles.idOf(this@MainActivity, it) }?.let { KeptFiles.keptPageFor(this@MainActivity, it) }
+            if (!offlineShell && lives != null && lives != origin && KeptFiles.hasShell(lives)) {
+                awayFrom = null
+                offlineNext = true
+                content.post { showWeb(Uri.parse(lives)) }
+                return
+            }
             showFailure(detail)
         }
 
@@ -1526,9 +1553,28 @@ class MainActivity : Activity() {
             // An error the page's service worker answered for (it fetched the
             // page and failed, with nothing kept) comes as the web view's own
             // error page with no onReceivedError: seen by its address.
+            // The web view's own error page is seen by its address or title,
+            // or by asking it - a script may not run there at all.
+            val errorPage = url?.startsWith("chrome-error:") == true || view.url?.startsWith("chrome-error:") == true ||
+                view.title == "Webpage not available"
+            if (errorPage) {
+                mainFrameFailed("The page could not be loaded.")
+                return
+            }
             view.evaluateJavascript("location.protocol") { proto ->
                 if (proto?.contains("chrome-error") == true) mainFrameFailed("The page could not be loaded.")
-                else triedAway = false
+                else {
+                    triedAway = false
+                    // Which install this address is, for opening its kept page
+                    // offline from any of its names (KeptFiles.rememberId).
+                    val here = ServerAddress.current
+                    if (here != null && !offlineShell && here !in idsKnown) {
+                        idsKnown.add(here)
+                        Thread {
+                            ServerAddress.installIdAt(Uri.parse(here))?.let { KeptFiles.rememberId(applicationContext, here, it) }
+                        }.start()
+                    }
+                }
             }
             CookieManager.getInstance().flush()
             mirrorCookies()
