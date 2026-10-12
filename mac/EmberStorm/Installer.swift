@@ -6,8 +6,9 @@ import Foundation
 /// stays the one place that knows how to install; this only asks its
 /// questions first, in a window, and shows it going.
 ///
-/// The script is the newest on main, fetched at the commit it is at (so the
-/// compose file it downloads matches it), as the Windows setup file does.
+/// The script is the newest signed release's (SignedRelease): install.sh and
+/// the compose file it uses, each checked against the list the release key
+/// signed on its YubiKey, as EmberStorm.exe does on Windows.
 /// It runs with no terminal, so it asks nothing: the answers come as
 /// settings (EMBERSTORM_KEEP_AWAKE, --library), the Mac's password through
 /// SUDO_ASKPASS (a window of macOS's own, `askpass`), and what it ends with
@@ -84,7 +85,7 @@ final class Installer {
         stage = .docker
         fraction = 0
         status = "Getting the setup..."
-        let (script, commit) = try await Self.fetchScript()
+        let (script, releaseEnv) = try await Self.fetchScript()
         let result = FileManager.default.temporaryDirectory.appending(path: "emberstorm-result-\(UUID().uuidString)")
         resultFile = result
         // The password asked before anything started (the questions page),
@@ -100,7 +101,7 @@ final class Installer {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = Docker.path
         env["SOUNDSTORM_DIR"] = dir.path
-        if let commit { env["SOUNDSTORM_BRANCH"] = commit }
+        env.merge(releaseEnv) { _, new in new }
         env["EMBERSTORM_KEEP_AWAKE"] = keepAwake ? "yes" : "no"
         env["EMBERSTORM_RESULT"] = result.path
         env["SUDO_ASKPASS"] = askpass.path
@@ -266,43 +267,45 @@ final class Installer {
 
     // MARK: The script, the password window, what it ended with
 
-    /// The newest install.sh on main, at the commit it is at.
-    nonisolated static func fetchScript() async throws -> (URL, String?) {
+    /// The newest signed release, checked: its install.sh to run, and where
+    /// its checked files are (SOUNDSTORM_RELEASE_DIR), so the script takes
+    /// its compose file from there and nothing from the branch. A release
+    /// that does not check out runs nothing.
+    nonisolated static func fetchScript() async throws -> (URL, [String: String]) {
         #if DEBUG
         // A checkout's own, to try a change before it is pushed.
         if let local = UserDefaults.standard.string(forKey: "script") {
             let copy = FileManager.default.temporaryDirectory.appending(path: "emberstorm-install-\(UUID().uuidString).sh")
             try FileManager.default.copyItem(at: URL(fileURLWithPath: local), to: copy)
-            return (copy, UserDefaults.standard.string(forKey: "branch"))
+            return (copy, [:])
         }
         #endif
-        var commit: String?
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/commits/main")!, timeoutInterval: 20)
-        request.setValue("application/vnd.github.sha", forHTTPHeaderField: "Accept")
-        if let (data, response) = try? await URLSession.shared.data(for: request),
-           (response as? HTTPURLResponse)?.statusCode == 200,
-           let sha = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           sha.count == 40, sha.allSatisfy(\.isHexDigit) {
-            commit = sha
-        }
-        let url = URL(string: "https://raw.githubusercontent.com/\(repo)/\(commit ?? "main")/install.sh")!
-        let (data, response): (Data, URLResponse)
+        var base = SignedRelease.base
+        var keys = SignedRelease.keys
+        #if DEBUG
+        // A test release (debug only): its address and the key it is signed with.
+        if let b = UserDefaults.standard.string(forKey: "releaseBase"), let u = URL(string: b) { base = u }
+        if let k = UserDefaults.standard.string(forKey: "releaseKey") { keys = [k] }
+        #endif
+        let dir = privateFolder.appending(path: "release")
+        let release: SignedRelease.Manifest
         do {
-            (data, response) = try await URLSession.shared.data(from: url)
+            release = try await SignedRelease.fetch(from: base, into: dir, keys: keys)
+        } catch let e as SignedRelease.Refused {
+            throw Failed(message: "EmberStorm's setup could not be checked, so nothing was run (\(e.reason)). Try again in a minute; if it says the same, download EmberStorm again from emberstorm.app.")
         } catch {
             throw Failed(message: "EmberStorm's setup could not be downloaded. Check this Mac is connected to the internet, then try again.")
         }
-        guard (response as? HTTPURLResponse)?.statusCode == 200, data.starts(with: Array("#!/bin/sh".utf8)) else {
-            throw Failed(message: "EmberStorm's setup could not be downloaded (GitHub answered something else). Try again in a minute.")
-        }
-        let file = FileManager.default.temporaryDirectory.appending(path: "emberstorm-install-\(UUID().uuidString).sh")
-        try data.write(to: file)
-        return (file, commit)
+        return (dir.appending(path: "install.sh"), [
+            "SOUNDSTORM_RELEASE_DIR": dir.path,
+            "SOUNDSTORM_RELEASE_VERSION": release.version,
+            "SOUNDSTORM_RELEASE_SERIAL": String(release.serial),
+        ])
     }
 
     /// A program sudo runs for the password, as there is no terminal: a
     /// window of macOS's own, saying why it is asked.
-    private static var privateFolder: URL {
+    nonisolated private static var privateFolder: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "EmberStorm")
     }
 

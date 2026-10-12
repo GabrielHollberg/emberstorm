@@ -152,3 +152,41 @@ func TestFetchWritesOnlyACheckedRelease(t *testing.T) {
 		t.Fatal("a list signed by another key was taken")
 	}
 }
+
+// The Mac app checks releases with the same keys, written into its source
+// (mac/EmberStorm/SignedRelease.swift): kept the same as box/release.pub.
+func TestTheMacAppHasTheReleaseKeys(t *testing.T) {
+	box, err := os.ReadFile("../../box/release.pub")
+	if err != nil {
+		t.Skip("no box/release.pub here")
+	}
+	swift, err := os.ReadFile("../../mac/EmberStorm/SignedRelease.swift")
+	if err != nil {
+		t.Skip("no Mac app here")
+	}
+	want, err := ParseKeys(box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(swift)
+	start := strings.Index(src, "static let keys: [String] = [")
+	end := strings.Index(src[start:], "]\n")
+	if start < 0 || end < 0 {
+		t.Fatal("no keys in SignedRelease.swift")
+	}
+	var got []string
+	for _, line := range strings.Split(src[start:start+end], "\n")[1:] {
+		line = strings.Trim(strings.TrimSpace(line), `",`)
+		if line != "" {
+			got = append(got, line)
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("the Mac app has %d release keys, box/release.pub %d: copy them over", len(got), len(want))
+	}
+	for i, k := range want {
+		if got[i] != base64.StdEncoding.EncodeToString(k) {
+			t.Fatalf("the Mac app's release key %d differs from box/release.pub: copy them over", i+1)
+		}
+	}
+}

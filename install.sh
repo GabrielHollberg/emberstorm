@@ -26,6 +26,20 @@ set -eu
 REPO="${SOUNDSTORM_REPO:-GabrielHollberg/emberstorm}"
 BRANCH="${SOUNDSTORM_BRANCH:-main}"
 COMPOSE_URL="${SOUNDSTORM_COMPOSE_URL:-https://raw.githubusercontent.com/$REPO/$BRANCH/docker-compose.yml}"
+# A signed release (the Mac app checked every file against the list the
+# release key signed, internal/desktoprelease - as EmberStorm.exe does on
+# Windows) is in SOUNDSTORM_RELEASE_DIR: the compose file, which names
+# EmberStorm's image by its digest, then comes from there and nothing from
+# the branch. Run by hand (curl | sh), it downloads from the branch as ever.
+RELEASE_DIR=""
+if [ -n "${SOUNDSTORM_RELEASE_DIR:-}" ] && [ -f "${SOUNDSTORM_RELEASE_DIR}/docker-compose.yml" ]; then
+	RELEASE_DIR=$SOUNDSTORM_RELEASE_DIR
+fi
+RELEASE_SERIAL=""
+case "${SOUNDSTORM_RELEASE_SERIAL:-}" in
+''|*[!0-9]*) ;;
+*) [ -n "$RELEASE_DIR" ] && RELEASE_SERIAL=$SOUNDSTORM_RELEASE_SERIAL ;;
+esac
 DIR="${SOUNDSTORM_DIR:-$PWD/soundstorm}"
 # The compose project, whose name prefixes every data volume. Always
 # soundstorm (docker-compose.yml says so); overridable only so a move can be
@@ -1423,7 +1437,25 @@ Uninstall it first (sh install.sh --uninstall; your media is kept), then
 import again."
 fi
 
-if [ -f docker-compose.yml ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ]; then
+# A release older than the one installed is not installed: an old signed
+# release served again would otherwise take an install back to it.
+if [ -n "$RELEASE_SERIAL" ]; then
+	had=$(get_env SOUNDSTORM_RELEASE_SERIAL)
+	case "$had" in
+	''|*[!0-9]*) ;;
+	*) [ "$RELEASE_SERIAL" -lt "$had" ] && die "This is an older release of EmberStorm (${SOUNDSTORM_RELEASE_VERSION:-}) than the one installed, so it was not installed.
+
+Download EmberStorm again from emberstorm.app and run it." ;;
+	esac
+fi
+
+if [ -n "$RELEASE_DIR" ]; then
+	[ -f docker-compose.yml ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ] && UPGRADE=1 || UPGRADE=0
+	[ "$UPGRADE" = "1" ] && note "already installed here - upgrading it instead"
+	cp "$RELEASE_DIR/docker-compose.yml" docker-compose.yml.new
+	mv docker-compose.yml.new docker-compose.yml
+	note "took docker-compose.yml from the signed release ${SOUNDSTORM_RELEASE_VERSION:-}"
+elif [ -f docker-compose.yml ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ]; then
 	note "already installed here - upgrading it instead"
 	UPGRADE=1
 	# The current compose file too: an update used to keep the one it was
@@ -1946,6 +1978,11 @@ if [ -n "$SETUP_QS" ]; then
 		"    $DIR/.env"
 fi
 # For the Mac setup app (mac/), which shows these in its own window.
+# Which signed release this is, so an older one is refused next time.
+if [ -n "$RELEASE_SERIAL" ]; then
+	set_env SOUNDSTORM_RELEASE_SERIAL "$RELEASE_SERIAL"
+	[ -n "${SOUNDSTORM_RELEASE_VERSION:-}" ] && set_env SOUNDSTORM_RELEASE_VERSION "$SOUNDSTORM_RELEASE_VERSION"
+fi
 if [ -n "${EMBERSTORM_RESULT:-}" ]; then
 	{
 		printf 'URL=%s\n' "$URL"
