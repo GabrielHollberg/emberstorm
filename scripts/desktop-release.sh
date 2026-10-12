@@ -128,5 +128,7 @@ echo "Release $version (serial $serial) made in $dir:"
 ls -l "$dir"
 echo
 echo "Sign it on the PC with the YubiKey (its PIN and a touch):"
-echo "  py box\\yubikey.py sign $(wslpath -w "$dir/desktop.json" 2>/dev/null || echo "$dir/desktop.json")"
+# printf, not echo: dash's echo reads the Windows path's backslashes as escapes.
+printf '  py box\\yubikey.py sign %s\n' "$(wslpath -w "$dir/desktop.json" 2>/dev/null || echo "$dir/desktop.json")"
+echo "  (or from the phone: the signing helper, scripts/signing-helper.py, and EmberStorm Signer)"
 echo "then publish: sh scripts/desktop-release.sh -p -v $version -o $dir"

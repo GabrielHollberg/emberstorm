@@ -2,8 +2,8 @@
 1 ICON "../../../emberstorm.ico"
 1 24 "setup.manifest"
 1 VERSIONINFO
-FILEVERSION 0,12,0,0
-PRODUCTVERSION 0,12,0,0
+FILEVERSION 0,13,0,0
+PRODUCTVERSION 0,13,0,0
 FILEOS 0x40004
 FILETYPE 0x1
 BEGIN
@@ -13,12 +13,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "EmberStorm"
       VALUE "FileDescription", "EmberStorm Setup"
-      VALUE "FileVersion", "0.12.0"
+      VALUE "FileVersion", "0.13.0"
       VALUE "InternalName", "EmberStorm"
       VALUE "LegalCopyright", "EmberStorm contributors, AGPL-3.0"
       VALUE "OriginalFilename", "EmberStorm.exe"
       VALUE "ProductName", "EmberStorm"
-      VALUE "ProductVersion", "0.12.0"
+      VALUE "ProductVersion", "0.13.0"
     END
   END
   BLOCK "VarFileInfo"
