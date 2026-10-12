@@ -26,9 +26,6 @@ import com.yubico.yubikit.piv.KeyType
 import com.yubico.yubikit.piv.PivSession
 import com.yubico.yubikit.piv.Slot
 import org.json.JSONObject
-import java.net.CookieHandler
-import java.net.CookieManager
-import java.net.CookiePolicy
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -38,16 +35,20 @@ import java.util.concurrent.Executors
  * EmberStorm Signer: the developer's own app for signing a release away from
  * the PC, the release key's YubiKey held to the back of the phone.
  *
- * The PC makes the release and leaves it on the developer's own EmberStorm
- * server, waiting (httpapi/signing.go, SOUNDSTORM_SIGNING). Here: sign in to
- * that server as its owner, see what waits - read from the release's own
- * bytes, not from anything the server says of it - and sign. The YubiKey
+ * The PC makes the release and hands it over itself, over Tailscale only
+ * (scripts/signing-helper.py, listening on the PC's Tailscale address alone):
+ * the release never sits on the internet-facing EmberStorm server, and being
+ * on the developer's Tailscale is the pass - no password here. Tailscale
+ * encrypts everything between the phone and the PC; this app talks to
+ * nothing but a Tailscale name or address. Here: see what waits - read from
+ * the release's own bytes, with its fingerprint to compare with the one the
+ * PC gave - and sign. The YubiKey
  * signs those very bytes inside itself (Ed25519 in its PIV slot 9c, as
  * box/yubikey.py signs on the PC: the bytes themselves, nothing added), after
  * its PIN; the app first checks the key on it is one of EmberStorm's release
  * keys (box/release.pub, copied in at build). The signature goes back to the
- * server, which checks it again and keeps it beside the file. The key never
- * leaves the YubiKey; nothing is kept on the phone but the server's address.
+ * PC, which checks it again and keeps it beside the file. The key never
+ * leaves the YubiKey; nothing is kept on the phone but the PC's name.
  */
 class MainActivity : Activity() {
     private val background = Executors.newSingleThreadExecutor()
@@ -58,8 +59,6 @@ class MainActivity : Activity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        // Cookies in memory only: signed in each time the app is opened.
-        CookieHandler.setDefault(CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER))
         yubikit = YubiKitManager(this)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -69,7 +68,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.BLACK)
             addView(root)
         })
-        showSignIn()
+        if (prefs.getString("pc", "").isNullOrEmpty()) showAddress() else showWaiting()
     }
 
     override fun onPause() {
@@ -79,50 +78,16 @@ class MainActivity : Activity() {
 
     // --- screens -------------------------------------------------------------
 
-    private fun showSignIn(message: String? = null) {
+    private fun showAddress(message: String? = null) {
         root.removeAllViews()
-        title("Sign in to your EmberStorm")
-        text("Your own server, as its owner. Releases the PC left there to be signed show next.", muted = true)
-        val server = field("Server address", prefs.getString("server", "") ?: "", InputType.TYPE_TEXT_VARIATION_URI)
-        val user = field("Username", prefs.getString("user", "") ?: "", InputType.TYPE_CLASS_TEXT)
-        val pass = field("Password", "", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        title("Your PC on Tailscale")
+        text("Its Tailscale name, as the Tailscale app shows it - something like mypc.tail1234.ts.net - or its 100.x address. Turn Tailscale on, on this phone and the PC.", muted = true)
+        val pc = field("PC", prefs.getString("pc", "") ?: "", InputType.TYPE_TEXT_VARIATION_URI)
         message?.let { text(it, error = true) }
-        button("Sign in") {
-            val address = normalise(server.text.toString()) ?: return@button showSignIn("Type the server's address, starting https://")
-            prefs.edit().putString("server", address).putString("user", user.text.toString().trim()).apply()
-            busy("Signing in...")
-            background.execute {
-                val body = JSONObject().put("username", user.text.toString().trim()).put("password", pass.text.toString()).toString()
-                val (code, answer) = call("POST", "/api/login", body)
-                runOnUiThread {
-                    when (code) {
-                        200 -> showWaiting()
-                        202 -> waitForApproval(JSONObject(answer).optString("pending"))
-                        else -> showSignIn(errorOf(answer, "Could not sign in ($code)."))
-                    }
-                }
-            }
-        }
-    }
-
-    // A server that approves new devices holds the sign-in until a device
-    // already signed in allows it (httpapi/devices.go).
-    private fun waitForApproval(id: String) {
-        root.removeAllViews()
-        title("Waiting for approval")
-        text("Allow this sign-in on a phone or computer already signed in to your EmberStorm.", muted = true)
-        background.execute {
-            repeat(200) {
-                Thread.sleep(3000)
-                val (code, answer) = call("GET", "/api/login/pending/$id", null)
-                if (code == 200 && JSONObject(answer).optBoolean("signedIn")) {
-                    runOnUiThread { showWaiting() }; return@execute
-                }
-                if (code == 403 || code == 404) {
-                    runOnUiThread { showSignIn(errorOf(answer, "The sign-in was not allowed.")) }; return@execute
-                }
-            }
-            runOnUiThread { showSignIn("Nobody allowed the sign-in in time.") }
+        button("Next") {
+            val host = tailscaleHost(pc.text.toString()) ?: return@button showAddress("That is not a Tailscale name (ending .ts.net) or address (100.x).")
+            prefs.edit().putString("pc", host).apply()
+            showWaiting()
         }
     }
 
@@ -137,18 +102,15 @@ class MainActivity : Activity() {
                 root.removeAllViews()
                 title("Waiting to be signed")
                 message?.let { text(it) }
-                if (code == 404) {
-                    text("This server is not set up for signing (SOUNDSTORM_SIGNING).", error = true)
-                    return@runOnUiThread
-                }
                 if (code != 200) {
-                    text(errorOf(answer, "Could not ask the server ($code)."), error = true)
-                    button("Sign in again") { showSignIn() }
+                    text(errorOf(answer, "Could not reach the PC ($code). Is Tailscale on, here and on the PC, and the signing helper running there?"), error = true)
+                    button("Try again") { showWaiting() }
+                    button("Change the PC", ghost = true) { showAddress() }
                     return@runOnUiThread
                 }
                 val items = JSONObject(answer).optJSONArray("items")
                 if (items == null || items.length() == 0) {
-                    text("Nothing is waiting. The PC leaves a release here when it is ready.", muted = true)
+                    text("Nothing is waiting on the PC.", muted = true)
                 }
                 for (i in 0 until (items?.length() ?: 0)) {
                     val item = items!!.getJSONObject(i)
@@ -256,22 +218,29 @@ class MainActivity : Activity() {
             val (code, answer) = call("PUT", "/api/signing/$name", body)
             runOnUiThread {
                 if (code == 200) showWaiting("Signed. The PC can publish it now.")
-                else showWaiting(errorOf(answer, "The server did not take the signature ($code)."))
+                else showWaiting(errorOf(answer, "The PC did not take the signature ($code)."))
             }
         }
     }
 
-    // --- the server --------------------------------------------------------------
+    // --- the PC --------------------------------------------------------------
 
-    private fun normalise(typed: String): String? {
-        var s = typed.trim().trimEnd('/')
-        if (s.isEmpty()) return null
-        if (!s.startsWith("https://")) s = "https://" + s.removePrefix("http://")
-        return runCatching { URL(s).let { "https://${it.host}" + if (it.port > 0) ":${it.port}" else "" } }.getOrNull()
+    /**
+     * A Tailscale name (MagicDNS, ending .ts.net) or a Tailscale address
+     * (100.64.0.0/10), and nothing else: plain http is only ever sent inside
+     * Tailscale's encrypted link.
+     */
+    private fun tailscaleHost(typed: String): String? {
+        val h = typed.trim().lowercase().removePrefix("http://").removePrefix("https://").substringBefore('/').substringBefore(':')
+        if (Regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\\.ts\\.net$").matches(h)) return h
+        val parts = h.split('.').mapNotNull { it.toIntOrNull() }
+        if (parts.size == 4 && h.count { it == '.' } == 3 && parts.all { it in 0..255 } && parts[0] == 100 && parts[1] in 64..127) return h
+        return null
     }
 
     private fun call(method: String, path: String, body: String?): Pair<Int, String> = runCatching {
-        val conn = URL((prefs.getString("server", "") ?: "") + path).openConnection() as HttpURLConnection
+        val host = tailscaleHost(prefs.getString("pc", "") ?: "") ?: error("No PC set")
+        val conn = URL("http://$host:8098$path").openConnection() as HttpURLConnection
         conn.requestMethod = method
         conn.connectTimeout = 15_000
         conn.readTimeout = 30_000
@@ -286,7 +255,7 @@ class MainActivity : Activity() {
         val text = stream?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
         conn.disconnect()
         code to text
-    }.getOrElse { 0 to JSONObject().put("error", "Could not reach the server: ${it.message}").toString() }
+    }.getOrElse { 0 to JSONObject().put("error", "Could not reach the PC: ${it.message}").toString() }
 
     private fun errorOf(answer: String, fallback: String) =
         runCatching { JSONObject(answer).optString("error").takeIf { it.isNotBlank() } }.getOrNull() ?: fallback

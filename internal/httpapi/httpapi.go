@@ -189,7 +189,6 @@ type Server struct {
 	scrobbling       sync.Map // account id -> a send in progress
 	beats            *beatStore
 	trainingDir      string
-	signingDir       string
 	// drivesDir is where the box's system mounts a USB drive plugged into
 	// it, read-only (drives.go); empty everywhere but a box.
 	// inviteTries limits invitation lookups per address (invites.go).
@@ -314,9 +313,6 @@ type Config struct {
 	// developer's own install only (SOUNDSTORM_TRAINING; see training.go).
 	// Empty, as everywhere else, means there is no training at all.
 	TrainingDir string
-	// SigningDir holds releases waiting for the developer's signing app, on
-	// their own install only (SOUNDSTORM_SIGNING; signing.go).
-	SigningDir string
 
 	// DrivesDir is where the box mounts USB drives plugged into it, read-only
 	// (SOUNDSTORM_DRIVES_DIR; drives.go). Empty: no drives to bring media in
@@ -392,7 +388,6 @@ func New(cfg Config) *Server {
 		scrobble:         cfg.Scrobble,
 		beats:            newBeatStore(cfg.BeatsDir),
 		trainingDir:      cfg.TrainingDir,
-		signingDir:       cfg.SigningDir,
 		deleted:          deletedPhotos{file: stateFile(cfg.StateDir, "photos-deleted.json")},
 		photoSendsRec:    photoSends{file: stateFile(cfg.StateDir, sendsStateFile)},
 		photoSharesRec:   photoShares{file: stateFile(cfg.StateDir, sharesStateFile)},
@@ -670,8 +665,6 @@ func (s *Server) Routes() http.Handler {
 	owner.HandleFunc("DELETE /api/reset", s.handleCancelReset)
 	owner.HandleFunc("GET /api/reset/waiting", s.handleResetWaiting)
 	owner.HandleFunc("POST /api/box/poweroff", s.handleBoxPowerOff)
-	owner.HandleFunc("GET /api/signing", s.handleSigning)
-	owner.HandleFunc("PUT /api/signing/{name}", s.handleSigningSign)
 	owner.HandleFunc("GET /api/box/timezone", s.handleBoxTimeZone)
 	owner.HandleFunc("PUT /api/box/timezone", s.handleBoxTimeZone)
 	owner.HandleFunc("GET /api/box/updates", s.handleBoxUpdates)
@@ -723,8 +716,6 @@ func (s *Server) Routes() http.Handler {
 	guarded.Handle("/api/reset/waiting", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/box/timezone", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/box/poweroff", s.auth.RequireOwner(owner))
-	guarded.Handle("/api/signing", s.auth.RequireOwner(owner))
-	guarded.Handle("/api/signing/", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/box/updates", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/box/updates/", s.auth.RequireOwner(owner))
 	guarded.Handle("/api/drives", s.auth.RequireOwner(owner))

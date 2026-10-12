@@ -121,7 +121,6 @@ func newHarness(t *testing.T, sources ...source.Source) *harness {
 		Collections:      testCollections(t),
 		DrivesDir:        testDrivesDir,
 		CaretakerSocket:  testCaretakerSocket,
-		SigningDir:       testSigningDir,
 	})
 
 	srv := httptest.NewServer(api.Routes())

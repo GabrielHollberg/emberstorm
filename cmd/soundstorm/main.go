@@ -372,17 +372,6 @@ func run(log *slog.Logger) error {
 		log.Info("training mode is on: Now Playing can record for the looks", "dir", trainingDir)
 	}
 
-	// Releases waiting for the developer's signing app (httpapi/signing.go):
-	// the developer's install alone, as training is.
-	signingDir := ""
-	if enabled(env("SOUNDSTORM_SIGNING", "false")) {
-		signingDir = filepath.Join(stateDir, "signing")
-		if err := os.MkdirAll(signingDir, 0o700); err != nil {
-			log.Warn("could not make the signing folder", "err", err)
-		}
-		log.Info("signing mode is on: releases put in the signing folder can be signed from the phone", "dir", signingDir)
-	}
-
 	api := httpapi.New(httpapi.Config{
 		Registry:         registry,
 		Store:            store,
@@ -437,7 +426,6 @@ func run(log *slog.Logger) error {
 		WhisperURL:      env("SOUNDSTORM_WHISPER_URL", "http://whisper:9000"),
 		StateDir:        stateDir,
 		TrainingDir:     trainingDir,
-		SigningDir:      signingDir,
 		DrivesDir:       os.Getenv("SOUNDSTORM_DRIVES_DIR"),
 		CaretakerSocket: os.Getenv("SOUNDSTORM_CARETAKER"),
 		BoxUnit:         os.Getenv("SOUNDSTORM_UNIT"),

@@ -10,7 +10,7 @@
         android:label="EmberStorm Signer"
         android:icon="@android:drawable/ic_lock_lock"
         android:theme="@android:style/Theme.Material.NoActionBar"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
