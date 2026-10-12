@@ -300,13 +300,23 @@
         <p id="my-photos-folders" class="muted small-print"></p>
         <!-- In the Android app: backing up this phone's camera roll. -->
         <div id="backup-controls" class="hidden">
-          <label class="remote-switch"><input id="backup-on" type="checkbox"><span>Back up this phone's photos and videos</span></label>
-          <div id="backup-options">
-            <label class="remote-switch"><input id="backup-wifi" type="checkbox"><span>Only on Wi-Fi</span></label>
-            <label class="remote-switch"><input id="backup-videos" type="checkbox"><span>Include videos</span></label>
-            <label class="remote-switch"><input id="backup-charging" type="checkbox"><span>Only while charging</span></label>
+          <!-- Whose phone it is on this server: only its own person backs it up. -->
+          <div id="backup-claim" class="hidden">
+            <p class="muted">Only the person whose phone this is can back up its photos to this server. Saying it's yours doesn't back anything up yet: it puts the switch here, for when you want it.</p>
+            <button id="backup-claim-yes" type="button" class="ghost">This is my phone</button>
           </div>
-          <p id="backup-status" class="muted" role="status"></p>
+          <p id="backup-whose" class="muted hidden"></p>
+          <div id="backup-mine">
+            <label class="remote-switch"><input id="backup-on" type="checkbox"><span>Back up this phone's photos and videos</span></label>
+            <div id="backup-options">
+              <label class="remote-switch"><input id="backup-wifi" type="checkbox"><span>Only on Wi-Fi</span></label>
+              <label class="remote-switch"><input id="backup-videos" type="checkbox"><span>Include videos</span></label>
+              <label class="remote-switch"><input id="backup-charging" type="checkbox"><span>Only while charging</span></label>
+            </div>
+            <p id="backup-status" class="muted" role="status"></p>
+            <p id="backup-elsewhere" class="muted hidden"></p>
+            <button id="backup-release" type="button" class="ghost hidden">This isn't my phone</button>
+          </div>
         </div>
         <button id="import-open" type="button" class="ghost">Bring your photos in from anywhere</button>
         <!-- Bringing a photo library in: the download each service gives, as

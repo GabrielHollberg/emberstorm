@@ -1060,7 +1060,7 @@ $('logout').addEventListener('click', async () => {
   closeVideo();
   // Downloads are the signed-in person's; a shared device keeps nothing of
   // theirs after they sign out - nor goes on backing up their photos.
-  if (BACKUP_APP) window.soundstormApp.backup('set', { enabled: false });
+  if (BACKUP_APP) backupCall('set', { enabled: false });
   await clearDownloads();
   await api('/api/logout', { method: 'POST' });
   if (state.setupTimer) clearInterval(state.setupTimer);
@@ -1108,7 +1108,7 @@ async function showApp(me) {
     const owner = localStorage.getItem('soundstorm-owner');
     // Downloads nobody is recorded as owning are as good as somebody else's.
     if (me && me.id && ((owner && owner !== me.id) || (!owner && hasDownloads()))) {
-      if (BACKUP_APP) window.soundstormApp.backup('set', { enabled: false });
+      if (BACKUP_APP) backupCall('set', { enabled: false });
       await clearDownloads();
     }
     if (me && me.id) localStorage.setItem('soundstorm-owner', me.id);
@@ -1161,7 +1161,7 @@ function renderAccount() {
   show($('people-block'), Boolean(me.owner));
   refreshMyPhotos();
   refreshDeviceCard();
-  if (BACKUP_APP) window.soundstormApp.backup('status');
+  if (BACKUP_APP) backupCall('status');
   if (me.owner) {
     loadPeople();
     loadInvites();
@@ -1987,6 +1987,13 @@ window.__soundstormBackup = (status) => {
   renderBackup();
   maybeAskBackup();
 };
+// Every message says this page knows whose phone it is (phones): each
+// server's backup belongs to the phone's own person there, who the app asks
+// "Is this your phone?" (ios/ PhotoBackup.swift; Android to follow). An app
+// that does not know it answers as before, without `phone`.
+function backupCall(cmd, options) {
+  window.soundstormApp.backup(cmd, { ...(options || {}), phones: 1 });
+}
 function backupSet(options) {
   // Changing it in Settings is an answer too: not asked again after.
   try { localStorage.setItem('soundstorm.backupAsked', '1'); } catch { /* no storage */ }
@@ -1994,7 +2001,7 @@ function backupSet(options) {
   // and the server refuses photos meant for somebody else - on a shared
   // phone the next person's cookie would otherwise take the first person's
   // photos (a security review).
-  if (BACKUP_APP) window.soundstormApp.backup('set', { ...options, account: (state.me && state.me.id) || '' });
+  if (BACKUP_APP) backupCall('set', { ...options, account: (state.me && state.me.id) || '' });
 }
 function hasPictures() {
   return Boolean(state.me && (state.me.libraries || []).includes('picture'));
@@ -2004,6 +2011,18 @@ function renderBackup() {
   const st = state.backup;
   show($('backup-controls'), Boolean(BACKUP_APP && st && hasPictures()));
   if (!st) return;
+  // Whose phone it is on this server: only its own person backs it up. Not
+  // claimed, anybody may say it is theirs; somebody else's, only who it is.
+  const phone = st.phone || 'mine';
+  show($('backup-claim'), phone === 'unclaimed');
+  show($('backup-whose'), phone === 'theirs');
+  $('backup-whose').textContent = `This phone's photos are backed up only by ${st.phoneOwner || 'the person'} whose phone it is.`;
+  show($('backup-mine'), phone === 'mine');
+  show($('backup-release'), phone === 'mine' && Boolean(st.phone));
+  const elsewhere = (phone === 'mine' && st.elsewhere) || [];
+  $('backup-elsewhere').textContent = elsewhere.length ? `This phone also backs up to ${elsewhere.join(', ')}.` : '';
+  show($('backup-elsewhere'), elsewhere.length > 0);
+  if (phone !== 'mine') return;
   $('backup-on').checked = st.enabled;
   $('backup-wifi').checked = st.wifiOnly;
   $('backup-videos').checked = st.videos;
@@ -2028,7 +2047,7 @@ function renderBackup() {
   clearTimeout(renderBackup.poll);
   if (BACKUP_APP && st.enabled && st.running) {
     renderBackup.poll = setTimeout(() => {
-      if (!document.hidden && $('backup-controls').offsetParent) window.soundstormApp.backup('status');
+      if (!document.hidden && $('backup-controls').offsetParent) backupCall('status');
       else renderBackup();
     }, 2000);
   }
@@ -2042,6 +2061,8 @@ function maybeAskBackup() {
   // Not the app's "decided": switching backup off for the last person marks
   // that too, and the next person was never asked.
   if (!BACKUP_APP || !st || st.enabled || !hasPictures() || localStorage.getItem('soundstorm.backupAsked')) return;
+  // An app that asks whose phone it is offers backup only in Settings.
+  if (st.phone) return;
   $('backup-ask-text').textContent = state.me && state.me.owner
     ? 'New photos and videos are sent to your server in the background, on Wi-Fi, into your own folder. Photos already on the server are not sent again. You can change this in Settings.'
     : 'New photos and videos are sent to this server in the background, on Wi-Fi, into your own folder. Photos already on the server are not sent again. Only you see them in the app; whoever looks after the server\'s computer can still open its folders. You can change this in Settings.';
@@ -2058,10 +2079,24 @@ $('backup-on').addEventListener('change', (e) => backupSet({ enabled: e.target.c
 $('backup-wifi').addEventListener('change', (e) => backupSet({ wifiOnly: e.target.checked }));
 $('backup-videos').addEventListener('change', (e) => backupSet({ videos: e.target.checked }));
 $('backup-charging').addEventListener('change', (e) => backupSet({ charging: e.target.checked }));
+$('backup-claim-yes').addEventListener('click', () => backupCall('claim'));
+$('backup-release').addEventListener('click', (e) => {
+  // A second tap, as deleting a playlist: it turns backup off here too.
+  const b = e.currentTarget;
+  if (!b.dataset.sure) {
+    b.dataset.sure = '1';
+    b.textContent = 'Tap again: backup here stops, and the next person to sign in is asked';
+    setTimeout(() => { delete b.dataset.sure; b.textContent = "This isn't my phone"; }, 5000);
+    return;
+  }
+  delete b.dataset.sure;
+  b.textContent = "This isn't my phone";
+  backupCall('release');
+});
 // While Settings is open the numbers move; asked every few seconds.
 setInterval(() => {
   if (BACKUP_APP && !$('my-photos-block').classList.contains('hidden') && document.visibilityState === 'visible') {
-    window.soundstormApp.backup('status');
+    backupCall('status');
   }
 }, 4000);
 

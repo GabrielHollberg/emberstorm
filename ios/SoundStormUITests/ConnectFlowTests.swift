@@ -153,21 +153,21 @@ final class ConnectFlowTests: XCTestCase {
             // Open already (a group of one card, or opened earlier): a tap would fold it.
             if !web.descendants(matching: .any)["Back up this phone's photos and videos"].firstMatch.exists { card.tap() }
         }
-        let turnOn = web.buttons["Turn on"]
-        if turnOn.waitForExistence(timeout: 8) {
-            turnOn.tap()
-            openSettings(web)
-            openPhotosCard()
-        } else {
-            openSettings(web)
-            openPhotosCard()
-            let toggle = web.descendants(matching: .any)["Back up this phone's photos and videos"].firstMatch
-            for _ in 0..<16 where !toggle.isHittable { web.swipeUp() }
-            XCTAssertTrue(toggle.isHittable, "no backup switch in Settings")
-            // On already from an earlier run, it stays on.
-            let on = (toggle.value as? String) == "1" || (toggle.value as? NSNumber)?.boolValue == true
-            if !on { toggle.tap() }
-        }
+        // Whose phone it is, asked by the app once; backup itself is turned
+        // on in Settings.
+        let mine = app.alerts["Is this your iPhone?"].buttons["Yes, it's mine"]
+        if mine.waitForExistence(timeout: 8) { mine.tap() }
+        let skip = web.descendants(matching: .any)["Skip the rest of the welcome"].firstMatch
+        if skip.waitForExistence(timeout: 6) { skip.tap() }
+        sleep(2)
+        openSettings(web)
+        openPhotosCard()
+        let toggle = web.descendants(matching: .any)["Back up this phone's photos and videos"].firstMatch
+        for _ in 0..<16 where !toggle.isHittable { web.swipeUp() }
+        XCTAssertTrue(toggle.isHittable, "no backup switch in Settings")
+        // On already from an earlier run, it stays on.
+        let on = (toggle.value as? String) == "1" || (toggle.value as? NSNumber)?.boolValue == true
+        if !on { toggle.tap() }
         // The system asks once for the photo library.
         let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow Full Access"]
         if allow.waitForExistence(timeout: 10) { allow.tap() }
@@ -178,6 +178,59 @@ final class ConnectFlowTests: XCTestCase {
             _ = done.waitForExistence(timeout: 5)
         }
         XCTAssertTrue(done.exists, "Settings never said the photos were backed up")
+    }
+
+    /// Whose phone it is (the owner's design, 2026-10-12): signing in, the
+    /// app asks "Is this your iPhone?" - which backs nothing up; Yes puts the
+    /// backup switch in Settings, with "This isn't my phone" to let it go, and
+    /// letting it go leaves "This is my phone" for whoever's it is. Needs a
+    /// server whose page knows it (ConnectFlowTests' header).
+    func testWhosePhoneIsAskedAndCanBeLetGo() {
+        let field = app.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        focus(field)
+        field.typeText(server + "\n")
+        let web = app.webViews.firstMatch
+        let settings = circle(web)
+        XCTAssertTrue(settings.waitForExistence(timeout: 15) || web.textFields.firstMatch.exists, "the server's page never appeared")
+        if !settings.exists { signIn(web) }
+        XCTAssertTrue(settings.waitForExistence(timeout: 15), "never got past signing in")
+
+        let question = app.alerts["Is this your iPhone?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 15), "the app never asked whose phone it is")
+        XCTAssertTrue(question.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "doesn't back anything up")).firstMatch.exists,
+                      "the question must say it backs nothing up")
+        question.buttons["Yes, it's mine"].tap()
+        // The note goes by itself; the page's welcome, open over everything
+        // on a new server, keeps it from the test's view, so it is looked at
+        // in a picture of the screen instead.
+        sleep(1)
+        try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/whose-phone-note.png"))
+        // A new server's owner gets the welcome over everything first.
+        let skip = web.descendants(matching: .any)["Skip the rest of the welcome"].firstMatch
+        if skip.waitForExistence(timeout: 6) { skip.tap() }
+        sleep(2)
+
+        openSettings(web)
+        let card = web.buttons.containing(NSPredicate(format: "label BEGINSWITH %@", "Your photos")).firstMatch
+        for _ in 0..<16 where !card.isHittable { web.swipeUp() }
+        XCTAssertTrue(card.isHittable, "no Your photos card in Settings")
+        let toggle = web.descendants(matching: .any)["Back up this phone's photos and videos"].firstMatch
+        if !toggle.exists { card.tap() }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "no backup switch for the phone's own person")
+        let release = web.buttons["This isn't my phone"]
+        for _ in 0..<8 where !release.isHittable { web.swipeUp() }
+        XCTAssertTrue(release.isHittable, "no way to let the phone go")
+        release.tap()
+        let sure = web.buttons.containing(NSPredicate(format: "label BEGINSWITH %@", "Tap again")).firstMatch
+        XCTAssertTrue(sure.waitForExistence(timeout: 3))
+        sure.tap()
+        let claim = web.buttons["This is my phone"]
+        XCTAssertTrue(claim.waitForExistence(timeout: 10), "letting it go did not offer it again")
+        XCTAssertFalse(toggle.isHittable, "the switch stayed after letting the phone go")
+        // Claimed again from Settings: the fix for a No said by accident.
+        claim.tap()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "claiming from Settings gave no switch")
     }
 
     /// Signing out turns this phone's backup off, as it must - the next

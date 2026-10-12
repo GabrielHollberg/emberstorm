@@ -152,6 +152,35 @@ final class WebViewController: UIViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in self?.letGoOfOpeningScreen() }
     }
 
+    /// A short note at the top of the screen that goes by itself.
+    private func showNote(_ text: String) {
+        let label = UILabel()
+        label.text = text
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.textColor = .white
+        label.font = .preferredFont(forTextStyle: .subheadline)
+        let note = UIView()
+        note.backgroundColor = UIColor(white: 0.14, alpha: 0.96)
+        note.layer.cornerRadius = 14
+        note.translatesAutoresizingMaskIntoConstraints = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+        note.addSubview(label)
+        view.addSubview(note)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: note.topAnchor, constant: 12),
+            label.bottomAnchor.constraint(equalTo: note.bottomAnchor, constant: -12),
+            label.leadingAnchor.constraint(equalTo: note.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(equalTo: note.trailingAnchor, constant: -16),
+            note.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            note.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            note.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+        ])
+        note.alpha = 0
+        UIView.animate(withDuration: 0.25) { note.alpha = 1 }
+        UIView.animate(withDuration: 0.4, delay: 5, options: []) { note.alpha = 0 } completion: { _ in note.removeFromSuperview() }
+    }
+
     private func letGoOfOpeningScreen() {
         guard let cover = opening else { return }
         opening = nil
@@ -644,12 +673,16 @@ final class WebViewController: UIViewController {
         webView.evaluateJavaScript("window.\(function) && window.\(function)(\(json))")
     }
 
-    /// How photo backup is going, to the page's Settings.
-    private func reportBackup() {
-        guard let data = try? JSONSerialization.data(withJSONObject: PhotoBackup.shared.status()),
+    /// How this server's photo backup is going, to the page's Settings.
+    private func reportBackup(_ status: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: status),
               let json = String(data: data, encoding: .utf8) else { return }
         webView.evaluateJavaScript("window.__soundstormBackup && window.__soundstormBackup(\(json))")
     }
+
+    /// "Is this your iPhone?" being asked now: one at a time, as the page
+    /// asks for backup's status every few seconds.
+    private var askingWhose = false
 
     fileprivate func received(_ message: WKScriptMessage) {
         // Only the server's own pages may ask the app for anything.
@@ -729,33 +762,35 @@ final class WebViewController: UIViewController {
             }
             volumeKeys.set(body["on"] as? Bool ?? false, in: view.window)
         case "backup":
+            // Each server's backup belongs to this phone's own person there
+            // (PhotoBackup): who is signed in is asked of the server, so no
+            // page message - nor a second person signing in - changes another
+            // person's backup.
             let command = body["cmd"] as? String ?? ""
-            var options = body["options"] as? [String: Any] ?? [:]
-            let backup = PhotoBackup.shared
-            let ours = backup.isDestination(current, typed: server)
+            let options = body["options"] as? [String: Any] ?? [:]
+            // A page that knows whose phone it is (`phones`) is told so; an
+            // older page sees only its own person's backup, as before.
+            let knowsPhones = options["phones"] != nil
+            let page = current
+            let typed = server
             Task {
-                // Only a person's yes points backup at a server: a status
-                // message changes nothing, and a page from another server
-                // than backup's may only turn it on here, after the app has
-                // asked by name (the blind security review: any page shown
-                // could point backup at itself, and switch it on).
-                if command == "set" {
-                    if options["enabled"] as? Bool == true && (!ours || !backup.enabled) {
-                        if await askToBackUp(to: current) {
-                            backup.rememberServer(current, typed: server)
-                            await backup.handle(command, options: options)
-                        } else {
-                            options["enabled"] = false
-                            if ours { await backup.handle(command, options: options) }
-                        }
-                    } else if ours || !backup.hasDestination {
-                        await backup.handle(command, options: options)
-                    }
+                let backup = PhotoBackup.shared
+                guard let who = await backup.whoIs(page) else { return }
+                if command != "status" {
+                    await backup.handle(command, options: options, page: page, typed: typed, who: who)
                 }
-                self.reportBackup()
+                if backup.shouldAsk(page, who), !askingWhose, page == current {
+                    askingWhose = true
+                    let yes = await askWhosePhone(on: who.serverName)
+                    askingWhose = false
+                    backup.answered(yes, page: page, typed: typed, who: who)
+                    if yes { showNote("You can turn on photo backup in Settings, Your photos, whenever you like.") }
+                }
+                let status = backup.status(page, who)
+                if knowsPhones || status["phone"] as? String == "mine" { reportBackup(status) }
                 // The page is up and signed in: a run that found no sign-in
                 // at launch can go now - but not one per message.
-                PhotoBackup.shared.pageAsked()
+                backup.pageAsked()
             }
         default:
             break
@@ -784,15 +819,18 @@ final class WebViewController: UIViewController {
     /// 0.46 checks. From a LAN address the id is not known, and any home name
     /// on the same port is accepted: home names only ever point at private
     /// addresses, and the page asking to go there is the server's own.
-    /// The app's own question before backup sends anywhere new: the page
-    /// cannot answer it.
-    private func askToBackUp(to url: URL) async -> Bool {
-        let host = url.host() ?? url.absoluteString
+    /// The app's own question, once per person on a server where this phone
+    /// is nobody's yet: whose phone it is - not whether to back up (the
+    /// owner's wording, 2026-10-12: it only makes backup possible later).
+    private func askWhosePhone(on serverName: String) async -> Bool {
+        let device = UIDevice.current.model // iPhone, iPad
+        let place = serverName.isEmpty ? "this server" : serverName
         return await withCheckedContinuation { done in
-            let ask = UIAlertController(title: "Back up this iPhone's photos and videos to \(host)?",
-                                        message: "Your photos will be sent to this server, and kept there.", preferredStyle: .alert)
-            ask.addAction(UIAlertAction(title: "Don't Allow", style: .cancel) { _ in done.resume(returning: false) })
-            ask.addAction(UIAlertAction(title: "Back Up", style: .default) { _ in done.resume(returning: true) })
+            let ask = UIAlertController(title: "Is this your \(device)?",
+                                        message: "Saying yes doesn't back anything up. It only means that later, if you want to, you can turn on photo backup for this \(device) in your Settings. Only one person on \(place) can.",
+                                        preferredStyle: .alert)
+            ask.addAction(UIAlertAction(title: "Not mine", style: .cancel) { _ in done.resume(returning: false) })
+            ask.addAction(UIAlertAction(title: "Yes, it's mine", style: .default) { _ in done.resume(returning: true) })
             var top: UIViewController = self
             while let shown = top.presentedViewController { top = shown }
             top.present(ask, animated: true)
@@ -966,6 +1004,9 @@ extension WebViewController: WKNavigationDelegate {
     /// TV the new page knew nothing of, and the phone's own volume stayed
     /// stuck in the middle - the page says again if it still controls one.
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // A new page (signed in or out, another person chosen): who is signed
+        // in is asked afresh.
+        PhotoBackup.shared.forgetWho(current)
         volumeKeys.set(false, in: nil)
     }
 
