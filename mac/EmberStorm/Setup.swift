@@ -77,6 +77,24 @@ final class Setup {
         #endif
         if let found = await Install.find() {
             dir = found
+            // A setup stopped part way (closed, the Mac switched off during
+            // the download) left a folder that looks installed: the questions
+            // again, and install.sh carries on there. With no mark, Docker is
+            // started first to ask it (an install from before the mark).
+            var done = await Install.finished(found)
+            if !done, Install.setting("SOUNDSTORM_INSTALLED", in: found) == nil, Docker.installed, !(await Docker.reachable()) {
+                page = .launching
+                launchStatus = "Starting Docker..."
+                if await Docker.start(status: { [weak self] s in self?.launchStatus = s }) {
+                    done = await Install.finished(found)
+                }
+            }
+            guard done else {
+                askAwake = !(await ThisMac.neverSleeps())
+                laptop = await ThisMac.isLaptop
+                page = .welcome
+                return
+            }
             installed = true
             UserDefaults.standard.set(found.path, forKey: "installDir")
             autoUpdate = Nightly.isOn(in: found)

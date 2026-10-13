@@ -74,6 +74,19 @@ enum Install {
         return nil
     }
 
+    /// Whether the setup there finished: install.sh marks it
+    /// (SOUNDSTORM_INSTALLED=1) once EmberStorm has started and answered; an
+    /// install from before the mark is known by EmberStorm's accounts volume
+    /// or container. A folder with neither is a setup stopped part way,
+    /// which the setup carries on (keeping its .env). Docker must be running
+    /// for the second test; not running, only the mark counts.
+    static func finished(_ dir: URL) async -> Bool {
+        if setting("SOUNDSTORM_INSTALLED", in: dir) == "1" { return true }
+        guard await Docker.reachable() else { return false }
+        if await Docker.run("docker", ["volume", "inspect", "soundstorm_soundstorm-state"]).code == 0 { return true }
+        return await Docker.run("docker", ["container", "inspect", "soundstorm"]).code == 0
+    }
+
     static func isInstall(_ dir: URL) -> Bool {
         FileManager.default.fileExists(atPath: dir.appending(path: "docker-compose.yml").path)
             && FileManager.default.fileExists(atPath: dir.appending(path: ".env").path)
