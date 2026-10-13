@@ -221,34 +221,96 @@ keep_awake() {
 		fi
 		;;
 	Linux)
+		# Asked on a laptop or a desktop, where something may put it to
+		# sleep; a plain server is not asked. Only where systemd can run the
+		# stay-awake service below.
 		laptop=0
 		for b in /sys/class/power_supply/BAT*; do [ -e "$b" ] && laptop=1; done
-		gnome=0
-		if command -v gsettings >/dev/null 2>&1 &&
-			[ "$(gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 2>/dev/null)" = "'suspend'" ]; then
-			gnome=1
-		fi
-		[ "$laptop" = "0" ] && [ "$gnome" = "0" ] && return 0
+		[ "$laptop" = "1" ] || [ -n "${XDG_CURRENT_DESKTOP:-}${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || return 0
+		command -v systemctl >/dev/null 2>&1 && command -v systemd-inhibit >/dev/null 2>&1 || return 0
 		say ""
 		say "EmberStorm can only be reached while this computer is awake."
-		if ask_yes "Keep it awake while plugged in? [Y/n]" yes; then
-			if [ "$gnome" = "1" ]; then
-				remember_was SOUNDSTORM_WAS_GNOME_SLEEP suspend
-				gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null &&
-					note "It no longer goes to sleep on its own while plugged in."
-			fi
-			if [ "$laptop" = "1" ] && [ -d /etc/systemd ]; then
-				# The lid too, on mains power only; logind reads it from the
-				# next start.
-				[ -e "$LID_CONF" ] || remember_was SOUNDSTORM_WAS_LID default
-				if printf '[Login]\nHandleLidSwitchExternalPower=ignore\n' |
-					as_root sh -c 'mkdir -p /etc/systemd/logind.conf.d && cat > '"$LID_CONF"; then
-					note "Closing the lid will not sleep it while plugged in (from the next restart)."
-				fi
+		prompt="Keep it awake while plugged in? [Y/n]"
+		[ "$laptop" = "1" ] && prompt="Keep it awake while plugged in, even with the lid closed? [Y/n]"
+		if ask_yes "$prompt" "${EMBERSTORM_KEEP_AWAKE:-yes}"; then
+			if install_awake; then
+				note "It stays awake while plugged in, and sleeps as usual on battery."
+				note "Your own sleep settings are not changed."
+			else
+				note "Could not set that up; your desktop's power settings have the same switches."
 			fi
 		fi
 		;;
 	esac
+}
+
+# The Linux stay-awake (2026-10-13, the owner's choice): one switch every
+# desktop obeys rather than each desktop's own settings (KDE, GNOME, Cinnamon,
+# XFCE and MATE keep them each their own way, and changing them meant asking
+# for them back). A small service holds systemd's block on sleep - the one a
+# video player or a system update takes - only while the computer is on mains
+# power: idle sleep and the lid do nothing then, and on battery it sleeps as
+# usual, never cooking in a bag. Nobody's settings change; uninstalling
+# removes the service and their own settings apply again. The script lives
+# where only root can change it, as root runs it.
+AWAKE_SCRIPT=/usr/local/lib/emberstorm/awake.sh
+AWAKE_UNIT=/etc/systemd/system/emberstorm-awake.service
+
+install_awake() {
+	cat <<'AWAKE_EOF' | as_root sh -c "mkdir -p /usr/local/lib/emberstorm && cat > $AWAKE_SCRIPT && chmod 755 $AWAKE_SCRIPT" || return 1
+#!/bin/sh
+# Keeps this computer from going to sleep while it is plugged in, so
+# EmberStorm stays reachable: holds systemd's block on sleep (and on the lid
+# and idle) on mains power, lets go on battery. Installed by EmberStorm's
+# setup, removed when EmberStorm is uninstalled.
+held=""
+on_mains() {
+	battery=0
+	for s in /sys/class/power_supply/*; do
+		[ -r "$s/type" ] || continue
+		case "$(cat "$s/type" 2>/dev/null)" in
+		Mains | USB*) [ "$(cat "$s/online" 2>/dev/null)" = 1 ] && return 0 ;;
+		Battery) battery=1 ;;
+		esac
+	done
+	[ "$battery" = 0 ]
+}
+let_go() {
+	[ -n "$held" ] || return 0
+	pkill -P "$held" 2>/dev/null
+	kill "$held" 2>/dev/null
+	held=""
+}
+trap 'let_go; exit 0' TERM INT
+while :; do
+	if on_mains; then
+		if [ -z "$held" ] || ! kill -0 "$held" 2>/dev/null; then
+			systemd-inhibit --what=sleep:idle:handle-lid-switch --mode=block \
+				--who=EmberStorm --why="Keeping EmberStorm reachable while plugged in" \
+				sleep infinity &
+			held=$!
+		fi
+	else
+		let_go
+	fi
+	sleep 20 &
+	wait $!
+done
+AWAKE_EOF
+	printf '%s\n' '[Unit]' 'Description=EmberStorm: stay awake while plugged in' 'After=systemd-logind.service' '' \
+		'[Service]' "ExecStart=/bin/sh $AWAKE_SCRIPT" 'Restart=always' 'RestartSec=10' '' \
+		'[Install]' 'WantedBy=multi-user.target' |
+		as_root sh -c "cat > $AWAKE_UNIT" || return 1
+	as_root systemctl daemon-reload >/dev/null 2>&1
+	as_root systemctl enable --now emberstorm-awake.service >/dev/null 2>&1
+}
+
+remove_awake() {
+	[ -e "$AWAKE_UNIT" ] || [ -e "$AWAKE_SCRIPT" ] || return 1
+	as_root systemctl disable --now emberstorm-awake.service >/dev/null 2>&1 || true
+	as_root rm -f "$AWAKE_UNIT" "$AWAKE_SCRIPT"
+	as_root rmdir /usr/local/lib/emberstorm 2>/dev/null || true
+	as_root systemctl daemon-reload >/dev/null 2>&1 || true
 }
 
 # check_room stops before the long download when the disk Docker keeps its
@@ -1391,6 +1453,10 @@ uninstall() {
 	# soundstorm-backup.json is deliberately not in this list.
 	remove_address_watch
 	remove_launcher
+	# The stay-awake service is EmberStorm's own, not a setting of theirs: it
+	# goes, and their own sleep settings apply again.
+	awake_gone=no
+	[ "$(uname -s)" = Linux ] && remove_awake && awake_gone=yes
 	rm -f "$DIR/docker-compose.yml" "$DIR/.env" "$DIR/$UPDATER_NAME" \
 		"$DIR/$UNINSTALLER_NAME" "$DIR/$SCRIPT_COPY" "$DIR/tailscale-serve.json"
 
@@ -1443,6 +1509,9 @@ uninstall() {
 		note "Docker was left installed: it was here before EmberStorm."
 	else
 		note "$name was left installed."
+	fi
+	if [ "$awake_gone" = yes ]; then
+		note "It no longer stays awake for EmberStorm: your own sleep settings apply again."
 	fi
 	if [ "$sleep_back" = yes ]; then
 		note "This computer goes to sleep on its own again, as before."
