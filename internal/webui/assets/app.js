@@ -11860,9 +11860,7 @@ function showUpdate(update, host) {
     linux: 'On the computer EmberStorm runs on, run sh ~/soundstorm/emberstorm-update.sh in a terminal.',
   };
   const steps = how[host] || 'On the computer EmberStorm runs on: Start menu, Update EmberStorm (Windows); the cloud in the menu bar, Update (Mac); or sh ~/soundstorm/emberstorm-update.sh (Linux).';
-  // The Mac's app does not update by itself yet; Windows and Linux do.
-  const nightly = host === 'mac' ? '' : ' It installs by itself overnight unless automatic updates are turned off.';
-  el.textContent = `EmberStorm ${version} is out.${nightly} To update now: ${steps}`;
+  el.textContent = `EmberStorm ${version} is out. It installs by itself overnight unless automatic updates are turned off. To update now: ${steps}`;
 }
 
 function hasDownloads() {
