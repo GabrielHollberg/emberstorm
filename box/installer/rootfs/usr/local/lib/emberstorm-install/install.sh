@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs when the box starts from the EmberStorm USB stick: writes the system
-# onto the box's built-in drive (the eMMC), checks every byte, gives the copy
+# onto the box's system drive (its eMMC, or the small system SSD), checks every byte, gives the copy
 # disk IDs of its own and switches the box off. Made by box/installer.sh.
 #
 # The storage drive (NVMe) is left as it is - a box being put right keeps
@@ -35,22 +35,76 @@ sleep 3
 # The stick itself: the disk this system is running from. Never written.
 self=$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null | head -n 1)
 
-# The built-in drive. An eMMC is mmcblkN (its boot0, boot1 and rpmb parts
-# are not disks to write); a box with no eMMC names it when the stick is
-# made (INSTALL_TARGET: the VM's is vda).
+# The system drive. A box with an eMMC has it as mmcblkN (its boot0, boot1
+# and rpmb parts are not disks to write). A box without one (the eMMC model
+# was discontinued, 2026-10-12) has the system on a small SSD beside the
+# large library drive: the one internal NVMe or SATA disk of 512 GB or less
+# that is not the stick and holds no EmberStorm library (SSDATA). Chosen by
+# size, not by slot, so it works whichever slot each drive sits in, and a
+# library drive is never big-enough-to-mistake: anything over 512 GB is
+# never written. INSTALL_TARGET names it outright when the stick is made.
+MAX_SYSTEM=512000000000
+internal_disk() {
+	tran=$(lsblk -dno TRAN "/dev/$1" 2>/dev/null | tr -d ' ')
+	rm=$(lsblk -dno RM "/dev/$1" 2>/dev/null | tr -d ' ')
+	case "$tran" in nvme | sata | ata) ;; *) return 1 ;; esac
+	[ "$rm" = 0 ] || return 1
+	case "$(readlink -f "/sys/block/$1" 2>/dev/null)" in */usb* | */thunderbolt* | "") return 1 ;; esac
+	return 0
+}
+holds_library() { lsblk -lno LABEL "/dev/$1" 2>/dev/null | grep -qx SSDATA; }
 target=""
 if [ -s "$P/target" ]; then
 	target=$(cat "$P/target")
 else
 	found=$(lsblk -dno NAME | grep -E '^mmcblk[0-9]+$' | grep -vx "${self:-none}")
-	[ "$(printf '%s\n' "$found" | grep -c .)" = 1 ] && target=$found
+	if [ "$(printf '%s
+' "$found" | grep -c .)" = 1 ]; then
+		target=$found
+	else
+		small=""
+		for d in $(lsblk -dno NAME,TYPE | awk '$2=="disk" {print $1}'); do
+			[ "$d" = "${self:-}" ] && continue
+			internal_disk "$d" || continue
+			holds_library "$d" && continue
+			[ "$(blockdev --getsize64 "/dev/$d")" -le "$MAX_SYSTEM" ] || continue
+			small="$small $d"
+		done
+		set -- $small
+		[ "$#" -le 1 ] || fail "More than one small drive was found ($*). Leave only the system drive (512 GB or less) and the library drive in the box, then start it from the stick again."
+		target=${1:-}
+		[ -n "$target" ] || fail "No system drive was found. EmberStorm goes on a small SSD (512 GB or less) in the box's system slot; the large drive is kept for the library."
+	fi
 fi
 [ -n "$target" ] && [ -b "/dev/$target" ] ||
-	fail "This box's built-in drive was not found."
-[ "$target" != "$self" ] || fail "The built-in drive is the stick itself."
+	fail "This box's system drive was not found."
+[ "$target" != "$self" ] || fail "The system drive is the stick itself."
 have=$(blockdev --getsize64 "/dev/$target")
 [ "$have" -ge "$size" ] ||
-	fail "The built-in drive is too small: $((have / 1000000000)) GB, $((size / 1000000000 + 1)) GB needed."
+	fail "The system drive is too small: $((have / 1000000000)) GB, $((size / 1000000000 + 1)) GB needed."
+# A stick for putting a box right writes only over EmberStorm or a blank
+# drive (a new system SSD after the old one failed): plugged into some other
+# computer, it must not take that computer's own drive for a system drive.
+# A factory stick sets up new hardware, whatever its drives came with.
+blank_disk() {
+	[ "$(lsblk -no NAME "/dev/$1" | wc -l)" -eq 1 ] || return 1
+	[ -z "$(blkid -p -o value -s TYPE "/dev/$1" 2>/dev/null)" ] || return 1
+	[ -z "$(blkid -p -o value -s PTTYPE "/dev/$1" 2>/dev/null)" ] || return 1
+}
+holds_emberstorm() {
+	root=$(case "$1" in *[0-9]) echo "/dev/${1}p1" ;; *) echo "/dev/${1}1" ;; esac)
+	[ -b "$root" ] || return 1
+	mkdir -p /run/emberstorm-old
+	mount -o ro "$root" /run/emberstorm-old 2>/dev/null || return 1
+	ok=1
+	[ -d /run/emberstorm-old/usr/local/lib/soundstorm ] && ok=0
+	umount /run/emberstorm-old
+	return $ok
+}
+if [ ! -e "$P/factory" ] && [ ! -s "$P/target" ]; then
+	blank_disk "$target" || holds_emberstorm "$target" ||
+		fail "The drive found ($target, $((have / 1000000000)) GB) holds something other than EmberStorm, so it was left alone. This stick only puts an EmberStorm box right."
+fi
 part() { case "$1" in *[0-9]) echo "/dev/${1}p$2" ;; *) echo "/dev/$1$2" ;; esac; }
 
 # A factory stick's record of each box it sets up, for its sticker and for
@@ -89,7 +143,7 @@ keep_record() {
 	umount /run/emberstorm-records
 }
 
-say "This erases the box's built-in drive ($((have / 1000000000)) GB) and installs"
+say "This erases the box's system drive ($((have / 1000000000)) GB) and installs"
 say "EmberStorm on it."
 if [ -e "$P/factory" ]; then
 	say "This stick is for the factory: the storage drive is wiped too."
@@ -97,7 +151,7 @@ else
 	say "Media, accounts and settings on the storage drive are kept."
 fi
 # A stick for putting a box right waits for somebody to say yes: plugged
-# into the wrong computer it would wipe that computer's built-in drive (the
+# into the wrong computer it would wipe that computer's system drive (the
 # box's blind security review). A factory stick, or one made for testing
 # (INSTALL_AUTO), carries on by itself after 20 seconds.
 if [ -e "$P/factory" ] || [ -e "$P/auto" ]; then
@@ -126,7 +180,7 @@ while kill -0 "$writer" 2>/dev/null; do
 	sleep 2
 done
 wait "$writer"
-[ ! -s /tmp/write-failed ] || fail "Writing to the built-in drive failed."
+[ ! -s /tmp/write-failed ] || fail "Writing to the system drive failed."
 sync
 printf '\r   100%% written   \n'
 
@@ -134,7 +188,7 @@ say "Checking what was written..."
 echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
 got_sum=$(head -c "$size" "/dev/$target" | sha256sum | cut -d' ' -f1)
 [ "$got_sum" = "$want_sum" ] ||
-	fail "What was written to the built-in drive does not match. The drive may be failing."
+	fail "What was written to the system drive does not match. The drive may be failing."
 
 say "Finishing..."
 # The partition table as written, read again before its parts are opened.
@@ -148,16 +202,16 @@ old_efi=$(blkid -c /dev/null -s PARTUUID -o value "$(part "$target" 15)")
 old_fs=$(blkid -c /dev/null -s UUID -o value "$(part "$target" 1)")
 # -e moves the second copy of the partition table to the drive's end (the
 # image is smaller than the drive); -G gives the disk and partitions new IDs.
-sgdisk -e -G "/dev/$target" >/dev/null || fail "The built-in drive's partitions could not be set up."
+sgdisk -e -G "/dev/$target" >/dev/null || fail "The system drive's partitions could not be set up."
 blockdev --rereadpt "/dev/$target" 2>/dev/null || partprobe "/dev/$target" 2>/dev/null || true
 udevadm settle 2>/dev/null || true
 e2fsck -fy "$(part "$target" 1)" >/dev/null 2>&1
-tune2fs -U random "$(part "$target" 1)" >/dev/null || fail "The built-in drive's system could not be given its own ID."
+tune2fs -U random "$(part "$target" 1)" >/dev/null || fail "The system drive's system could not be given its own ID."
 new_root=$(blkid -c /dev/null -s PARTUUID -o value "$(part "$target" 1)")
 new_efi=$(blkid -c /dev/null -s PARTUUID -o value "$(part "$target" 15)")
 new_fs=$(blkid -c /dev/null -s UUID -o value "$(part "$target" 1)")
 [ -n "$old_root" ] && [ -n "$new_root" ] && [ -n "$old_fs" ] && [ -n "$new_fs" ] ||
-	fail "The built-in drive's IDs could not be read."
+	fail "The system drive's IDs could not be read."
 
 mkdir -p /mnt/box
 mount "$(part "$target" 1)" /mnt/box || fail "The installed system could not be opened."
@@ -196,7 +250,7 @@ umount /mnt/box/boot/efi /mnt/box
 # buyer find the code: stop, and the box is simply set up again.
 [ "$kept" = yes ] || fail "This box's record could not be kept on the stick (its EMBERSTORM drive)."
 
-# The box starts from its built-in drive first. The firmware also finds it
+# The box starts from its system drive first. The firmware also finds it
 # by itself (EFI/BOOT), so a failure here is not fatal.
 # One entry: those left by earlier installs go first, as some firmware has
 # little room for them.
@@ -206,7 +260,7 @@ done
 efibootmgr -q -c -d "/dev/$target" -p 15 -L EmberStorm -l '\EFI\debian\shimx64.efi' 2>/dev/null || true
 
 if [ -e "$P/factory" ]; then
-	# Every internal storage drive, NVMe or SATA; never the built-in drive
+	# Every internal storage drive, NVMe or SATA; never the system drive
 	# just written or the stick; disks only (a CD drive is on SATA too).
 	for d in $(lsblk -dno NAME,TYPE,TRAN | awk '$2=="disk" && ($3=="nvme" || $3=="sata" || $3=="ata") {print $1}'); do
 		[ "$d" = "$self" ] || [ "$d" = "$target" ] && continue

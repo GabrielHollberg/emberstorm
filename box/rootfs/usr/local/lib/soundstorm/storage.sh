@@ -1,8 +1,9 @@
 #!/bin/sh
 # Mounts the box's data drive at /srv/soundstorm, preparing it the first time.
 #
-# The data drive is the internal disk that is not the system disk (on the ME
-# Mini, the NVMe drive beside the eMMC). It is known by its label, SSDATA.
+# The data drive is the internal disk that is not the system disk (the NVMe
+# drive beside the eMMC, or beside the small system SSD on a box with none).
+# It is known by its label, SSDATA.
 # A disk is only ever formatted when it is blank - no partition table, no
 # filesystem, nothing a probe recognises. A disk holding anything at all is
 # left alone, whatever it is: losing somebody's files to a wrong guess here is
@@ -124,8 +125,10 @@ if ! mounted; then
 	if [ -z "$dev" ]; then
 		rootd=$(root_disk)
 		# Whole internal disks: not the system disk, not USB, not removable,
-		# not loop/zram/optical.
-		for name in $(lsblk -dno NAME,TYPE | awk '$2=="disk" {print $1}'); do
+		# not loop/zram/optical. NVMe drives first: on a box with drive bays,
+		# a blank hard drive put in a bay must not take the library before
+		# the SSD meant for it.
+		for name in $(lsblk -dno NAME,TYPE,TRAN | awk '$2=="disk" {print ($3=="nvme" ? 0 : 1), $1}' | sort | awk '{print $2}'); do
 			[ "$name" = "$rootd" ] && continue
 			internal "/dev/$name" || continue
 			if blank "$name"; then

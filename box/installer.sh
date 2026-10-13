@@ -1,9 +1,9 @@
 #!/bin/sh
 # Makes the EmberStorm USB stick: a small system that, started on a box,
-# writes box/out/soundstorm-box.qcow2 onto its built-in drive (the eMMC),
-# checks it, gives it disk IDs of its own and switches the box off
-# (installer/rootfs/.../install.sh). It is how a real box gets its system -
-# the eMMC is soldered in, so it cannot be written from another computer -
+# writes box/out/soundstorm-box.qcow2 onto its system drive - the eMMC, or
+# on a box without one the small system SSD (512 GB or less) beside the
+# library drive - checks it, gives it disk IDs of its own and switches the box
+# off (installer/rootfs/.../install.sh). It is how a real box gets its system
 # and how one is put right later. Run as root where box/build.sh ran, after
 # it:
 #
@@ -15,7 +15,8 @@
 #   FACTORY=1          the stick also wipes the storage drive (NVMe), so the
 #                      box starts new; without it a box keeps its media and
 #                      accounts, for putting one right.
-#   INSTALL_TARGET=vda the drive to write when it is not an eMMC (the VM's).
+#   INSTALL_TARGET=vda the drive to write, whatever it is (the VM's
+#                      virtio disk; without it the stick chooses).
 #   INSTALL_AUTO=1     install without waiting for Enter (testing in the VM;
 #                      a FACTORY stick never waits either).
 set -eu

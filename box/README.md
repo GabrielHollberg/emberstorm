@@ -6,7 +6,7 @@ SoundStorm on it. See "Selling it on a box" in `CLAUDE.md` for why.
 
     box/models.sh       copies the backends' models out of a working install
     box/build.sh        builds out/soundstorm-box.qcow2
-    box/run-vm.sh       boots it as a pretend box (UEFI, eMMC + NVMe drive)
+    box/run-vm.sh       boots it as a pretend box (UEFI, eMMC or system SSD + NVMe drive)
     box/installer.sh    makes the USB stick that installs it onto a real box
     box/release.sh      makes a signed release (manifest) for boxes to update to
     box/compose.box.yml the box's additions to docker-compose.yml
@@ -29,24 +29,28 @@ through `/mnt`.
 
 ## Installing it on a real box
 
-A box's eMMC is soldered in, so its system is written by starting the box
-from a USB stick:
+A box's system is written by starting the box from a USB stick. The stick
+chooses the system drive: an eMMC where the box has one, otherwise the one
+internal SSD of 512 GB or less that holds no library - a small system SSD
+beside the large library drive, in whichever M.2 slot. It stops, writing
+nothing, when it finds no such drive or more than one, and a repair stick
+writes only over EmberStorm or a blank drive.
 
     wsl -d Debian -u root -- sh -c 'cd /mnt/h/dev/soundstorm && OUT=/root/box-out sh box/installer.sh'
 
 makes `out/emberstorm-installer.img`; write it to a stick of 16GB or more with
 balenaEtcher or Rufus (DD mode), plug it into the box with the network cable
 and a monitor, and start it from the stick (the boot menu key at power-on,
-often F7 or F11 - not yet checked on the ME Mini). It shows what it is
+often F7 or F11 - not yet checked on the test unit). It shows what it is
 doing, takes about ten minutes, and
 switches off; take the stick out and switch on. The storage drive is kept
 (putting a box right) unless the stick was made with `FACTORY=1`, which
 wipes it so the box starts new. To try it in the VM, make the stick with
-`INSTALL_TARGET=vda INSTALL_AUTO=1` (a repair stick otherwise waits for Enter), then `run-vm.sh installer`, then `run-vm.sh`.
+`INSTALL_TARGET=vda INSTALL_AUTO=1` (a repair stick otherwise waits for Enter), then `run-vm.sh installer`, then `run-vm.sh`. For a box with a system SSD, make it with `INSTALL_AUTO=1` alone and run both with `NVME_SYSTEM=1`.
 
 ## How a box starts
 
-1. `soundstorm-grow` grows the system partition to fill the eMMC.
+1. `soundstorm-grow` grows the system partition to fill the system drive.
 2. `soundstorm-storage` mounts the data drive (label `SSDATA`) at
    `/srv/soundstorm`, formatting it as btrfs the first time - **only a blank
    disk is ever formatted**, and never a USB one. It holds three subvolumes:

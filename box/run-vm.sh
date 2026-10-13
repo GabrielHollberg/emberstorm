@@ -30,6 +30,10 @@
 # OFFLINE=1 cuts the VM off from the internet (the forwarded ports still
 # work): a box built with its images must start with no downloads at all.
 #
+# NVME_SYSTEM=1 makes the system disk a 256 GB NVMe drive, as on the boxes
+# without an eMMC (a small system SSD beside the library drive), for a stick
+# made without INSTALL_TARGET, which chooses the drive itself.
+#
 # MEM is the VM's memory in MB. The VM shares this PC's memory with the live
 # server's containers, so it is kept small by default.
 set -eu
@@ -39,6 +43,12 @@ out="${OUT:-$here/out}"
 vm="$out/vm"
 mkdir -p "$vm"
 MEM=${MEM:-4608}
+sysize=64G
+sysdev="virtio-blk-pci,drive=system,bootindex=1"
+if [ "${NVME_SYSTEM:-}" = 1 ]; then
+	sysize=256G
+	sysdev="nvme,drive=system,serial=SYSTEM0001,bootindex=1"
+fi
 restrict=""
 [ "${OFFLINE:-}" = 1 ] && restrict=",restrict=on"
 
@@ -58,7 +68,7 @@ installer)
 	stop
 	[ -f "$out/emberstorm-installer.img" ] || { echo "Make the stick first: box/installer.sh" >&2; exit 1; }
 	rm -f "$vm/system.qcow2" "$vm/vars.fd"
-	qemu-img create -q -f qcow2 "$vm/system.qcow2" 64G
+	qemu-img create -q -f qcow2 "$vm/system.qcow2" "$sysize"
 	# The stick is not changed by a run (snapshot): it can be used again.
 	# KEEP_STICK=1 keeps what the run writes to it, as a real stick would -
 	# a factory stick's list of the boxes it made (its EMBERSTORM partition).
@@ -76,7 +86,7 @@ fi
 # The system disk is a layer over the built image, so the image stays as
 # built; 64G like the ME Mini's eMMC (it only takes what is written).
 [ -f "$vm/system.qcow2" ] ||
-	qemu-img create -q -f qcow2 -b "$out/soundstorm-box.qcow2" -F qcow2 "$vm/system.qcow2" 64G
+	qemu-img create -q -f qcow2 -b "$out/soundstorm-box.qcow2" -F qcow2 "$vm/system.qcow2" "$sysize"
 [ -f "$vm/data.qcow2" ] || qemu-img create -q -f qcow2 "$vm/data.qcow2" 1T
 [ -f "$vm/vars.fd" ] || cp /usr/share/OVMF/OVMF_VARS_4M.fd "$vm/vars.fd"
 
@@ -86,7 +96,7 @@ qemu-system-x86_64 \
 	-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 	-drive if=pflash,format=raw,file="$vm/vars.fd" \
 	-drive file="$vm/system.qcow2",if=none,id=system,format=qcow2 \
-	-device virtio-blk-pci,drive=system,bootindex=1 \
+	-device "$sysdev" \
 	-drive file="$vm/data.qcow2",if=none,id=data,format=qcow2 \
 	-device nvme,drive=data,serial=SSDATA0001 \
 	-nic user,model=virtio-net-pci$restrict,hostfwd=tcp::8399-:8099,hostfwd=tcp::2222-:22 \
