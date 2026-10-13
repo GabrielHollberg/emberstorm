@@ -1089,9 +1089,13 @@ extension WebViewController: WKNavigationDelegate {
         if current.scheme != KeptFiles.scheme {
             let here = current
             Task {
-                if let id = await ServerAddress.healthID(here) ?? ServerAddress.installName(here.host() ?? "")?.label {
+                let health = await ServerAddress.health(here)
+                if let id = health?.id ?? ServerAddress.installName(here.host() ?? "")?.label {
                     KeptFiles.shared.rememberId(here, id: id)
                 }
+                // The router's outside port, for the away twin (another
+                // EmberStorm in the house may hold the usual one).
+                if let health { ServerAddress.rememberPorts(here, awayPort: health.awayPort) }
             }
         }
         // What the server calls itself now, for the list of servers (the

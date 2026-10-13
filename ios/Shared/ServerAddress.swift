@@ -135,7 +135,34 @@ enum ServerAddress {
         guard let host = url.host(), let n = installName(host), n.level != level,
               var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         parts.host = "\(n.label).\(level).\(n.zone)"
+        // The router's outside port when it is not the server's own (another
+        // EmberStorm in the house holds the usual one; `/healthz`'s
+        // awayPort), and the home port back from the away name.
+        let defaults = UserDefaults.standard
+        let away = defaults.integer(forKey: "awayPort:" + n.label)
+        if level == "net", away > 0 {
+            parts.port = away
+        } else if level == "home", away > 0, url.port == away {
+            let home = defaults.integer(forKey: "homePort:" + n.label)
+            if home > 0 { parts.port = home }
+        }
         return parts.url
+    }
+
+    /// Notes an install's ports from its page: the home name's own port, and
+    /// the away port its `/healthz` gives when the router's differs (none
+    /// forgets it), as Android 0.65 does.
+    nonisolated static func rememberPorts(_ page: URL, awayPort: Int?) {
+        guard let host = page.host(), let n = installName(host) else { return }
+        let defaults = UserDefaults.standard
+        if n.level == "home" {
+            defaults.set(page.port ?? (page.scheme == "https" ? 443 : 80), forKey: "homePort:" + n.label)
+        }
+        if let awayPort, (1...65535).contains(awayPort) {
+            defaults.set(awayPort, forKey: "awayPort:" + n.label)
+        } else {
+            defaults.removeObject(forKey: "awayPort:" + n.label)
+        }
     }
 
     /// An install's name in the newest zone, when it is saved under an older
@@ -213,13 +240,20 @@ enum ServerAddress {
     /// The install's id, as its /healthz says (servers since chosen names
     /// carry it): how two of an install's names are known to be one server.
     nonisolated static func healthID(_ server: URL) async -> String? {
+        await health(server)?.id
+    }
+
+    /// What `/healthz` says of the install: its id and, when the router's
+    /// outside port differs from its own, the away port.
+    nonisolated static func health(_ server: URL) async -> (id: String?, awayPort: Int?)? {
         var request = URLRequest(url: server.appending(path: "healthz"))
         request.timeoutInterval = 8
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        struct Health: Decodable { let id: String? }
+        struct Health: Decodable { let id: String?; let awayPort: Int? }
         guard let (data, response) = try? await smallData(request),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return (try? JSONDecoder().decode(Health.self, from: data))?.id
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let h = try? JSONDecoder().decode(Health.self, from: data) else { return nil }
+        return (h.id, h.awayPort)
     }
 
     /// A first name for a server, until somebody gives it one: its address
