@@ -154,8 +154,18 @@ def make_handler(root, keys):
     return Handler
 
 
+def desktop():
+    """The Desktop as Windows has it - often inside OneDrive, not ~/Desktop."""
+    if os.name == "nt":
+        import ctypes
+        buf = ctypes.create_unicode_buffer(260)
+        if ctypes.windll.shell32.SHGetFolderPathW(None, 0x10, None, 0, buf) == 0 and buf.value:
+            return buf.value
+    return os.path.join(os.path.expanduser("~"), "Desktop")
+
+
 def main():
-    root = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.expanduser("~"), "Desktop", "emberstorm-signing")
+    root = sys.argv[1] if len(sys.argv) > 1 else os.path.join(desktop(), "emberstorm-signing")
     os.makedirs(root, exist_ok=True)
     keys = release_keys()
     ip = tailscale_ip()
