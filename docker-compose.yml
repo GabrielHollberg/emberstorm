@@ -97,6 +97,10 @@ services:
       # Which computer it runs on (windows, mac or linux), written by the
       # installers: Settings shows directions for that computer's own settings.
       SOUNDSTORM_HOST: ${SOUNDSTORM_HOST:-}
+      # The signed release it was installed from, so it can tell the owner when
+      # a newer one is out; SOUNDSTORM_UPDATE_CHECK=off stops it looking.
+      SOUNDSTORM_RELEASE_SERIAL: ${SOUNDSTORM_RELEASE_SERIAL:-}
+      SOUNDSTORM_UPDATE_CHECK: ${SOUNDSTORM_UPDATE_CHECK:-on}
       SOUNDSTORM_VOICES_URL: ${SOUNDSTORM_VOICES_URL:-http://kokoro:8880}
       SOUNDSTORM_WHISPER_URL: ${SOUNDSTORM_WHISPER_URL:-http://whisper:9000}
 

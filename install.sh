@@ -903,6 +903,47 @@ uv0pqc/uvWPTSdkPt0PO/YEP2gA86Fy0jUnYyNsm8Xg=
 BASE="https://github.com/${SOUNDSTORM_REPO:-GabrielHollberg/emberstorm}/releases/latest/download"
 here=$(cd "$(dirname "$0")" && pwd)
 die() { printf 'EmberStorm was not updated: %s\n' "$1" >&2; exit 1; }
+
+# Updating by itself at night (2026-10-13, as boxes do): a cron line runs this
+# with --nightly at a quiet time chosen once, between 2 and 5, which installs
+# only a signed release newer than the one installed. --auto-off and
+# --auto-on turn it off and on; off is remembered, so updates do not put it
+# back.
+TAG='# emberstorm-update'
+env_set() {
+	[ -f "$here/.env" ] || return 0
+	tmp="$here/.env.tmp.$$"
+	grep -v "^$1=" "$here/.env" >"$tmp" || true
+	printf '%s=%s\n' "$1" "$2" >>"$tmp"
+	cat "$tmp" >"$here/.env" && rm -f "$tmp"
+}
+case "${1:-}" in
+--auto-on | --auto-off)
+	command -v crontab >/dev/null 2>&1 || die "this computer has no cron to run updates at night."
+	# A % in a cron line is a line break: such a folder gets no nightly run.
+	case "$here" in *%*) die "the install folder's name has a % in it, which cron cannot run." ;; esac
+	{ crontab -l 2>/dev/null || true; } | grep -vF "$TAG" >"${TMPDIR:-/tmp}/emberstorm-cron.$$" || true
+	if [ "$1" = --auto-on ]; then
+		minute=$(awk 'BEGIN { srand(); printf "%d", rand() * 60 }')
+		hour=$(awk 'BEGIN { srand(); printf "%d", 2 + rand() * 3 }')
+		printf '%s %s * * * PATH=/usr/local/bin:/usr/bin:/bin sh "%s/emberstorm-update.sh" --nightly >"%s/update.log" 2>&1 %s\n' \
+			"$minute" "$hour" "$here" "$here" "$TAG" >>"${TMPDIR:-/tmp}/emberstorm-cron.$$"
+		env_set SOUNDSTORM_AUTO_UPDATE on
+		echo "EmberStorm now updates itself at night, around $hour:$(printf '%02d' "$minute")."
+	else
+		env_set SOUNDSTORM_AUTO_UPDATE off
+		echo "EmberStorm no longer updates itself at night. To update: sh \"$here/emberstorm-update.sh\""
+	fi
+	crontab "${TMPDIR:-/tmp}/emberstorm-cron.$$"
+	rm -f "${TMPDIR:-/tmp}/emberstorm-cron.$$"
+	exit 0
+	;;
+--nightly)
+	shift
+	NIGHTLY=1
+	;;
+*) NIGHTLY='' ;;
+esac
 command -v curl >/dev/null 2>&1 || die "curl is needed to download the update."
 openssl version 2>/dev/null | grep -q '^OpenSSL [3-9]' || die "OpenSSL 3 is needed to check the update's signature."
 if command -v sha256sum >/dev/null 2>&1; then sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -929,6 +970,14 @@ grep -q '"kind": "emberstorm-desktop"' "$work/desktop.json" || die "the release 
 version=$(sed -n 's/^  "version": "\([0-9][0-9A-Za-z.+-]*\)",$/\1/p' "$work/desktop.json")
 serial=$(sed -n 's/^  "serial": \([0-9][0-9]*\),$/\1/p' "$work/desktop.json")
 [ -n "$serial" ] || die "the release has no serial."
+# At night, only a release newer than the one installed: nothing restarts
+# when there is nothing new.
+if [ -n "$NIGHTLY" ]; then
+	have=$(sed -n 's/^SOUNDSTORM_RELEASE_SERIAL=//p' "$here/.env" 2>/dev/null | head -n 1)
+	case "$have" in ''|*[!0-9]*) have=0 ;; esac
+	[ "$serial" -gt "$have" ] || exit 0
+	echo "Updating to EmberStorm $version, $(date)."
+fi
 listed() {
 	awk -v f="\"$1\": {" 'index($0, f) { getline; sub(/.*"sha256": "/, ""); sub(/".*/, ""); print; exit }' "$work/desktop.json"
 }
@@ -1090,6 +1139,10 @@ remove_address_watch() {
 	command -v crontab >/dev/null 2>&1 || return 0
 	if crontab -l 2>/dev/null | grep -qF "$ADDRESS_TAG"; then
 		crontab -l 2>/dev/null | grep -vF "$ADDRESS_TAG" | crontab - 2>/dev/null || true
+	fi
+	# And the nightly update (the updater's --auto-on).
+	if crontab -l 2>/dev/null | grep -qF '# emberstorm-update'; then
+		crontab -l 2>/dev/null | grep -vF '# emberstorm-update' | crontab - 2>/dev/null || true
 	fi
 }
 
@@ -1458,7 +1511,7 @@ uninstall() {
 	awake_gone=no
 	[ "$(uname -s)" = Linux ] && remove_awake && awake_gone=yes
 	rm -f "$DIR/docker-compose.yml" "$DIR/.env" "$DIR/$UPDATER_NAME" \
-		"$DIR/$UNINSTALLER_NAME" "$DIR/$SCRIPT_COPY" "$DIR/tailscale-serve.json"
+		"$DIR/$UNINSTALLER_NAME" "$DIR/$SCRIPT_COPY" "$DIR/tailscale-serve.json" 		"$DIR/update.log" "$DIR/docker-compose.yml.prev"
 
 	docker_gone=no
 	if [ "$drop_docker" = yes ]; then
@@ -1971,6 +2024,24 @@ Download EmberStorm again from emberstorm.app and run it." ;;
 	esac
 fi
 
+# What an update replaces, kept until the new version answers: the compose
+# file naming the versions running now, and the release they came from. A
+# download that fails, or a version that does not start, puts them back and
+# starts the old version again (as a box's update is undone).
+rm -f docker-compose.yml.prev
+PREV_SERIAL=''
+if [ -f docker-compose.yml ]; then
+	cp docker-compose.yml docker-compose.yml.prev
+	PREV_SERIAL=$(get_env SOUNDSTORM_RELEASE_SERIAL)
+fi
+# put_back_previous starts the version that was running before this update.
+put_back_previous() {
+	[ "$UPGRADE" = "1" ] && [ -f docker-compose.yml.prev ] || return 1
+	mv -f docker-compose.yml.prev docker-compose.yml
+	if [ -n "$PREV_SERIAL" ]; then set_env SOUNDSTORM_RELEASE_SERIAL "$PREV_SERIAL"; fi
+	$COMPOSE $PROFILE up -d >/dev/null 2>&1
+}
+
 if [ -n "$RELEASE_DIR" ]; then
 	[ -f docker-compose.yml ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ] && UPGRADE=1 || UPGRADE=0
 	[ "$UPGRADE" = "1" ] && note "already installed here - upgrading it instead"
@@ -2158,6 +2229,12 @@ fi
 install_address_watch
 install_updater
 install_uninstaller
+# Updating by itself at night on Linux, unless it was turned off (the
+# updater's --auto-off): the cron line added once, at a time of its own.
+if [ -f "$DIR/$UPDATER_NAME" ] && [ "$(get_env SOUNDSTORM_AUTO_UPDATE)" != off ] && command -v crontab >/dev/null 2>&1 &&
+	! crontab -l 2>/dev/null | grep -qF '# emberstorm-update'; then
+	sh "$DIR/$UPDATER_NAME" --auto-on >/dev/null 2>&1 || true
+fi
 # EmberStorm installed Docker (this run): said for the uninstaller, which
 # then offers to take it away again. Never cleared by a later update.
 [ -n "${DOCKER_INSTALLED_BY:-}" ] && set_env SOUNDSTORM_DOCKER_INSTALLED "$DOCKER_INSTALLED_BY"
@@ -2332,6 +2409,11 @@ for wait in 30 60 120 0; do
 	sleep "$wait"
 done
 if [ "$pulled" != 1 ]; then
+	if put_back_previous; then
+		DIE_HEADING="EmberStorm was not updated."
+		die "The new version could not be downloaded, so the version you had is
+running again, as it was. Try updating again later."
+	fi
 	if [ "$limited" = 1 ]; then
 		die "The download server is busy and asked for a pause. Wait a few minutes,
 then run this again - anything already downloaded is kept."
@@ -2340,11 +2422,22 @@ then run this again - anything already downloaded is kept."
 Check your connection and run this again - anything already downloaded is kept."
 fi
 
+# Which signed release this is, written before EmberStorm starts so it knows
+# (Settings, About: a newer one, desktopupdate.go); written again at the end.
+if [ -n "$RELEASE_SERIAL" ]; then
+	set_env SOUNDSTORM_RELEASE_SERIAL "$RELEASE_SERIAL"
+	[ -n "${SOUNDSTORM_RELEASE_VERSION:-}" ] && set_env SOUNDSTORM_RELEASE_VERSION "$SOUNDSTORM_RELEASE_VERSION"
+fi
 step "Starting"
 # Captured rather than streamed, so a failure can be read and explained instead
 # of leaving somebody to interpret a Docker error.
 if ! out=$($COMPOSE $PROFILE up -d 2>&1); then
 	printf '%s\n' "$out" >&2
+	if put_back_previous; then
+		DIE_HEADING="EmberStorm was not updated."
+		die "The new version would not start, so the version you had is running
+again, as it was. Nothing was lost. Try updating again later."
+	fi
 	# The pre-flight port check above cannot always tell - a machine with no
 	# nc, ss or lsof has nothing to ask - so this is where a busy port is
 	# usually discovered, and it deserves a better answer than the logs.
@@ -2371,12 +2464,19 @@ until health_ok "$URL/healthz"; do
 		note "still starting... (${waited}s). This is normal the first time."
 	fi
 	if [ "$waited" -gt 120 ]; then
+		if put_back_previous; then
+			DIE_HEADING="EmberStorm was not updated."
+			die "The new version did not start properly, so the version you had is
+running again, as it was. Nothing was lost. Try updating again later."
+		fi
 		die "EmberStorm started but never answered on $URL.
 
   cd $DIR && $COMPOSE logs soundstorm"
 	fi
 	sleep 2
 done
+# It answers: the new version stays.
+rm -f docker-compose.yml.prev
 
 # Run again after a first install stopped part way (a download that failed),
 # it counts as an update, but nobody has made an account yet: it still shows
@@ -2506,8 +2606,14 @@ fi
 # How to update: through the updater left here, which installs only a
 # release signed with EmberStorm's release key.
 if [ -f "$DIR/$UPDATER_NAME" ]; then
-	note "To update later: sh \"$DIR/$UPDATER_NAME\" (it installs only releases"
-	note "signed by EmberStorm)."
+	if [ "$(get_env SOUNDSTORM_AUTO_UPDATE)" = on ]; then
+		note "It updates itself at night, installing only releases signed by"
+		note "EmberStorm. To update now: sh \"$DIR/$UPDATER_NAME\""
+		note "To stop it updating by itself: sh \"$DIR/$UPDATER_NAME\" --auto-off"
+	else
+		note "To update later: sh \"$DIR/$UPDATER_NAME\" (it installs only releases"
+		note "signed by EmberStorm)."
+	fi
 	say ""
 fi
 if [ -f "$DIR/$UNINSTALLER_NAME" ]; then

@@ -442,6 +442,8 @@ func run(log *slog.Logger) error {
 		CaretakerSocket: os.Getenv("SOUNDSTORM_CARETAKER"),
 		BoxUnit:         os.Getenv("SOUNDSTORM_UNIT"),
 		Host:            os.Getenv("SOUNDSTORM_HOST"),
+		ReleaseSerial:   releaseSerial(),
+		UpdateCheckOff:  strings.EqualFold(os.Getenv("SOUNDSTORM_UPDATE_CHECK"), "off"),
 	})
 
 	// Books with both an ebook and an audiobook are synced for read-along by
@@ -678,4 +680,14 @@ func newSetupCode() string {
 		out.WriteByte(alphabet[int(c)%len(alphabet)])
 	}
 	return out.String()
+}
+
+// releaseSerial is the signed release this computer install came from, as the
+// installers write it (SOUNDSTORM_RELEASE_SERIAL), or 0 when not known.
+func releaseSerial() int64 {
+	n, err := strconv.ParseInt(strings.TrimSpace(os.Getenv("SOUNDSTORM_RELEASE_SERIAL")), 10, 64)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }

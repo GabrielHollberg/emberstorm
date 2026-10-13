@@ -203,6 +203,9 @@ type Server struct {
 	caretakerSocket string
 	boxUnit         string
 	host            string
+	releaseSerial   int64
+	updateCheckOff  bool
+	desktopRel      desktopUpdates
 	caretakerOnce   sync.Once
 	caretakerClient *http.Client
 
@@ -339,6 +342,13 @@ type Config struct {
 	// windows, mac or linux), for Settings' directions for that computer's
 	// own settings. Empty on a box, and on installs from before it.
 	Host string
+
+	// ReleaseSerial is the signed release a computer install came from
+	// (SOUNDSTORM_RELEASE_SERIAL, written by the installers), 0 when not
+	// known; UpdateCheckOff stops it looking for newer ones
+	// (desktopupdate.go).
+	ReleaseSerial  int64
+	UpdateCheckOff bool
 }
 
 // RemoteState is the current state of remote access, for the account panel. It
@@ -415,6 +425,8 @@ func New(cfg Config) *Server {
 		caretakerSocket:  cfg.CaretakerSocket,
 		boxUnit:          cfg.BoxUnit,
 		host:             cfg.Host,
+		releaseSerial:    cfg.ReleaseSerial,
+		updateCheckOff:   cfg.UpdateCheckOff,
 		rescanTimers:     map[media.Kind]*time.Timer{},
 		lastRescan:       map[media.Kind]time.Time{},
 		autoKick:         make(chan struct{}, 1),
@@ -921,6 +933,10 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		// that computer's own settings are (staying awake, the lid, signing
 		// in by itself), which EmberStorm cannot change from inside Docker.
 		if user.IsOwner() && s.caretakerSocket == "" {
+			// A newer EmberStorm for this computer, signed (desktopupdate.go).
+			if u := s.desktopUpdateFor(); u != nil {
+				answer["update"] = u
+			}
 			switch s.host {
 			case "windows", "mac", "linux":
 				answer["host"] = s.host

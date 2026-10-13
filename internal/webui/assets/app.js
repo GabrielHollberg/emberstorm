@@ -1222,6 +1222,7 @@ function renderAccount() {
       for (const el of document.querySelectorAll('#host-block .host-name')) show(el, !body.host);
     }
     showBuild(ok && body && body.build);
+    showUpdate(ok && body && body.update, ok && body ? body.host : undefined);
     // The box's serial, as on its label: what support asks for.
     const unit = ok && body && body.boxUnit;
     show($('box-unit'), Boolean(unit));
@@ -11843,6 +11844,25 @@ function showBuild(build) {
     lines.push(`This ${TV ? 'TV' : 'phone'}'s ${kind}: ${appVersion}`);
   }
   $('about-build').textContent = lines.join('. ') + '.';
+}
+
+// A newer EmberStorm for this computer (the owner's, off a box; the server
+// checked its signature, desktopupdate.go): said in About with how to update
+// here, and that it updates by itself at night unless that was turned off.
+function showUpdate(update, host) {
+  const el = $('about-update');
+  const version = update && typeof update.version === 'string' && /^[0-9][0-9.]{0,15}$/.test(update.version) ? update.version : '';
+  show(el, Boolean(version));
+  if (!version) return;
+  const how = {
+    windows: 'On the computer EmberStorm runs on: Start menu, Update EmberStorm.',
+    mac: 'On the Mac EmberStorm runs on: the cloud in the menu bar, Update.',
+    linux: 'On the computer EmberStorm runs on, run sh ~/soundstorm/emberstorm-update.sh in a terminal.',
+  };
+  const steps = how[host] || 'On the computer EmberStorm runs on: Start menu, Update EmberStorm (Windows); the cloud in the menu bar, Update (Mac); or sh ~/soundstorm/emberstorm-update.sh (Linux).';
+  // The Mac's app does not update by itself yet; Windows and Linux do.
+  const nightly = host === 'mac' ? '' : ' It installs by itself overnight unless automatic updates are turned off.';
+  el.textContent = `EmberStorm ${version} is out.${nightly} To update now: ${steps}`;
 }
 
 function hasDownloads() {

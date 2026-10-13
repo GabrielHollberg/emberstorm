@@ -697,7 +697,7 @@
            the setup asked about - EmberStorm runs in Docker and cannot change
            them itself, by design. The installer says which computer it is
            (SOUNDSTORM_HOST); with none, all three show. -->
-      <div id="host-block" class="account-section card hidden" data-hint="Staying awake, the lid, starting by itself" data-cat="devices" data-words="sleep awake lid power battery restart sign in log in automatic computer pc mac linux windows network private firewall">
+      <div id="host-block" class="account-section card hidden" data-hint="Staying awake, the lid, starting by itself" data-cat="devices" data-words="sleep awake lid power battery restart sign in log in automatic computer pc mac linux windows network private firewall update updates nightly">
         <h2>The computer EmberStorm runs on</h2>
         <p class="muted">The setup asked about a few of this computer's own settings. To change
           them later, use the computer's settings:</p>
@@ -717,6 +717,11 @@
               Wi-Fi or Ethernet, your network - Network profile type: Private.</li>
             <li><strong>Starting when you sign in:</strong> Docker Desktop, Settings, General -
               "Start Docker Desktop when you sign in". EmberStorm starts with it.</li>
+            <li><strong>Updating by itself at night:</strong> on unless turned off - the newest
+              signed release, between 2 and 5 at night, the old version put back if the new
+              one does not start. To turn it off or on: Task Scheduler, Task Scheduler Library,
+              "EmberStorm update" - Disable or Enable. To update now: Start menu, Update
+              EmberStorm.</li>
           </ul>
         </div>
         <div data-host="mac">
@@ -734,6 +739,7 @@
               keyboard and power are plugged in.</li>
             <li><strong>Starting when you log in:</strong> Docker Desktop, Settings, General -
               "Start Docker Desktop when you sign in".</li>
+            <li><strong>Updating:</strong> the EmberStorm app in the menu bar - Update.</li>
           </ul>
         </div>
         <div data-host="linux">
@@ -748,6 +754,12 @@
               Management; GNOME: Settings, Power).</li>
             <li><strong>Starting:</strong> EmberStorm starts by itself whenever the computer
               does - no sign-in needed.</li>
+            <li><strong>Updating by itself at night:</strong> on unless turned off - the newest
+              signed release, between 2 and 5 at night, the old version put back if the new
+              one does not start. To turn it off, run
+              <code>sh ~/soundstorm/emberstorm-update.sh --auto-off</code> (your install
+              folder, if not that one); <code>--auto-on</code> turns it on again. To update now:
+              <code>sh ~/soundstorm/emberstorm-update.sh</code>.</li>
           </ul>
         </div>
       </div>
@@ -984,6 +996,7 @@
           and the media servers it runs alongside keep their own licenses.
           </p>
         <p id="about-build" class="muted"></p>
+        <p id="about-update" class="about-update hidden"></p>
         <p id="box-unit" class="muted hidden"></p>
         <p id="box-code" class="muted hidden"></p>
       </div>

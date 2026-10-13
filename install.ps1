@@ -70,6 +70,11 @@ param(
     [switch]$Move,
     [string]$Import,
     [Alias('no-library')][switch]$NoLibrary,
+    # The nightly update (the "EmberStorm update" scheduled task): no window,
+    # no questions, nothing asking for administrator; only an installed
+    # EmberStorm, only a newer signed release, and the old version put back
+    # if the new one does not start.
+    [switch]$Unattended,
     [switch]$Console
 )
 
@@ -196,6 +201,7 @@ $Dir       = if ($env:SOUNDSTORM_DIR) { $env:SOUNDSTORM_DIR }
              elseif (Test-Path (Join-Path $env:USERPROFILE 'SoundStorm\docker-compose.yml')) { Join-Path $env:USERPROFILE 'SoundStorm' }
              else { Join-Path $env:USERPROFILE 'EmberStorm' }
 $FirstPort = if ($env:SOUNDSTORM_PORT) { [int]$env:SOUNDSTORM_PORT } else { 8099 }
+$script:Unattended = [bool]$Unattended
 
 # Updating runs the newest signed release, never the branch.
 #
@@ -219,6 +225,30 @@ function Test-OurSignature([string]$Path) {
 $selfName = if ($PSCommandPath) { [IO.Path]::GetFileName($PSCommandPath) } else { '' }
 if (-not $Launch -and -not $Uninstall -and -not $ReleaseDir -and $env:SOUNDSTORM_FRESH -ne '1' -and
     ($selfName -eq 'soundstorm.ps1' -or $selfName -eq 'soundstorm-install.ps1')) {
+    # At night, nothing is fetched or run unless EmberStorm is installed here,
+    # updating by itself is on, and the newest release is newer than the one
+    # installed (its list only read here, to decide; EmberStorm.exe checks its
+    # signature before anything runs). Offline, it waits for the next night -
+    # never a message nobody is there to read.
+    if ($Unattended) {
+        $settings = @{}
+        $envFile = Join-Path $Dir '.env'
+        if (Test-Path -LiteralPath $envFile) {
+            foreach ($line in (Get-Content -LiteralPath $envFile)) {
+                if ($line -match '^\s*([A-Z_]+)=(.*)$') { $settings[$Matches[1]] = $Matches[2].Trim() }
+            }
+        }
+        if ($settings['SOUNDSTORM_AUTO_UPDATE'] -eq 'off' -or $settings['SOUNDSTORM_INSTALLED'] -ne '1') { exit 0 }
+        $listFile = Join-Path $env:TEMP "emberstorm-latest-$PID.json"
+        try {
+            Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest/download/desktop.json" `
+                -OutFile $listFile -UseBasicParsing -TimeoutSec 60
+            $latest = Get-Content -LiteralPath $listFile -Raw | ConvertFrom-Json
+        } catch { exit 0 } finally { Remove-Item -LiteralPath $listFile -Force -ErrorAction SilentlyContinue }
+        $had = [long]0
+        [void][long]::TryParse("$($settings['SOUNDSTORM_RELEASE_SERIAL'])", [ref]$had)
+        if (-not $latest -or [long]$latest.serial -le $had) { exit 0 }
+    }
     $launcher = Join-Path $Dir 'EmberStorm.exe'
     if (-not ((Test-Path -LiteralPath $launcher) -and (Test-OurSignature $launcher))) {
         $launcher = Join-Path $env:TEMP "EmberStorm-update-$PID.exe"
@@ -343,6 +373,7 @@ function Wait-ProcessPumped($Process, [int]$TimeoutSeconds = 0) {
 # Read-Text asks for one line of text: in a box with the window up, since a
 # hidden console cannot be typed into, and on the console otherwise.
 function Read-Text([string]$Prompt, [string]$Title = 'EmberStorm Setup') {
+    if ($script:Unattended) { return '' }
     if ($script:Gui) {
         Add-Type -AssemblyName Microsoft.VisualBasic
         return [Microsoft.VisualBasic.Interaction]::InputBox($Prompt, $Title, '')
@@ -1228,7 +1259,7 @@ function ConvertTo-ArgumentList($Bound) {
 # The copy it runs is its own temporary file, because the file this run came
 # from may be a downloaded copy its parent is about to delete.
 $script:BoundArgs = $PSBoundParameters
-$script:WindowWanted = (-not $Launch) -and (-not $Console) -and ($env:SOUNDSTORM_CONSOLE -ne '1') -and [Environment]::UserInteractive
+$script:WindowWanted = (-not $Launch) -and (-not $Console) -and (-not $Unattended) -and ($env:SOUNDSTORM_CONSOLE -ne '1') -and [Environment]::UserInteractive
 if ($script:WindowWanted -and $env:SOUNDSTORM_WINDOW -ne '1' -and $PSCommandPath) {
     $canShow = $false
     try {
@@ -1260,6 +1291,7 @@ if (-not $Launch) {
         $owned = $false
         try { $owned = $script:SetupMutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $owned = $true }
         if (-not $owned) {
+            if ($Unattended) { exit 0 }
             try {
                 Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
                 [void][System.Windows.Forms.MessageBox]::Show('EmberStorm setup is already running. Look for its window - it may be minimized in the taskbar.', 'EmberStorm Setup', 'OK', 'Information')
@@ -1380,6 +1412,8 @@ function Test-DockerFirstRun {
 # "I understand". The window has no close button, so the only way on is to
 # have read it; the console fallback asks for Enter.
 function Confirm-DockerGuide {
+    # Docker never yet started and accepted: not for a night with nobody there.
+    if ($script:Unattended) { exit 0 }
     $text = "EmberStorm runs inside a free program called Docker Desktop. It is already on this PC but has not been opened yet, so when setup starts it, Docker opens a window asking you to accept its terms:`r`n`r`n" +
         "    Subscription Service Agreement  ->  click Accept`r`n`r`n" +
         "That is the only thing to click: setup skips Docker's sign-in and questions for you, and no Docker account is needed.`r`n`r`n" +
@@ -1465,7 +1499,7 @@ function Register-Resume {
     # Not for a console run (its prompts would be in a window nobody sees),
     # and not more than three times: a setup that keeps stopping at the same
     # place stops asking at every sign-in (a review).
-    if ($Launch -or $Console -or -not $PSCommandPath) { return $false }
+    if ($Launch -or $Console -or $script:Unattended -or -not $PSCommandPath) { return $false }
     $resumes = 0
     if ("$env:EMBERSTORM_RESUMES" -match '^\d+$') { $resumes = [int]$env:EMBERSTORM_RESUMES }
     if ($resumes -ge 3) { return $false }
@@ -1537,6 +1571,7 @@ function Stop-ForRestart([string]$Text) {
 # dismissed, whether to ask again - most often it was a misclick, and stopping
 # the whole setup for one was a dead end. $false where no window can be shown.
 function Confirm-TryAgain([string]$What, [switch]$Optional) {
+    if ($script:Unattended) { return $false }
     if (-not $script:Gui) { return $false }
     if ($Optional) {
         $page = New-GuiPageText 'Windows needs your permission' @(
@@ -2485,6 +2520,8 @@ function Get-WslPath {
 }
 
 function Invoke-Elevated([string]$File, [string[]]$Arguments) {
+    # Never at night: nobody is there to say yes, so it counts as refused.
+    if ($script:Unattended) { return $null }
     if (Test-Administrator) {
         return (Invoke-Native $File $Arguments -Show).ExitCode
     }
@@ -3214,6 +3251,7 @@ function Wait-ForEmberStorm([string]$Url) {
             if ($waited % 20 -eq 0) { Note "still starting... ($waited seconds). This is normal the first time." }
             if ($waited -gt 180) {
                 Save-EmberStormLog
+                if (Restore-PreviousVersion) { Stop-With $script:NotUpdated }
                 Stop-With "  EmberStorm started but never answered.`n`n$(Get-HelpAdvice)"
             }
         }
@@ -4047,6 +4085,7 @@ function Test-DownloadRoom([long]$Need = 30GB) {
 # Confirm-HomeNetwork asks the network question in a Yes/No window, falling
 # back to the console only where no window can be shown. Returns $true for yes.
 function Confirm-HomeNetwork([string]$NetworkName) {
+    if ($script:Unattended) { return $false }
     if ($script:Gui) {
         $page = New-GuiPageText 'Is this your home network?' @(
             "Windows is treating the network this PC is on (""$NetworkName"") as public - the setting for cafes and airports - so your phone, TV and other computers cannot reach EmberStorm.",
@@ -4498,6 +4537,35 @@ function Register-Uninstaller([switch]$Unfinished) {
     }
 }
 
+# Updating by itself at night, as boxes do (2026-10-13): a scheduled task of
+# this person's own (no administrator), "EmberStorm update", running the saved
+# script with -Unattended at a quiet time chosen once between 2 and 5, only
+# while plugged in, stopped by Windows after two hours should anything hang.
+# Made once: a task somebody disabled in Task Scheduler stays disabled, and
+# SOUNDSTORM_AUTO_UPDATE=off in .env keeps it from being made at all.
+$NightlyTask = 'EmberStorm update'
+function Register-NightlyUpdate([string]$Script) {
+    if (-not (Test-Path -LiteralPath $Script)) { return }
+    if ((Get-EnvSetting 'SOUNDSTORM_AUTO_UPDATE') -eq 'off') { return }
+    try {
+        if (Get-ScheduledTask -TaskName $NightlyTask -ErrorAction SilentlyContinue) { return }
+        $ps = Join-Path ([Environment]::GetFolderPath('Windows')) 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $action = New-ScheduledTaskAction -Execute $ps -WorkingDirectory $Dir `
+            -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$Script`" -Unattended"
+        $at = (Get-Date).Date.AddHours(2).AddMinutes((Get-Random -Minimum 0 -Maximum 180))
+        $trigger = New-ScheduledTaskTrigger -Daily -At $at
+        $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 2) -MultipleInstances IgnoreNew
+        $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $principal = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited
+        $null = Register-ScheduledTask -TaskName $NightlyTask -Action $action -Trigger $trigger -Settings $settings `
+            -Principal $principal -Description 'Updates EmberStorm at night to the newest release signed by EmberStorm.'
+        Set-EnvSetting 'SOUNDSTORM_AUTO_UPDATE' 'on'
+        Note "EmberStorm updates itself at night, around $($at.ToString('H:mm')), while plugged in."
+    } catch {
+        Note "Could not set up updating at night: $($_.Exception.Message)"
+    }
+}
+
 # Remove-Shortcuts takes away the shortcuts under the product's names - its
 # own and the old SoundStorm ones, or only the old ones (-OldOnly, as an update
 # replaces them).
@@ -4800,7 +4868,10 @@ exit 0
 
     Step "Step 3 of 4 - Removing shortcuts"
     # Not stopped: the shortcuts stay with what still runs.
-    if (-not $stillRunning) { Remove-Shortcuts }
+    if (-not $stillRunning) {
+        Remove-Shortcuts
+        Unregister-ScheduledTask -TaskName $NightlyTask -Confirm:$false -ErrorAction SilentlyContinue
+    }
     # Not stopped: the entry in Settings, Apps and the files it runs stay, so
     # uninstalling again can finish the job (they were removed, leaving no
     # way back to it - the bug review).
@@ -5869,8 +5940,27 @@ if ($pull.ExitCode -ne 0 -and $upgrade) {
     Stop-With "  Could not download the media servers. That is almost always the`n  internet connection. Try again - anything already downloaded is kept."
 }
 
-Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath 'docker-compose.yml.old'
+# The compose file naming the version running before this update is kept
+# until the new one answers: should it not start, it is put back and the old
+# version started again, as a box's update is undone.
+function Restore-PreviousVersion {
+    $old = Join-Path $Dir 'docker-compose.yml.old'
+    if (-not $upgrade -or -not (Test-Path -LiteralPath $old)) { return $false }
+    Move-Item -Force -LiteralPath $old (Join-Path $Dir 'docker-compose.yml')
+    if ($script:PrevSerial) { Set-EnvSetting 'SOUNDSTORM_RELEASE_SERIAL' $script:PrevSerial }
+    $null = Invoke-Docker (@('compose') + $composeArgs + @('up', '-d')) -Capture
+    return $true
+}
+$script:NotUpdated = "  EmberStorm was not updated: the new version did not start properly, so`n  the version you had is running again, as it was. Nothing was lost.`n  Try updating again later."
+if (-not $upgrade) { Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath 'docker-compose.yml.old' }
 Step "Step 4 of 4 - Starting EmberStorm"
+$script:PrevSerial = Get-EnvSetting 'SOUNDSTORM_RELEASE_SERIAL'
+# Which signed release this is, written before EmberStorm starts so it knows
+# (Settings, About: a newer one, desktopupdate.go); written again at the end.
+if ($releaseSerial -gt 0) {
+    Set-EnvSetting 'SOUNDSTORM_RELEASE_SERIAL' "$releaseSerial"
+    Set-EnvSetting 'SOUNDSTORM_RELEASE_VERSION' "$env:SOUNDSTORM_RELEASE_VERSION"
+}
 if ($firstInstall -and -not (Test-DockerRulesReady) -and $lanAccess -notin @('public', 'refused', 'domain')) {
     # The dialog appears the moment the port is first published, i.e. during
     # the next command, and its default answer is the one that shuts phones
@@ -5890,6 +5980,7 @@ if ($start.ExitCode -ne 0) {
         Stop-With "  Port $port is already being used by another program on this PC.`n`n  Restart the PC and try again. If it happens again, send the log file (Show log file, below) to whoever helps you with EmberStorm."
     }
     Save-EmberStormLog
+    if (Restore-PreviousVersion) { Stop-With $script:NotUpdated }
     Stop-With "  EmberStorm would not start.`n`n$(Get-HelpAdvice)"
 }
 
@@ -5901,7 +5992,9 @@ Wait-ForEmberStorm $url
 if ($lan -and $lanAccess -eq 'ready' -and -not (Test-LanAccessReady ([int]$port))) {
     $lanAccess = Set-LanAccess $lan ([int]$port)
 }
-# Started and answering: installed, from now on an update.
+# Started and answering: installed, from now on an update; the version
+# before it is not needed any more.
+Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath (Join-Path $Dir 'docker-compose.yml.old')
 Set-EnvSetting 'SOUNDSTORM_INSTALLED' '1'
 # Which signed release this is, so an older one is never installed over it.
 if ($releaseSerial -gt 0) {
@@ -5916,6 +6009,8 @@ if ((Get-EnvSetting 'SOUNDSTORM_IMPORTING') -eq '1') {
 # The ordinary entry now, its "setup not finished" gone - here as well as with
 # the shortcuts, should those fail.
 Register-Uninstaller
+
+Register-NightlyUpdate (Join-Path $Dir 'soundstorm.ps1')
 
 if (-not $NoShortcuts) {
     Note "Adding shortcuts to the desktop and the Start menu."
