@@ -3096,7 +3096,10 @@ html.holding, html.holding body { overscroll-behavior: none; }
 .sk-line.short { width: 50%; margin-top: 8px; }
 .sk-heading { height: 18px; width: 40%; margin: 22px 20px 12px; }
 .sk-strip { display: flex; gap: 14px; padding: 0 20px; overflow: hidden; }
-.sk-strip > .skeleton { flex: 0 0 38%; }
+/* The size of Home's real cards (.home-strip), not a share of the window: 38%
+   matched a phone's and was three huge cards on a computer's screen. */
+.sk-strip > .skeleton { flex: 0 0 150px; width: 150px; }
+@media (min-width: 900px) { .sk-strip > .skeleton { flex-basis: 180px; width: 180px; } }
 .sk-page-head { margin: 12px 20px 8px; }
 .sk-title { height: 24px; width: 55%; margin-top: 4px; }
 @keyframes sk-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }

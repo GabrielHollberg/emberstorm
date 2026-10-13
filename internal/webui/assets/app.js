@@ -16372,7 +16372,8 @@ function showSkeleton(view, shape, round) {
       heading.className = 'sk-line sk-heading';
       const strip = document.createElement('div');
       strip.className = 'sk-strip';
-      strip.append(...skeletonCards(3));
+      // Enough to fill a wide screen; the strip cuts off what does not fit.
+      strip.append(...skeletonCards(10));
       row.append(heading, strip);
       return row;
     }));
