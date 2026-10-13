@@ -89,19 +89,39 @@ pull_progress() {
 	*) _full='#' _empty='-' ;;
 	esac
 	awk -v total="${1:-0}" -v full="$_full" -v empty="$_empty" -v on="$GREEN" -v off="$OFF" '
-	function draw(   n, i, t, bar) {
+	function draw(   n, i, t, bar, got) {
 		if (done > total) total = done
 		t = (total > 0) ? total : 1
-		n = int(done * 30 / t)
+		n = int(done * 24 / t)
 		bar = ""
-		for (i = 0; i < 30; i++) bar = bar (i < n ? full : empty)
-		printf "\r    %s%s%s %3d%%  %d of %d  %-22.22s", on, bar, off, int(done * 100 / t), done, total, cur
+		for (i = 0; i < 24; i++) bar = bar (i < n ? full : empty)
+		got = (sum >= 1e9) ? sprintf("%.1f GB", sum / 1e9) : sprintf("%d MB", sum / 1e6)
+		printf "\r    %s%s%s %3d%%  %d of %d  %8s  %-18.18s", on, bar, off, int(done * 100 / t), done, total, got, cur
 		fflush()
+	}
+	# "12.43MB" (newer Compose) or "[==>  ] 12.3MB/45.6MB" (older): bytes.
+	function bytes(v,   n) {
+		sub(/\/.*/, "", v)
+		n = v + 0
+		if (v ~ /[kK]B$/) n *= 1e3
+		else if (v ~ /MB$/) n *= 1e6
+		else if (v ~ /GB$/) n *= 1e9
+		return n
 	}
 	# Older Compose writes "<service> Pulling"; newer "Image <ref> Pulling",
 	# the image named in full, which is shown short (navidrome).
 	function short(r) { sub(/@.*/, "", r); sub(/.*\//, "", r); sub(/:.*/, "", r); return r }
-	BEGIN { done = 0; cur = "starting"; draw() }
+	BEGIN { done = 0; sum = 0; cur = "starting"; draw() }
+	# How much has arrived, from the first second: every part downloads at
+	# once, so none is whole - and the count of parts moves - for a while.
+	$2 == "Downloading" {
+		for (i = 3; i <= NF; i++) if ($i ~ /^[0-9.]+[kKMG]?B/) {
+			v = bytes($i)
+			if (v > got_[$1]) { sum += v - got_[$1]; got_[$1] = v; draw() }
+			break
+		}
+		next
+	}
 	(NF == 2 || (NF == 3 && $1 == "Image")) { name = $(NF - 1); state = $NF }
 	!(NF == 2 || (NF == 3 && $1 == "Image")) { next }
 	state == "Pulling" { cur = short(name); draw(); next }
