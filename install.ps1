@@ -5641,6 +5641,9 @@ if (-not $setupCode) {
     $setupCode = -join ($bytes | ForEach-Object { $_.ToString('x2') })
     Set-EnvSetting 'SOUNDSTORM_SETUP_CODE' $setupCode
 }
+# Which computer EmberStorm runs on, for Settings' directions for this
+# computer's own settings (staying awake, the lid, signing in by itself).
+Set-EnvSetting 'SOUNDSTORM_HOST' 'windows'
 
 # Every run, not only when something above was written: an install from before
 # this existed has a .env with its folder's permissions, and running the

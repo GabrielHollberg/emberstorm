@@ -1211,6 +1211,16 @@ function renderAccount() {
     show($('box-off-block'), box);
     show($('box-updates-block'), box);
     if (box) { showBoxTimeZone(); showBoxUpdates(); }
+    // Off a box, where the computer's own settings are (the owner's): its
+    // directions only, when the installer said which computer it is.
+    const hasHost = Boolean(ok && body && typeof body.host === 'string');
+    show($('host-block'), hasHost);
+    if (hasHost) {
+      for (const el of document.querySelectorAll('#host-block [data-host]')) {
+        show(el, !body.host || el.dataset.host === body.host);
+      }
+      for (const el of document.querySelectorAll('#host-block .host-name')) show(el, !body.host);
+    }
     showBuild(ok && body && body.build);
     // The box's serial, as on its label: what support asks for.
     const unit = ok && body && body.boxUnit;

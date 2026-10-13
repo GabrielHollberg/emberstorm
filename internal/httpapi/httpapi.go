@@ -202,6 +202,7 @@ type Server struct {
 	// box.
 	caretakerSocket string
 	boxUnit         string
+	host            string
 	caretakerOnce   sync.Once
 	caretakerClient *http.Client
 
@@ -333,6 +334,11 @@ type Config struct {
 	// BoxUnit is a box's serial, as on its sticker (SOUNDSTORM_UNIT), shown
 	// to the owner for support. Empty off a box.
 	BoxUnit string
+
+	// Host is the computer an installer put EmberStorm on (SOUNDSTORM_HOST:
+	// windows, mac or linux), for Settings' directions for that computer's
+	// own settings. Empty on a box, and on installs from before it.
+	Host string
 }
 
 // RemoteState is the current state of remote access, for the account panel. It
@@ -408,6 +414,7 @@ func New(cfg Config) *Server {
 		drivesDir:        cfg.DrivesDir,
 		caretakerSocket:  cfg.CaretakerSocket,
 		boxUnit:          cfg.BoxUnit,
+		host:             cfg.Host,
 		rescanTimers:     map[media.Kind]*time.Timer{},
 		lastRescan:       map[media.Kind]time.Time{},
 		autoKick:         make(chan struct{}, 1),
@@ -910,6 +917,17 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		}
 		// Every account's devices may be asked to approve a new one.
 		answer["approveNewDevices"] = s.store.ApproveNewDevices()
+		// The computer it runs on, off a box: Settings shows the owner where
+		// that computer's own settings are (staying awake, the lid, signing
+		// in by itself), which EmberStorm cannot change from inside Docker.
+		if user.IsOwner() && s.caretakerSocket == "" {
+			switch s.host {
+			case "windows", "mac", "linux":
+				answer["host"] = s.host
+			default:
+				answer["host"] = ""
+			}
+		}
 		// A box can be started over or erased (reset.go): the owner's cards.
 		if user.IsOwner() && s.caretakerSocket != "" {
 			answer["boxReset"] = true

@@ -693,6 +693,65 @@
         <p id="server-name-note" class="muted hidden" role="status"></p>
       </div>
 
+      <!-- Off a box (owner only): where the computer's own settings are that
+           the setup asked about - EmberStorm runs in Docker and cannot change
+           them itself, by design. The installer says which computer it is
+           (SOUNDSTORM_HOST); with none, all three show. -->
+      <div id="host-block" class="account-section card hidden" data-hint="Staying awake, the lid, starting by itself" data-cat="devices" data-words="sleep awake lid power battery restart sign in log in automatic computer pc mac linux windows network private firewall">
+        <h2>The computer EmberStorm runs on</h2>
+        <p class="muted">The setup asked about a few of this computer's own settings. To change
+          them later, use the computer's settings:</p>
+        <div data-host="windows">
+          <h3 class="host-name">Windows</h3>
+          <ul class="host-steps">
+            <li><strong>Staying awake while plugged in:</strong> Settings, System, Power &amp;
+              battery, Screen, sleep &amp; hibernate timeouts - "When plugged in, put my device
+              to sleep after": Never, or a time to let it sleep.</li>
+            <li><strong>Closing the lid (laptops):</strong> Control Panel, Hardware and Sound,
+              Power Options, Choose what closing the lid does - "Plugged in".</li>
+            <li><strong>Signing in by itself after a restart:</strong> press Windows+R, type
+              <code>netplwiz</code>, click your name, and tick or untick "Users must enter a
+              user name and password". If that box is missing: Settings, Accounts, Sign-in
+              options, turn off "Only allow Windows Hello sign-in".</li>
+            <li><strong>Phones and TVs can't reach it:</strong> Settings, Network &amp; internet,
+              Wi-Fi or Ethernet, your network - Network profile type: Private.</li>
+            <li><strong>Starting when you sign in:</strong> Docker Desktop, Settings, General -
+              "Start Docker Desktop when you sign in". EmberStorm starts with it.</li>
+          </ul>
+        </div>
+        <div data-host="mac">
+          <h3 class="host-name">Mac</h3>
+          <ul class="host-steps">
+            <li><strong>Staying awake while plugged in:</strong> a MacBook: System Settings,
+              Battery, Options - "Prevent automatic sleeping on power adapter when the display
+              is off". Other Macs: System Settings, Energy - "Prevent automatic sleeping when
+              the display is off".</li>
+            <li><strong>Starting after a power cut:</strong> System Settings, Energy - "Start up
+              automatically after a power failure".</li>
+            <li><strong>Logging in by itself after a restart:</strong> System Settings, Users
+              &amp; Groups - "Automatically log in as" (not offered while FileVault is on).</li>
+            <li><strong>Closing the lid:</strong> a MacBook sleeps when closed unless a display,
+              keyboard and power are plugged in.</li>
+            <li><strong>Starting when you log in:</strong> Docker Desktop, Settings, General -
+              "Start Docker Desktop when you sign in".</li>
+          </ul>
+        </div>
+        <div data-host="linux">
+          <h3 class="host-name">Linux</h3>
+          <ul class="host-steps">
+            <li><strong>Staying awake while plugged in, lid closed or not:</strong> if you said
+              yes during setup, EmberStorm keeps it awake on mains power and lets it sleep on
+              battery. To stop that, run
+              <code>sudo systemctl disable --now emberstorm-awake</code> in a terminal; to start
+              it again, <code>sudo systemctl enable --now emberstorm-awake</code>. Your own
+              settings are in your desktop's power settings (KDE: System Settings, Power
+              Management; GNOME: Settings, Power).</li>
+            <li><strong>Starting:</strong> EmberStorm starts by itself whenever the computer
+              does - no sign-in needed.</li>
+          </ul>
+        </div>
+      </div>
+
       <!-- Updates on a box (owner only): the version, what is waiting, and
            Update now - else it installs by itself at night (boxupdates.go). -->
       <div id="box-updates-block" class="account-section card hidden" data-hint="Version, and updating now" data-cat="devices" data-words="update updates version upgrade new release automatic">

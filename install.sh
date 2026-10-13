@@ -2069,6 +2069,12 @@ if [ -z "$SETUP_CODE" ]; then
 ')
 	set_env SOUNDSTORM_SETUP_CODE "$SETUP_CODE"
 fi
+# Which computer EmberStorm runs on, for Settings' directions for this
+# computer's own settings (staying awake, the lid, signing in by itself).
+case "$(uname -s)" in
+Darwin) set_env SOUNDSTORM_HOST mac ;;
+Linux) set_env SOUNDSTORM_HOST linux ;;
+esac
 # Only a fresh install shows it: an existing one already has its owner.
 SETUP_QS=''
 if [ "$UPGRADE" != "1" ] && [ -z "$IMPORT" ]; then

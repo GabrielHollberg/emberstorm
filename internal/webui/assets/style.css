@@ -4702,3 +4702,9 @@ html.numbering-open { overflow: hidden; }
 /* Room for it, so it never sits over a part's Change button. */
 #intake { padding-right: 30px; }
 #intake-list, .intake-peek-list { padding-right: 24px; }
+
+/* The computer EmberStorm runs on: directions for its own settings. */
+#host-block h3 { font-size: 1rem; margin: 14px 0 4px; }
+#host-block .host-steps { padding-left: 1.1em; margin: 6px 0 0; }
+#host-block .host-steps li { margin: 8px 0; line-height: 1.5; }
+#host-block code { overflow-wrap: anywhere; }
