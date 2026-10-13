@@ -1637,7 +1637,7 @@ MOVE_VOLUMES="soundstorm-state navidrome-data jellyfin-config abs-config abs-met
 
 # Settings that describe this computer and its network rather than the
 # install. They are worked out again on the new one.
-MOVE_LOCAL='^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME|DOCKER_INSTALLED|WAS_[A-Z_]+)='
+MOVE_LOCAL='^SOUNDSTORM_(INSTALLED|PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME|DOCKER_INSTALLED|WAS_[A-Z_]+)='
 
 # windows_name_problems lists files under $1 that cannot exist on Windows:
 # names with a character Windows refuses, names ending in a dot or a space,
@@ -1882,7 +1882,14 @@ MOVE_IMAGE='alpine:3'
 # is the release the YubiKey signed, not this script as GitHub has it now
 # (the updater sets SOUNDSTORM_FRESH, so it does not come back round).
 # Uninstalling runs as it is.
-if [ -z "$RELEASE_DIR" ] && [ "${SOUNDSTORM_FRESH:-}" != 1 ] && [ -f "$DIR/$UPDATER_NAME" ]; then
+# Only for an install that is finished: a first setup stopped part way has
+# its updater already, and handed over it was taken for an update by the
+# release's own installer (found 2026-10-13, a stopped setup run again).
+finished_install() {
+	grep -q '^SOUNDSTORM_INSTALLED=1' "$DIR/.env" 2>/dev/null ||
+		docker volume inspect "${PROJECT}_soundstorm-state" >/dev/null 2>&1
+}
+if [ -z "$RELEASE_DIR" ] && [ "${SOUNDSTORM_FRESH:-}" != 1 ] && [ -f "$DIR/$UPDATER_NAME" ] && finished_install; then
 	handover=1
 	for a in "$@"; do
 		case "$a" in --uninstall|-u) handover="" ;; esac
@@ -2076,13 +2083,24 @@ put_back_previous() {
 	$COMPOSE $PROFILE up -d >/dev/null 2>&1
 }
 
+# installed_here is whether EmberStorm was installed in this folder: marked so
+# once it has started and answered (SOUNDSTORM_INSTALLED, as the Windows setup
+# marks it), or - an install from before the mark - its accounts volume made.
+# A compose file alone was taken for an install, so a first setup stopped
+# during the download was an update the next time, skipping its questions.
+installed_here() {
+	[ -f docker-compose.yml ] || return 1
+	[ "$(get_env SOUNDSTORM_INSTALLED)" = 1 ] && return 0
+	docker volume inspect "${PROJECT}_soundstorm-state" >/dev/null 2>&1
+}
+
 if [ -n "$RELEASE_DIR" ]; then
-	[ -f docker-compose.yml ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ] && UPGRADE=1 || UPGRADE=0
+	installed_here && [ "${SOUNDSTORM_FORCE:-}" != "1" ] && UPGRADE=1 || UPGRADE=0
 	[ "$UPGRADE" = "1" ] && note "already installed here - upgrading it instead"
 	cp "$RELEASE_DIR/docker-compose.yml" docker-compose.yml.new
 	mv docker-compose.yml.new docker-compose.yml
 	note "took docker-compose.yml from the signed release ${SOUNDSTORM_RELEASE_VERSION:-}"
-elif [ -f docker-compose.yml ] && [ "${SOUNDSTORM_FORCE:-}" != "1" ]; then
+elif installed_here && [ "${SOUNDSTORM_FORCE:-}" != "1" ]; then
 	note "already installed here - upgrading it instead"
 	UPGRADE=1
 	# The current compose file too: an update used to keep the one it was
@@ -2124,12 +2142,25 @@ if [ "$UPGRADE" = "0" ]; then
 	# Created 0600 before anything is written into it: .env holds the setup
 	# code and, with --tailscale, a reusable auth key, and the default umask
 	# would otherwise leave it world-readable for any other local account.
-	( umask 077; : > .env )
-	printf 'SOUNDSTORM_PORT=%s\n' "$PORT" > .env
+	#
+	# A first setup stopped part way and run again keeps the .env it made:
+	# the setup code, and what this computer's settings were before the
+	# setup changed them, which the uninstall puts back.
 	lan=$(lan_address)
-	if [ -n "$lan" ]; then
-		printf 'SOUNDSTORM_TLS_HOSTS=%s\n' "$lan" >> .env
+	if [ -f .env ]; then
+		note "carrying on with the setup that was stopped"
+		set_env SOUNDSTORM_PORT "$PORT"
+		[ -n "$lan" ] && set_env SOUNDSTORM_TLS_HOSTS "$lan"
+	else
+		( umask 077; : > .env )
+		printf 'SOUNDSTORM_PORT=%s\n' "$PORT" > .env
+		if [ -n "$lan" ]; then
+			printf 'SOUNDSTORM_TLS_HOSTS=%s\n' "$lan" >> .env
+		fi
 	fi
+	# Said at once, so a setup stopped during the download still knows the
+	# uninstall may offer to take Docker away again.
+	[ -n "${DOCKER_INSTALLED_BY:-}" ] && set_env SOUNDSTORM_DOCKER_INSTALLED "$DOCKER_INSTALLED_BY"
 else
 	PORT=$(get_env SOUNDSTORM_PORT)
 	# A port asked for when running it (SOUNDSTORM_PORT=9000 sh install.sh,
@@ -2510,8 +2541,9 @@ running again, as it was. Nothing was lost. Try updating again later."
 	fi
 	sleep 2
 done
-# It answers: the new version stays.
+# It answers: the new version stays, and this folder holds an install now.
 rm -f docker-compose.yml.prev
+set_env SOUNDSTORM_INSTALLED 1
 
 # Run again after a first install stopped part way (a download that failed),
 # it counts as an update, but nobody has made an account yet: it still shows

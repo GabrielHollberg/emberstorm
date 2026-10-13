@@ -47,16 +47,29 @@ until $s test -e /tmp/ready 2>/dev/null; do i=$((i+1)); [ $i -gt 120 ] && { say 
 kill $web
 say "up: $($s 'grep PRETTY /etc/os-release')"
 
-say "installing (the website's command, no terminal)"
+# LOCAL=1: this checkout's install.sh rather than main's. STOP_AFTER=N: a first
+# run cut off after N seconds (the download), then the real one.
+if [ -n "${LOCAL:-}" ]; then
+	$s 'cat >install.sh' </mnt/h/dev/soundstorm/install.sh
+	cmd='sh install.sh'
+else
+	cmd='curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh'
+fi
+if [ -n "${STOP_AFTER:-}" ]; then
+	say "a first run, stopped after ${STOP_AFTER}s"
+	$s "timeout -s INT $STOP_AFTER $cmd" >>"$log" 2>&1
+	$s 'ls ~/soundstorm; cat ~/soundstorm/.env' >>"$log" 2>&1
+fi
+say "installing (no terminal)"
 start=$(date +%s)
-$s 'curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh' >>"$log" 2>&1
+$s "$cmd" >>"$log" 2>&1
 rc=$?
 say "installer exit $rc after $(( ($(date +%s)-start)/60 )) min"
 
 say "checks"
 $s 'sleep 60; curl -s localhost:8099/healthz; echo; curl -s localhost:8099/ | grep -o "<title>[^<]*" | head -1;
 	echo containers running: $(sudo docker ps -q | wc -l);
-	ls ~/soundstorm; grep -E "^SOUNDSTORM_(INSTALLED|DOCKER_INSTALLED|HOST|AUTO_UPDATE|RELEASE_SERIAL)=" ~/soundstorm/.env;
+	ls ~/soundstorm; grep -E "^SOUNDSTORM_(INSTALLED|SETUP_CODE|WAS_[A-Z_]+|DOCKER_INSTALLED|HOST|AUTO_UPDATE|RELEASE_SERIAL)=" ~/soundstorm/.env;
 	crontab -l 2>/dev/null | grep -c emberstorm-update; ls -ld ~/soundstorm/library' >>"$log" 2>&1
 tail -20 "$log" | sed 's/^/   /'
 
