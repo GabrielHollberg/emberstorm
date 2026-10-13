@@ -188,6 +188,14 @@ ask_yes() {
 # A Mac is also told to start up again after a power cut, which it can do by
 # itself. On Linux only a laptop or a desktop with a sleeping session is asked;
 # a plain server does not sleep.
+# remember_was KEY VALUE: a setting as it was before the setup changed it,
+# kept in .env (the first value only: a second install keeps the original)
+# for the uninstaller to offer back.
+remember_was() {
+	[ -n "$(get_env "$1")" ] || set_env "$1" "$2"
+}
+LID_CONF=/etc/systemd/logind.conf.d/emberstorm-lid.conf
+
 keep_awake() {
 	case "$(uname -s)" in
 	Darwin)
@@ -197,6 +205,11 @@ keep_awake() {
 		say "EmberStorm can only be reached while this Mac is awake."
 		# The Mac setup app asks in its own window and says the answer here.
 		if ask_yes "Keep it awake while plugged in, and start up again after a power cut? [Y/n]" "${EMBERSTORM_KEEP_AWAKE:-yes}"; then
+			# What it was, for the uninstaller to offer back (asked then: it
+			# may be relied on by the time).
+			restart_was=$(pmset -g 2>/dev/null | awk '$1 == "autorestart" {print $2; exit}')
+			remember_was SOUNDSTORM_WAS_MAC_SLEEP "${sleep_ac:-1}"
+			remember_was SOUNDSTORM_WAS_MAC_AUTORESTART "${restart_was:-0}"
 			if as_root pmset -c sleep 0 && as_root pmset -a autorestart 1; then
 				note "This Mac stays awake while plugged in, and starts again after a power cut."
 			else
@@ -220,14 +233,16 @@ keep_awake() {
 		say "EmberStorm can only be reached while this computer is awake."
 		if ask_yes "Keep it awake while plugged in? [Y/n]" yes; then
 			if [ "$gnome" = "1" ]; then
+				remember_was SOUNDSTORM_WAS_GNOME_SLEEP suspend
 				gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' 2>/dev/null &&
 					note "It no longer goes to sleep on its own while plugged in."
 			fi
 			if [ "$laptop" = "1" ] && [ -d /etc/systemd ]; then
 				# The lid too, on mains power only; logind reads it from the
 				# next start.
+				[ -e "$LID_CONF" ] || remember_was SOUNDSTORM_WAS_LID default
 				if printf '[Login]\nHandleLidSwitchExternalPower=ignore\n' |
-					as_root sh -c 'mkdir -p /etc/systemd/logind.conf.d && cat > /etc/systemd/logind.conf.d/emberstorm-lid.conf'; then
+					as_root sh -c 'mkdir -p /etc/systemd/logind.conf.d && cat > '"$LID_CONF"; then
 					note "Closing the lid will not sleep it while plugged in (from the next restart)."
 				fi
 			fi
@@ -475,6 +490,7 @@ run this again:
 	# Where its command lives, should the installer not have linked it into
 	# a folder on PATH yet.
 	PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"
+	DOCKER_INSTALLED_BY=desktop
 	note "Docker Desktop is installed."
 }
 
@@ -1306,16 +1322,26 @@ uninstall() {
 	have_docker=0
 	command -v docker >/dev/null 2>&1 && docker_reachable && have_docker=1
 
-	# Every question first, as the Windows setup asks them on one page;
-	# with nobody at a terminal, the defaults: keep a copy of the accounts,
-	# remove the programs, leave Docker.
-	keep_copy=no drop_images=no drop_docker=no saved=no
+	# Every question first, as the Windows setup asks them on one page: each
+	# change the setup made, asked back one by one, as it may be relied on
+	# by now. With nobody at a terminal, the defaults (keep a copy of the
+	# accounts, remove the programs, change nothing else back), or what the
+	# Mac setup app passes for its own window's choices:
+	# EMBERSTORM_UNINSTALL_COPY, _PROGRAMS, _DOCKER, _SLEEP, _LID (yes or no).
+	keep_copy=no drop_images=no drop_docker=no saved=no undo_sleep=no undo_lid=no name=Docker
+	was_mac_sleep=$(get_env SOUNDSTORM_WAS_MAC_SLEEP)
+	was_mac_restart=$(get_env SOUNDSTORM_WAS_MAC_AUTORESTART)
+	was_gnome=$(get_env SOUNDSTORM_WAS_GNOME_SLEEP)
+	was_lid=$(get_env SOUNDSTORM_WAS_LID)
+	# An install from before the record: the lid's file is EmberStorm's by
+	# its name, so it can be offered back all the same.
+	[ -z "$was_lid" ] && [ -e "$LID_CONF" ] && was_lid=default
 	if [ "$have_docker" = 1 ]; then
-		ask_yes "Keep a copy of your accounts, in case you install EmberStorm again? [Y/n]" yes && keep_copy=yes
-		ask_yes "Remove EmberStorm's downloaded programs (about 12 GB)? [Y/n]" yes && drop_images=yes
+		ask_yes "Keep a copy of your accounts, in case you install EmberStorm again? [Y/n]" "${EMBERSTORM_UNINSTALL_COPY:-yes}" && keep_copy=yes
+		ask_yes "Remove EmberStorm's downloaded programs (about 12 GB)? [Y/n]" "${EMBERSTORM_UNINSTALL_PROGRAMS:-yes}" && drop_images=yes
 		# Docker only when EmberStorm installed it - one already here was
 		# somebody's own - and never without saying what else it holds.
-		if [ "$(uname -s)" = Linux ] && [ -n "$docker_by" ]; then
+		if [ -n "$docker_by" ]; then
 			all=$(docker ps -aq 2>/dev/null | wc -l | tr -d ' ')
 			ours=$(docker ps -aq --filter "label=com.docker.compose.project=$PROJECT" 2>/dev/null | wc -l | tr -d ' ')
 			others=$((all - ours))
@@ -1323,10 +1349,17 @@ uninstall() {
 				important "Docker also holds $others other container(s) on this computer."
 				important "Removing Docker removes them too."
 			fi
-			ask_yes "Remove Docker too? EmberStorm installed it. [y/N]" no && drop_docker=yes
+			name=Docker
+			[ "$docker_by" = desktop ] && name="Docker Desktop"
+			ask_yes "Remove $name too? EmberStorm installed it. [y/N]" "${EMBERSTORM_UNINSTALL_DOCKER:-no}" && drop_docker=yes
 		fi
 	fi
-
+	if [ -n "$was_mac_sleep$was_gnome" ]; then
+		ask_yes "Let this computer go to sleep on its own again, as before EmberStorm? [y/N]" "${EMBERSTORM_UNINSTALL_SLEEP:-no}" && undo_sleep=yes
+	fi
+	if [ -n "$was_lid" ]; then
+		ask_yes "Let closing the lid put it to sleep again while plugged in? [y/N]" "${EMBERSTORM_UNINSTALL_LID:-no}" && undo_lid=yes
+	fi
 	if [ "$have_docker" = 1 ]; then
 
 		if [ "$keep_copy" = yes ]; then
@@ -1363,13 +1396,30 @@ uninstall() {
 
 	docker_gone=no
 	if [ "$drop_docker" = yes ]; then
-		step "Removing Docker"
+		step "Removing $name"
 		important "Your computer may ask for your password - type it and press Enter."
-		if remove_docker_linux "$docker_by"; then
-			docker_gone=yes
+		if [ "$docker_by" = desktop ]; then
+			remove_docker_mac && docker_gone=yes
 		else
-			note "Docker could not be removed; it is still installed."
+			remove_docker_linux "$docker_by" && docker_gone=yes
 		fi
+		[ "$docker_gone" = yes ] || note "$name could not be removed; it is still installed."
+	fi
+
+	# The settings asked to be put back, as they were before the setup.
+	sleep_back=no lid_back=no
+	if [ "$undo_sleep" = yes ]; then
+		if [ -n "$was_mac_sleep" ] && as_root pmset -c sleep "$was_mac_sleep"; then
+			sleep_back=yes
+			[ -n "$was_mac_restart" ] && as_root pmset -a autorestart "$was_mac_restart"
+		fi
+		if [ -n "$was_gnome" ] && command -v gsettings >/dev/null 2>&1 &&
+			gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type "$was_gnome" 2>/dev/null; then
+			sleep_back=yes
+		fi
+	fi
+	if [ "$undo_lid" = yes ] && as_root rm -f "$LID_CONF"; then
+		lid_back=yes
 	fi
 
 	say ""
@@ -1388,14 +1438,35 @@ uninstall() {
 		note "keep it if you might install EmberStorm again."
 	fi
 	if [ "$docker_gone" = yes ]; then
-		note "Docker was removed."
-	elif [ "$(uname -s)" = Linux ] && [ -z "$docker_by" ]; then
+		note "$name was removed."
+	elif [ -z "$docker_by" ]; then
 		note "Docker was left installed: it was here before EmberStorm."
 	else
-		note "Docker was left installed."
+		note "$name was left installed."
+	fi
+	if [ "$sleep_back" = yes ]; then
+		note "This computer goes to sleep on its own again, as before."
+	elif [ -n "$was_mac_sleep$was_gnome" ]; then
+		note "This computer still stays awake while plugged in, as EmberStorm set it."
+	fi
+	if [ "$lid_back" = yes ]; then
+		note "Closing the lid puts it to sleep again, from the next restart."
+	elif [ -n "$was_lid" ]; then
+		note "Closing the lid while plugged in still does not put it to sleep."
 	fi
 	say ""
 	exit 0
+}
+
+# remove_docker_mac takes away Docker Desktop, when the setup installed it and
+# it was asked to: Docker's own uninstaller (its containers, images and
+# settings), then the app.
+remove_docker_mac() {
+	app=/Applications/Docker.app
+	[ -d "$app" ] || return 0
+	osascript -e 'quit app "Docker"' >/dev/null 2>&1 || true
+	"$app/Contents/MacOS/uninstall" >/dev/null 2>&1 || return 1
+	rm -rf "$app" 2>/dev/null || as_root rm -rf "$app"
 }
 
 # --- moving it to another computer ------------------------------------------
@@ -1410,7 +1481,7 @@ MOVE_VOLUMES="soundstorm-state navidrome-data jellyfin-config abs-config abs-met
 
 # Settings that describe this computer and its network rather than the
 # install. They are worked out again on the new one.
-MOVE_LOCAL='^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME)='
+MOVE_LOCAL='^SOUNDSTORM_(PORT|TLS_HOSTS|LIBRARY_PATH|LIBRARY_HINT|GATEWAY|UPNP_URL|NOT_HOME|DOCKER_INSTALLED|WAS_[A-Z_]+)='
 
 # windows_name_problems lists files under $1 that cannot exist on Windows:
 # names with a character Windows refuses, names ending in a dot or a space,
