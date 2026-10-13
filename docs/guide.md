@@ -419,10 +419,7 @@ own, and a parent's, say - under **Your servers** on the connect screen
 one to switch, and hold one to rename or remove it. You stay signed in to each,
 so switching back asks for nothing.
 
-**Or install the web app:**
-- **iPhone:** Share → Add to Home Screen.
-- **Android:** Chrome menu → Install app. This only works from the secure
-  address.
+Without the app, any phone uses EmberStorm in its web browser.
 
 Worth doing:
 - **Give the computer a fixed address** in your router (a DHCP reservation).

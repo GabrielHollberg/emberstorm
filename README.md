@@ -120,7 +120,7 @@ but yourself, and nothing to set up by hand.
 | **Internet** | For the first install (a large download); afterwards it runs at home |
 
 Phones, tablets and other computers need nothing installed: they use EmberStorm
-in their web browser, or add it to their home screen as an app. There is also
+in their web browser. There is also
 an Android app (from the [releases page](https://github.com/GabrielHollberg/emberstorm/releases),
 the `android-` ones, which also run on Google TV, Android TV and Fire TV). The
 iPhone and Apple TV apps are in testing and not in the App Store yet; until
@@ -238,13 +238,10 @@ like.
 
 **3. Put it on your phone.** Open **Settings → Use on your phone or TV** on the
 computer. It shows the address to type on your phone (your phone must be on the
-same Wi-Fi). Then either install the app (Android: the newest `android-` file on
+same Wi-Fi). Then get the app (Android: the newest `android-` file on
 the [releases page](https://github.com/GabrielHollberg/emberstorm/releases)),
-which also backs up the phone's photos, or add the web app to your home screen
-(on an iPhone, for now, this is the way):
-- **iPhone:** Share → **Add to Home Screen**.
-- **Android:** Chrome menu → **Install app**. Use the secure address, the one
-  ending in `.home.emberstorm.app`.
+which also backs up the phone's photos. The iPhone app is coming to the App
+Store; until then an iPhone uses EmberStorm in Safari.
 
 **4. Add your family.** **Settings → People**: give each person a name and a
 password, tick which shelves they may see, and set their photo space if you

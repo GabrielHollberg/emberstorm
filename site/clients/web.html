@@ -176,6 +176,11 @@ The manifest is likewise served by hand, because Go's MIME table has no
 <code>.webmanifest</code> and Chrome ignores a manifest not sent as JSON.</div>
 
 <h2 id="install">Installing it as an app</h2>
+<p><strong>Not offered any more</strong> (the owner's decision, 2026-10-12): on a phone or tablet the
+page offers the phone app from its store once (<code>offerInstall</code>; <code>APP_STORE_URL</code>
+stays empty until the iPhone app is listed, and an iPhone is offered nothing until then), Chrome's own
+install prompt is held back (<code>beforeinstallprompt</code>), and a computer is offered nothing. The
+web app can still be added to a home screen from the browser's own menu, for those who look.</p>
 <p>On an iPhone, Share &rarr; Add to Home Screen works from any address. On Android, Chrome's
 <strong>Install app</strong> only appears where a service worker can register - and Chrome refuses
 to register one on an origin with a certificate error, even after the warning was clicked
