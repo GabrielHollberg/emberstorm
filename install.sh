@@ -312,7 +312,9 @@ install_docker_linux() {
 	# fails. sudo still asks for the password on the terminal.
 	log=$(mktemp)
 	note "Installing... (a few minutes)"
+	DOCKER_INSTALLED_BY=docker
 	if ! as_root sh "$tmp" >"$log" 2>&1; then
+		DOCKER_INSTALLED_BY=distro
 		# Docker's installer knows the common systems by name only, and
 		# refuses the rest - Arch, openSUSE, Alpine, and some made from
 		# Ubuntu (Linux Mint, Pop!_OS). Then the system's own Docker, from
@@ -1094,7 +1096,7 @@ install_launcher() {
 	command -v xdg-open >/dev/null 2>&1 || return 0
 	# A desktop file's Exec line has quoting rules of its own: a folder
 	# whose name holds any of these is left without a launcher.
-	case "$DIR" in *[\"\`\$\\%]*) return 0 ;; esac
+	case "$DIR" in *[\"\`\$\\%\']*) return 0 ;; esac
 	open_url=$(with_here "$URL")
 	cat >"$DIR/$OPENER_NAME" <<EOF || return 0
 #!/bin/sh
@@ -1136,6 +1138,14 @@ EOF
 		printf 'Terminal=false\n'
 		printf 'Categories=AudioVideo;Network;\n'
 		printf 'StartupNotify=false\n'
+		# Right-click on the menu entry (KDE, GNOME): Uninstall EmberStorm,
+		# in a terminal window, asking first.
+		if [ -f "$DIR/$UNINSTALLER_NAME" ]; then
+			printf 'Actions=uninstall;\n\n'
+			printf '[Desktop Action uninstall]\n'
+			printf 'Name=Uninstall EmberStorm\n'
+			printf 'Exec=sh "%s/%s" --window\n' "$DIR" "$UNINSTALLER_NAME"
+		fi
 	} >"$LAUNCHER" || return 0
 	command -v update-desktop-database >/dev/null 2>&1 &&
 		update-desktop-database "$LAUNCHER_DIR" >/dev/null 2>&1
@@ -1145,6 +1155,92 @@ EOF
 
 remove_launcher() {
 	rm -f "$LAUNCHER" "$DIR/$OPENER_NAME" "$DIR/emberstorm.png"
+}
+
+# Uninstalling from the install folder, with nothing to look up or download:
+# a copy of this script beside the install (from the signed release when the
+# install came from one, else the branch it came from), and a small
+# emberstorm-uninstall.sh that runs it with --uninstall. "--window" opens it in
+# a terminal window, for the app menu's right-click Uninstall EmberStorm.
+UNINSTALLER_NAME=emberstorm-uninstall.sh
+SCRIPT_COPY=emberstorm-install.sh
+
+install_uninstaller() {
+	if [ -n "$RELEASE_DIR" ] && [ -f "$RELEASE_DIR/install.sh" ]; then
+		cp "$RELEASE_DIR/install.sh" "$DIR/$SCRIPT_COPY.new" 2>/dev/null || rm -f "$DIR/$SCRIPT_COPY.new"
+	else
+		fetch "https://raw.githubusercontent.com/$REPO/$BRANCH/install.sh" "$DIR/$SCRIPT_COPY.new" 2>/dev/null ||
+			rm -f "$DIR/$SCRIPT_COPY.new"
+	fi
+	# Kept only when it is a whole script, never half a download.
+	if [ -f "$DIR/$SCRIPT_COPY.new" ] && sh -n "$DIR/$SCRIPT_COPY.new" 2>/dev/null &&
+		grep -q '^uninstall() {' "$DIR/$SCRIPT_COPY.new"; then
+		mv -f "$DIR/$SCRIPT_COPY.new" "$DIR/$SCRIPT_COPY"
+	else
+		rm -f "$DIR/$SCRIPT_COPY.new"
+	fi
+	cat >"$DIR/$UNINSTALLER_NAME" <<EOF || return 0
+#!/bin/sh
+# Removes EmberStorm from this computer, asking first. Your media library is
+# kept. Run:  sh $(shell_quote "$DIR/$UNINSTALLER_NAME")
+# (written by install.sh; uninstalling removes it)
+here=\$(cd "\$(dirname "\$0")" && pwd)
+self="\$here/$UNINSTALLER_NAME"
+if [ "\${1:-}" = --window ]; then
+	# A terminal window of its own, from the app menu: whichever this
+	# desktop has, each started its own way.
+	run="sh '\$self'; printf '\\\\nPress Enter to close this window. '; read _"
+	for t in x-terminal-emulator konsole gnome-terminal kgx xfce4-terminal mate-terminal lxterminal tilix alacritty kitty xterm; do
+		command -v "\$t" >/dev/null 2>&1 || continue
+		case "\$t" in
+		gnome-terminal | kgx | tilix) exec "\$t" -- sh -c "\$run" ;;
+		xfce4-terminal) exec "\$t" -x sh -c "\$run" ;;
+		kitty) exec "\$t" sh -c "\$run" ;;
+		*) exec "\$t" -e sh -c "\$run" ;;
+		esac
+	done
+	exit 1
+fi
+if [ -f "\$here/$SCRIPT_COPY" ]; then
+	SOUNDSTORM_DIR="\$here" exec sh "\$here/$SCRIPT_COPY" --uninstall
+fi
+curl -fsSL https://raw.githubusercontent.com/$REPO/$BRANCH/install.sh | SOUNDSTORM_DIR="\$here" sh -s -- --uninstall
+EOF
+	chmod 755 "$DIR/$UNINSTALLER_NAME" 2>/dev/null || true
+}
+
+# remove_docker_linux takes away the Docker this setup installed ($1: docker,
+# from Docker's own installer; distro, the system's own packages), its
+# repository and everything it stored. Only when EmberStorm installed it, and
+# asked first (uninstall).
+remove_docker_linux() {
+	as_root systemctl disable --now docker.socket docker containerd >/dev/null 2>&1 || true
+	if [ "$1" = docker ]; then
+		pkgs="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras docker-model-plugin"
+	else
+		pkgs="docker.io docker-compose-v2 docker-compose-plugin docker-compose docker moby-engine docker-cli-compose"
+	fi
+	if command -v apt-get >/dev/null 2>&1; then
+		have=""
+		for p in $pkgs; do dpkg -s "$p" >/dev/null 2>&1 && have="$have $p"; done
+		[ -z "$have" ] || as_root env DEBIAN_FRONTEND=noninteractive apt-get purge -yq $have >/dev/null 2>&1 || return 1
+		as_root rm -f /etc/apt/sources.list.d/docker.list /etc/apt/sources.list.d/docker.sources \
+			/etc/apt/keyrings/docker.asc /etc/apt/keyrings/docker.gpg
+	elif command -v dnf >/dev/null 2>&1; then
+		have=""
+		for p in $pkgs; do rpm -q "$p" >/dev/null 2>&1 && have="$have $p"; done
+		[ -z "$have" ] || as_root dnf remove -y $have >/dev/null 2>&1 || return 1
+		as_root rm -f /etc/yum.repos.d/docker-ce.repo
+	elif command -v pacman >/dev/null 2>&1; then
+		as_root pacman -Rns --noconfirm docker docker-compose >/dev/null 2>&1 || return 1
+	elif command -v zypper >/dev/null 2>&1; then
+		as_root zypper --non-interactive remove docker docker-compose >/dev/null 2>&1 || return 1
+	elif command -v apk >/dev/null 2>&1; then
+		as_root apk del docker docker-cli-compose >/dev/null 2>&1 || return 1
+	else
+		return 1
+	fi
+	as_root rm -rf /var/lib/docker /var/lib/containerd
 }
 
 # --- removing it -------------------------------------------------------------
@@ -1179,39 +1275,81 @@ uninstall() {
 	say "${BOLD}Removing EmberStorm${OFF}"
 	say ""
 
+	if [ ! -f "$DIR/docker-compose.yml" ]; then
+		note "EmberStorm is not installed in $DIR."
+		say ""
+		exit 0
+	fi
+	cd "$DIR"
 	library=$(library_path)
+	docker_by=$(get_env SOUNDSTORM_DOCKER_INSTALLED)
+	have_docker=0
+	command -v docker >/dev/null 2>&1 && docker_reachable && have_docker=1
 
-	if [ -f "$DIR/docker-compose.yml" ]; then
-		cd "$DIR"
-		if command -v docker >/dev/null 2>&1; then
-			# A copy first, into the folder rather than the volume about to be
-			# deleted. This is the exact moment the credentials for four
-			# backends stop existing anywhere.
+	# Every question first, as the Windows setup asks them on one page;
+	# with nobody at a terminal, the defaults: keep a copy of the accounts,
+	# remove the programs, leave Docker.
+	keep_copy=no drop_images=no drop_docker=no saved=no
+	if [ "$have_docker" = 1 ]; then
+		ask_yes "Keep a copy of your accounts, in case you install EmberStorm again? [Y/n]" yes && keep_copy=yes
+		ask_yes "Remove EmberStorm's downloaded programs (about 12 GB)? [Y/n]" yes && drop_images=yes
+		# Docker only when EmberStorm installed it - one already here was
+		# somebody's own - and never without saying what else it holds.
+		if [ "$(uname -s)" = Linux ] && [ -n "$docker_by" ]; then
+			all=$(docker ps -aq 2>/dev/null | wc -l | tr -d ' ')
+			ours=$(docker ps -aq --filter "label=com.docker.compose.project=$PROJECT" 2>/dev/null | wc -l | tr -d ' ')
+			others=$((all - ours))
+			if [ "$others" -gt 0 ]; then
+				important "Docker also holds $others other container(s) on this computer."
+				important "Removing Docker removes them too."
+			fi
+			ask_yes "Remove Docker too? EmberStorm installed it. [y/N]" no && drop_docker=yes
+		fi
+	fi
+
+	if [ "$have_docker" = 1 ]; then
+
+		if [ "$keep_copy" = yes ]; then
+			# Into the folder rather than the volume about to be deleted:
+			# the moment the passwords EmberStorm made on the media servers
+			# stop existing anywhere else.
 			step "Saving your accounts first"
 			if save_backup "$DIR/soundstorm-backup.json"; then
-				note "saved to $DIR/soundstorm-backup.json"
-				note "keep it if you might reinstall - it is the only copy of the"
-				note "passwords EmberStorm made on the media servers"
+				saved=yes
 			else
 				note "could not save a copy; carrying on with the uninstall"
 			fi
-
-			step "Stopping it and removing its data"
-			note "accounts and the servers own settings go; your media does not"
-			# down -v takes the named volumes with it - EmberStorm accounts,
-			# and Jellyfin and Navidrome own databases. The library is a bind
-			# mount from the folder and is untouched by this.
-			$COMPOSE down -v >/dev/null 2>&1 || true
-		else
-			note "docker is not available, so the containers were left alone"
 		fi
-		step "Cleaning up"
-		# soundstorm-backup.json is deliberately not in this list.
-		rm -f "$DIR/docker-compose.yml" "$DIR/.env"
-		remove_address_watch
-		remove_launcher
+
+		step "Stopping it and removing its data"
+		note "accounts and the media servers' own settings go; your media does not"
+		# down -v takes the named volumes with it; the library is a bind mount
+		# from the folder and is untouched. --rmi all: the programs too.
+		if [ "$drop_images" = yes ]; then
+			$COMPOSE --profile tailscale down -v --rmi all >/dev/null 2>&1 || true
+		else
+			$COMPOSE --profile tailscale down -v >/dev/null 2>&1 || true
+		fi
 	else
-		note "nothing installed in $DIR"
+		note "Docker is not running, so EmberStorm's containers were left as they are."
+	fi
+
+	step "Cleaning up"
+	# soundstorm-backup.json is deliberately not in this list.
+	remove_address_watch
+	remove_launcher
+	rm -f "$DIR/docker-compose.yml" "$DIR/.env" "$DIR/$UPDATER_NAME" \
+		"$DIR/$UNINSTALLER_NAME" "$DIR/$SCRIPT_COPY" "$DIR/tailscale-serve.json"
+
+	docker_gone=no
+	if [ "$drop_docker" = yes ]; then
+		step "Removing Docker"
+		important "Your computer may ask for your password - type it and press Enter."
+		if remove_docker_linux "$docker_by"; then
+			docker_gone=yes
+		else
+			note "Docker could not be removed; it is still installed."
+		fi
 	fi
 
 	say ""
@@ -1223,9 +1361,19 @@ uninstall() {
 		say "    $library"
 		say ""
 		say "Delete that folder yourself if you want it gone."
+		say ""
 	fi
-	say ""
-	note "Docker was left installed - other things may be using it."
+	if [ "$saved" = yes ]; then
+		note "A copy of your accounts is in $DIR/soundstorm-backup.json -"
+		note "keep it if you might install EmberStorm again."
+	fi
+	if [ "$docker_gone" = yes ]; then
+		note "Docker was removed."
+	elif [ "$(uname -s)" = Linux ] && [ -z "$docker_by" ]; then
+		note "Docker was left installed: it was here before EmberStorm."
+	else
+		note "Docker was left installed."
+	fi
 	say ""
 	exit 0
 }
@@ -1501,8 +1649,18 @@ fi
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--uninstall|-u)
-			need_docker
-			compose_cmd
+			# Never installs Docker just to uninstall; started if it is there.
+			if command -v docker >/dev/null 2>&1; then
+				need_docker
+				compose_cmd
+				# Run from any folder, it finds the install by asking Docker
+				# where it was started from.
+				if [ -z "${SOUNDSTORM_DIR:-}" ] && [ ! -f "$DIR/docker-compose.yml" ]; then
+					found=$(docker inspect soundstorm \
+						--format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>/dev/null) || found=''
+					[ -n "$found" ] && [ -f "$found/docker-compose.yml" ] && DIR=$found
+				fi
+			fi
 			uninstall
 			;;
 		--https)
@@ -1833,6 +1991,10 @@ fi
 
 install_address_watch
 install_updater
+install_uninstaller
+# EmberStorm installed Docker (this run): said for the uninstaller, which
+# then offers to take it away again. Never cleared by a later update.
+[ -n "${DOCKER_INSTALLED_BY:-}" ] && set_env SOUNDSTORM_DOCKER_INSTALLED "$DOCKER_INSTALLED_BY"
 
 # Where the library lives: beside the install unless --library says otherwise,
 # which is how it goes on an external drive. Compose mounts every shelf from
@@ -2180,6 +2342,11 @@ fi
 if [ -f "$DIR/$UPDATER_NAME" ]; then
 	note "To update later: sh \"$DIR/$UPDATER_NAME\" (it installs only releases"
 	note "signed by EmberStorm)."
+	say ""
+fi
+if [ -f "$DIR/$UNINSTALLER_NAME" ]; then
+	note "To remove it: sh \"$DIR/$UNINSTALLER_NAME\" (it asks first; your media"
+	note "is kept)."
 	say ""
 fi
 
