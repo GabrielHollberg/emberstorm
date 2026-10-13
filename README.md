@@ -189,7 +189,9 @@ It sets up Docker if the computer does not have it (the engine EmberStorm runs
 on: plain Docker on Linux, Docker Desktop on a Mac), downloads everything, sets
 it all up and prints the address to open. Your computer asks for your password
 once, to install Docker. On a Mac, a Docker window may open the first time:
-click **Skip**, no Docker account is needed.
+click **Skip**, no Docker account is needed. On a Linux desktop it opens
+EmberStorm in your browser when it is done and adds **EmberStorm** to your app
+menu, which starts it if needed and opens it.
 
 <details>
 <summary>Already use Docker Compose? Install by hand</summary>

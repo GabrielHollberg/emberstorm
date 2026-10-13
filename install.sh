@@ -63,9 +63,51 @@ fi
 # what this says is something the person needs to read. DIM is kept for the
 # reference lines at the very end that nobody needs on a first read.
 say()  { printf '%s\n' "$*"; }
-step() { printf '\n%s%s==>%s %s%s\n' "$CYAN" "$BOLD" "$OFF$BOLD" "$*" "$OFF"; }
+# On a terminal the steps are numbered for a person ("3. Downloading ...");
+# piped, each is "==> name", which the Mac setup app reads (Installer.read) -
+# keep that form and the step names when changing this.
+STEP_N=0
+step() {
+	if [ -t 1 ]; then
+		STEP_N=$((STEP_N + 1))
+		printf '\n%s%s%d.%s %s%s%s\n' "$CYAN" "$BOLD" "$STEP_N" "$OFF" "$BOLD" "$*" "$OFF"
+	else
+		printf '\n==> %s\n' "$*"
+	fi
+}
 note() { printf '    %s\n' "$*"; }
 important() { printf '    %s%s%s\n' "$YELLOW" "$*" "$OFF"; }
+
+# pull_progress turns docker compose pull's line-a-change output (it cannot
+# redraw without a terminal of its own, so a 12GB download is thousands of
+# lines of layers and megabytes) into one bar that fills as each part of
+# EmberStorm arrives: "<service> Pulling" as one starts, "<service> Pulled"
+# or "Skipped" as it is in. Only on a terminal; $1 is how many parts.
+pull_progress() {
+	case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+	*UTF-8* | *utf-8* | *UTF8* | *utf8*) _full='█' _empty='░' ;;
+	*) _full='#' _empty='-' ;;
+	esac
+	awk -v total="${1:-0}" -v full="$_full" -v empty="$_empty" -v on="$GREEN" -v off="$OFF" '
+	function draw(   n, i, t, bar) {
+		if (done > total) total = done
+		t = (total > 0) ? total : 1
+		n = int(done * 30 / t)
+		bar = ""
+		for (i = 0; i < 30; i++) bar = bar (i < n ? full : empty)
+		printf "\r    %s%s%s %3d%%  %d of %d  %-22.22s", on, bar, off, int(done * 100 / t), done, total, cur
+		fflush()
+	}
+	# Older Compose writes "<service> Pulling"; newer "Image <ref> Pulling",
+	# the image named in full, which is shown short (navidrome).
+	function short(r) { sub(/@.*/, "", r); sub(/.*\//, "", r); sub(/:.*/, "", r); return r }
+	BEGIN { done = 0; cur = "starting"; draw() }
+	(NF == 2 || (NF == 3 && $1 == "Image")) { name = $(NF - 1); state = $NF }
+	!(NF == 2 || (NF == 3 && $1 == "Image")) { next }
+	state == "Pulling" { cur = short(name); draw(); next }
+	state == "Pulled" || state == "Skipped" { if (!seen[name]++) done++; if (done >= total) cur = "done"; draw(); next }
+	END { printf "\n" }'
+}
 
 # frame draws a box around the one thing somebody has to act on, so it cannot
 # be lost among the lines above it. Arguments are lines; one starting with "*"
@@ -1027,6 +1069,84 @@ open_browser() {
 	fi
 }
 
+# with_here adds here=server to an address the setup opens on this computer:
+# the page then never offers to install itself as an app on the server's own
+# computer (as the Windows setup's Open EmberStorm and desktop icon do).
+with_here() {
+	case "$1" in
+	*\?*) printf '%s&here=server' "$1" ;;
+	*/) printf '%s?here=server' "$1" ;;
+	*) printf '%s/?here=server' "$1" ;;
+	esac
+}
+
+# The app menu's EmberStorm on a Linux desktop (KDE, GNOME and the rest read
+# the same file): the Windows desktop icon's job - start EmberStorm if it is
+# not running, then open it - with the cloud as its icon, taken from the
+# server itself. Only with a desktop: a server with no screen gets nothing.
+LAUNCHER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+LAUNCHER="$LAUNCHER_DIR/emberstorm.desktop"
+OPENER_NAME=emberstorm-open.sh
+
+install_launcher() {
+	[ "$(uname -s)" = Linux ] || return 0
+	[ -n "${XDG_CURRENT_DESKTOP:-}${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || return 0
+	command -v xdg-open >/dev/null 2>&1 || return 0
+	# A desktop file's Exec line has quoting rules of its own: a folder
+	# whose name holds any of these is left without a launcher.
+	case "$DIR" in *[\"\`\$\\%]*) return 0 ;; esac
+	open_url=$(with_here "$URL")
+	cat >"$DIR/$OPENER_NAME" <<EOF || return 0
+#!/bin/sh
+# Opens EmberStorm, starting it first when it is not running: the app
+# menu's EmberStorm (install.sh made this; uninstalling removes it).
+cd $(shell_quote "$DIR") || exit 1
+$COMPOSE -f docker-compose.yml up -d >/dev/null 2>&1 ||
+	sg docker -c "$COMPOSE -f docker-compose.yml up -d" >/dev/null 2>&1
+i=0
+while [ \$i -lt 60 ]; do
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsk -o /dev/null --max-time 2 $(shell_quote "$URL/healthz") && break
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q --no-check-certificate -O /dev/null -T 2 $(shell_quote "$URL/healthz") && break
+	else
+		break
+	fi
+	i=\$((i + 1))
+	sleep 1
+done
+exec xdg-open $(shell_quote "$open_url")
+EOF
+	chmod 755 "$DIR/$OPENER_NAME" || return 0
+	# The cloud, as the server itself serves it.
+	icon="$DIR/emberstorm.png"
+	if command -v curl >/dev/null 2>&1; then
+		curl -fsk -o "$icon" "$URL/static/icons/icon-512.png" 2>/dev/null || rm -f "$icon"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -q --no-check-certificate -O "$icon" "$URL/static/icons/icon-512.png" 2>/dev/null || rm -f "$icon"
+	fi
+	mkdir -p "$LAUNCHER_DIR" || return 0
+	{
+		printf '[Desktop Entry]\n'
+		printf 'Type=Application\n'
+		printf 'Name=EmberStorm\n'
+		printf 'Comment=Your music, films, books and photos\n'
+		printf 'Exec=sh "%s/%s"\n' "$DIR" "$OPENER_NAME"
+		[ -f "$icon" ] && printf 'Icon=%s\n' "$icon"
+		printf 'Terminal=false\n'
+		printf 'Categories=AudioVideo;Network;\n'
+		printf 'StartupNotify=false\n'
+	} >"$LAUNCHER" || return 0
+	command -v update-desktop-database >/dev/null 2>&1 &&
+		update-desktop-database "$LAUNCHER_DIR" >/dev/null 2>&1
+	LAUNCHER_MADE=1
+	return 0
+}
+
+remove_launcher() {
+	rm -f "$LAUNCHER" "$DIR/$OPENER_NAME" "$DIR/emberstorm.png"
+}
+
 # --- removing it -------------------------------------------------------------
 
 # save_backup writes the state backup to $1, owned by whoever runs this and
@@ -1089,6 +1209,7 @@ uninstall() {
 		# soundstorm-backup.json is deliberately not in this list.
 		rm -f "$DIR/docker-compose.yml" "$DIR/.env"
 		remove_address_watch
+		remove_launcher
 	else
 		note "nothing installed in $DIR"
 	fi
@@ -1851,17 +1972,26 @@ fi
 # retry-after", seen on the first Mac run, 2026-10-10) stopped the setup with
 # the network blamed. Each try keeps what the last one downloaded.
 pulled=0
+pull_total=$($COMPOSE $PROFILE config --images 2>/dev/null | sort -u | grep -c .) ||
+	pull_total=$($COMPOSE $PROFILE config --services 2>/dev/null | grep -c .) || pull_total=0
 for wait in 30 60 120 0; do
 	pull_log=$(mktemp)
-	# Shown as it goes, and kept to read why it stopped; its own exit
-	# status, which the pipe would hide, in a file of its own.
-	{ $COMPOSE $PROFILE pull 2>&1; echo $? >"$pull_log.status"; } | tee "$pull_log"
+	# Shown as it goes (as a bar on a terminal), and kept to read why it
+	# stopped; its own exit status, which the pipe would hide, in a file of
+	# its own.
+	if [ -t 1 ]; then
+		{ $COMPOSE $PROFILE pull 2>&1; echo $? >"$pull_log.status"; } | tee "$pull_log" | pull_progress "$pull_total"
+	else
+		{ $COMPOSE $PROFILE pull 2>&1; echo $? >"$pull_log.status"; } | tee "$pull_log"
+	fi
 	if [ "$(cat "$pull_log.status" 2>/dev/null)" = 0 ]; then
 		rm -f "$pull_log" "$pull_log.status"
 		pulled=1
 		break
 	fi
 	rm -f "$pull_log.status"
+	# The bar hid Docker's own lines: what it said last, for whoever reads on.
+	[ -t 1 ] && tail -n 4 "$pull_log" | sed 's/^/    /'
 	limited=0
 	grep -qiE 'toomanyrequests|retry-after|rate limit' "$pull_log" && limited=1
 	rm -f "$pull_log"
@@ -1951,6 +2081,14 @@ say ""
 note "The media servers are still setting themselves up in the background."
 note "The app shows you when each one is ready - that takes a minute or two."
 say ""
+LAUNCHER_MADE=0
+install_launcher
+if [ "$LAUNCHER_MADE" = 1 ]; then
+	say "EmberStorm is in your app menu, with the cloud icon: it starts EmberStorm"
+	say "if needed and opens it. Right-click it to add it to your favourites or"
+	say "pin it to the taskbar."
+	say ""
+fi
 lan=$(lan_address)
 mdns=$(mdns_name)
 secure=''
@@ -2086,4 +2224,4 @@ if [ -n "${EMBERSTORM_RESULT:-}" ]; then
 		printf 'UPGRADE=%s\n' "$UPGRADE"
 	} >"$EMBERSTORM_RESULT" 2>/dev/null || true
 fi
-open_browser "$URL$SETUP_QS"
+open_browser "$(with_here "$URL$SETUP_QS")"
