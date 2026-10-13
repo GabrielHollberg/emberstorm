@@ -552,7 +552,7 @@ function New-SetupWindow([string]$Heading, [string]$Subheading, [string[]]$StepN
         </Grid>
         <Border x:Name="Track" Height="8" CornerRadius="4" Background="#24242E" ClipToBounds="True">
           <Grid HorizontalAlignment="Left">
-            <Border x:Name="Fill" CornerRadius="4" Width="0">
+            <Border x:Name="Fill" CornerRadius="4" Width="0" HorizontalAlignment="Left">
               <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                   <GradientStop Color="#5E9BFF" Offset="0"/>
