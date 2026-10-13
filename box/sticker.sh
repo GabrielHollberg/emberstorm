@@ -32,6 +32,9 @@
 #   sh box/sticker.sh reprint EM-XXXX-XXXX [LEDGER] [OUTDIR]   (from the ledger)
 #   sh box/sticker.sh cards [OUTDIR] [--test]
 #   sh box/sticker.sh logo [COUNT] [OUTDIR]   (icon labels, from spot START)
+#   sh box/sticker.sh drives [BOXES] [OUTDIR] [--test]
+#           Avery 5267, 1/2" x 1-3/4", 80 a sheet: a SYSTEM DRIVE and a
+#           LIBRARY DRIVE label for each box, stuck along each M.2 drive.
 #
 # units.csv (unit,setup_code,made) is a factory stick's record of the boxes
 # it set up. The codes are each box's own: keep it with the factory's
@@ -170,6 +173,33 @@ logo_label() {
 	echo '</g>'
 }
 
+# drive_label X Y KIND: a 1.75" x 0.5" label for one of the box's drives
+# (system or library), stuck along the drive's own label: what it is, and
+# for the library the one thing that loses it - Windows reads nothing on a
+# Linux drive and offers to format it, and the library is btrfs. Not over
+# the chips or a heatsink pad.
+drive_label() {
+	x=$1 y=$2 kind=$3
+	echo "<g transform=\"translate($x $y)\">"
+	[ "$TEST" = 1 ] && echo '<rect width="1.75" height="0.5" rx="0.06" fill="none" stroke="#999" stroke-width="0.01"/>'
+	if [ "$kind" = system ]; then
+		head="SYSTEM DRIVE" l1="EmberStorm's own system. Your media is not on it." l2="Leave in this box. Switch off before removing."
+	else
+		head="LIBRARY DRIVE" l1="Your media and accounts. Leave in this box." l2="Never plug into Windows: it offers to erase it."
+	fi
+	cloud 0.07 0.07 0.13 "#000" "d$kind$x$y"
+	cat <<EOF
+<text x="0.24" y="0.165" font-size="0.088" font-weight="bold">EmberStorm <tspan font-weight="900">$head</tspan></text>
+<text x="0.07" y="0.31" font-size="0.066">$l1</text>
+<text x="0.07" y="0.42" font-size="0.066">$l2</text>
+</g>
+EOF
+}
+
+# Avery 5267 (1/2" x 1-3/4", 80 a sheet, 4 x 20): columns at 0.3, 2.35, 4.4,
+# 6.45; rows from 0.5, every 0.5. Each row holds two boxes' pairs.
+DCOLS="0.3 2.35 4.4 6.45"
+
 # Avery 64510: columns at 0.625, 3.25, 5.875; rows at 0.625, 3.2083,
 # 5.7917, 8.375 (inches from the sheet's top left).
 LCOLS="0.625 3.25 5.875"
@@ -262,6 +292,32 @@ logo)
 	} >"$out/logo-labels.html"
 	echo "  $out/logo-labels.html: $n icon label(s) from spot $start of a sheet of Avery 64510"
 	;;
+drives)
+	# drives [BOXES] [OUTDIR]: a system and a library label for each box,
+	# side by side, 40 boxes a sheet of Avery 5267.
+	KX=$(stretch 6.45 "${MEASURED_X:-}"); KY=$(stretch 10 "${MEASURED_Y:-}")
+	boxes=${2:-40}
+	case "$boxes" in '' | *[!0-9]*) echo "usage: sticker.sh drives [BOXES] [OUTDIR] [--test]" >&2; exit 2 ;; esac
+	out=${3:-stickers}
+	mkdir -p "$out"
+	{
+		html_open
+		n=0
+		while [ $n -lt "$boxes" ]; do
+			[ $((n % 40)) = 0 ] && page_open
+			spot=$((n % 40))
+			row=$((spot / 2))
+			pair=$((spot % 2))
+			y=$(awk -v r="$row" 'BEGIN { printf "%.3f", 0.5 + r * 0.5 }')
+			drive_label "$(echo $DCOLS | cut -d' ' -f$((pair * 2 + 1)))" "$y" system
+			drive_label "$(echo $DCOLS | cut -d' ' -f$((pair * 2 + 2)))" "$y" library
+			n=$((n + 1))
+			[ $((n % 40)) = 0 ] && page_close
+		done
+		[ $((n % 40)) = 0 ] || page_close
+	} >"$out/drive-labels.html"
+	echo "  $out/drive-labels.html: drive labels for $boxes box(es), $(( (boxes + 39) / 40 )) sheet(s) of Avery 5267"
+	;;
 cards)
 	KX=$(stretch 5.75 "${MEASURED_X:-}"); KY=$(stretch 7.625 "${MEASURED_Y:-}")
 	out=${2:-stickers}
@@ -285,7 +341,7 @@ cards)
 	echo "  $out/cards-front.html and cards-back.html: 9 cards, Avery 35703 - print the fronts, turn the sheet over side to side, print the backs"
 	;;
 *)
-	sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//' >&2
+	sed -n '2,38p' "$0" | sed 's/^# \{0,1\}//' >&2
 	exit 2
 	;;
 esac
