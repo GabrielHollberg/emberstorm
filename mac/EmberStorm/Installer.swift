@@ -220,11 +220,12 @@ final class Installer {
             return
         }
         // docker compose pull, without a terminal: "<name> Pulling" as each
-        // image starts and "<name> Pulled" as it is in.
+        // image starts and "<name> Pulled" as it is in - or, from newer
+        // Compose, "Image <ref> Pulling" and "Image <ref> Pulled".
         let words = line.split(separator: " ")
-        if words.count == 2, stage == .download {
-            let name = String(words[0])
-            switch words[1] {
+        if words.count == 2 || (words.count == 3 && words[0] == "Image"), stage == .download {
+            let name = String(words[words.count - 2])
+            switch words[words.count - 1] {
             case "Pulling": pulling.insert(name)
             case "Pulled", "Skipped": pulling.insert(name); pulled.insert(name)
             default: break
