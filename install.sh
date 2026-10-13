@@ -469,6 +469,40 @@ enable_docker_service() {
 	fi
 }
 
+# ensure_cron gives Linux the cron the address check and the night's update
+# run from. Fedora's cloud image and minimal Arch, openSUSE and Debian come
+# without one, and both were then quietly never set up (found 2026-10-13 on a
+# fresh Fedora 44). The system's own package, as Docker is installed; left
+# installed on uninstall, as it is a plain part of the system.
+ensure_cron() {
+	[ "$(uname -s)" = Linux ] || return 0
+	command -v crontab >/dev/null 2>&1 && return 0
+	note "Setting up cron, which keeps EmberStorm's address and updates current."
+	if command -v apt-get >/dev/null 2>&1; then
+		as_root env DEBIAN_FRONTEND=noninteractive apt-get install -yq cron >/dev/null 2>&1 || {
+			as_root apt-get update -q >/dev/null 2>&1
+			as_root env DEBIAN_FRONTEND=noninteractive apt-get install -yq cron >/dev/null 2>&1
+		}
+	elif command -v dnf >/dev/null 2>&1; then
+		as_root dnf install -y cronie >/dev/null 2>&1
+	elif command -v pacman >/dev/null 2>&1; then
+		as_root pacman -Sy --noconfirm --needed cronie >/dev/null 2>&1
+	elif command -v zypper >/dev/null 2>&1; then
+		as_root zypper --non-interactive install cronie >/dev/null 2>&1
+	elif command -v apk >/dev/null 2>&1; then
+		as_root apk add busybox-openrc >/dev/null 2>&1
+	fi
+	if command -v systemctl >/dev/null 2>&1; then
+		as_root systemctl enable --now crond >/dev/null 2>&1 || as_root systemctl enable --now cron >/dev/null 2>&1
+	elif command -v rc-update >/dev/null 2>&1; then
+		as_root rc-update add crond default >/dev/null 2>&1
+		as_root rc-service crond start >/dev/null 2>&1
+	fi
+	command -v crontab >/dev/null 2>&1 ||
+		note "Could not set up cron: EmberStorm will not update itself at night or follow a new address here."
+	return 0
+}
+
 start_docker_linux() {
 	# Running, but this account may not use it yet: a new install adds it to
 	# the docker group, which only a new login brings - and the old message,
@@ -2226,6 +2260,7 @@ if [ -z "$(get_env SOUNDSTORM_UPNP_URL)" ]; then
 	fi
 fi
 
+ensure_cron
 install_address_watch
 install_updater
 install_uninstaller
