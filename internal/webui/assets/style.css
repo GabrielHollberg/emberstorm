@@ -2883,6 +2883,12 @@ body.offline-mode .offline-strip {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06); text-align: center;
 }
 body.offline-mode .item-more { display: none; }
+/* The public demo's account: one quiet line under the header. */
+.demo-strip { display: none; }
+body.demo-account .demo-strip {
+  display: block; padding: 6px 14px; font-size: 13px; text-align: center;
+  color: var(--muted, #aab3c2); background: #121822; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
 
 /* The downloaded badge: a small green tick in the cover's corner. */
 .art-wrap { position: relative; }

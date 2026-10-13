@@ -205,6 +205,7 @@ type Server struct {
 	host            string
 	releaseSerial   int64
 	updateCheckOff  bool
+	demoUser        string
 	desktopRel      desktopUpdates
 	caretakerOnce   sync.Once
 	caretakerClient *http.Client
@@ -349,6 +350,12 @@ type Config struct {
 	// (desktopupdate.go).
 	ReleaseSerial  int64
 	UpdateCheckOff bool
+
+	// DemoUser names the account a public demo server lets anybody sign in
+	// as (SOUNDSTORM_DEMO_USER, demo.go): it may look at and play
+	// everything, and change only what is put back every night. Empty, as
+	// on every install but the demo, there is no such account.
+	DemoUser string
 }
 
 // RemoteState is the current state of remote access, for the account panel. It
@@ -427,6 +434,7 @@ func New(cfg Config) *Server {
 		host:             cfg.Host,
 		releaseSerial:    cfg.ReleaseSerial,
 		updateCheckOff:   cfg.UpdateCheckOff,
+		demoUser:         cfg.DemoUser,
 		rescanTimers:     map[media.Kind]*time.Timer{},
 		lastRescan:       map[media.Kind]time.Time{},
 		autoKick:         make(chan struct{}, 1),
@@ -795,6 +803,13 @@ func (s *Server) withUserContext(next http.Handler) http.Handler {
 			})
 			return
 		}
+		if s.isDemo(user) && !demoMayChange(r) {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"error": "This is a demo, so that can't be changed here.",
+				"demo":  true,
+			})
+			return
+		}
 		s.auth.Renew(w, r)
 		ctx := source.WithUserID(r.Context(), user.ID)
 		// And what they are allowed to reach. Set here, once, for every
@@ -929,6 +944,9 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		}
 		// Every account's devices may be asked to approve a new one.
 		answer["approveNewDevices"] = s.store.ApproveNewDevices()
+		if s.isDemo(user) {
+			answer["demo"] = true
+		}
 		// The computer it runs on, off a box: Settings shows the owner where
 		// that computer's own settings are (staying awake, the lid, signing
 		// in by itself), which EmberStorm cannot change from inside Docker.

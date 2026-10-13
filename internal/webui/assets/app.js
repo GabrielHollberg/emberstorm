@@ -70,6 +70,8 @@ async function api(path, options = {}) {
   // Held to choosing a new password: the server answers nothing else, so the
   // screen for it comes up wherever this happened.
   if (resp.status === 403 && body && body.mustRenew) showRenew();
+  // The public demo refused a change (demo.go): said, wherever it was asked.
+  if (resp.status === 403 && body && body.demo) showToast(body.error || 'This is a demo.');
   return { ok: resp.ok, status: resp.status, body };
 }
 
@@ -6647,6 +6649,8 @@ async function moveToSecureName(name) {
     }
     if (body.signedIn) {
       state.approveNewDevices = Boolean(body.approveNewDevices);
+      // The public demo's account (demo.go): the strip under the header.
+      document.body.classList.toggle('demo-account', body.demo === true);
       showApp(body.user);
       setTimeout(adoptNativePlayback, 0);
     }

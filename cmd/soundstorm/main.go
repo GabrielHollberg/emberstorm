@@ -444,6 +444,7 @@ func run(log *slog.Logger) error {
 		Host:            os.Getenv("SOUNDSTORM_HOST"),
 		ReleaseSerial:   releaseSerial(),
 		UpdateCheckOff:  strings.EqualFold(os.Getenv("SOUNDSTORM_UPDATE_CHECK"), "off"),
+		DemoUser:        strings.TrimSpace(os.Getenv("SOUNDSTORM_DEMO_USER")),
 	})
 
 	// Books with both an ebook and an audiobook are synced for read-along by

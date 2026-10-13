@@ -13,7 +13,11 @@
 const { chromium } = require('playwright');
 
 const [mode, base] = process.argv.slice(2);
-const ACCOUNT = { username: 'smoke', password: 'smoke test password 4417' };
+// Another account by SMOKE_USER and SMOKE_PASSWORD: the demo server's demo
+// account (scripts/demo-stack.sh), walked as a reviewer would.
+const ACCOUNT = process.env.SMOKE_USER
+  ? { username: process.env.SMOKE_USER, password: process.env.SMOKE_PASSWORD || '' }
+  : { username: 'smoke', password: 'smoke test password 4417' };
 const results = [];
 let failed = false;
 
