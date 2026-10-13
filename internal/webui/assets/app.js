@@ -1280,8 +1280,17 @@ function renderBoxUpdates(d) {
   const waiting = d.available && d.state !== 'updating';
   show($('box-updates-waiting'), Boolean(waiting));
   if (waiting) {
+    // With "Update by itself" off, a waiting update still installs at night
+    // once it is a month old (the caretaker's maxPutOff): said with its date.
+    let anyway = '';
+    if (d.auto === false && d.available.created) {
+      const by = new Date(new Date(d.available.created).getTime() + 30 * 24 * 3600 * 1000);
+      anyway = by > new Date()
+        ? ` It installs by itself on the night of ${when(by)} unless you update sooner.`
+        : ' It installs by itself tonight unless you update sooner.';
+    }
     $('box-updates-waiting').textContent = `EmberStorm ${d.available.version} is ready to install.` +
-      (d.available.notes ? ` ${d.available.notes}` : '');
+      (d.available.notes ? ` ${d.available.notes}` : '') + anyway;
   }
   show($('box-updates-now'), Boolean(waiting));
   $('box-updates-auto').checked = d.auto !== false;
@@ -1293,7 +1302,7 @@ function renderBoxUpdates(d) {
   else if (d.state === 'failed') text = `The last update could not be installed.${d.message ? ` (${d.message})` : ''} The box carries on as it was.`;
   else if (!d.available && d.lastCheck) text = `Up to date. Last looked ${when(d.lastCheck)}.`;
   else if (!d.available) text = d.auto === false
-    ? 'Updates are installed only when you choose Update now.'
+    ? 'A new update waits for you to choose Update now, for up to a month.'
     : 'The box looks for updates by itself and installs them at night.';
   state.textContent = text;
   show(state, Boolean(text));
@@ -1353,7 +1362,7 @@ $('box-updates-auto').addEventListener('change', async (e) => {
   const want = e.target.checked;
   const r = await api('/api/box/updates/auto', { method: 'PUT', body: JSON.stringify({ auto: want }) });
   if (!r.ok) { e.target.checked = !want; showToast((r.body && r.body.error) || 'Could not change that.'); return; }
-  showToast(want ? 'The box will update itself at night.' : 'Updates will wait for you to choose Update now.');
+  showToast(want ? 'The box will update itself at night.' : 'Updates will wait for you - for up to a month, then the box installs them at night.');
   showBoxUpdates();
 });
 $('box-time-use').addEventListener('click', async () => {

@@ -19,9 +19,9 @@ const out = process.env.SHOTS || require('os').tmpdir();
 
   let looked = false, updating = false, asked = [];
   const status = () => ({
-    state: updating ? 'updating' : 'idle', auto: true, version: '2026.10.1',
+    state: updating ? 'updating' : 'idle', auto: !process.env.AUTO_OFF, version: '2026.10.1',
     installed: '2026-10-10T20:00:00Z', lastCheck: looked ? '2026-10-11T18:00:00Z' : undefined,
-    available: looked && !updating ? { version: '2026.10.2', notes: 'Switching off takes one press.' } : undefined,
+    available: looked && !updating ? { version: '2026.10.2', notes: 'Switching off takes one press.', created: new Date(Date.now() - 9 * 864e5).toISOString() } : undefined,
   });
   await page.route(/\/api\/session$/, async (route) => {
     const res = await route.fetch();

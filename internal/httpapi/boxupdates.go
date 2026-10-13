@@ -50,10 +50,16 @@ func (s *Server) boxUpdates(w http.ResponseWriter, r *http.Request, st caretaker
 		}
 	}
 	if st.Available != nil {
-		answer["available"] = map[string]any{
+		available := map[string]any{
 			"version": st.Available.Version,
 			"notes":   st.Available.Notes,
 		}
+		// With Auto off, the caretaker still installs an update a month after
+		// it came out (maxPutOff): the card says when.
+		if !st.Available.Created.IsZero() {
+			available["created"] = st.Available.Created
+		}
+		answer["available"] = available
 	}
 	if st.Message != "" {
 		answer["message"] = st.Message
