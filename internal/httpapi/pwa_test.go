@@ -194,7 +194,8 @@ func TestShellCarriesTheInstallTags(t *testing.T) {
 	page := string(body)
 
 	for _, want := range []string{
-		`rel="manifest"`,
+		// The manifest is added on a phone or tablet only (sw-register.js):
+		// a computer's browser offers no install beside the real one.
 		`name="theme-color"`,
 		`name="apple-mobile-web-app-capable"`,
 		`rel="apple-touch-icon"`,
@@ -206,6 +207,9 @@ func TestShellCarriesTheInstallTags(t *testing.T) {
 		if !strings.Contains(page, want) {
 			t.Errorf("shell is missing %s", want)
 		}
+	}
+	if strings.Contains(page, `rel="manifest"`) {
+		t.Error("the shell names the manifest itself; a computer's browser would offer to install the web app")
 	}
 }
 

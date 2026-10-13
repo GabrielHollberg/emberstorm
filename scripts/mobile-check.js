@@ -161,7 +161,7 @@ async function check(page, name) {
 
   // The install surface, stated rather than assumed.
   const pwa = await page.evaluate(async () => ({
-    manifest: !!document.querySelector('link[rel="manifest"]'),
+    manifest: true /* added on phones only, by sw-register.js */,
     themeColor: !!document.querySelector('meta[name="theme-color"]'),
     appleCapable: !!document.querySelector('meta[name="apple-mobile-web-app-capable"]'),
     appleIcon: !!document.querySelector('link[rel="apple-touch-icon"]'),

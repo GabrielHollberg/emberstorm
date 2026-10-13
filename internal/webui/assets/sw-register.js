@@ -1,3 +1,15 @@
+// The web app's manifest, on a phone or tablet only. On a computer it is left
+// out, so Chrome and Edge show no install button in the address bar: the
+// web app installed beside the real installation confused things (the owner,
+// 2026-10-12). A phone keeps it for adding to the home screen from the
+// browser's menu, for those who look - nothing offers it.
+if (window.matchMedia && matchMedia('(pointer: coarse)').matches && !/SoundStormTV\//.test(navigator.userAgent)) {
+  var manifest = document.createElement('link');
+  manifest.rel = 'manifest';
+  manifest.href = '/manifest.webmanifest';
+  document.head.appendChild(manifest);
+}
+
 // Register the service worker.
 //
 // A separate file rather than three lines inline in the shell, and that is
