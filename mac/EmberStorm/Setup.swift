@@ -22,6 +22,8 @@ final class Setup {
     /// Where it is installed, or will be.
     private(set) var dir = Install.defaultFolder
     private(set) var installed = false
+    /// Updating by itself at night (Nightly), shown in the menu bar's cloud.
+    private(set) var autoUpdate = true
     /// The answers.
     var library: URL?
     var keepAwake = true
@@ -77,6 +79,8 @@ final class Setup {
             dir = found
             installed = true
             UserDefaults.standard.set(found.path, forKey: "installDir")
+            autoUpdate = Nightly.isOn(in: found)
+            Nightly.keep(in: found)
             await launch()
         } else {
             askAwake = !(await ThisMac.neverSleeps())
@@ -118,6 +122,8 @@ final class Setup {
                                                      password: !updating && needsPassword ? password : nil)
                 installed = true
                 UserDefaults.standard.set(dir.path, forKey: "installDir")
+                autoUpdate = Nightly.isOn(in: dir)
+                Nightly.keep(in: dir)
                 page = .finished(result)
             } catch let e as Installer.Failed {
                 page = .failed(e.message, .setup)
@@ -152,6 +158,11 @@ final class Setup {
     func update() {
         updating = true
         setUp()
+    }
+
+    func setAutoUpdate(_ on: Bool) {
+        Nightly.set(on, in: dir)
+        autoUpdate = Nightly.isOn(in: dir)
     }
 
     func chooseLibrary() {
@@ -220,28 +231,82 @@ final class Setup {
         window?.orderOut(nil)
     }
 
+    /// Removing it asks first, one window, each change the setup made as
+    /// its own choice (as the Windows uninstall asks): shown only for what
+    /// the setup changed (.env's record), Docker Desktop and sleep unticked -
+    /// somebody may rely on them by now. install.sh takes the answers as
+    /// EMBERSTORM_UNINSTALL_*.
     func uninstall() {
         let alert = NSAlert()
         alert.messageText = "Remove EmberStorm from this Mac?"
-        alert.informativeText = "Its accounts, settings and the media servers' data are removed. Your media - music, films, books and photos - stays where it is, and a copy of the accounts is kept in the install folder. Docker Desktop stays; remove it from Applications if nothing else uses it."
+        alert.informativeText = "Its accounts, settings and the media servers' data are removed. Your media - music, films, books and photos - stays where it is."
+        func box(_ title: String, _ on: Bool) -> NSButton {
+            let b = NSButton(checkboxWithTitle: title, target: nil, action: nil)
+            b.state = on ? .on : .off
+            return b
+        }
+        let copy = box("Keep a copy of your accounts, in case you install EmberStorm again", true)
+        let programs = box("Remove EmberStorm's downloaded programs (about 12 GB)", true)
+        var choices = [copy, programs]
+        // Docker Desktop only when EmberStorm installed it: one already here
+        // was somebody's own.
+        let docker = Install.setting("SOUNDSTORM_DOCKER_INSTALLED", in: dir).map { !$0.isEmpty } == true
+            ? box("Remove Docker Desktop too (EmberStorm installed it)", false) : nil
+        let sleep = Install.setting("SOUNDSTORM_WAS_MAC_SLEEP", in: dir).map { !$0.isEmpty } == true
+            ? box("Let this Mac go to sleep on its own again, as before EmberStorm", false) : nil
+        choices += [docker, sleep].compactMap { $0 }
+        let stack = NSStackView(views: choices)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 420, height: CGFloat(choices.count) * 26)
+        alert.accessoryView = stack
         alert.addButton(withTitle: "Remove")
         alert.addButton(withTitle: "Cancel")
         alert.buttons.first?.hasDestructiveAction = true
         guard alert.runModal() == .alertFirstButtonReturn else { return }
+        func yes(_ b: NSButton?) -> String { b?.state == .on ? "yes" : "no" }
+        let answers = [
+            "EMBERSTORM_UNINSTALL_COPY": yes(copy),
+            "EMBERSTORM_UNINSTALL_PROGRAMS": yes(programs),
+            "EMBERSTORM_UNINSTALL_DOCKER": yes(docker),
+            "EMBERSTORM_UNINSTALL_SLEEP": yes(sleep),
+            "EMBERSTORM_UNINSTALL_LID": "no",
+        ]
         let library = Install.setting("SOUNDSTORM_LIBRARY_PATH", in: dir).map { URL(fileURLWithPath: $0, relativeTo: dir).standardizedFileURL.path }
             ?? dir.appending(path: "library").path
         page = .removing
         Task {
             do {
-                _ = try await installer.run(dir: dir, arguments: ["--uninstall"], keepAwake: false)
+                _ = try await installer.run(dir: dir, arguments: ["--uninstall"], keepAwake: false, extra: answers)
                 installed = false
                 UserDefaults.standard.removeObject(forKey: "installDir")
+                // What the app kept for itself: the night's update and the
+                // checked release.
+                Nightly.unschedule()
+                try? FileManager.default.removeItem(at: Installer.privateFolder.appending(path: "release"))
                 page = .removed(library)
+                offerTrash()
             } catch let e as Installer.Failed {
                 page = .failed(e.message, .uninstall)
             } catch {
                 page = .failed(error.localizedDescription, .uninstall)
             }
+        }
+    }
+
+    /// Removed: the app itself offered to the Trash, the last thing left.
+    private func offerTrash() {
+        let alert = NSAlert()
+        alert.messageText = "Move the EmberStorm app to the Trash?"
+        alert.informativeText = "EmberStorm has been removed. The app is all that is left of it on this Mac."
+        alert.addButton(withTitle: "Move to Trash")
+        alert.addButton(withTitle: "Keep the app")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        try? FileManager.default.removeItem(at: Installer.privateFolder)
+        UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "dev.soundstorm.mac")
+        NSWorkspace.shared.recycle([Bundle.main.bundleURL]) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }
 

@@ -1,10 +1,25 @@
 import AppKit
 import SwiftUI
 
+/// Where the app starts: the night's update with no window at all (its
+/// LaunchAgent, Nightly), else the app.
+@main
+enum Entry {
+    static func main() {
+        if CommandLine.arguments.contains(Nightly.argument) {
+            Task { @MainActor in
+                await Nightly.run()
+                exit(0)
+            }
+            dispatchMain()
+        }
+        EmberStormApp.main()
+    }
+}
+
 /// EmberStorm for the Mac: the setup the first time it is opened, and the way
 /// to start EmberStorm every time after - the Windows setup window and its
 /// desktop icon in one app, so nobody types a command into Terminal.
-@main
 struct EmberStormApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var setup = Setup()
@@ -36,6 +51,10 @@ struct EmberStormApp: App {
             Divider()
             Button("Update EmberStorm...") { Setup.showWindow(); setup.update() }
                 .disabled(setup.installer.running)
+            // On unless turned off, as on Windows and Linux: a newer signed
+            // release installed between 2 and 5, the old version put back if
+            // the new one does not start.
+            Toggle("Update by itself at night", isOn: Binding(get: { setup.autoUpdate }, set: { setup.setAutoUpdate($0) }))
             Button("Uninstall EmberStorm...") { Setup.showWindow(); setup.uninstall() }
                 .disabled(setup.installer.running)
             Divider()

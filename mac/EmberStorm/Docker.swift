@@ -88,6 +88,24 @@ enum Install {
         return nil
     }
 
+    /// Sets one setting in the install's .env, as install.sh's env_set
+    /// does: the line replaced or added, the file's own permissions kept
+    /// (0600: it holds the setup code and the backends' passwords).
+    static func setSetting(_ key: String, _ value: String, in dir: URL) {
+        let file = dir.appending(path: ".env")
+        guard let text = try? String(contentsOf: file, encoding: .utf8),
+              let handle = try? FileHandle(forWritingTo: file) else { return }
+        var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        if lines.last == "" { lines.removeLast() }
+        lines.removeAll { $0.hasPrefix(key + "=") }
+        lines.append("\(key)=\(value)")
+        // Written in place, so the file keeps its owner and mode.
+        let data = Data((lines.joined(separator: "\n") + "\n").utf8)
+        handle.write(data)
+        handle.truncateFile(atOffset: UInt64(data.count))
+        try? handle.close()
+    }
+
     static func port(in dir: URL) -> String {
         let p = setting("SOUNDSTORM_PORT", in: dir) ?? ""
         return !p.isEmpty && p.allSatisfy(\.isNumber) ? p : "8099"

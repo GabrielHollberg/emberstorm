@@ -73,7 +73,10 @@ final class Installer {
 
     /// Runs it: arguments as install.sh takes them. Throws with what the
     /// script said, in its own words, when it stops.
-    func run(dir: URL, arguments: [String], keepAwake: Bool, password: String? = nil) async throws -> Result {
+    /// `extra` adds settings for the script (the uninstall's choices);
+    /// `unattended` (the night's update) asks for no password at all.
+    func run(dir: URL, arguments: [String], keepAwake: Bool, password: String? = nil,
+             extra: [String: String] = [:], unattended: Bool = false) async throws -> Result {
         running = true
         defer { running = false; creep?.cancel() }
         lines = []
@@ -104,7 +107,8 @@ final class Installer {
         env.merge(releaseEnv) { _, new in new }
         env["EMBERSTORM_KEEP_AWAKE"] = keepAwake ? "yes" : "no"
         env["EMBERSTORM_RESULT"] = result.path
-        env["SUDO_ASKPASS"] = askpass.path
+        env["SUDO_ASKPASS"] = unattended ? "/usr/bin/false" : askpass.path
+        env.merge(extra) { _, new in new }
         if let icon = Bundle.main.url(forResource: "AppIcon", withExtension: "icns") { env["EMBERSTORM_ICON"] = icon.path }
         p.environment = env
         p.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
@@ -306,7 +310,7 @@ final class Installer {
 
     /// A program sudo runs for the password, as there is no terminal: a
     /// window of macOS's own, saying why it is asked.
-    nonisolated private static var privateFolder: URL {
+    nonisolated static var privateFolder: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appending(path: "EmberStorm")
     }
 
