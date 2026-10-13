@@ -2127,7 +2127,7 @@ if [ "$UPGRADE" = "1" ]; then
 else
 	step "Downloading the media servers"
 	note "That is everything - the rest needs nothing from you."
-	note "about 8GB the first time - the photo and film servers are most of it"
+	note "about 8 GB to download - the photo and film servers are most of it"
 fi
 # Tried again after 30, 60 and 120 seconds, as the Windows setup does: a
 # registry asking for a pause ("toomanyrequests", "error from registry ...
