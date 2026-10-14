@@ -1,5 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
+}
+
+// The upload key for Google Play (2026-10-13): Google keeps the key that signs
+// what phones install (Play App Signing), and this one only proves an upload is
+// ours. Its file is in the private repo; its password in a file outside every
+// repository - EMBERSTORM_UPLOAD_PROPERTIES, else ~/.emberstorm/android-upload.properties
+// (storeFile, storePassword, keyAlias, keyPassword). Without it, release builds
+// are not signed and cannot be uploaded; the debug builds published on GitHub
+// are unchanged.
+val uploadProps = Properties().apply {
+    val f = file(System.getenv("EMBERSTORM_UPLOAD_PROPERTIES")
+        ?: "${System.getProperty("user.home")}/.emberstorm/android-upload.properties")
+    if (f.isFile) f.inputStream().use { load(it) }
 }
 
 android {
@@ -10,13 +25,27 @@ android {
         applicationId = "dev.soundstorm.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 65
-        versionName = "0.65"
+        versionCode = 66
+        versionName = "0.66"
+    }
+
+    signingConfigs {
+        if (uploadProps.getProperty("storeFile") != null) {
+            create("upload") {
+                storeFile = file(uploadProps.getProperty("storeFile"))
+                storePassword = uploadProps.getProperty("storePassword")
+                keyAlias = uploadProps.getProperty("keyAlias")
+                keyPassword = uploadProps.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
+        // For Google Play: an app bundle (gradlew bundleRelease), signed with
+        // the upload key.
         release {
             isMinifyEnabled = false
+            signingConfigs.findByName("upload")?.let { signingConfig = it }
         }
         // The published APK is this build type, signed with the debug key so
         // it installs over earlier ones - but not debuggable: with it, anyone
