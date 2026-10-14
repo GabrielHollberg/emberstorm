@@ -4373,8 +4373,8 @@ async function loadPlayback(item) {
 
   // The table of contents: the book's own chapters (marks inside one file as
   // well as one file each), else its files when there are several.
-  audio.chapters = Array.isArray(info.chapters) && info.chapters.length > 1 ? info.chapters
-    : audio.tracks.length > 1 ? audio.tracks.map((t) => ({ title: t.title, startSeconds: t.startSeconds || 0 })) : [];
+  audio.chapters = withoutSharedStart(Array.isArray(info.chapters) && info.chapters.length > 1 ? info.chapters
+    : audio.tracks.length > 1 ? audio.tracks.map((t) => ({ title: t.title, startSeconds: t.startSeconds || 0 })) : []);
   renderDockButtons();
   audio.captionChapter = -1;
   updateTrackCaption();
@@ -4629,6 +4629,23 @@ function updateTrackCaption() {
 // updateChapterCaption: the mini-player's second line (and the lock screen's
 // title) is the chapter being listened to - "3 of 12 · its title" - kept up
 // as it plays from one chapter into the next. True when a book has chapters.
+// Chapters named after their files often all begin with the book's title
+// ("The Long Road North - Track 09"), so a list of them, cut to fit a phone,
+// is the title over and over. Words every chapter starts with are taken off,
+// up to a separator, when what is left of each still says something.
+function withoutSharedStart(chapters) {
+  const titles = chapters.map((c) => String(c.title || ''));
+  if (titles.length < 2 || titles.some((t) => !t)) return chapters;
+  let n = 0;
+  while (n < titles[0].length && titles.every((t) => t[n] === titles[0][n])) n++;
+  // Back to a separator - never a plain space, or "Chapter 1" would become "1".
+  while (n > 0 && !/[\-–—:_|]/.test(titles[0][n - 1])) n--;
+  if (n < 4) return chapters;
+  const rest = titles.map((t) => t.slice(n).replace(/^[\s\-–—:_.,|]+/, '').trim());
+  if (rest.some((t) => !/[\p{L}\p{N}]/u.test(t))) return chapters;
+  return chapters.map((c, i) => ({ ...c, title: rest[i] }));
+}
+
 function updateChapterCaption() {
   const list = audio.chapters || [];
   if (!audio.item || audio.item.kind === 'music' || list.length < 2) return false;
