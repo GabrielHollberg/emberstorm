@@ -1113,6 +1113,16 @@ if (window.soundstormApp) {
 
 async function showApp(me) {
   state.me = me || null;
+  // Whether this is the public demo's account (demo.go), known before
+  // anything below asks the phone app about photo backup (backupCall, which
+  // says nothing for the demo): an opening already signed in learns it from
+  // the session (boot), but signing in by the form - Apple's reviewer's way
+  // in - comes here without it, and the app asked "Is this your iPhone?".
+  if (me && !state.sessionRead) {
+    const s = await api('/api/session');
+    document.body.classList.toggle('demo-account', Boolean(s.ok && s.body && s.body.demo === true));
+  }
+  state.sessionRead = false;
   // An invitation opened while signed in: it is for somebody else.
   if (me && inviteFromAddress && new URLSearchParams(location.search).has('invite')) {
     forgetInviteInAddress();
@@ -6655,6 +6665,7 @@ async function moveToSecureName(name) {
       state.approveNewDevices = Boolean(body.approveNewDevices);
       // The public demo's account (demo.go): the strip under the header.
       document.body.classList.toggle('demo-account', body.demo === true);
+      state.sessionRead = true;
       showApp(body.user);
       setTimeout(adoptNativePlayback, 0);
     }
