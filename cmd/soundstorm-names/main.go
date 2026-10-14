@@ -57,11 +57,12 @@ func run(log *slog.Logger) error {
 		Label:          env("NAMES_LABEL", "home"),
 		ClientIPHeader: os.Getenv("NAMES_CLIENT_IP_HEADER"),
 		Log:            log,
-		// The Android app's signing key (the debug key it is published with
-		// until it has a store key); NAMES_ANDROID_CERTS, comma separated,
-		// adds or replaces.
+		// The Android app's signing keys: the debug key the GitHub builds are
+		// signed with, and Google Play's app signing key for the Play
+		// version; NAMES_ANDROID_CERTS, comma separated, replaces both.
 		AndroidCerts: strings.Split(env("NAMES_ANDROID_CERTS",
-			"C3:3E:B7:FA:E1:A6:6C:74:79:FC:D6:9C:5D:3D:79:BF:29:02:06:82:9D:C2:66:42:E8:62:86:71:23:75:27:FF"), ","),
+			"C3:3E:B7:FA:E1:A6:6C:74:79:FC:D6:9C:5D:3D:79:BF:29:02:06:82:9D:C2:66:42:E8:62:86:71:23:75:27:FF,"+
+				"26:9A:78:7B:5F:15:38:48:66:A1:69:A0:2B:D1:40:66:AD:9E:DD:9A:D3:46:7E:8C:2D:FF:B0:03:82:1D:60:91"), ","),
 		// The iPhone app (team LZA2K5LLDS); NAMES_APPLE_APPS replaces.
 		AppleApps: strings.Split(env("NAMES_APPLE_APPS", "LZA2K5LLDS.dev.soundstorm.app"), ","),
 		// The website, the only page that may ask which installs are on a
