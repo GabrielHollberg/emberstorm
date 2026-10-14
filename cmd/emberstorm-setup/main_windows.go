@@ -61,12 +61,14 @@ func main() {
 }
 
 // installer answers the installer to run and what to tell it: the one beside
-// this program in a checkout of the project (where .git is - Downloads, where
-// this is usually run from, is somewhere a web page can drop an install.ps1),
-// else the newest signed release, checked and written to a folder of the
-// person's own. Never run from memory: Defender blocks that.
+// this program in a checkout of the project, only when a developer asks for
+// it (EMBERSTORM_LOCAL_INSTALLER=1 as well as .git there - Downloads, where
+// this is usually run from, is somewhere a web page or an unpacked zip can
+// drop an install.ps1 and a .git, and this program is signed), else the
+// newest signed release, checked and written to a folder of the person's
+// own. Never run from memory: Defender blocks that.
 func installer() (string, []string, error) {
-	if exe, err := os.Executable(); err == nil {
+	if exe, err := os.Executable(); err == nil && os.Getenv("EMBERSTORM_LOCAL_INSTALLER") == "1" {
 		dir := filepath.Dir(exe)
 		local := filepath.Join(dir, "install.ps1")
 		if isFile(local) && exists(filepath.Join(dir, ".git")) {

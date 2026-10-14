@@ -215,11 +215,24 @@ $script:Unattended = [bool]$Unattended
 # every file before running it. Offline, it carries on with this copy and
 # downloads nothing. Not for -Launch (nothing is fetched) nor -Uninstall
 # (which must work as it is), nor a checkout being tried.
+#
+# The name alone is not enough: the certificate's issuer must be Certum's too
+# (a certificate of the same name from anywhere else is not ours), and the
+# program 0.13 or later - EmberStorm.exe 0.12, signed with the same
+# certificate, fetched this script from the branch and ran it unchecked, so
+# handing over to it would undo the whole check (the security review,
+# 2026-10-14). Its version is in its signed resources, so it cannot be changed.
 function Test-OurSignature([string]$Path) {
     try {
         $sig = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop
-        return ($sig.Status -eq 'Valid' -and
-                "$($sig.SignerCertificate.Subject)" -match 'CN=Open Source Developer Gabriel Hollberg(,|$)')
+        if ($sig.Status -ne 'Valid' -or
+            "$($sig.SignerCertificate.Subject)" -notmatch 'CN=Open Source Developer Gabriel Hollberg(,|$)' -or
+            "$($sig.SignerCertificate.Issuer)" -notmatch '^CN=Certum Code Signing 2021 CA, O=Asseco Data Systems S\.A\.') {
+            return $false
+        }
+        $version = [version]'0.0'
+        if (-not [version]::TryParse("$((Get-Item -LiteralPath $Path).VersionInfo.FileVersion)".Trim(), [ref]$version)) { return $false }
+        return ($version -ge [version]'0.13')
     } catch { return $false }
 }
 $selfName = if ($PSCommandPath) { [IO.Path]::GetFileName($PSCommandPath) } else { '' }
