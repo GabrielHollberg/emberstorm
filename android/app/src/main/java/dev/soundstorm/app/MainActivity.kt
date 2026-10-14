@@ -1190,53 +1190,77 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Phone photo backup, as the page's Settings asks: "status" answers how
-     * it is going; "set" turns it on or off and changes its options, asking
-     * for the camera roll first when it is turned on.
+     * Phone photo backup, as the page's Settings asks (PhotoBackup). Each
+     * server's backup belongs to this phone's own person there: who is signed
+     * in is asked of the server, never taken from the page, so no page message
+     * - nor a second person signing in - changes another person's backup.
+     * "status" answers how it is going; "set" turns it on or off and changes
+     * its options (its owner only), asking for the camera roll first when it
+     * is turned on; "claim" and "release" say whose phone it is. A server
+     * nobody has claimed asks the person signed in "Is this your phone?".
      */
     private fun backup(cmd: String, options: JSONObject) {
         if (isTv) return
-        when (cmd) {
-            "set" -> {
-                // Where photos go is this phone's question, never the page's
-                // alone: a page could otherwise send a phone's whole camera
-                // roll to another server (the twelfth security pass). The
-                // first time, and whenever the page is another server's,
-                // the phone asks, naming it.
-                val here = ServerAddress.current?.takeIf { it.startsWith("https://") }
-                if (options.optBoolean("enabled")) {
-                    if (here == null) {
-                        Toast.makeText(this, "Photos are backed up only over a secure address. Open EmberStorm by its emberstorm.app address first.", Toast.LENGTH_LONG).show()
-                        options.put("enabled", false)
-                    } else if (here != PhotoBackup.rememberedServer(this) && options.optBoolean("confirmedHere").not()) {
-                        val host = Uri.parse(here).host ?: here
-                        AlertDialog.Builder(this)
-                            .setTitle("Back up this phone's photos?")
-                            .setMessage("Your photos and videos will be sent to $host. Do it only if that is your own EmberStorm.")
-                            .setPositiveButton("Back up") { _, _ ->
-                                PhotoBackup.rememberServer(applicationContext, here)
-                                backup("set", options.put("confirmedHere", true))
-                            }
-                            .setNegativeButton("Not now") { _, _ ->
-                                PhotoBackup.configure(applicationContext, JSONObject().put("enabled", false))
-                                reportBackup()
-                            }
-                            .show()
-                        return
-                    }
-                }
-                if (options.optBoolean("enabled") && !PhotoBackup.hasPermission(this)) {
-                    pendingBackup = options
-                    requestPermissions(PhotoBackup.permissions(), BACKUP_PERMISSION)
-                    return
-                }
-                PhotoBackup.configure(applicationContext, options)
-            }
+        val here = ServerAddress.current ?: return
+        // A page that knows whose phone it is (`phones`) is told so; an older
+        // page sees only its own person's backup, as before.
+        val knowsPhones = options.has("phones")
+        backupIO.execute {
+            val who = runCatching { PhotoBackup.whoIs(here) }.getOrNull() ?: return@execute
+            runOnUiThread { backupFor(cmd, options, here, who, knowsPhones) }
         }
-        reportBackup()
     }
 
-    private var pendingBackup: JSONObject? = null
+    private val backupIO = Executors.newSingleThreadExecutor()
+    private var askingWhose = false
+
+    private fun backupFor(cmd: String, options: JSONObject, here: String, who: PhotoBackup.Person, knowsPhones: Boolean) {
+        if (here != ServerAddress.current || isFinishing) return
+        val c = applicationContext
+        when (cmd) {
+            "claim" -> PhotoBackup.claim(c, here, who)
+            "release" -> PhotoBackup.release(c, here, who)
+            "set" -> {
+                val d = PhotoBackup.dest(c, PhotoBackup.serverKey(Uri.parse(here)))
+                if (d != null && d.account == who.id) {
+                    if (options.optBoolean("enabled")) {
+                        if (d.server == null && !here.startsWith("https://")) {
+                            Toast.makeText(this, "Photos are backed up only over a secure address. Open EmberStorm by its emberstorm.app address first.", Toast.LENGTH_LONG).show()
+                            options.put("enabled", false)
+                        } else if (!PhotoBackup.hasPermission(this)) {
+                            pendingBackup = Triple(options, here, who)
+                            requestPermissions(PhotoBackup.permissions(), BACKUP_PERMISSION)
+                            return
+                        }
+                    }
+                    PhotoBackup.configure(c, here, who, options)
+                }
+            }
+        }
+        if (PhotoBackup.shouldAsk(c, here, who) && !askingWhose) {
+            askingWhose = true
+            val server = who.serverName.ifBlank { Uri.parse(here).host ?: "this server" }
+            AlertDialog.Builder(this)
+                .setTitle("Is this your phone?")
+                .setMessage("Saying yes doesn't back anything up. It only means that later, if you want to, you can turn on photo backup for this phone in your Settings. Only one person on $server can.")
+                .setCancelable(false)
+                .setPositiveButton("Yes, it's mine") { _, _ ->
+                    askingWhose = false
+                    PhotoBackup.answered(c, true, here, who)
+                    Toast.makeText(this, "You can turn on photo backup in Settings, Your photos, whenever you like.", Toast.LENGTH_LONG).show()
+                    reportBackup(here, who, knowsPhones)
+                }
+                .setNegativeButton("Not mine") { _, _ ->
+                    askingWhose = false
+                    PhotoBackup.answered(c, false, here, who)
+                    reportBackup(here, who, knowsPhones)
+                }
+                .show()
+        }
+        reportBackup(here, who, knowsPhones)
+    }
+
+    private var pendingBackup: Triple<JSONObject, String, PhotoBackup.Person>? = null
 
     /** Adding files in the background (Uploads), as the page asks. */
     private fun uploads(cmd: String, data: JSONObject) {
@@ -1252,21 +1276,23 @@ class MainActivity : Activity() {
         webView?.evaluateJavascript("window.__soundstormUploads && window.__soundstormUploads($answer)", null)
     }
 
-    private fun reportBackup() {
+    private fun reportBackup(here: String, who: PhotoBackup.Person, knowsPhones: Boolean) {
         val view = webView ?: return
-        view.evaluateJavascript(
-            "window.__soundstormBackup && window.__soundstormBackup(" + PhotoBackup.status(this) + ")", null)
+        if (here != ServerAddress.current) return
+        val status = PhotoBackup.status(this, here, who)
+        if (!knowsPhones && status.optString("phone") != "mine") return
+        view.evaluateJavascript("window.__soundstormBackup && window.__soundstormBackup($status)", null)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != BACKUP_PERMISSION) return
-        val options = pendingBackup ?: return
+        val (options, here, who) = pendingBackup ?: return
         pendingBackup = null
         // Refused, backup stays off and the page says why.
         if (!PhotoBackup.hasPermission(this)) options.put("enabled", false)
-        PhotoBackup.configure(applicationContext, options)
-        reportBackup()
+        PhotoBackup.configure(applicationContext, here, who, options)
+        reportBackup(here, who, true)
     }
 
     private fun setStatusColor(color: Int) {
@@ -1573,8 +1599,10 @@ class MainActivity : Activity() {
         // starting in the app's own window is stopped, and the server shown
         // again (a security review).
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
-            // A new page controls nothing until it says so.
+            // A new page controls nothing until it says so, and whoever is
+            // signed in is asked afresh (signed in or out, switched person).
             remoteVolume = false
+            PhotoBackup.forgetWho()
             val u = url?.let { runCatching { Uri.parse(it) }.getOrNull() }
             if (u == null || url == "about:blank" || isServer(u)) return
             view.stopLoading()

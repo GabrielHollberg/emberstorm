@@ -2078,7 +2078,11 @@ window.__soundstormBackup = (status) => {
 // server's backup belongs to the phone's own person there, who the app asks
 // "Is this your phone?" (ios/ PhotoBackup.swift; Android to follow). An app
 // that does not know it answers as before, without `phone`.
+// Never for the public demo's account (demo.go refuses its photos anyway):
+// any message makes the app ask "Is this your phone?", which on the demo -
+// an app store's reviewer, somebody trying it - leads to a switch that fails.
 function backupCall(cmd, options) {
+  if (document.body.classList.contains('demo-account')) return;
   window.soundstormApp.backup(cmd, { ...(options || {}), phones: 1 });
 }
 function backupSet(options) {
