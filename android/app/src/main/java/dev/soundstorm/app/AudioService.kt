@@ -102,8 +102,10 @@ class AudioService : MediaSessionService() {
                 // system (lock screen, notification, Bluetooth), this app, and
                 // the car, watch and assistant apps - not any app on the phone,
                 // which a media session allows unless told (a security review).
+                // Android 9 at least (minSdk 28): before it a controller could not
+                // be told apart, so any app was let in.
                 override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
-                    if (android.os.Build.VERSION.SDK_INT < 28 || controller.isTrusted || controller.packageName == packageName ||
+                    if (controller.isTrusted || controller.packageName == packageName ||
                         controller.packageName in CONTROLLERS || session.isMediaNotificationController(controller))
                         super.onConnect(session, controller)
                     else MediaSession.ConnectionResult.reject()
