@@ -60,7 +60,7 @@
           <a class="button primary" href="#install">Install it free</a>
           <a class="button" href="#box">Get the box</a>
         </div>
-        <p class="small">Windows, Mac and Linux · Apps for Android and Google TV · iPhone and Apple TV coming soon</p>
+        <p class="small">Windows, Mac and Linux · Apps for Android and Google TV · <a href="https://testflight.apple.com/join/b5st2jTN">Try the iPhone app (beta)</a></p>
       </div>
       <div class="hero-shots">
         <img class="shot tv" src="shots/tv.png" alt="EmberStorm playing music on a TV, with a storm animation">
@@ -171,7 +171,7 @@
       <h3 class="apps-head">Then get the apps</h3>
       <ul class="apps">
         <li><strong>Android, Google TV and Fire TV:</strong> <a href="https://github.com/GabrielHollberg/emberstorm/releases">from the releases page</a> (the android ones). They find your server by themselves.</li>
-        <li><strong>iPhone and Apple TV:</strong> in testing, coming to the App Store. Until then an iPhone uses it in Safari.</li>
+        <li><strong>iPhone and Apple TV:</strong> <a href="https://testflight.apple.com/join/b5st2jTN">Try the iPhone app (beta)</a> through Apple's TestFlight, before it comes to the App Store.</li>
         <li><strong>Any phone or computer:</strong> works in the web browser too.</li>
       </ul>
     </section>
@@ -286,10 +286,12 @@
         form.hidden = true;
         typeShow.hidden = true;
         status.textContent = 'The EmberStorm app is not on this phone yet.';
-        const store = document.createElement('span');
-        store.className = 'button soon';
-        store.textContent = /iPhone|iPad|iPod/.test(navigator.userAgent)
-          ? 'Coming soon to the App Store' : 'Coming soon to Google Play';
+        // The iPhone app is in a public beta (TestFlight) until the App Store.
+        const iphone = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        const store = document.createElement(iphone ? 'a' : 'span');
+        store.className = iphone ? 'button primary' : 'button soon';
+        if (iphone) store.href = 'https://testflight.apple.com/join/b5st2jTN';
+        store.textContent = iphone ? 'Try the iPhone app (beta)' : 'Coming soon to Google Play';
         list.append(store);
         if (!dialog.open) dialog.showModal();
         offerTyping();
