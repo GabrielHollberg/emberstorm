@@ -23,7 +23,7 @@
     <nav>
       <a href="#features">Features</a>
       <a href="#install">Install</a>
-      <a href="#box">The box</a>
+      <a href="#apps">Apps</a>
       <a href="docs/">Docs</a>
       <a href="https://github.com/GabrielHollberg/emberstorm">GitHub</a>
     </nav>
@@ -58,9 +58,9 @@
           It runs on a computer in your house, so your memories stay yours. Free, open source, and no subscriptions.</p>
         <div class="cta">
           <a class="button primary" href="#install">Install it free</a>
-          <a class="button" href="#box">Get the box</a>
+          <a class="button" href="#apps">Get the apps</a>
         </div>
-        <p class="small">Windows, Mac and Linux · Apps for Android and Google TV · <a href="https://testflight.apple.com/join/b5st2jTN">Try the iPhone app (beta)</a></p>
+        <p class="small">Windows, Mac and Linux · Apps for iPhone, Android, Apple TV, Google TV and Fire TV</p>
       </div>
       <div class="hero-shots">
         <img class="shot tv" src="shots/tv.png" alt="EmberStorm playing music on a TV, with a storm animation">
@@ -168,33 +168,49 @@
             <span class="note">On a Mac, the same command works too, if you would rather use a terminal.</span></li>
         </ol>
       </div>
-      <h3 class="apps-head">Then get the apps</h3>
-      <ul class="apps">
-        <li><strong>Android, Google TV and Fire TV:</strong> <a href="https://github.com/GabrielHollberg/emberstorm/releases">from the releases page</a> (the android ones). They find your server by themselves.</li>
-        <li><strong>iPhone and Apple TV:</strong> <a href="https://testflight.apple.com/join/b5st2jTN">Try the iPhone app (beta)</a> through Apple's TestFlight, before it comes to the App Store.</li>
-        <li><strong>Any phone or computer:</strong> works in the web browser too.</li>
-      </ul>
     </section>
 
-    <!-- The box: an idea being tested, said honestly. -->
-    <section id="box" class="box">
-      <div>
-        <h2>Or get the EmberStorm box</h2>
-        <p>A small, quiet box with EmberStorm already on it. Plug it into power and your router,
-          scan the code on its back with your phone, and make your account. Nothing to install, nothing to configure.</p>
-        <p class="small">The box is in testing now. Leave your email for news about it - like when
-          pre-orders open. A few emails at most; unsubscribe any time.</p>
-        <!-- The list is kept by Buttondown (privacy page says so); a plain form,
-             no script: Buttondown's own page confirms and asks the person to
-             click the link it emails, so nobody is signed up by someone else. -->
-        <form class="signup" action="https://buttondown.com/api/emails/embed-subscribe/EmberStorm" method="post">
-          <label class="sr-only" for="signup-email">Your email</label>
-          <input id="signup-email" type="email" name="email" placeholder="you@example.com" autocomplete="email" required>
-          <input type="hidden" name="tag" value="box">
-          <button class="button primary" type="submit">Notify me</button>
-        </form>
+    <!-- The apps, a tab each as the computers have: once EmberStorm is
+         installed, phones and TVs find it by themselves. -->
+    <section id="apps" class="install">
+      <h2>Get the apps</h2>
+      <p class="section-lead">Once EmberStorm is installed on a computer at home, the apps find it by themselves on your Wi-Fi.
+        Any phone or computer can also simply open it in a web browser.</p>
+      <div class="tabs" role="tablist">
+        <button class="tab apptab on" role="tab" data-app="iphone" aria-selected="true">iPhone &amp; iPad</button>
+        <button class="tab apptab" role="tab" data-app="android" aria-selected="false">Android</button>
+        <button class="tab apptab" role="tab" data-app="appletv" aria-selected="false">Apple TV</button>
+        <button class="tab apptab" role="tab" data-app="tv" aria-selected="false">Google TV &amp; Fire TV</button>
+      </div>
+      <div class="app" data-app="iphone">
+        <ol>
+          <li><a class="button primary" href="https://testflight.apple.com/join/b5st2jTN">Get the iPhone app (beta)</a></li>
+          <li>It opens Apple's <strong>TestFlight</strong>: install TestFlight if asked, then tap <strong>Accept</strong> and <strong>Install</strong>.
+            <span class="note">The app is in a public beta until it reaches the App Store.</span></li>
+        </ol>
+      </div>
+      <div class="app hidden" data-app="android">
+        <ol>
+          <li><a class="button primary" href="https://github.com/GabrielHollberg/emberstorm/releases/download/android-0.68/EmberStorm-0.68.apk">Download the Android app</a></li>
+          <li>Open the download, and if Android asks, allow your browser to install apps. Then tap <strong>Install</strong>.
+            <span class="note">Google Play is coming. Until then the app comes straight from EmberStorm's releases.</span></li>
+        </ol>
+      </div>
+      <div class="app hidden" data-app="appletv">
+        <ol>
+          <li>On your iPhone, open <a href="https://testflight.apple.com/join/b5st2jTN">the TestFlight beta</a> and tap <strong>Accept</strong>.</li>
+          <li>On the Apple TV, install <strong>TestFlight</strong> from the App Store, sign in with the same Apple Account, and install EmberStorm from it.</li>
+        </ol>
+      </div>
+      <div class="app hidden" data-app="tv">
+        <ol>
+          <li>On the TV, install the <strong>Downloader</strong> app from its app store.</li>
+          <li>In Downloader, type <code>github.com/GabrielHollberg/emberstorm/releases</code>, choose the newest
+            <strong>EmberStorm for Android</strong>, and install its <code>.apk</code>. Allow Downloader to install apps when the TV asks.</li>
+        </ol>
       </div>
     </section>
+
   </main>
 
   <footer>
@@ -288,10 +304,11 @@
         status.textContent = 'The EmberStorm app is not on this phone yet.';
         // The iPhone app is in a public beta (TestFlight) until the App Store.
         const iphone = /iPhone|iPad|iPod/.test(navigator.userAgent);
-        const store = document.createElement(iphone ? 'a' : 'span');
-        store.className = iphone ? 'button primary' : 'button soon';
-        if (iphone) store.href = 'https://testflight.apple.com/join/b5st2jTN';
-        store.textContent = iphone ? 'Try the iPhone app (beta)' : 'Coming soon to Google Play';
+        const store = document.createElement('a');
+        store.className = 'button primary';
+        store.href = iphone ? 'https://testflight.apple.com/join/b5st2jTN' : '#apps';
+        store.textContent = iphone ? 'Try the iPhone app (beta)' : 'Get the Android app';
+        if (!iphone) store.addEventListener('click', () => dialog.close());
         list.append(store);
         if (!dialog.open) dialog.showModal();
         offerTyping();
@@ -354,7 +371,7 @@
     })();
 
     // The install tabs, starting on the visitor's own system, and the copy button.
-    const tabs = document.querySelectorAll('.tab');
+    const tabs = document.querySelectorAll('.tab:not(.apptab)');
     const choose = (os) => {
       tabs.forEach((t) => { const on = t.dataset.os === os; t.classList.toggle('on', on); t.setAttribute('aria-selected', String(on)); });
       document.querySelectorAll('.os').forEach((p) => p.classList.toggle('hidden', p.dataset.os !== os));
@@ -362,6 +379,14 @@
     tabs.forEach((t) => t.addEventListener('click', () => choose(t.dataset.os)));
     if (/Macintosh|Mac OS X/.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent)) choose('mac');
     else if (!/Windows/.test(navigator.userAgent)) choose('unix');
+    // The app tabs, starting on this phone's own kind.
+    const appTabs = document.querySelectorAll('.apptab');
+    const chooseApp = (app) => {
+      appTabs.forEach((t) => { const on = t.dataset.app === app; t.classList.toggle('on', on); t.setAttribute('aria-selected', String(on)); });
+      document.querySelectorAll('.app').forEach((p) => p.classList.toggle('hidden', p.dataset.app !== app));
+    };
+    appTabs.forEach((t) => t.addEventListener('click', () => chooseApp(t.dataset.app)));
+    if (/Android/.test(navigator.userAgent)) chooseApp('android');
     document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); b.textContent = 'Copied'; } catch { b.textContent = 'Select and copy'; }
       setTimeout(() => { b.textContent = 'Copy'; }, 2000);

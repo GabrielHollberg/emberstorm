@@ -87,7 +87,8 @@ h3 { font-size: 19px; margin: 0 0 8px; }
 .install ol { padding-left: 1.2em; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; max-width: 46em; }
 .install ol > li { min-width: 0; }
 .install .note { display: block; color: var(--muted); font-size: 15px; }
-.tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 24px; }
+.install li code { overflow-wrap: anywhere; }
+.tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 24px; }
 .tab { border: 0; background: none; color: var(--muted); padding: 9px 18px; border-radius: 9px; font: inherit; font-weight: 600; cursor: pointer; }
 .tab.on { background: #222a36; color: var(--text); }
 .code { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 12px 14px; border-radius: 12px; background: #0a0d12; border: 1px solid var(--border); overflow-x: auto; }
