@@ -1565,13 +1565,13 @@ function Clear-Resume {
 function Stop-ForRestart([string]$Text) {
     $script:RestartStop = $true
     $after = if (Register-Resume) {
-        "`n`n  After the restart, sign in and the setup carries on by itself: its window comes back on its own within a minute or two."
+        "`n`n  After the restart, sign in and the setup carries on by itself. Its window can take a few minutes to come back while Windows finishes starting - leave it be, there is nothing to click until it does."
     } else { '' }
     Stop-With ($Text + $after) @{
         Label = 'Restart now'
         Run   = {
             $sure = [System.Windows.MessageBox]::Show($script:Gui.Window,
-                "Restart this PC now?`r`n`r`nAny other programs still open will be closed, so save your work in them first.`r`n`r`nYes - restart now.`r`nNo - not yet. Restart when you are ready; the setup carries on by itself once you sign back in.",
+                "Restart this PC now?`r`n`r`nAny other programs still open will be closed, so save your work in them first.`r`n`r`nAfter you sign back in, the setup starts again by itself. Its window can take a few minutes to appear - there is no need to open anything.`r`n`r`nYes - restart now.`r`nNo - not yet. Restart when you are ready; the setup carries on by itself once you sign back in.",
                 'EmberStorm Setup', 'YesNo', 'Question')
             if ("$sure" -eq 'Yes') {
                 Start-Process -FilePath (Join-Path ([Environment]::GetFolderPath('Windows')) 'System32\shutdown.exe') -ArgumentList '/r', '/t', '0' -WindowStyle Hidden
