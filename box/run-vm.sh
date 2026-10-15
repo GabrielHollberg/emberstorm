@@ -11,6 +11,8 @@
 #        INSTALL_TARGET=vda) onto a blank built-in drive, as a real box gets
 #        its system; it switches itself off when done, and a plain start
 #        then boots what it wrote
+#   wsl -d Debian -u root -- sh box/run-vm.sh repair
+#        the same, onto the drives as they are: putting a box right
 #
 # SoundStorm answers at http://localhost:8399, SSH (a DEV_SSH build) at
 # localhost port 2222, and the console is written to box/out/vm/console.log.
@@ -34,6 +36,10 @@
 # without an eMMC (a small system SSD beside the library drive), for a stick
 # made without INSTALL_TARGET, which chooses the drive itself.
 #
+# ONE_DRIVE=1 gives the box one drive only, a 1 TB NVMe holding both the
+# system and the library, as a one-drive box has (a stick made without
+# INSTALL_TARGET splits it).
+#
 # MEM is the VM's memory in MB. The VM shares this PC's memory with the live
 # server's containers, so it is kept small by default.
 set -eu
@@ -48,6 +54,12 @@ sysdev="virtio-blk-pci,drive=system,bootindex=1"
 if [ "${NVME_SYSTEM:-}" = 1 ]; then
 	sysize=256G
 	sysdev="nvme,drive=system,serial=SYSTEM0001,bootindex=1"
+fi
+datadev="-drive file=$vm/data.qcow2,if=none,id=data,format=qcow2 -device nvme,drive=data,serial=SSDATA0001"
+if [ "${ONE_DRIVE:-}" = 1 ]; then
+	sysize=1T
+	sysdev="nvme,drive=system,serial=ONEDRIVE0001,bootindex=1"
+	datadev=""
 fi
 restrict=""
 [ "${OFFLINE:-}" = 1 ] && restrict=",restrict=on"
@@ -64,11 +76,13 @@ stick=""
 case "${1:-}" in
 stop) stop; exit 0 ;;
 fresh) stop; rm -f "$vm/system.qcow2" "$vm/data.qcow2" "$vm/vars.fd" ;;
-installer)
+installer | repair)
 	stop
 	[ -f "$out/emberstorm-installer.img" ] || { echo "Make the stick first: box/installer.sh" >&2; exit 1; }
-	rm -f "$vm/system.qcow2" "$vm/vars.fd"
-	qemu-img create -q -f qcow2 "$vm/system.qcow2" "$sysize"
+	if [ "$1" = installer ]; then
+		rm -f "$vm/system.qcow2" "$vm/vars.fd"
+		qemu-img create -q -f qcow2 "$vm/system.qcow2" "$sysize"
+	fi
 	# The stick is not changed by a run (snapshot): it can be used again.
 	# KEEP_STICK=1 keeps what the run writes to it, as a real stick would -
 	# a factory stick's list of the boxes it made (its EMBERSTORM partition).
@@ -87,7 +101,7 @@ fi
 # built; 64G like the ME Mini's eMMC (it only takes what is written).
 [ -f "$vm/system.qcow2" ] ||
 	qemu-img create -q -f qcow2 -b "$out/soundstorm-box.qcow2" -F qcow2 "$vm/system.qcow2" "$sysize"
-[ -f "$vm/data.qcow2" ] || qemu-img create -q -f qcow2 "$vm/data.qcow2" 1T
+[ -z "$datadev" ] || [ -f "$vm/data.qcow2" ] || qemu-img create -q -f qcow2 "$vm/data.qcow2" 1T
 [ -f "$vm/vars.fd" ] || cp /usr/share/OVMF/OVMF_VARS_4M.fd "$vm/vars.fd"
 
 qemu-system-x86_64 \
@@ -97,8 +111,7 @@ qemu-system-x86_64 \
 	-drive if=pflash,format=raw,file="$vm/vars.fd" \
 	-drive file="$vm/system.qcow2",if=none,id=system,format=qcow2 \
 	-device "$sysdev" \
-	-drive file="$vm/data.qcow2",if=none,id=data,format=qcow2 \
-	-device nvme,drive=data,serial=SSDATA0001 \
+	$datadev \
 	-nic user,model=virtio-net-pci$restrict,hostfwd=tcp::8399-:8099,hostfwd=tcp::2222-:22 \
 	-display none -serial file:"$vm/console.log" \
 	-monitor unix:"$vm/monitor.sock",server,nowait \

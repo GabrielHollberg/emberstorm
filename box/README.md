@@ -34,7 +34,14 @@ chooses the system drive: an eMMC where the box has one, otherwise the one
 internal SSD of 512 GB or less that holds no library - a small system SSD
 beside the large library drive, in whichever M.2 slot. It stops, writing
 nothing, when it finds no such drive or more than one, and a repair stick
-writes only over EmberStorm or a blank drive.
+writes only over EmberStorm or a blank drive. **A box with one drive** (128 GB
+or more) gets both on it: the system in its first 64 GiB, the library
+(`SSDATA`, btrfs) in a partition from there to the end. Putting such a box
+right rewrites the system's part only and puts the library's partition back
+exactly as it was (found by its table entry, or by its filesystem at 64 GiB
+if a cut-short repair lost the entry); its bytes are never written. A lone
+library drive, or a library with no EmberStorm system beside it, is refused.
+Every repair asks for a copy of the library on another drive first.
 
     wsl -d Debian -u root -- sh -c 'cd /mnt/h/dev/soundstorm && OUT=/root/box-out sh box/installer.sh'
 
@@ -46,7 +53,7 @@ doing, takes about ten minutes, and
 switches off; take the stick out and switch on. The storage drive is kept
 (putting a box right) unless the stick was made with `FACTORY=1`, which
 wipes it so the box starts new. To try it in the VM, make the stick with
-`INSTALL_TARGET=vda INSTALL_AUTO=1` (a repair stick otherwise waits for Enter), then `run-vm.sh installer`, then `run-vm.sh`. For a box with a system SSD, make it with `INSTALL_AUTO=1` alone and run both with `NVME_SYSTEM=1`.
+`INSTALL_TARGET=vda INSTALL_AUTO=1` (a repair stick otherwise waits for Enter), then `run-vm.sh installer`, then `run-vm.sh`. For a box with a system SSD, make it with `INSTALL_AUTO=1` alone and run both with `NVME_SYSTEM=1`. For a one-drive box, the same with `ONE_DRIVE=1`; `run-vm.sh repair` starts from the stick onto the drives as they are.
 
 ## How a box starts
 
