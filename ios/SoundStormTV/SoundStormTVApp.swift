@@ -432,6 +432,7 @@ struct RootView: View {
                     ProgressView().task { model.signedOutElsewhere() }
                 } else {
                     LibraryView()
+                        .overlay(alignment: .bottom) { RefusedNotice() }
                         .modifier(DeviceRequests())
                         .modifier(RemoteControlled())
                         .environment(api)
@@ -439,5 +440,26 @@ struct RootView: View {
                 }
             }
         }
+    }
+}
+
+/// The server's word when it refused a change on a TV that only plays
+/// (switched to somebody from their phone), shown for a few seconds.
+struct RefusedNotice: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Group {
+            if let text = model.api?.refused {
+                Toast(text: text, lines: 3)
+                    .frame(maxWidth: 1200)
+                    .padding(.bottom, 60)
+                    .task(id: text) {
+                        try? await Task.sleep(for: .seconds(6))
+                        if model.api?.refused == text { model.api?.refused = nil }
+                    }
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: model.api?.refused)
     }
 }

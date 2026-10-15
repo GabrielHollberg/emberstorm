@@ -183,12 +183,14 @@ extension View {
 /// box, its text in the page's white.
 struct Toast: View {
     let text: String
+    var lines = 1
 
     var body: some View {
         Text(text)
             .font(.system(size: 28, weight: .medium))
             .foregroundStyle(Theme.text)
-            .lineLimit(1)
+            .lineLimit(lines)
+            .multilineTextAlignment(.center)
             .padding(.horizontal, 36)
             .padding(.vertical, 20)
             .background(RoundedRectangle(cornerRadius: 24).fill(Color(red: 36 / 255, green: 42 / 255, blue: 53 / 255)))

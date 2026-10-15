@@ -390,6 +390,12 @@ struct SettingsView: View {
                 if let user = api.user {
                     Text("Signed in as \(user.name)\(user.owner == true ? ", the owner of this server" : "").")
                         .muted()
+                    if api.limited {
+                        // Switched here from their phone: only playing.
+                        Text("This TV was switched to \(user.name) from a phone, so it can only play. To change settings here, choose Switch person and pick \(user.name) with their PIN or password.")
+                            .muted()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 VStack(alignment: .leading, spacing: 24) {
                     Text("On this TV")

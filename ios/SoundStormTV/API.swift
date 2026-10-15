@@ -50,6 +50,8 @@ final class API {
         let serverName: String?
         /// The server's secure home name, offered while this is not on it.
         let secureName: String?
+        /// Switched to this person from their phone: the session only plays.
+        let limited: Bool?
         /// Which build the server is (to anyone signed in), for Settings.
         let build: Build?
     }
@@ -62,6 +64,13 @@ final class API {
     /// Whether new devices need approval (the owner's setting), known from
     /// the session answer; nil until asked.
     private(set) var approveNewDevices: Bool?
+    /// A TV switched to somebody from their phone only plays (the server's
+    /// playback session, 2026-10-14): their settings, People and passwords
+    /// stay off it until they choose themselves in "Who's listening?".
+    private(set) var limited = false
+    /// What the server said when it refused a change for that reason, for a
+    /// moment on screen (RootView) - said, not failed silently.
+    var refused: String?
     private var approvalAsked = Date.distantPast
 
     enum Failure: LocalizedError {
@@ -82,6 +91,7 @@ final class API {
     func session() async throws -> Session {
         let s: Session = try await get("api/session")
         user = s.signedIn ? s.user : nil
+        limited = s.signedIn && s.limited == true
         if s.signedIn { sessionEnded = false }
         approveNewDevices = s.signedIn ? (s.approveNewDevices ?? false) : nil
         if let name = s.serverName { ServerAddress.serverCalls(server, name) }
@@ -202,7 +212,9 @@ final class API {
             approvalAsked = Date()
             _ = try? await session()
         }
-        guard approveNewDevices == true else { return [] }
+        // Allowing a sign-in would hand on an account this TV holds only to
+        // play: the server refuses it, so it is not offered.
+        guard approveNewDevices == true, !limited else { return [] }
         let a: Answer? = try? await get("api/devices/pending")
         return a?.pending ?? []
     }
@@ -942,6 +954,10 @@ final class API {
             if code == 401 && user != nil && request.url?.path != "/api/login" { sessionEnded = true }
             // Held to choosing a new password: nothing else answers until then.
             if code == 403 && problem?.mustRenew == true { renewDemanded = true }
+            if code == 403 && problem?.limited == true {
+                limited = true
+                refused = problem?.error ?? "On this TV you can only play. To change this, choose yourself in Switch person."
+            }
             throw Failure.status(code, problem?.error)
         }
         return data
@@ -979,6 +995,7 @@ final class API {
         struct Answer: Decodable { let user: User? }
         let a: Answer = try await send("POST", "api/players/switch", Body(code: code, id: id))
         user = a.user
+        limited = true
         renewDemanded = false
         sessionEnded = false
     }
@@ -992,7 +1009,7 @@ final class API {
 }
 
 private struct EmptyAnswer: Decodable {}
-private struct Problem: Decodable { let error: String; let mustRenew: Bool? }
+private struct Problem: Decodable { let error: String; let mustRenew: Bool?; let limited: Bool? }
 
 // MARK: Models - media.Item and friends, as the server writes them.
 
