@@ -1,8 +1,12 @@
 # EmberStorm for Android
 
 A native shell around the server's own web app - the Android counterpart of
-`ios/`, and the app for Google TV, Android TV and Fire TV as well. Why it is
-built this way is in `CLAUDE.md` under "The Android app" and "TV apps".
+`ios/`, and the app for Google TV, Android TV and Fire TV as well. The page
+stays the one product, so every web change reaches the app at once; only what
+a web view cannot do well (music with the screen off, the lock screen, photo
+backup, keeping downloads) is native. Android 9 or newer (`minSdk` 28): below
+it any app on the phone could control the music, as a controller could not be
+told apart. More in the documentation site (`site/`).
 
 What is native, and what is still the page:
 
@@ -14,19 +18,46 @@ What is native, and what is still the page:
   as a music player: it keeps playing with the screen off, pauses for an alarm
   or a call and plays on after, and gives the lock screen, notification,
   headphones and a car their controls. The next ten songs are handed over
-  ahead, so the music carries on even if Android ends the page. Downloads
-  (`blob:` addresses) and crossfade still play in the page.
+  ahead, so the music carries on even if Android ends the page, and the app
+  saves an audiobook's place itself every ten seconds and when it stops, so
+  an hour listened with the screen off is not lost. The sleep timer is kept
+  by the player too. Crossfade is off in the app.
+- **Downloads are kept by the app** (`KeptFiles.kt`), in its own folder,
+  which the system never clears and backups leave out: the page hands each
+  file over, and a downloaded song or book plays from the app's copy through
+  the native player. When the server cannot be reached, the app opens its
+  kept copy of the page on the downloads (from any of the install's
+  addresses, preferring one holding downloads), with Change server, and
+  loads the server again by itself once it answers.
 - **Photo backup** (`PhotoBackup.kt`): WorkManager jobs that send the phone's
-  camera roll to `PUT /api/photos/backup`, checking each batch with
-  `POST /api/photos/backup/check` first, so a reinstall sends nothing twice.
-  The page's Settings → Your photos holds the switch and its options (Wi-Fi
-  only, videos, only while charging); not on a TV. One backup runs at a time,
-  in the foreground with a quiet notification where Android allows (an ordinary
-  job is stopped at ten minutes), and Settings shows the file being sent.
-  Signing out, or another account appearing, turns it off.
+  camera roll to `PUT /api/photos/backup`, checking with
+  `POST /api/photos/backup/check` first, so the server is the one record and
+  a reinstall sends nothing twice; while the folder's marker
+  (`GET /api/photos/backup/marker`) holds, only photos not yet confirmed are
+  checked. A phone backs up to any number of servers, one person each: the
+  first person to sign in to a server is asked "Is this your phone?", and only
+  whoever says yes gets the switch there (`claim`, `release`), its sends
+  waiting while somebody else is signed in. The page's Settings → Your photos
+  holds the switch and its options (Wi-Fi only, videos, only while charging);
+  never on a TV or for the public demo's account. One backup runs at a time,
+  in the foreground with a quiet notification where Android allows, and
+  Settings shows the file being sent.
+- **Adding media in the background** (`Uploads.kt`): Add media's files, and
+  anything shared to EmberStorm from another app's Share sheet (`Shared.kt`),
+  get the page's usual review and are then sent by the app, carrying on with
+  the app closed (Wi-Fi only and while charging, if asked).
 - **Several saved servers** (`ServerAddress.kt`): the connect screen lists
   **Your servers**, the latest used first; tap to switch, long-press to rename
-  or remove. Each keeps its own sign-in.
+  or remove. Each keeps its own sign-in, carried between an install's home and
+  away names. The app also looks for servers on the network
+  (`ServerDiscovery.kt`) and offers a new box with no owner yet as **Set it
+  up**, its setup code scanned off the label or typed. A typed address can be
+  just the code at the start of an install's name.
+- **Links**: `https://<name>/link/<code>` (a TV's sign-in QR code) and
+  `names.emberstorm.app/open` open the app (verified App Links), as does
+  `soundstorm://link`; only servers the app knows are opened. Settings has
+  **Scan the TV's code** (Google's code scanner), and while the phone
+  controls a TV its volume buttons turn the TV's volume.
 - **TV**: the manifest adds `LEANBACK_LAUNCHER` and a banner, and marks leanback
   and a touchscreen as not required, so phones install it as before. On a TV the
   web view's user agent gains `SoundStormTV/1` and the page switches to its
@@ -64,14 +95,23 @@ Builds are published from `main`, from the PC:
 1. Raise `versionCode` (and `versionName`) in `app/build.gradle.kts`, so a
    phone installs over the last one.
 2. `./gradlew assembleDebug`.
-3. Publish `app-debug.apk` as a GitHub **pre-release** named
-   `android-<version>`. Never mark it Latest: Latest is the server's installer,
-   which the README's download link follows.
+3. Publish it as `EmberStorm-<version>.apk` on a GitHub **pre-release**
+   named `android-<version>`. Never mark it Latest: Latest is the computers'
+   release, which the README's download links follow. The website's Android
+   tab links one release's APK by name, so change it there too.
 
 The published build is the debug build type, signed with the debug key so each
 installs over the last, but with `isDebuggable = false` - a published APK that
-is debuggable hands its cookies to anybody with adb. A release signing key is
-still to come.
+is debuggable hands its cookies to anybody with adb.
+
+**Google Play is coming.** `./gradlew bundleRelease` makes an app bundle
+signed with an **upload key**, whose file and password are kept outside this
+repository (`EMBERSTORM_UPLOAD_PROPERTIES`, else
+`~/.emberstorm/android-upload.properties`); without it a release build is
+unsigned. Google keeps the key phones see (Play App Signing), and the names
+service lists both that key and the debug key, so app links open either
+version. A phone moving from the GitHub version to Play's uninstalls once, as
+their signatures differ.
 
 ## The things to check on a real phone
 
@@ -88,6 +128,8 @@ still to come.
   folder on the server, and does a second run send nothing again?
 - Add a second server under Change server: does switching back keep you signed
   in?
+- Download a song, then turn the network off and open the app: does it open
+  on the downloads, and come back to the server by itself once online?
 
 ## Testing on the emulator
 

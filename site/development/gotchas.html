@@ -82,8 +82,9 @@ down.</p>
   name, so EmberStorm introduced itself under a new name to get real paths.</li>
   <li><strong>Navidrome will not turn lossy into lossless</strong>: a lossy song asked for as FLAC
   comes back as Opus. The server's beat analysis uses a transcoding of its own name instead.</li>
-  <li><strong>Immich is pinned to its major version.</strong> v3 broke endpoints "that affect only
-  third-party tools" - which is what EmberStorm is.</li>
+  <li><strong>Every backend is pinned by digest.</strong> Immich's v3 broke endpoints "that affect only
+  third-party tools" - which is what EmberStorm is - and AudioMuse-AI releases weekly. A new version
+  is tried, then its index digest (every processor) committed.</li>
   <li><strong>Storyteller's app token reads only the <code>st_token</code> cookie</strong>; a bearer
   token is sent to the login page.</li>
   <li><strong>Every backend handles a deleted file differently</strong>: Navidrome hides it,
@@ -141,11 +142,17 @@ down.</p>
   <li><strong>Install WSL first</strong> (<code>wsl --install --no-distribution</code>), and check
   <code>HypervisorPresent</code> before the firmware virtualization flag, which reads false once a
   hypervisor is running.</li>
-  <li><strong>Smart App Control blocks downloaded scripts by extension</strong>, and Defender blocks
-  piping a downloaded script into PowerShell on sight. The setup file downloads to a file and runs
-  it with <code>-File</code>.</li>
-  <li><strong>A raw GitHub URL ignores the query string when caching</strong>, so the installer
-  downloads from the newest commit's URL instead.</li>
+  <li><strong>Smart App Control blocks downloaded scripts by extension</strong>, and an unsigned
+  program outright; Defender blocks piping a downloaded script into PowerShell on sight. So the
+  download is a signed program, and the script it runs is a file, run with <code>-File</code>.</li>
+  <li><strong>A raw GitHub URL ignores the query string when caching</strong> a branch's file for five
+  minutes - one reason installs now run a release's checked files rather than the branch's.</li>
+  <li><strong>Every compose network needs a fixed subnet.</strong> With eight more networks, Docker ran
+  past its default address pools and gave one network the home router's own range; the server's router
+  requests then went to Docker, the router's port mapping lapsed, and the install could no longer be
+  reached from away. The backend networks now have fixed subnets in <code>10.231.0.0/16</code>. And a
+  network whose addresses change is rebuilt with its containers reattached without their service names,
+  so a renamed network is the safe way to change one.</li>
   <li><strong>The compose project name is fixed</strong>, so a second install in another folder
   would adopt the first one's containers. Both installers refuse, naming the other folder.</li>
   <li><strong><code>go:embed</code> rejects file names with an apostrophe.</strong></li>

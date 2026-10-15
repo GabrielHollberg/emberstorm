@@ -40,8 +40,7 @@
     of yours is sent to us, and we have no way to see it.</p>
 
     <h2>What we collect</h2>
-    <p>Nothing about you or what you do - unless you leave your email for news
-    about the box (below). EmberStorm and its apps have no
+    <p>Nothing about you or what you do. EmberStorm and its apps have no
     accounts with us, no analytics, no advertising and no tracking. They do not
     report what you watch, play, read or search for, to us or to anyone. The
     one service we run (below) is there to give your server a secure address,
@@ -56,7 +55,7 @@
     other members of the household do not see them.</p>
 
     <h2>The apps</h2>
-    <p>The iPhone, Apple TV, Android and Android TV apps talk only to the
+    <p>The iPhone, Apple TV, Android, Google TV and Fire TV apps talk only to the
     EmberStorm server you choose. They ask for these, and use them only for
     what is said:</p>
     <ul>
@@ -64,15 +63,16 @@
         from your phone): your photos and videos are sent to your own server,
         and nowhere else.</li>
       <li><strong>Camera</strong>: to scan a code, such as the one a TV shows
-        to sign in. The picture is read on the phone and not kept.</li>
+        to sign in. The picture is read on the phone and not kept (on Android,
+        by Google Play services' own code scanner).</li>
       <li><strong>Local network</strong>: to find your EmberStorm server at
         home, so you do not have to type its address.</li>
     </ul>
     <p>Signing in keeps a cookie from your server on the device, as a website
     does. Downloads you choose are kept on the device until you remove them or
-    sign out. If you have allowed your iPhone or Apple TV to share analytics
-    with app developers, Apple may pass us anonymous crash reports; that is
-    Apple's setting, and the apps add nothing to it.</p>
+    sign out. While the iPhone and Apple TV apps are in Apple's TestFlight
+    beta, TestFlight passes us crash reports and any feedback you choose to
+    send, as Apple's TestFlight describes; the apps add nothing to it.</p>
 
     <h2>What leaves your house</h2>
     <p>EmberStorm itself contacts the internet only for these:</p>
@@ -87,27 +87,33 @@
         website can find yours - you can turn that off in Settings. It never
         carries your media, and it does not know who you are - unless the web
         address you choose for your server says so (thesmiths.emberstorm.app).</li>
-      <li><strong>Updates.</strong> EmberStorm checks for a newer release a
-        couple of times a day, and installs it by itself at night - on your
-        own computer unless you turn that off, and on the EmberStorm box. Only
+      <li><strong>Updates.</strong> EmberStorm looks at GitHub for a newer
+        release twice a day, and installs it by itself at night - on your own
+        computer unless you turn that off, and on the EmberStorm box. Only
         releases signed by EmberStorm are installed. The programs come from
         GitHub and Docker's registries, which see your home's internet
-        address.</li>
+        address. An EmberStorm box also gets its system's security updates
+        from Debian and sets its clock over the internet.</li>
       <li><strong>Things you switch on</strong>, all off until you do: lyrics
         found online (LRCLIB), artist bios and similar artists (MusicBrainz,
-        ListenBrainz, Wikipedia), checking a show against an episode guide
-        (TVmaze), scrobbling to ListenBrainz, importing playlists from Plex,
-        and remote access. Each is sent only what it needs - an artist and
-        song name, a show's name - and nothing that says who you are.</li>
+        ListenBrainz, Wikipedia), and remote access. Each is sent only what it
+        needs - an artist and song name - and nothing that says who you are.
+        Scrobbling, if you connect your own ListenBrainz account, sends that
+        account what you play, as scrobbling does.</li>
       <li><strong>Things you do</strong>: choosing the right film or show, or
         a poster for one, asks the film and TV server's online databases
         (TheMovieDb, the Open Movie Database) by the title, and shows their
-        posters through your server.</li>
+        posters through your server. Checking a show against an episode guide
+        asks TVmaze by the show's name. Importing playlists from Plex signs in
+        to your Plex account, on Plex's own page, and reads your playlists
+        from your Plex server.</li>
     </ul>
     <p>The media servers EmberStorm runs for you also go online for their
     usual jobs: the film and TV server looks up posters and details (from
     TheMovieDb and similar), the photo server downloads its search models
-    once, and speech recognition for making ebooks downloads its model once.
+    once and checks for its own new versions, speech recognition for making
+    ebooks downloads its model once, and the read-along server downloads its
+    speech model once and checks its changelog.
     On Windows and Mac, EmberStorm runs inside Docker Desktop, which has its
     own privacy policy and sends Docker usage statistics unless you turn them
     off in its settings.</p>

@@ -11,8 +11,8 @@
 <main>
 <h1>The web app</h1>
 <p class="lede">The whole product, in plain JavaScript with no framework and no build step,
-embedded in the server binary. It is what a browser shows, what installs to a home screen,
-and what the Android and iPhone apps wrap.</p>
+embedded in the server binary. It is what a browser shows, and what the Android and iPhone apps
+wrap.</p>
 
 <h2 id="files">The files</h2>
 <p>Everything lives in <code>internal/webui/assets</code> and is served by the Go server through
@@ -24,7 +24,7 @@ and what the Android and iPhone apps wrap.</p>
   <tr><td><code>reader.js</code></td><td>The book reader, around the vendored foliate-js (see <a href="reader.html">The reader</a>).</td></tr>
   <tr><td><code>sw.js</code>, <code>sw-register.js</code></td><td>The service worker and the file that registers it.</td></tr>
   <tr><td><code>style.css</code></td><td>All styling, including the TV mode (<code>html.tv</code>) and the safe-area variables.</td></tr>
-  <tr><td><code>manifest.webmanifest</code></td><td>What makes it installable: name, icons, <code>display: standalone</code>.</td></tr>
+  <tr><td><code>manifest.webmanifest</code></td><td>Name, icons, <code>display: standalone</code> - linked only on a phone or tablet, so a computer's browser offers no install button.</td></tr>
   <tr><td><code>vendor/</code></td><td>foliate-js and hls.js, the only third-party code in the project, checked in and pinned.</td></tr>
 </table>
 
@@ -145,11 +145,20 @@ kind of media.</p>
 <p>Offline, the app stays itself rather than showing an error screen: each tab lists only what
 is on the device, Home shows one strip per downloaded kind, and search looks through the
 downloads. The browser's <code>online</code> event brings everything back.</p>
+<p><strong>In the phone apps downloads are kept by the app</strong>, not in web storage, which a phone
+may clear when short of space. When the app says it keeps downloads (<code>soundstormApp.keeps</code>),
+the page hands each file to it (<code>soundstormApp.keep</code>), reads the list and the files back
+from the app, and a kept song or audiobook goes to the app's own player by its server address. Older
+downloads are moved across quietly. Opened with the server out of reach, the app shows the page's own
+kept copy on its downloads, with an offline bar and Change server (see
+<a href="android.html#kept">Android</a> and <a href="iphone.html#kept">iPhone</a>).</p>
 
 <h2 id="sw">The service worker's rules</h2>
-<p>The service worker (<code>sw.js</code>) exists so the app can be installed to a home screen.
-It is deliberately the smallest thing that does that, because every failure of a cache in front
-of a media server is worse than the problem it solves. It has three rules:</p>
+<p>The service worker (<code>sw.js</code>) lets a browser open the app offline on its downloads. It
+is deliberately the smallest thing that does that, because every failure of a cache in front of a
+media server is worse than the problem it solves. Inside the phone apps it is not registered at all
+(and one registered before is removed): there the app's own kept copy of the page is the offline page,
+and a worker once answered an offline load there with a black error page. It has three rules:</p>
 <ol>
   <li><strong>Nothing under <code>/api/</code> is ever cached.</strong> Search results, sessions and
   positions are live state; a stale one is worse than no answer.</li>
@@ -162,7 +171,8 @@ of a media server is worse than the problem it solves. It has three rules:</p>
   warning people know how to handle.</li>
 </ol>
 <p>The one exception to rule 3 is opening the app offline for downloads, and it applies only on
-the real <code>*.emberstorm.app</code> names, only when the network actually failed. Those names
+the real <code>*.emberstorm.app</code> names, only when the network actually failed (or a server that
+was reachable gives no answer at all for six seconds, when a kept copy exists). Those names
 carry trusted certificates that renew themselves, so the trap rule 3 exists for cannot happen
 there. On an IP address, localhost or a self-signed certificate, the rule holds exactly.</p>
 <p>What the worker does answer - the app's own <code>/static/</code> files - is network-first.
@@ -175,14 +185,14 @@ service worker's scope is its own folder, and from <code>/static/</code> it coul
 The manifest is likewise served by hand, because Go's MIME table has no
 <code>.webmanifest</code> and Chrome ignores a manifest not sent as JSON.</div>
 
-<h2 id="install">Installing it as an app</h2>
+<h2 id="install">The app, not the web app</h2>
 <p><strong>Not offered any more</strong> (the owner's decision, 2026-10-12): on a phone or tablet the
 page offers the phone app from its store once (<code>offerInstall</code>; <code>APP_STORE_URL</code>
 stays empty until the iPhone app is listed, and an iPhone is offered nothing until then), Chrome's own
 install prompt is held back (<code>beforeinstallprompt</code>), and a computer is offered nothing. The
 web app can still be added to a home screen from the browser's own menu, for those who look.</p>
-<p>On an iPhone, Share &rarr; Add to Home Screen works from any address. On Android, Chrome's
-<strong>Install app</strong> only appears where a service worker can register - and Chrome refuses
+<p>For those who do: on an iPhone, Share &rarr; Add to Home Screen works from any address. On Android,
+Chrome's <strong>Install app</strong> only appears where a service worker can register - and Chrome refuses
 to register one on an origin with a certificate error, even after the warning was clicked
 through. So the app installs only from the secure <code>https://&lt;id&gt;.home.emberstorm.app:8099</code>
 name, which has a real Let's Encrypt certificate (see

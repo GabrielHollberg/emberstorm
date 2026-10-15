@@ -19,9 +19,7 @@ in <code>internal/collections</code>, one file per person.</p>
 <p>Navidrome has favorites and playlists built in. But the household shares one Navidrome
 account - an account each would be several times the provisioning for no visible gain - so
 anything stored there would be everybody's at once. The same reasoning keeps film positions in
-EmberStorm rather than Jellyfin. The notes had always said "revisit when favorites reach the UI";
-this is that moment, answered by keeping them above the backends rather than giving every person
-a backend account.</p>
+EmberStorm rather than Jellyfin. Keeping them above the backends answers it without giving every person a backend account.</p>
 
 <h2 id="files">A file per person, not state.json</h2>
 <p><code>state.json</code> holds credentials, accounts and sessions. It is rewritten whole on every
@@ -59,6 +57,8 @@ Custom again brings a hand-made order back. The server returns songs already sor
 (<code>Playlist.Ordered</code>), each carrying its position in <code>Items</code> for removing and
 moving. Removing has an Undo: the add endpoint answers the new count, so the song goes back and is
 moved into place.</p>
+<p><code>GET /api/playlists?has=&lt;source&gt;/&lt;id&gt;</code> says which playlists already hold a
+song, so adding one song to several playlists at once can tick the ones it is not in yet.</p>
 <p>A playlist can have a picture of its own, stored like a song's own cover under the key
 <code>playlist:&lt;id&gt;</code>, accepted only for the person's own playlist and deleted with it.</p>
 
@@ -103,7 +103,14 @@ Plex account.</p>
 directory's <code>collections/art/&lt;account&gt;/</code> and named by content, so one picture for an album is
 stored once. Keys name what is replaced: <code>song:&lt;source&gt;/&lt;id&gt;</code> or
 <code>art:&lt;source&gt;/&lt;art id&gt;</code> with Navidrome's version suffix dropped, so an
-edited file keeps the choice. Only JPEG, PNG and WebP are accepted, judged by their bytes (never
+edited file keeps the choice. A film or show's own cover is keyed by the film itself
+(<code>art:&lt;source&gt;/&lt;film id&gt;</code>, Jellyfin's version suffix dropped), so it works for a
+film with no picture at all and is not undone by a poster found later - unlike choosing a film's
+poster, which changes it for everyone and is the owner's alone. A person's own picture, shown in
+"Who's listening?" and the menu at the top, is kept the same way under the key <code>me</code>
+(<code>PUT</code>/<code>DELETE /api/account/picture</code>), and <code>GET
+/api/profiles/{id}/picture</code> serves it before anybody signs in only for somebody kept on that
+device. The picture can come from the device or from the person's own photos on the server. Only JPEG, PNG and WebP are accepted, judged by their bytes (never
 SVG), up to 4 MB; pictures are served only to their owner, sandboxed and <code>nosniff</code>;
 unused ones are deleted.</p>
 
@@ -140,7 +147,8 @@ counts, so it says something from the first day.</p>
 
 <h2 id="prefs">Preferences</h2>
 <p>Settings that should follow a person rather than a device - the order of the category pills and
-which are put away, the Now Playing look, audiobook speed, the read-along highlight - are kept in
+which are put away, the Now Playing look, audiobook speed, the read-along highlight, how far the
+owner got through the welcome - are kept in
 the same file behind <code>GET</code>/<code>PATCH /api/prefs</code>, bounded. One subtlety: a row
 with no saved list means "defaults", which hide Genres, so an empty list is stored as an empty list,
 never null - otherwise "I added Genres back" would read as "defaults" and hide it again.</p>

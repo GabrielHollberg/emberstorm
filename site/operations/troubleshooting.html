@@ -25,13 +25,14 @@ publicly.</div>
 <ol>
   <li><strong>Use the computer's address, not localhost.</strong> On a phone, <code>localhost</code> is
   the phone. Settings &rarr; Use on your phone or TV shows the right address, for example
-  <code>http://192.168.1.50:8099</code>. Include the port.</li>
+  <code>http://192.168.0.50:8099</code>. Include the port.</li>
   <li><strong>Same network?</strong> A guest Wi-Fi network usually cannot see other devices, and mobile
   data is not the home network at all. The installer cannot check either of these.</li>
   <li><strong>Windows: is the network Public?</strong> Windows makes every new Wi-Fi network Public, and
-  Public lets nothing in. Run <strong>Update EmberStorm</strong> while on the home network: it notices,
-  asks whether this is your home network, and with your consent marks it Private and opens EmberStorm's
-  port for private networks only.</li>
+  Public lets nothing in. EmberStorm asks when it starts on such a network whether it is your home
+  network, once per network, and with your consent marks it Private and opens EmberStorm's port for
+  private networks only. If you answered no on your home network, change it in Windows' own network
+  settings; in EmberStorm, Settings &rarr; Devices &rarr; The computer EmberStorm runs on says where.</li>
   <li><strong>Windows: a Docker firewall block.</strong> If the firewall alert for "Docker Desktop
   Backend" was cancelled during setup, Windows added a Block rule, and Block beats Allow. The same
   update step removes the block for private networks.</li>
@@ -64,9 +65,11 @@ browser's own warning rather than a cached page that cannot work. A browser stil
 version of the worker can be stuck until its site data is cleared.</p>
 
 <h2 id="install-app">Android will not offer "Install app"</h2>
-<p>Chrome only installs a web app from an origin with a trusted certificate - not from a LAN IP address,
-and not from a self-signed certificate even after clicking through the warning. Open the secure
-<code>.home.emberstorm.app</code> address and install from there, or use the Android app.</p>
+<p>Use the Android app instead: it is what the page offers on a phone, and it plays with the screen
+off and keeps downloads safe. For the web app on a home screen, Chrome only installs from an origin
+with a trusted certificate - not from a LAN IP address, and not from a self-signed certificate even
+after clicking through the warning - so open the secure <code>.home.emberstorm.app</code> address and
+use the browser's menu there.</p>
 
 <h2 id="getting-ready">A shelf stuck on "Getting ready"</h2>
 <p>EmberStorm sets up each media server itself in the background, retrying with backoff, and the setup
@@ -164,7 +167,11 @@ meant to say what to do:</p>
   <tr><td>There is no room left for photos</td><td>The person's photo space is full (100 GB by default, set by the owner in People), or the server's disk is. Nothing is deleted; backup resumes when there is room.</td></tr>
   <tr><td>Could not reach the server; it will try again</td><td>A network problem. Android retries by itself.</td></tr>
   <tr><td>It carries on when the phone is on Wi-Fi</td><td>Not an error: backup is set to Wi-Fi only.</td></tr>
+  <tr><td>Backup waits while someone else is signed in</td><td>The phone is backed up on this server by the person whose phone it is, and only while they are the one signed in there. It carries on when they sign in again.</td></tr>
 </table>
+<p>A phone backs up on each server for one person only: the first to sign in there is asked "Is this
+your phone?", and everybody else sees whose it is rather than a switch. If the wrong person said yes,
+they can let it go in Settings &rarr; Your photos (<strong>This isn't my phone</strong>).</p>
 <p>The phone decides when backup runs - Android its jobs, iOS its background uploads - so a large
 backup proceeds in stretches, especially with
 "only while charging" on. Photos already on the server are never sent twice, even after a reinstall.</p>
@@ -185,6 +192,9 @@ backup proceeds in stretches, especially with
   after ten minutes.</li>
   <li><strong>"Choose a new password"</strong> before anything else works: the owner asked everyone
   for one, or the old password no longer meets the rules (12 characters, not a common one).</li>
+  <li><strong>A TV refuses changes</strong> after somebody sent it something from their phone: a TV
+  switched that way only plays. Choose yourself in "Who's listening?" on the TV, with your PIN or
+  password, for the full account.</li>
   <li><strong>A PIN that keeps failing</strong> on a shared device: after five wrong tries switching to
   that person waits, and after fifteen they are taken off the device - sign in with the password
   instead.</li>

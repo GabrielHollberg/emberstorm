@@ -73,6 +73,10 @@ phone app is where the browser picks up. Its API needs care:</p>
   time (<code>1e999</code> decodes to <code>+Inf</code>), and progress is decoded leniently so one junk
   record cannot become a permanent error for that book.</li>
 </ul>
+<p>Each place carries when Audiobookshelf last recorded it (<code>lastUpdate</code>), so a place a
+device kept while offline is used, and sent, only when it is newer than the server's - an old copy
+never pulls a book back. In the phone apps the native player saves the place itself while the screen
+is off.</p>
 <p>Continue leaves out finished books, ones hidden from continue listening in Audiobookshelf's own UI,
 missing ones and podcast episodes. A position under half a percent or over 98.5% is "not started" or
 "finished".</p>
@@ -85,6 +89,13 @@ says which chapters fall in which file - what <a href="storyteller.html">Storyte
 conversion rests on. Chapter names come from the chapter list when there is one per file, then the ID3
 title, then the file name. Some LibriVox MP3s ship double-encoded tags; those are left alone rather than
 "repaired" by guessing.</p>
+<p><strong>Long single-file books play in pieces.</strong> An Audible .m4b keeps its index at the end,
+and a long one's index can be tens of megabytes, which a player fetched before saying a word. So a
+file whose index is 2&nbsp;MB or more is offered as HLS made from the file itself
+(<code>internal/mp4hls</code>, <code>/api/bookhls/...</code>): EmberStorm reads the index once and
+serves ten-second fragments of the original bytes, nothing transcoded. Each piece is sized from the
+index before anything is sent and refused past 16&nbsp;MB, and an index claiming more samples than the
+file could hold is refused. Downloads keep the file itself.</p>
 
 <h2 id="missing">Deleted files</h2>
 <p>Audiobookshelf sets <code>isMissing</code> on a book whose files are gone and <strong>keeps serving
@@ -95,7 +106,8 @@ is no "not missing" filter to ask for, so the adapter skips them client-side, on
 tested separately.</p>
 
 <h2 id="version">Version</h2>
-<p>The image follows <code>latest</code>; everything above was checked against 2.36.1.</p>
+<p>The image is pinned by digest at 2.36.1, the version everything above was checked against; a new
+version is tried and its digest committed before any install gets it.</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

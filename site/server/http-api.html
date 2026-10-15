@@ -20,13 +20,14 @@ middleware that every request passes through.</p>
 than the last:</p>
 <div class="diagram" role="img" aria-label="A request passes logging, security headers, same-origin and body deadline middleware, then the public mux; /api/ goes through sign-in and user context to the guarded mux; owner paths go through RequireOwner to the owner mux.">
   <div class="row">
+    <div class="box">OnlyHomeOverHTTP<small>plain http only at home</small></div>
     <div class="box">withLogging<small>status, time taken</small></div>
     <div class="box">secureHeaders<small>framing, nosniff, HSTS</small></div>
     <div class="box">sameOrigin<small>cross-site writes refused</small></div>
     <div class="box">bodyDeadline<small>30s for a body</small></div>
   </div>
   <div class="arrow">&#8595;</div>
-  <div class="row"><div class="box core">public mux<small>shell, static files, /healthz, /ca.crt, session, sign-up, sign-in, sign-out</small></div></div>
+  <div class="row"><div class="box core">public mux<small>shell, static files, /healthz, /ca.crt, session, sign-up, sign-in, sign-out, invitations, "Who's listening?", TV sign-in codes</small></div></div>
   <div class="arrow">&#8595; /api/ &rarr; auth.Require &rarr; withUserContext &#8595;</div>
   <div class="row"><div class="box core">guarded mux<small>everything a signed-in person may do</small></div></div>
   <div class="arrow">&#8595; owner paths &rarr; auth.RequireOwner &#8595;</div>
@@ -37,17 +38,49 @@ than the last:</p>
 <p>Only what must work before anybody signs in: the app shell at <code>/</code> (one page for
 every state - it asks <code>/api/session</code> and draws the sign-up form, the sign-in form or the
 library), <code>/static/</code>, the service worker and manifest (served from the root, because a
-service worker's scope is its own directory), <code>/healthz</code>, <code>/ca.crt</code> for a
+service worker's scope is its own directory), <code>/healthz</code> (status, the server's name,
+whether it has an owner yet - what a device searching the network shows), <code>/ca.crt</code> for a
 device that wants to trust the local authority, the name service's reachability challenge, and
-<code>GET /api/session</code>, <code>POST /api/signup</code>, <code>/api/login</code> and
-<code>/api/logout</code>.</p>
+<code>GET /api/session</code>, <code>POST /api/signup</code>, <code>/api/login</code> (and asking
+how a held sign-in went) and <code>/api/logout</code>. A few more must work before a session
+exists, each carrying its own proof: an invitation's page and its acceptance (the token is the
+proof), "Who's listening?" (<code>/api/profiles</code>, which a TV asks before anybody is signed
+in, and switching between the people kept on this device), a TV asking for a sign-in code and
+asking how it went, a TV being switched to somebody by a one-time code, and on a box the power
+button's password reset.</p>
+
+<h3>Before any of it: plain http only at home</h3>
+<p>One port speaks both plain HTTP and TLS, and with remote access on the router forwards both.
+So in front of everything, <code>OnlyHomeOverHTTP</code> (in <code>internal/servetls</code>)
+sends a plain-http GET or HEAD on to https unless the address typed only works inside the house -
+a private, loopback or link-local address, Tailscale's 100.64/10, a name with no dot, or one
+under <code>.local</code>, <code>.lan</code>, <code>.home</code> and the like. Anything else
+over plain http is refused, as its body has already crossed in the clear. It goes by the address
+typed, not by who asks, because under Docker Desktop every connection arrives from Docker's own
+gateway. The one exception is the name service's reachability check, which asks over plain http
+and follows no redirect.</p>
 
 <h3>The guarded mux</h3>
 <p>Everything else under <code>/api/</code> is mounted as
 <code>s.auth.Require(s.withUserContext(guarded))</code>. <code>Require</code> refuses a request
-without a valid session with 401. <code>withUserContext</code> then puts two things into the
-request's context: the account id (<code>source.WithUserID</code>) and what that account may
-reach (<code>source.WithAccess</code>).</p>
+without a valid session with 401. <code>withUserContext</code> then turns away three kinds of
+session before anything else runs, each with a 403 the apps recognise:</p>
+<ul>
+  <li><strong>Held to a new password</strong> (<code>{"mustRenew": true}</code>): the owner asked
+  everybody to choose one, or theirs no longer meets the rules. Only
+  <code>/api/account/password</code> answers until they do.</li>
+  <li><strong>Playing only</strong> (<code>{"limited": true}</code>): a TV switched to somebody from
+  their phone holds a session for playing, not for the account. It may do what playing does -
+  positions, plays, favorites, playlists, the player itself - and nothing else, owner routes
+  included, until that person chooses themselves in "Who's listening?" with their PIN or
+  password.</li>
+  <li><strong>The demo account</strong> (<code>{"demo": true}</code>, only when
+  <code>SOUNDSTORM_DEMO_USER</code> names one): the same kind of allowlist - a route added later is
+  refused to it until somebody decides it is harmless.</li>
+</ul>
+<p>Otherwise it renews the session, and puts two things into the request's context: the account
+id (<code>source.WithUserID</code>) and what that account may reach
+(<code>source.WithAccess</code>).</p>
 <div class="why">Access is enforced by the registry, not remembered by each handler.
 <code>Registry.All</code>, <code>Matching</code> and <code>ByID</code> all take a context, so a
 handler physically cannot reach a source without passing the request's context - and with it
@@ -68,7 +101,9 @@ every owner setting.</p>
 <h3>Logging</h3>
 <p><code>withLogging</code> records method, path, status and milliseconds for each request.
 Media, art, book resources and static files log at debug - a film is hundreds of requests and
-would bury everything else. It wraps the response writer in a <code>statusRecorder</code>, and
+would bury everything else. Paths that carry a secret - an invitation's token, a TV's sign-in
+code or id, a held sign-in's id - are logged with that part replaced by <code>...</code>, as the
+log's last lines go into a file people are told to send when setup fails. It wraps the response writer in a <code>statusRecorder</code>, and
 that recorder has an <code>Unwrap</code> method for a reason that cost months:
 <code>http.ResponseController</code> reaches the real connection only through wrappers that
 unwrap. Without it, every read deadline set behind the logger answered
@@ -92,16 +127,22 @@ set up - is the same <em>site</em>. So <code>sameOrigin</code> refuses any reque
 GET, HEAD or OPTIONS whose <code>Sec-Fetch-Site</code> is anything but
 <code>same-origin</code> or <code>none</code>, falling back to comparing <code>Origin</code> with
 the host. A request with neither header did not come from a browser page - the installer, curl,
-the Apple TV app - and carries no cookie a page could have borrowed.</p>
+the Apple TV app - and carries no cookie a page could have borrowed. Reads under
+<code>/api/</code> are guarded too, more lightly: a GET whose <code>Sec-Fetch-Site</code> is
+<code>same-site</code> or <code>cross-site</code> is refused, because some reads start work - a
+film's conversion, a song heard, a voice's sample - that another site's page could otherwise fire
+through a visitor's browser.</p>
 
 <h3>Body deadlines</h3>
 <p><code>bodyDeadline</code> gives any request that has a body thirty seconds to send it. Every
 body here except a file is a few hundred bytes of JSON, so that is generous, and it stops a
 client holding a connection open by sending a byte at a time. File uploads - <code>/api/upload</code>,
-a phone's photo backup, a piece of a photo download - get a rolling window instead
+a piece of a large upload, a phone's photo backup, a piece of a photo download - get a rolling window instead
 (<code>stallReader</code>): the deadline moves a minute forward only once 16KB has arrived since
 it last moved. A bad mobile link manages that easily; a trickle of one byte every fifty-nine
-seconds never does. An account may also have at most four uploads in flight.</p>
+seconds never does. An account may also have at most four uploads in flight (a phone's
+backups have an allowance of their own, 64, and are refused at once rather than held waiting,
+since a held request's unread body would stall the others sharing its connection).</p>
 
 <h2 id="no-readtimeout">Why there is no global ReadTimeout</h2>
 <p>The <code>http.Server</code> has a <code>ReadHeaderTimeout</code> of ten seconds, an
@@ -116,20 +157,25 @@ alone, which is exactly what <code>bodyDeadline</code> does.</p>
 <p>Some writes are cheap to send and expensive to receive - each rewrites a person's whole
 collections file, or <code>state.json</code> under the lock every request takes, or calls a
 service outside the house. Those go through an <code>allowance</code>: a per-person token bucket
-with a burst and a refill rate, put in front of a handler with
+with a burst and a refill rate (a few open routes key it by address instead), put in front of a handler with
 <code>s.limited(&amp;bucket, burst, every, handler)</code>. Past it the answer is 429, "too many
 changes at once; wait a moment".</p>
 <table>
   <tr><th>Allowance</th><th>Covers</th><th>Shape</th></tr>
-  <tr><td><code>listWrites</code></td><td>Favorites, playlists, custom covers, preferences</td><td>60, then one a second</td></tr>
+  <tr><td><code>listWrites</code></td><td>Favorites, playlists, photo albums and sharing them, custom covers, preferences, film matching and posters, episode numbering</td><td>60, then one a second</td></tr>
   <tr><td><code>plays</code></td><td>Recording a play (rewrites the collections file and appends to the listen log)</td><td>20, then one every 10s; dropped quietly past it</td></tr>
   <tr><td><code>positions</code></td><td>Reading positions (each rewrites <code>state.json</code>)</td><td>30, then one every 2s; the app keeps an unsynced copy and retries</td></tr>
   <tr><td><code>otherWrites</code></td><td>Audiobook positions sent to Audiobookshelf, the scrobbling token check, the read-along queue</td><td>per route</td></tr>
   <tr><td><code>nowPlaying</code>, <code>imports</code>, <code>plexPins</code>, <code>artUploads</code></td><td>"Playing now" to ListenBrainz, playlist imports, Plex sign-ins, cover uploads</td><td>per route</td></tr>
+  <tr><td><code>startAsks</code>, <code>sendAsks</code>, <code>photoChecks</code>, <code>checkAsks</code>, <code>pieceStarts</code></td><td>Work that starts something - a read-along sync, an ebook made, a voice sample, a photo import, taking photos sent; sending photos (ten, then one every 30 seconds); a phone's backup checks; checking names already taken; starting an upload in pieces</td><td>per route</td></tr>
+  <tr><td><code>keeps</code>, <code>playerCommands</code>, <code>guideAsks</code>, <code>reports</code>, <code>linkAsks</code>, <code>inviteTries</code></td><td>"Keep me on this device", commands to another player, the episode guide, playback reports, TV sign-in codes and invitation lookups (these two keyed by address, as nobody is signed in yet)</td><td>per route</td></tr>
 </table>
-<p>Other ceilings are not token buckets: at most four Jellyfin video conversions per person
-(<code>hlsSessions</code>), four uploads in flight, two password hashes at once across the whole
-server (see <a href="accounts.html">accounts</a>), and minimum gaps between library rescans.</p>
+<p>The tables behind them forget full buckets once they pass 1,024 entries and refuse newcomers
+past 100,000, so a flood of new names or addresses cannot grow them without end. Other ceilings
+are not token buckets: at most four live Jellyfin play sessions per person, counted per video as
+well (<code>hlsSessions</code>), four uploads in flight, two password hashes at once across the
+whole server (see <a href="accounts.html">accounts</a>), and minimum gaps between library
+rescans.</p>
 
 <h2 id="errors">Error conventions</h2>
 <ul>
@@ -142,6 +188,10 @@ server (see <a href="accounts.html">accounts</a>), and minimum gaps between libr
   <li><strong>Declining on purpose is not failing.</strong> An upload of something already in
   the library is a 409 ("already in your library"), and the app shows it as skipped, not
   failed. A full photo space is a 507.</li>
+  <li><strong>A refusal the app acts on says why in the body.</strong> Beside
+  <code>error</code>, a 403 carries <code>mustRenew</code>, <code>limited</code> or
+  <code>demo</code>, and the app shows the matching screen or message rather than a bare
+  "forbidden".</li>
   <li><strong>No secrets in errors.</strong> A transport error's text can carry the request
   address, and a Subsonic address carries its credential in the query; <code>httpx.Redact</code>
   strips it. Members see "did not answer"; the owner sees setup detail; the log gets the rest.
@@ -155,18 +205,18 @@ server (see <a href="accounts.html">accounts</a>), and minimum gaps between libr
 <h2 id="endpoints">Notable endpoints</h2>
 <table>
   <tr><th>Area</th><th>Endpoints</th></tr>
-  <tr><td>Session</td><td><code>GET /api/session</code> (signed in? secure name to move to? remote-access state), <code>POST /api/signup</code>, <code>/api/login</code> (202 and a pending id when a new device needs approval), <code>/api/login/pending/{id}</code>, <code>/api/logout</code>, <code>POST /api/account/password</code>, <code>PUT /api/account/pin</code></td></tr>
-  <tr><td>Devices and people</td><td><code>GET /api/devices/pending</code> and <code>POST /api/devices/pending/{id}</code> (allowing a new device), <code>GET /api/profiles</code>, <code>POST /api/profiles/switch</code>, <code>POST /api/profiles/keep</code>, <code>DELETE /api/profiles/{id}</code> ("Who's listening?"), <code>POST /api/link</code>, <code>GET /api/link/{id}</code>, <code>/api/link/{id}/qr.png</code>, <code>GET|POST /api/link/code/{code}</code> (signing a TV in from a phone), <code>GET|POST /api/invite/{token}</code> (accepting an invitation)</td></tr>
-  <tr><td>Players</td><td><code>POST /api/players/hello</code>, <code>/state</code>, <code>GET /api/players/{id}/next</code> (a long poll for commands), <code>POST /api/players/{id}/command</code>, <code>POST /api/players/switch</code> (playing on, and controlling, another device)</td></tr>
-  <tr><td>Setup and library</td><td><code>GET /api/setup</code> (backends getting ready), <code>GET /api/library</code> (counts, free space), <code>POST /api/library/rescan</code>, <code>GET /api/probe</code> (a link-speed sample)</td></tr>
+  <tr><td>Session</td><td><code>GET /api/session</code> (signed in? secure name to move to? remote-access state), <code>POST /api/signup</code>, <code>/api/login</code> (202 and a pending id when a new device needs approval), <code>/api/login/pending/{id}</code>, <code>/api/logout</code>, <code>POST /api/account/password</code>, <code>PUT /api/account/pin</code>, <code>PUT|DELETE /api/account/picture</code></td></tr>
+  <tr><td>Devices and people</td><td><code>GET /api/devices/pending</code> and <code>POST /api/devices/pending/{id}</code> (allowing a new device), <code>GET /api/profiles</code>, <code>POST /api/profiles/switch</code>, <code>POST /api/profiles/keep</code>, <code>DELETE /api/profiles/{id}</code>, <code>GET /api/profiles/{id}/picture</code> ("Who's listening?"), <code>POST /api/link</code>, <code>GET /api/link/{id}</code>, <code>/api/link/{id}/qr.png</code>, <code>GET|POST /api/link/code/{code}</code> (signing a TV in from a phone), <code>GET|POST /api/invite/{token}</code> (accepting an invitation)</td></tr>
+  <tr><td>Players</td><td><code>POST /api/players/hello</code>, <code>/state</code>, <code>GET /api/players/{id}/next</code> (a long poll for commands), <code>POST /api/players/{id}/command</code>, <code>GET|POST /api/players/{id}/ask/{ask}</code> (a TV in use asking whether to let somebody take over), <code>POST /api/players/switch</code> (playing on, and controlling, another device)</td></tr>
+  <tr><td>Setup and library</td><td><code>GET /api/setup</code> (backends getting ready), <code>GET /api/library</code> (counts, free space), <code>POST /api/library/rescan</code>, <code>GET /api/probe</code> (a link-speed sample), <code>POST /api/diagnostics/playback</code> (a playback report, on the developer's install)</td></tr>
   <tr><td>Search and browse</td><td><code>GET /api/search</code> (empty <code>q</code> browses a shelf), <code>GET /api/home</code>, <code>GET /api/continue</code>, <code>GET /api/genres</code>, <code>GET /api/books/pairs|authors|series</code>, <code>GET /api/tv/show</code>, <code>/api/tv/next</code></td></tr>
   <tr><td>Playing</td><td><code>GET /api/stream/{source}/{id}</code>, <code>GET /api/art/{source}/{id}</code>, <code>GET /api/playback/{source}/{id}</code> (direct or HLS, tracks, chapters, position), <code>PUT /api/playback/...</code> (audiobook position), <code>GET /api/hls/{source}/{path}</code>, <code>GET /api/bookhls/...</code> (a long audiobook in pieces), <code>GET /api/subtitle/...</code></td></tr>
-  <tr><td>Books</td><td><code>GET /api/book/manifest</code>, <code>/api/book/resource</code> (one file from inside an EPUB), <code>GET|PUT /api/book/progress</code>, <code>GET|POST /api/readalong</code>, <code>/api/voices/...</code> (making an audiobook or an ebook)</td></tr>
-  <tr><td>Music</td><td><code>/api/music/albums</code>, <code>/artists</code>, <code>/mixes</code>, <code>GET|POST /api/music/radio</code>, <code>/api/music/sound</code>, <code>/api/music/beats</code>, <code>/api/music/lyrics/...</code>, <code>POST /api/history</code>, <code>/api/scrobble</code>, <code>GET /api/recap</code></td></tr>
+  <tr><td>Books</td><td><code>GET /api/book/manifest</code>, <code>/api/book/resource</code> (one file from inside an EPUB), <code>GET|PUT /api/book/progress</code>, <code>GET|POST /api/readalong</code>, <code>POST /api/readalong/next</code>, <code>/api/voices</code>, <code>/api/voices/sample</code>, <code>POST /api/voices/make|make-ebook</code>, <code>/api/voices/jobs</code> (making an audiobook or an ebook, and its queue)</td></tr>
+  <tr><td>Music</td><td><code>/api/music/albums</code>, <code>/artists</code>, <code>/mixes</code>, <code>GET|POST /api/music/radio</code>, <code>/api/music/sound</code>, <code>/api/music/beats</code>, <code>/api/music/lyrics/...</code>, <code>POST /api/history</code>, <code>/api/scrobble</code>, <code>GET /api/recap</code>, <code>GET|PUT /api/training/song</code> (the developer's install only)</td></tr>
   <tr><td>Collections</td><td><code>/api/favorites</code>, <code>/api/playlists</code> (and items, move, import), <code>/api/plex/*</code>, <code>/api/myart</code>, <code>GET|PATCH /api/prefs</code></td></tr>
-  <tr><td>Uploads</td><td><code>POST /api/upload/plan</code> (where would these go?), <code>POST /api/upload/check</code> (names already taken), <code>PUT /api/upload?path=&amp;kind=</code> (one file as the whole body), <code>/api/drives/...</code> (a USB drive on a box)</td></tr>
-  <tr><td>Photos</td><td><code>/api/photos/people</code>, <code>/places</code>, <code>/on-this-day</code>, <code>/usage</code>, <code>POST /api/photos/backup/check</code>, <code>PUT /api/photos/backup</code>, <code>/api/photos/import</code> (resumable pieces), <code>/api/photos/months</code> and <code>/month</code> (the timeline), <code>/api/photos/albums</code> (albums and sharing them), <code>POST /api/photos/send</code> and <code>/api/photos/inbox</code> (sending photos to somebody)</td></tr>
-  <tr><td>Owner only</td><td><code>/api/users</code> (add, remove, reset password, libraries, photo limit), <code>POST /api/users/new-passwords</code> (everyone must choose a new password), <code>/api/invites</code>, <code>PUT /api/remote</code>, <code>/api/settings/lyrics|discovery|readalong|new-devices|server-name|web-name|findable</code>, <code>/api/books/pairs/not-same|by-hand</code>, <code>/api/films/...</code> (find the right film, its poster), <code>POST /api/move</code>, <code>POST /api/delete/preview</code>, <code>/api/delete</code>, <code>/api/delete/undo</code>, <code>/api/reset</code> (Start over and Erase, on a box)</td></tr>
+  <tr><td>Uploads</td><td><code>POST /api/upload/plan</code> (where would these go?), <code>POST /api/upload/check</code> (names already taken), <code>POST /api/upload/describe</code> (a name for a second file of the same name), <code>PUT /api/upload?path=&amp;kind=</code> (one file as the whole body), <code>/api/upload/pieces</code> (a large file in 8MB pieces), <code>/api/drives/...</code> (a USB drive on a box, owner only)</td></tr>
+  <tr><td>Photos</td><td><code>/api/photos/people</code>, <code>/places</code>, <code>/on-this-day</code>, <code>/of?type=</code> (videos, Live Photos, stills), <code>/usage</code>, <code>POST /api/photos/backup/check</code>, <code>GET /api/photos/backup/marker</code>, <code>PUT /api/photos/backup</code>, <code>/api/photos/import</code> (resumable pieces), <code>/api/photos/months</code> and <code>/month</code> (the timeline), <code>/api/photos/albums</code> (albums, and sharing, leaving and accepting them through <code>/api/photos/shares</code>), <code>POST /api/photos/save</code> (copies of a shared album's photos), <code>GET /api/photos/send-to</code>, <code>POST /api/photos/send</code> and <code>/api/photos/inbox</code> (sending photos to somebody)</td></tr>
+  <tr><td>Owner only</td><td><code>/api/users</code> (add, remove, reset password, libraries, photo limit, may make books), <code>/api/tvs</code> (TVs shared with the house), <code>/api/photos/limit-default</code>, <code>POST /api/users/new-passwords</code> (everyone must choose a new password), <code>/api/invites</code>, <code>PUT /api/remote</code>, <code>/api/settings/lyrics|discovery|readalong|new-devices|server-name|web-name|findable</code>, <code>/api/books/pairs/not-same|by-hand</code>, <code>/api/films/...</code> (find the right film or show, its poster), <code>/api/tv/numbering</code> and <code>/api/tv/guide</code> (numbering a show's episodes), <code>POST /api/move</code>, <code>POST /api/delete/preview</code>, <code>/api/delete</code>, <code>/api/delete/undo</code>, <code>/api/reset</code> (Start over and Erase, on a box), <code>/api/box/...</code> (a box's updates, time zone, switching it off)</td></tr>
 </table>
 <p>Item ids in paths are attacker-supplied and are treated as such: the hardened client in
 <code>internal/httpx</code> refuses absolute references, a second leading slash and dot segments

@@ -10,7 +10,7 @@
 <body data-page="clients/tv" data-root="..">
 <main>
 <h1>TVs</h1>
-<p class="lede">TV apps are the graveyard this project's notes warn about, and they were built
+<p class="lede">TV apps are where projects like this go to die (see <a href="../architecture/decisions.html#not">what EmberStorm does not do</a>), and they were built
 anyway, knowingly, in a shape that keeps them small: Android-family TVs run the same Android app
 with the web page in a TV mode, and the Apple TV - which has no web view at all - gets one native
 app that follows the same rules.</p>
@@ -23,6 +23,18 @@ app that follows the same rules.</p>
 </table>
 <p>The scope on both is watching, listening, photos and books. Settings, uploads and account
 management stay on a phone or computer.</p>
+
+<h2 id="shared">A TV belongs to the house, and plays for whoever sends</h2>
+<p>A TV is a player like any open page, and a phone can send it something to play. A TV signed in as
+the owner is the house's; anybody else's TV is offered to the others only once the owner chooses to
+share it ("Let everyone in the house play on Living room TV?"), and Settings, Devices lists the shared
+TVs with Stop sharing. Sending to a shared TV switches it to the sender - asked on screen first if
+somebody is using it - and that switch gives the TV a <strong>playback-only</strong> session: it plays
+what it is sent, keeps its places and favorites, but the person's People, passwords and other settings
+stay off it, and the server refuses those requests with a plain message. Choosing oneself in "Who's
+listening?" on the TV, with one's PIN or password, gives the full session. A TV's commands are taken
+only by the device that said hello as that TV, so another device cannot listen in on them. See
+<a href="../server/accounts.html#shared-tvs">shared TVs</a>.</p>
 
 <h2 id="android-tv">Android-family TVs</h2>
 <p>The Android app's manifest adds the <code>LEANBACK_LAUNCHER</code> category, a TV banner (drawn by
@@ -106,7 +118,7 @@ new back callback (see <a href="android.html#back">Android</a>).</p>
 <p>tvOS has no web view, so the page cannot be wrapped as it is on Android TV. The owner decided on a
 real Apple TV app rather than relying on AirPlay. It is a second target in the iPhone project, written
 in SwiftUI, with the same bundle id as the iPhone app so that Universal Purchase will make them one App
-Store listing; for now it is in TestFlight. What carries over is not code but every behaviour already settled for Android TV - OK
+Store listing; for now it is a public beta through TestFlight. What carries over is not code but every behaviour already settled for Android TV - OK
 plays and pauses, buttons fade after four seconds, the playing song first in the side bar, photos and
 books keep the music playing - so the app was built to those rules rather than working them out
 again.</p>
@@ -131,7 +143,8 @@ given the cookies explicitly (<code>AVURLAssetHTTPCookiesKey</code>), or the ser
   <tr><td>Who's listening?</td><td>The people kept on the TV, asked every time it opens, with their PINs (see <a href="../server/accounts.html#profiles">profiles</a>); Switch person in Settings.</td></tr>
   <tr><td>Account rules</td><td>A screen for choosing a new password when the account is held to one; while new devices need approval, a signed-in TV is asked to allow other sign-ins, and Back means "Not now", never "Don't allow".</td></tr>
   <tr><td>Servers</td><td>Several saved servers on the connect screen, shared code with the iPhone app (<code>ios/Shared</code>), and a server on the home network found by itself (<code>ServerDiscovery</code>).</td></tr>
-  <tr><td>Controlled from a phone</td><td>The TV is a player like any open page: it reports what it plays and obeys a phone's commands (play, seek, a look, subtitles, audio, quality), and asks before somebody else takes it over (<code>Remote.swift</code>).</td></tr>
+  <tr><td>Controlled from a phone</td><td>The TV is a player like any open page: it reports what it plays and obeys a phone's commands (play, seek, a look, subtitles, audio, quality), and asks before somebody else takes it over (<code>Remote.swift</code>). Switched to somebody from their phone, it only plays: a change the server refuses shows the server's own words, it does not offer to allow sign-ins, and its Settings say how to choose oneself for the full account.</td></tr>
+  <tr><td>Its address</td><td>Kept by a bare home address, the TV moves to the install's secure name once that answers, but only to a name of the same install.</td></tr>
 </table>
 <p>Crossfade is not built on the TV: it is off by default on the page and set per device, so the TV
 would need a setting of its own just to turn it on.</p>

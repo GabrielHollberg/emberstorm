@@ -84,6 +84,16 @@ The listener backs off and retries on accept errors rather than closing - runnin
 descriptors once restarted the server.</p>
 <p>Auto mode serves plain HTTP beside TLS even when it has no LAN address to name; falling back to
 https-only would have broken the <code>http://localhost</code> address the installer prints.</p>
+<p><strong>But plain HTTP answers only at home addresses.</strong> With remote access on, the router
+forwards the one port, both protocols included, so <code>http://</code> typed with the home's public
+address or the away name showed the sign-in page unencrypted to the internet.
+<code>OnlyHomeOverHTTP</code> now sends a plain-http GET or HEAD on to https unless the address typed
+only works inside the house (a private, loopback, link-local or Tailscale address, a name with no
+dot, or one under <code>.local</code>, <code>.lan</code>, <code>.home</code>,
+<code>.internal</code>, <code>.ts.net</code> and the like), and refuses any other method there. It
+judges the address typed, not who asked, because under Docker Desktop every connection arrives from
+Docker's own gateway. The name service's reachability check is the one path kept on plain http
+everywhere, as it asks that way and follows no redirect.</p>
 
 <h2 id="names">The name service</h2>
 <p>The only thing that removes the warning is a certificate somebody on the internet vouches for,
@@ -166,8 +176,12 @@ Settings, Devices, Your web address:</p>
   and kept as a DNS TXT record holding the install's id (still no database), first come first served.
   Claiming makes <code>yourname.home.emberstorm.app</code> and <code>yourname.net...</code> point at
   the install's own names, the install certifies them beside its code's, and from then the page moves
-  to the chosen name. The code's names stay underneath, never shown. Single common first and last
-  names are held back; asking for one says only that it is not available.</li>
+  to the chosen name. The code's names stay underneath, never shown, and every older bookmark keeps
+working. Single common first and last names are held back; asking for one says only that it is not
+available, exactly as for a taken one. Looking names up and claiming them are limited per install and
+per network, and a name let go is kept a month for the install that let it go, so a family's address
+cannot be taken the day after a change. A certificate already carrying the chosen name keeps it when
+a claim is refused once at start-up; the claim is tried again five minutes later.</li>
   <li><strong>Open my EmberStorm</strong> on emberstorm.app finds an install on the visitor's own
   internet connection: an install that allows it says so with its address announcements, and the
   names service keeps that in memory only. On a phone the button opens the app.</li>
@@ -206,7 +220,9 @@ somebody else:</p>
 record appears only when the install actually reached the service over IPv6. Audio to a device on
 a <code>*.net</code> name is paced (see <a href="streaming.html">streaming</a>). After a restart the
 remote name is read back from the certificate on disk, so a DNS-provider hiccup at start-up cannot
-drop it from the reissued certificate.</p>
+drop it from the reissued certificate. And a working away name is not dropped on one failed
+reachability check - the router's port may only just have opened after a restart: it is kept and
+checked again five minutes later, three times, before it leaves the certificate.</p>
 
 <h2 id="portmap">Opening the port, and knowing when you cannot</h2>
 <p><code>internal/portmap</code> opens the port on the router where it allows, in pure standard
@@ -219,6 +235,15 @@ the gateway (<code>SOUNDSTORM_GATEWAY</code>) - inside the container the default
 bridge, not the router. UPnP is used only to open this one port at the owner's request, follows no
 redirects, and with a gateway configured talks only to a device at that address. The name service's
 probe, not any protocol's reply, is the final word on whether the port opened.</p>
+<p><strong>Two servers in one house</strong> both default to 8099, and a router sends an outside
+port to only one machine. When UPnP says the port is taken (<code>ErrPortTaken</code>), the server
+asks for the next ports up, twenty at most (<code>FallbackPorts</code>), and keeps the one granted
+from then on; PCP and NAT-PMP grant a port of their own, which is used the same way. That outside
+port is what the reachability probe checks, what the away address and invitations carry, and what
+<code>/healthz</code> reports as <code>awayPort</code> so the apps can find the server from outside;
+the home address keeps 8099. A router with no automatic forwarding can be given a port by hand: the
+owner forwards, say, 8100 to this server's 8099 and enters it in Settings
+(<code>PUT /api/remote</code>, <code>outsidePort</code>).</p>
 <p>The router's own WAN address says when remote access cannot work at all, and
 <code>Maintainer.ExternalAddress</code> asks for it even when the mapping <em>succeeded</em> -
 because a router behind carrier-grade NAT opens the port without complaint, on an address the

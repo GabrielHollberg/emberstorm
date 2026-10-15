@@ -22,21 +22,33 @@ that holds it together, a single branch, was learnt from a bug that shipped.</p>
   <tr><td>Deploys</td><td>Yes - it is the only machine that does</td><td>No</td></tr>
 </table>
 <p>The PC deploys with:</p>
-<pre><code>docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build soundstorm
+<pre><code>SOUNDSTORM_BUILD_COMMIT=$(git rev-parse HEAD) SOUNDSTORM_BUILD_DATE=$(git log -1 --format=%cI) \
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build soundstorm
 sh scripts/after-deploy.sh
 git push</code></pre>
+<p>The two build settings are what Settings, About shows as the server's build; without them it says
+"a local build".</p>
 <p><code>after-deploy.sh</code> is the check that followed two deploys in one day that broke the app
 for the owner: the live server healthy and its page loading without a script error, then a throwaway
 test server (<code>scripts/smoke-stack.sh</code>, with generated media and an account of its own)
 given the new build and walked by a browser at phone, TV and computer size - a song plays, Photos
-opens, a film plays, a book opens, Settings opens. A screen it does not walk is not covered.</p>
+opens, a film plays, a book opens, Settings opens. A screen it does not walk is not covered. It also
+says whether GitHub's last image build passed, a failure failing the check: for three days a gofmt
+failure stopped every published image while the live server, built locally, hid it. A commit hook on
+both machines now refuses staged Go files gofmt would change.</p>
 <p>The dev override adds <code>build: .</code>, which the published compose file deliberately
 lacks so that it works in an empty folder for somebody who never cloned anything.</p>
 <p>Each session has its own memory, which the other never sees. So anything both must know - a
-decision, a reversal, a trap, a task handed over - goes into <code>CLAUDE.md</code>, the working
-notes at the root of the repository. Hand-offs are written there explicitly: a "For the PC" list
-from the Mac's security review, "For the Mac" notes when the Apple TV's song analysis had to
-follow a server change, each marked done when the other machine finished it.</p>
+decision, a reversal, a trap, a task handed over - goes into the working notes, which both read
+first. Hand-offs are written there explicitly: a "For the PC" list from the Mac's security review,
+"For the Mac" notes when the Apple TV's song analysis had to follow a server change, each marked done
+when the other machine finished it. The notes live in a private repository cloned beside this one,
+not here: they record everything, including open weak spots and details about the household, which
+belong nowhere public. What a reader of this repository needs from them is on this site.</p>
+<div class="note"><strong>Nothing private goes anywhere public.</strong> A commit hook
+(<code>scripts/private-check.sh</code>) refuses any commit, or commit message, containing a word
+from a private list kept outside the repository; made-up stand-ins are used in public text instead
+(<code>k3x9m2p7qa</code>, <code>yourname.home.emberstorm.app</code>, <code>192.168.0.50</code>).</div>
 
 <h2 id="main">Why main is the only branch</h2>
 <p>The apps used to live on branches of their own, <code>android-app</code> and
@@ -81,28 +93,43 @@ image, and checks the Windows setup file still has CRLF line endings. Only then 
   lowercase.</li>
   <li>Every action is pinned to a commit, not a tag - a moved tag in the publish job would push to
   the image every install pulls - and jobs get only the permissions they need.</li>
-  <li>A <code>v*</code> tag also creates the release. <code>EmberStorm.exe</code> is signed and
-  attached by hand on the PC, <code>EmberStorm.dmg</code> from the Mac; the README links to
-  <code>/releases/latest/download/EmberStorm.exe</code>.</li>
+  <li>Every image is also tagged with its commit (<code>sha-&lt;commit&gt;</code>), and GitHub signs its
+  build provenance, so a release can name the image built from an exact commit on main by digest and
+  check it was built by this workflow.</li>
 </ul>
-<p>Users update by running the installer again, which pulls the newer image. EmberStorm never
-updates itself.</p>
+
+<h3>Computer releases</h3>
+<p>A <code>v*</code> tag makes the release that people download.
+<code>scripts/desktop-release.sh</code> gathers the files the installers run and the compose file,
+with EmberStorm's image named by digest after its provenance is checked, and writes
+<code>desktop.json</code> listing each file's SHA-256. That list is signed with the release key, which
+lives on a hardware key and never on a computer - from the developer's phone, with the key held to
+it, over a private network (<code>android/signer</code>, <code>scripts/signing-helper.py</code>); the
+fingerprint is compared before signing, and the signature checked before it is kept.
+<code>EmberStorm.exe</code> is signed with the code-signing certificate and attached by hand on the PC,
+<code>EmberStorm.dmg</code> (signed and notarized) from the Mac, carried over unchanged when the Mac app
+has not changed. The README links to <code>/releases/latest/download/EmberStorm.exe</code>.</p>
+<p>Installs pick a release up at night by themselves, or when somebody updates; every installer checks
+the list and every file before running anything. The server never updates itself.</p>
 
 <h3>The Android app</h3>
 <p>Built on the PC from <code>android/</code> on main with <code>gradlew assembleDebug</code>,
 with <code>versionCode</code> raised every time so a phone installs over the last build. Published
 as a GitHub pre-release named <code>android-&lt;version&gt;</code>, <strong>never marked
 Latest</strong>, because Latest is where the README's installer link points. Nothing updates an
-installed copy by itself: each release is installed on the owner's phone, and on the projector by
-<code>adb install -r</code> over the network.</p>
+installed copy by itself: each release is installed by hand, and on a TV by
+<code>adb install -r</code> over the network. Builds for Google Play are app bundles signed with an
+upload key kept outside the repository.</p>
 
 <h3>The websites</h3>
 <p><code>.github/workflows/website.yml</code>, run by hand, publishes the public website
 (<code>web/</code>, emberstorm.app) with this documentation site under <code>/docs</code>.</p>
 
 <h3>The Apple apps</h3>
-<p>Archived on the Mac and sent to TestFlight. The Apple TV's release build is signed by hand with
-a distribution profile, because automatic signing first wants a development profile, which needs a
+<p>Archived on the Mac and sent to TestFlight, where a public beta group lets anybody try them; a
+build for that group is reviewed by Apple first, using a separate public demo server whose media is
+all free and which is put back every night. The Apple TV's release build is signed by hand with a
+distribution profile, because automatic signing first wants a development profile, which needs a
 registered Apple TV the team does not have.</p>
 
 <h2 id="owner">How the owner works</h2>
@@ -119,7 +146,7 @@ registered Apple TV the team does not have.</p>
   changed or copied.</li>
   <li><strong>Never print credentials.</strong></li>
 </ul>
-<p>That style shows throughout the notes: decisions are often recorded as "at the owner's asking",
+<p>That style shows throughout the notes and this site: decisions are often recorded as "at the owner's asking",
 and a reversal records what was reported ("glitching when lyrics load"), what was measured, and
 what changed - so the reasoning survives even when the behaviour is changed again later.</p>
 

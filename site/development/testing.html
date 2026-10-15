@@ -66,7 +66,7 @@ requires the walk to object.</div>
 <h2 id="stacks">Throwaway stacks</h2>
 <p>Most backend behaviour is verified against a real server, not a fake: a disposable compose
 stack that EmberStorm provisions by itself, with generated media - a two-minute film, a two-season
-show, a library with ReplayGain tags of 0, -5 and +8&nbsp;dB. The notes record versions: Jellyfin
+show, a library with ReplayGain tags of 0, -5 and +8&nbsp;dB. The versions checked: Jellyfin
 12.1.0, Audiobookshelf 2.36.1, Navidrome 0.64.1, Immich 3.2.2, AudioMuse-AI 3.6.3.</p>
 <div class="warn">A project name (<code>-p</code>) is not enough for a second stack. The compose
 file pins <code>container_name</code> on every service, which a project name does not namespace, so
@@ -101,6 +101,21 @@ exactly as the arrows do.</p>
 produce real ones, so the folder-walking code (<code>readEntries</code> until an empty batch) is
 tested with a fake entry tree.</p>
 
+<h2 id="fuzz">Fuzzing the file readers</h2>
+<p>Every reader of somebody else's bytes has a fuzz test (<code>fuzz_test.go</code> in
+<code>tags</code>, <code>epub</code>, <code>pdf</code>, <code>flac</code>, <code>photoimport</code>,
+<code>library</code>, <code>mp4hls</code> and <code>stream</code>; <code>go test -fuzz=FuzzX
+./internal/&lt;pkg&gt;</code>), run in a memory-capped container. What a run finds is kept as a test
+case under <code>testdata/fuzz</code>. <code>scripts/reader-css-check.js</code> does the same job for the
+reader's stylesheet cleaning, against crafted references.</p>
+
+<h2 id="linux-vm">Fresh machines</h2>
+<p><code>scripts/vmtest-linux.sh ubuntu|fedora|mint</code> starts a throwaway virtual machine from a
+distribution's cloud image, with a normal user and no terminal (so every question takes its default),
+runs the website's one command, checks the server, its containers and the files left behind, runs the
+uninstaller, and throws the machine away. It found that Fedora's cloud image has no cron, so the
+night's update was silently never set up.</p>
+
 <h2 id="smoke">The check after every deploy</h2>
 <p><code>scripts/after-deploy.sh</code> runs after every deploy: the live server healthy and its page
 loading without a script error, then a throwaway test server (<code>scripts/smoke-stack.sh</code>: its
@@ -108,7 +123,8 @@ own generated music, film, photos and the starter book, an account of its own, i
 volumes) given the new build and walked by a browser at phone, TV and computer size - a song plays and
 Now Playing opens, Photos shows and a photo and a video open, a film plays, a book opens, Settings
 opens. It was proved against the two bugs that prompted it, each put back on purpose and each caught.
-A screen it does not walk is not covered; a step is added when one is built.</p>
+A screen it does not walk is not covered; a step is added when one is built. Smaller walks for single
+features live beside it in <code>scripts/smoke/</code>.</p>
 
 <h2 id="real">Real media</h2>
 <p><code>scripts/fetch-test-library.ps1</code> builds about 750&nbsp;MB from Project Gutenberg,
@@ -139,7 +155,8 @@ Check the equivalent policy before adding any source.</div>
 <h2 id="ci">CI</h2>
 <p>Before any image is published, <code>publish.yml</code> requires:</p>
 <ul>
-  <li><code>gofmt</code> clean, <code>go vet ./...</code> and <code>go test ./...</code>;</li>
+  <li><code>gofmt</code> clean (also refused by the commit hook before anything is pushed),
+  <code>go vet ./...</code> and <code>go test ./...</code>;</li>
   <li>the certificate rehearsal against Pebble;</li>
   <li>the Tailscale serve config points at the <code>soundstorm-app</code> alias, not
   <code>soundstorm</code> (which inside the sidecar resolves to itself);</li>
@@ -148,6 +165,7 @@ Check the equivalent policy before adding any source.</div>
   <li><code>EmberStorm-Setup.cmd</code> still has CRLF on every line - counted against the line
   count, which also catches half a file converted.</li>
 </ul>
+<p>The published image carries signed build provenance, which releases check before naming it.</p>
 
 <h2 id="pace">How much to check</h2>
 <p>One real check per change, then commit. Long comparison runs and mutation testing are not done

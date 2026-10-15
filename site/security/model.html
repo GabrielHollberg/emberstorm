@@ -50,7 +50,13 @@ by the server under a lock, so two first sign-ups racing cannot both become owne
   <li>Switching person on a shared device ("Who's listening?") needs that person's PIN if they set
   one, and the owner's always; wrong PINs are counted before they are checked, and fifteen take the
   person off the device. A TV signed in from a phone is vouched for by that phone, with a one-time
-  code that lasts ten minutes.</li>
+  code that lasts ten minutes; a code that arrived by a link must be typed, never accepted unseen.</li>
+  <li><strong>A TV is shared only by the owner's choice</strong>, and only from the device it was
+  shared from; nobody can say hello under another device's player id, and a TV's commands go only to
+  the device that is that TV. Sending something to a shared TV switches it to the sender with a
+  <strong>playback-only</strong> session: owner routes and anything beyond playing, favorites and
+  places are refused, so a TV left on somebody cannot be used to reach their account. Choosing oneself
+  on the TV with a PIN or password gives the full session.</li>
 </ul>
 
 <h2 id="members">What a member can reach</h2>
@@ -63,7 +69,8 @@ limited to its own types - an id alone cannot cross from TV to films.</p>
 only library is that folder, so faces, places and search see their photos alone. The owner's own
 library leaves every member's folder out, so the owner does not see members' photos in the app
 either; photos pass between people only when sent or shared. Deleting, people, settings and remote access are the owner's routes, mounted behind an
-owner check.</p>
+owner check. A public demo account, where one is configured, may change only what an allowlist
+names - a route added later is refused to it until somebody decides it is harmless.</p>
 
 <h2 id="files">Files from other people</h2>
 <p>The most-tested boundary. A book's chapters are rendered in same-origin frames, so a script inside
@@ -98,6 +105,12 @@ tag walks capped, a zip that would unpack to far more than its size refused.</p>
 
 <h2 id="network">The network and the apps</h2>
 <ul>
+  <li>Plain http answers only at home addresses. A plain-http request to the away name or the home's
+  public address is redirected to https, and anything but a read is refused, so a password never
+  crosses the internet in the clear.</li>
+  <li>On a box, the power button's password reset needs a code shown only on the box's own screen or
+  printed on its label, from the home network only; erasing or starting over waits for presses of the
+  button at the box itself.</li>
   <li>Cross-site writes are refused on <em>origin</em>, not site - every install shares a parent
   domain until it is on the Public Suffix List.</li>
   <li>The local certificate authority is name-constrained to the install's own networks, so a leaked
@@ -105,15 +118,32 @@ tag walks capped, a zip that would unpack to far more than its size refused.</p>
   <li>The name service only ever names private addresses for the home name, and the public name only
   after it has reached the install itself.</li>
   <li>The phone apps follow the page to the install's secure name but never save a name a page asked
-  for; the Android app plays only the server's own addresses, sends cookies only to the host they
-  belong to, and lets only trusted apps control playback.</li>
+  for, and follow another name only when it answers as the same install from the same machine; photo
+  backup goes only to the server it was turned on for, over https. The Android app plays only the
+  server's own addresses, sends cookies only to the host they belong to, and lets only trusted apps
+  control playback (it needs Android 9 or later, where they can be told apart).</li>
 </ul>
 
-<h2 id="left">Accepted and open</h2>
-<div class="warn">Recorded rather than forgotten: images are pulled by tag and the Windows installer
-is unsigned; the name service's daily budgets can be spent by many networks until the domain is on
-the Public Suffix List; backends' database passwords are fixed defaults reachable only on the
-compose network; the Android app is signed with a test key.</div>
+<h2 id="supply">What runs, and where it came from</h2>
+<ul>
+  <li><strong>Signed releases.</strong> A computer install or update runs only a release whose
+  <code>desktop.json</code> - every script, the compose file and the Windows program, each with its
+  SHA-256 - is signed with the release key, checked by EmberStorm.exe, the Mac app and the Linux
+  updater before anything runs; an older release than the one installed is refused. The release key
+  lives on hardware keys, with a backup key kept apart. The Windows program is signed with a
+  code-signing certificate, and the Mac app is signed and notarized.</li>
+  <li><strong>Pinned images.</strong> Every backend image is pinned by digest, so a new release of a
+  backend reaches nobody until it has been tried and its digest committed. EmberStorm's own image is
+  built by CI, which signs its build provenance, and a release names it by digest after checking that
+  provenance names the very commit on main.</li>
+  <li><strong>Contained backends.</strong> Each media server has its own Docker network with only
+  EmberStorm on it (fixed subnets in <code>10.231.0.0/16</code>, clear of home routers); the photo and
+  mood databases sit on internal networks only their own app reaches; no container may gain privileges
+  after it starts. A taken-over backend cannot reach the others.</li>
+  <li><strong>Box updates</strong> are signed manifests with an expiry, installed only if newer, with
+  the data snapshotted first and everything put back if the release is not healthy or cannot reach
+  its update channel afterwards.</li>
+</ul>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

@@ -27,6 +27,9 @@ credentials it generated, and drives it through its API - so the person using Em
   <tr><td>Whisper</td><td>Speech to text</td><td>pinned by digest</td><td>Nothing to set up; fetches its model on first start</td><td>Writing an audiobook down, word by word, for Make an ebook</td></tr>
   <tr><td><a href="local.html">EmberStorm itself</a></td><td>Ebooks, documents</td><td>-</td><td>Nothing to provision; it scans the folders</td><td>EPUB and PDF metadata, covers, the reader's resources</td></tr>
 </table>
+<p>Every image is pinned by digest, never a moving tag: a backend's new release reaches installs only
+once it has been tried and its digest committed to <code>docker-compose.yml</code>, which updates
+fetch.</p>
 <p>Jellyfin is provisioned once and registered as two sources sharing one token -
 <code>jellyfin</code> (films) and <code>jellyfin-tv</code> (series and episodes) - because they are
 separate Jellyfin libraries with different scrapers. That is why <code>provision.buildSources</code>
@@ -104,9 +107,12 @@ That rule absorbs a surprising amount of disagreement, each found against a live
   <li><strong>Access is per kind</strong>: <code>Registry.All</code>, <code>Matching</code> and
   <code>ByID</code> take the request's context, which carries what the account may see, so a handler
   cannot reach a source without the restriction being applied.</li>
-  <li><strong>No backend publishes a port.</strong> Only EmberStorm's port is published; the backends
-  are reachable only on the compose network, and the shared HTTP client refuses absolute references,
-  dot segments and redirects to another host, since its headers carry admin keys.</li>
+  <li><strong>No backend publishes a port, and each has a network of its own.</strong> Only EmberStorm's
+  port is published. Each backend sits on its own Docker network with EmberStorm alone beside it (a
+  fixed subnet in <code>10.231.0.0/16</code>; AudioMuse-AI also reaches Navidrome), so one taken over
+  cannot reach the others, and no container may gain privileges after it starts. The shared HTTP client
+  refuses absolute references, dot segments and redirects to another host, since its headers carry
+  admin keys.</li>
 </ul>
 
 <h2 id="pages">Each backend</h2>

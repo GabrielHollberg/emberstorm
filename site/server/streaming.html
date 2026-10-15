@@ -181,8 +181,31 @@ Blu-ray's PGS are pictures and would render nothing.</p>
 <div class="warn">The HLS query reaches Jellyfin with EmberStorm's admin token, and several
 Jellyfin options write URLs carrying that token into the playlist that is piped back - HLS
 subtitle playlists, subtitles in the manifest, trickplay tiles. So every key containing
-"subtitle" is stripped from the query and <code>enableTrickplay=false</code> is forced. An
-allowlist would be better and waits on a full list of the keys Jellyfin's own playlists use.</div>
+"subtitle" is stripped from the query, <code>enableTrickplay=false</code> is forced, and the
+device id is always EmberStorm's own and any <code>liveStreamId</code> is dropped (either could
+reach another person's conversion). An allowlist would be better and waits on a full list of the
+keys Jellyfin's own playlists use.</div>
+<p>A film in several parts (Jellyfin stacks <code>- part1</code>, <code>- part2</code>) plays as
+one: the playback answer lists the parts and their lengths, a later part is playable once its film
+has been asked about, and the app plays them in turn with its place counted across the whole
+film.</p>
+
+<h2 id="bookhls">Long audiobooks in pieces</h2>
+<p>An audiobook kept as one MP4 (an <code>.m4b</code>) carries an index a player must read before
+the first sound, and an Audible book keeps it at the end - tens of megabytes for a very long book,
+which away from home meant half a minute of silence before a word. So a file whose index is 2MB or
+more (<code>mp4hls.MinIndex</code>) is offered as HLS made from the file itself: the playback
+answer says <code>mode: hls</code> with <code>/api/bookhls/&lt;source&gt;/&lt;item&gt;/&lt;track&gt;/index.m3u8</code>,
+and the server serves an init segment and ten-second fragments - a <code>moof</code> of the
+samples' sizes and durations and an <code>mdat</code> of the original bytes. Nothing is
+transcoded; only the sound track is kept. The playlist is sent gzipped, and a few books are kept
+open with their index in memory, opened two at a time and once per book however many ask.</p>
+<p>The index is somebody else's file, so it is read with limits: 256MB at most, 50 million
+samples, 200,000 fragments, no fragment of more than 20,000 samples - and every fragment is sized
+from the index before a byte is read (<code>SegmentLength</code>), refused over 16MB and then
+streamed as it is read rather than built in memory. A crafted file claiming one fragment is
+gigabytes is refused, as is one whose samples claim more than the file holds or whose time never
+moves. Downloads keep the file itself; a downloaded book plays its file.</p>
 
 <h2 id="guards">Active-content guards</h2>
 <p>Everything the proxy serves comes from EmberStorm's own origin, where the session cookie
@@ -211,7 +234,9 @@ door; see the <a href="../security/reviews.html">review passes</a>.</p>
 
 <h2 id="downloads">Downloads</h2>
 <p>The server does not package downloads; the app fetches the same addresses it would play and
-keeps them in the browser's Cache API. Songs are downloaded as originals (<code>streamPath</code>,
+keeps them - in the browser's Cache API, or, inside the Android and iPhone apps, in the app's own
+folder, which the phone never clears (the page hands each address to the app, which fetches it
+with the session's cookies from the server's own origin only). Songs are downloaded as originals (<code>streamPath</code>,
 never the converted <code>playPath</code>). A film the browser can play is kept as it is; one it
 cannot is kept as the HLS stream it would play - the playlist and every piece - at Standard
 quality unless the person chooses otherwise, since an original Blu-ray picture would be tens of

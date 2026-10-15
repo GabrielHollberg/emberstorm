@@ -120,7 +120,9 @@ there to go stale. See <a href="state.html">State and data</a>.</div>
 </ul>
 <p>EmberStorm also cannot update itself and should never learn how: it has no access to the Docker
 socket, which is the whole reason a compromise of it cannot reach the host. Updating is running
-the installer again.</p>
+the installer again - from a release signed with the project's release key, by hand or by the
+installers' own nightly job on the host, never by the server (see
+<a href="../operations/maintain.html#update">Updating</a>).</p>
 
 <h2 id="tailscale">Tailscale is opt-in</h2>
 <p>Reaching EmberStorm away from home can be done with a Tailscale sidecar
@@ -155,6 +157,9 @@ constraints are what keep it from becoming a trap:</p>
   <li><strong>Every failure falls back.</strong> Until a real certificate arrives, or if it never
   can, the local certificate authority serves exactly as before.</li>
 </ul>
+<p>The service also keeps, in DNS alone, the easier web names owners choose
+(<code>yourname.home.emberstorm.app</code>), and answers Open my EmberStorm on the website with the
+installs seen from the visitor's own internet connection, held in memory only.</p>
 <p>Answering DNS itself was the first design, but the host offers no UDP, and it would have made
 every lookup depend on the service's uptime. Writing ordinary records through the registrar's
 API is less clever and strictly more robust. The ACME client is the project's own

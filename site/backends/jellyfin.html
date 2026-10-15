@@ -102,8 +102,8 @@ restricted to its own types (cached ten minutes, since every HLS segment asks) -
 refused films could play one through the TV source. HLS paths must match the shapes Jellyfin's own
 playlists use; a doubly-encoded <code>..</code> once reached the admin API. And some options make
 Jellyfin write URLs carrying the admin token into the master playlist - HLS subtitles, subtitles in the
-manifest, trickplay tiles - so every subtitle key is stripped and <code>enableTrickplay=false</code> is
-forced.</p>
+manifest, trickplay tiles - so every subtitle key and any <code>liveStreamId</code> is stripped and
+<code>enableTrickplay=false</code> is forced.</p>
 
 <h2 id="missing">Deleted files</h2>
 <p>Jellyfin removes items for deleted files on its next validation - <em>unless the library folder is
@@ -114,8 +114,9 @@ empty, and <code>EnsurePlaceholders</code> writes them back before every scan. T
 <code>IsMissing=false</code>, so episodes Jellyfin manufactures for gaps in a series never appear.</p>
 
 <h2 id="version">Version</h2>
-<p>The image follows <code>latest</code>; everything above was checked against 12.1.0. Jellyfin's API has
-moved under EmberStorm before, so re-verify authentication and the HLS query keys when it changes.</p>
+<p>The image is pinned by digest at 12.1; everything above was checked against 12.1.0. Jellyfin's API has
+moved under EmberStorm before, so re-verify authentication and the HLS query keys before moving the
+pin.</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

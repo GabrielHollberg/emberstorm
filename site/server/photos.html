@@ -73,7 +73,21 @@ file of the same name beside it under a name for what makes it different (its ca
 was taken). The server is the one record of what was sent: the phones keep no list, and ask about
 every photo on each run; a photo deleted from a person's folder is remembered, so the phone does not
 send it back. These uploads are exempt from the 30-second body deadline, which
-would cut off a phone's video on a slow uplink.</p>
+would cut off a phone's video on a slow uplink, and each holds its size against the person's photo
+space as it starts, so many arriving at once cannot together pass the limit.</p>
+<p><strong>Checking only what is new.</strong> Asking about every photo on every run is about five
+hundred requests for fifty thousand photos. So <code>GET /api/photos/backup/marker</code> gives a
+short summary of the person's folder (<code>library.PersonalMarker</code>: a count and an order-free
+sum of each file's place and size) that changes when a photo is added, removed, renamed or replaced.
+A phone keeps the photos the server confirmed and the marker; while the marker holds it asks only
+about photos it has not confirmed or that were edited since, and it checks everything again when the
+marker moves, once a day, or when another server or account is chosen. The server stays the record.</p>
+<p><strong>A picture with no date inside it keeps the phone's date.</strong> Screenshots and saved
+pictures carry none, and Immich would date them by the file - the day they were backed up. The date
+the phone sends is written beside such a picture (and a video with a zero date header) as a sidecar,
+and a picture backed up before that rule is healed on the next check that names it. Immich reads a
+sidecar beside a photo it already has only when its sidecar job runs, so every date written asks for
+one, gathered into a single request a few seconds later.</p>
 <p><strong>The Android half</strong> (<code>PhotoBackup.kt</code>) runs as WorkManager jobs, so
 Android decides when (Wi-Fi only unless turned off, charging if asked) and it carries on with the app
 closed: one when a photo is added, one every six hours, each chaining the next while there is more,
@@ -119,7 +133,7 @@ anywhere on the window. <code>internal/photoimport</code> does the sorting.</p>
 <table>
   <tr><th>Source</th><th>Notes</th></tr>
   <tr><td>The download's own record</td><td>Takeout's JSON sidecars, found despite Takeout's naming (edited copies, "(1)" copies, names cut at 47 characters, album copies whose sidecar lives in the year's folder); iCloud's "Photo Details.csv", whose date has an unquoted comma; Facebook, Instagram and Flickr JSON.</td></tr>
-  <tr><td>EXIF</td><td>Found by its marker, so in a HEIC too (<code>ExifTaken</code>).</td></tr>
+  <tr><td>EXIF</td><td>Found by its marker; in a HEIC, where the EXIF is an item of its own often megabytes into the file, read where the file's index says it is (<code>ReadTaken</code>, <code>FileTaken</code>), a few small reads rather than the whole file.</td></tr>
   <tr><td>A date in the name</td><td><code>IMG_20191225_090000</code>, <code>PXL_...</code>, screenshots, WhatsApp's, Telegram's (<code>NameTaken</code>).</td></tr>
   <tr><td>The file's own date</td><td>In a download, if not the day of the download. For a dropped file, only a video's (a still's file date is when it was saved or scanned).</td></tr>
   <tr><td>Nothing</td><td><code>Undated/</code> - never today's month.</td></tr>
@@ -183,11 +197,15 @@ improved or moved: their folders are left exactly as they are. Such a photo then
   moving part plays over its still.</li>
   <li><strong>Albums</strong> are Immich's own, made in the person's own photo account, so as private
   as the photos.</li>
-  <li><strong>Send to...</strong> hands somebody else here a copy of some photos: they wait, and the
-  other person chooses <strong>Add to my photos</strong> (copies filed by date in their own folder) or
-  No thanks.</li>
+  <li><strong>Send to...</strong> hands somebody else here a copy of some photos
+  (<code>photosend.go</code>): they wait in <code>library/.photo-inbox/</code> (hard links where the
+  disk allows, so they take no room), and the other person chooses <strong>Add to my photos</strong>
+  (copies filed by date in their own folder, ones they already have skipped) or No thanks. Only one's
+  own photos can be sent, 500 at a time; unanswered sends go after 30 days.</li>
   <li><strong>Sharing an album</strong> lets others see it (or add to it) while they are in it -
-  the files stay the owner's - and <strong>Save to my photos</strong> makes real copies.</li>
+  the files stay the owner's - and <strong>Save to my photos</strong> makes real copies. It is
+  Immich's own album sharing between the people's photo accounts; nothing is pushed on anyone, as an
+  invitation is accepted or declined first (<code>photoshare.go</code>).</li>
 </ul>
 
 <h2 id="browse">People, Places and On this day</h2>

@@ -81,7 +81,16 @@ PDF would read its own metadata and land under a different author from its m4b.<
 depth, and anything dropped there is already folder-shaped. A film's <em>name</em> is tidied,
 though (<code>library/filmnames.go</code>): a disc ripper's <code>_t00</code> comes off, "PT. 1" or
 "Disc 2" at the end becomes Jellyfin's " - part1", and a loose film goes in a folder of its own name,
-so that Jellyfin finds its poster. Documents keep theirs too - a tax
+so that Jellyfin finds its poster. A disc ripper's every title of one film used to tidy to
+the same name and collide, so a drop holding several titles of one film is sorted by size: the
+largest is the film, one half its size or more a second version beside it (named, once its bytes
+are in, by what differs - its picture size or its length), and the rest go to the film's
+<code>extras/</code> folder as "Extra (12 min)", where Jellyfin shows them; an extra dropped later
+goes beside its film the same way. A TV drop with no episode numbers is numbered in the plan
+(<code>library/episodes.go</code>): the longest title, when as long as the others together, is a
+play-all and not kept; a much shorter one is an extra; the rest are episodes in rip order, named
+<code>Show/Season 01/Show S01E01.mkv</code> and numbered on from the show's last episode. The owner
+can do the same afterwards from a show's page. Documents keep theirs too - a tax
 form has no author, and <code>Taxes/2024/</code> is exactly how somebody finds it again.
 Pictures are sorted by date into each person's own folder, which has
 <a href="photos.html">its own page</a>.</p>
@@ -133,6 +142,13 @@ destination with the one each upload returns.</p>
 <p>The staged file is called something like <code>part-123456789</code>, so anything that looks
 at a name - the PDF title parser, the duplicate check's format - must use the <em>dropped</em>
 name. Twice a feature first read the staged name and got it wrong; both are now tested.</p>
+<p><strong>Big files go in pieces.</strong> A file over 64MB is sent 8MB at a time
+(<code>pieces.go</code>: <code>POST /api/upload/pieces</code> starts it,
+<code>PUT .../{id}?offset=</code> sends a piece, <code>GET</code> says how far it got,
+<code>DELETE</code> stops it). A failed piece is sent again after a pause, so a dropped connection or
+a phone changing network loses one piece rather than an hour's film; once the last is in the file is
+filed exactly as a one-piece upload is, moved into place rather than copied again. Unfinished uploads
+live in memory - eight an account, forgotten after six idle hours, swept at a restart.</p>
 <p>On the browser side, <code>walkEntry</code> must call <code>readEntries</code> until it
 returns an empty batch. It hands back at most a hundred at a time, and reading once silently
 truncates a large folder - the classic way to lose half an album.</p>
@@ -148,7 +164,10 @@ inherit the answer. A folder of nothing but companions names no shelf and is ski
 <code>Season 01</code> folder is television. A group of only images is pictures; images beside
 audio or a book are artwork. A video named the way a camera names it (<code>MVI_</code>,
 <code>PXL_</code>, <code>GOPR</code>, a date and time) is a clip for the photo shelf even on its
-own - the first test filed a camera's .MOV as a film. A file's own type may decide; a name may only
+own - the first test filed a camera's .MOV as a film. And a video planned as a film is looked
+inside once it has arrived (<code>tags.VideoCamera</code>): a phone or camera writes its make and
+model, where it was filmed, or a maker's own box, and a film never does, so such a home video goes
+to the person's photos by the date it was filmed instead (an encoder's own tag does not count). A file's own type may decide; a name may only
 ask: a folder called "Audiobooks" used to send every audio file in it there unasked, FLAC and all,
 and now raises the question instead.</p>
 <p>A drop that mixes shelves is <strong>split where its subfolders disagree</strong>
@@ -180,6 +199,9 @@ already used: an exact copy (compared by a sample of the file) is never sent, an
 asked about once - <strong>Keep both</strong>, Skip, or Replace (owner only, the old one to the bin).
 Kept both, the new one is named for what makes it different, never "(2)": "Dune (2021) -
 2160p.mkv", "IMG_0001 - iPhone 15 Pro.jpg", a song's bitrate, an audiobook's narrator.</p>
+<p>The app's own background uploads (Android and iPhone, which keep sending with the app put
+away) go through the same plan and the same <code>PUT</code>; only the sending moves out of the
+page.</p>
 <p><strong>Move to</strong>, in any item's menu (owner only, <code>POST /api/move</code>), refiles
 something put on the wrong shelf by the new shelf's own rule, never over a file already there.</p>
 
@@ -246,6 +268,20 @@ small card that is simply small from warning forever); <strong>critical</strong>
 Uploads always leave 1 GB free, refused up front when the size is known and mid-copy when it is
 not, because the library is often Docker's disk too, and a backend database that cannot write is
 a broken server, not a full shelf.</p>
+<p>Where EmberStorm's own data lives on another drive than the library - on a box, or a Linux
+computer - <code>/api/library</code> also reports that drive's space (<code>dataSpace</code>), and the
+app warns when it runs low; on Docker Desktop the container only sees Docker's own disk, so the
+Windows launcher checks the real drive instead.</p>
+
+<h2 id="drives">On a box: bringing a USB drive in</h2>
+<p>Most people's media is on a drive, and a browser over Wi-Fi is no way to move a terabyte. On a
+box, a USB drive plugged in is only noticed at first - its label, filesystem and size - and opened,
+read-only, by the box's own system once the owner taps <strong>Bring in what is on it</strong>
+(<code>drives.go</code>, owner only, as a drive may hold anybody's files). The page then plans it
+exactly as a drop, reading the little it needs from the drive through the server, and hands the plan
+back (<code>POST /api/drives/{id}/import</code>); the server copies each file through the same filing
+as an upload, one import at a time, carrying on with the page closed. Nothing on the drive is
+written.</p>
 
 <h2 id="rescan">Telling the backends to look</h2>
 <p>Every backend indexes on its own timer, so an uploaded file could sit unsearchable for up to

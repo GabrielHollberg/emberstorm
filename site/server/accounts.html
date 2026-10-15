@@ -20,7 +20,9 @@ restart.</p>
 choose which shelves each may see, change server settings and delete media. Everybody else is a
 <strong>member</strong>. That is the entire difference. A media server for a household does not
 need a permission matrix, and every role beyond these two is a decision somebody has to make
-about their family.</p>
+about their family. The one thing the owner can hand out is <strong>Can make audiobooks and
+ebooks</strong> (<code>User.CanMakeBooks</code>, People): making a book ties the server up for
+hours, so it is the owner's unless given.</p>
 <p>The owner is always unrestricted, whatever is stored for them. They are the only account that
 can change restrictions, so an owner who locked themselves out of a shelf would have no way
 back in.</p>
@@ -30,7 +32,8 @@ server. After that, only the owner adds accounts: with a password the owner choo
 <strong>Invite someone</strong> (People), which makes a QR code and a link shown once
 (<code>invites.go</code>). The person opens it, chooses their own password, and is signed in. An
 invitation works once, for seven days, at most twenty waiting, and the state keeps only a hash of
-its 128-bit token. Even the role of the
+its 128-bit token. An invited person signs in without <a href="#approval">device approval</a>:
+the owner vouched for them. Even the role of the
 first account is decided by the server: <code>AddUser</code> makes the first account the owner
 and everyone after a member under one lock, so two sign-ups racing on a fresh install cannot
 both become owner.</p>
@@ -46,7 +49,9 @@ nothing: the installers generate it into <code>.env</code> (<code>SOUNDSTORM_SET
 and open the browser at <code>/?setup=&lt;code&gt;</code>, and the page fills it in. The installer
 also shows it in full at the end, grouped in fours; case, spaces and dashes are ignored when
 typed (<code>NormalizeSetupCode</code>). With no installer, EmberStorm makes one up at each start
-and logs it until an account exists.</p>
+and logs it until an account exists. A box gets its code when it is made, kept on its storage
+drive so a reinstall keeps it, and printed on the label on its back as text and a QR code; a
+wrong code typed at a box says which box this is, in case two are on one network.</p>
 <div class="note">The page removes <code>?setup=</code> from the address once it knows it is
 staying, so the code is not left in history or a bookmark. That once ran too early: the page
 stripped the code, then moved itself to the install's secure name carrying an already-empty
@@ -75,7 +80,11 @@ costs a few hundred milliseconds per sign-in, which is the point.</p>
 </ul>
 
 <h2 id="sessions">Sessions and cookies</h2>
-<p>A session is a 256-bit random token in a cookie, valid for thirty days. The state file keys
+<p>A session is a 256-bit random token in a cookie, valid for thirty days - renewed while it is
+in use: past half its life every request extends it to a full thirty days again, and the page's
+own session check sends the cookie afresh (an app's player may drop a cookie sent on another
+answer). Before that, every TV, phone app and photo backup was signed out thirty days after
+signing in however much it was used; now only a device unused for thirty days is. The state file keys
 sessions by a <strong>SHA-256 hash</strong> of the token, never the token itself. That file is
 what a backup copies and what an old volume leaves behind with nobody running the server
 around it; with raw tokens as keys it was itself enough to sign in as anybody with a live
@@ -100,7 +109,7 @@ to pin every core of a Raspberry Pi with a handful of parallel requests.
 <code>internal/auth/throttle.go</code> answers that, and guessing, separately.</p>
 <table>
   <tr><th>Limit</th><th>Rule</th><th>Why</th></tr>
-  <tr><td>Hashing slots</td><td>At most two hashes at once, server-wide; a sign-in waits up to 10s for a slot</td><td>Protects the CPU whoever is asking.</td></tr>
+  <tr><td>Hashing slots</td><td>At most two hashes at once, server-wide, plus one more kept for devices that have signed in before; a sign-in waits up to 10s for a slot</td><td>Protects the CPU whoever is asking, without letting strangers who keep both shared slots busy hold the household out.</td></tr>
   <tr><td>Per address</td><td>5 free wrong passwords, then 1s, doubling, capped at 5 minutes; forgotten after an hour without failures</td><td>Slows a single guesser.</td></tr>
   <tr><td>Per account</td><td>10 free, then 2s, doubling, capped at 1 minute; counted for any name, existing or not</td><td>Per address is five guesses per address an attacker can borrow. The cap is short because it reaches the real owner too.</td></tr>
   <tr><td>One guess in flight per account</td><td><code>throttle.reserve</code></td><td>The wait was checked before hashing and a failure recorded after, so a burst sent at once all passed the check. Now a burst against one name waits on itself.</td></tr>
@@ -155,7 +164,10 @@ came from: behind Docker Desktop every connection looks alike, and a request's a
 own address can be faked. A password change retires every device token, so after one every
 other device asks again. Somebody with nothing else signed in - the owner on a new laptop - can
 approve with the setup code from the server's <code>.env</code>, since whoever can read the
-server's files owns it anyway; a code made up at start (no <code>.env</code>) cannot.</p>
+server's files owns it anyway - but only from the home network, never through the away-from-home
+name, as anybody who once saw the code on a box's label would otherwise get past approval from
+anywhere. A code made up at start (no <code>.env</code>) cannot. A held sign-in is also refused
+once the account's password has changed while it waited.</p>
 
 <h2 id="access">Which shelves somebody can see</h2>
 <p><code>User.Libraries</code> is a list of media kinds; <code>nil</code> means all of them,
@@ -235,6 +247,39 @@ fingerprint of their password's salt, so a new password takes them off every dev
   friend's phone, staying switchable would be staying signed in.</li>
 </ul>
 
+<h3 id="shared-tvs">Shared TVs, and sessions that may only play</h3>
+<p>Any open EmberStorm page is a player that a person's phone can send things to and control
+(<code>players.go</code>), and one rule keeps accounts apart: a device acts as one person, and only
+that person's phones control it. A TV is the exception - shared by its nature - but only once the
+owner shares it with the house (<code>state.SharedTVs</code>, by player id, tied to the device's
+own profile cookie; Settings, Devices, Shared TVs, at most fifty). A TV signed in as the owner is
+shared as it says hello; anybody else's is offered to the owner first. A page merely saying it is
+a TV, or saying hello under another player's id from another device, gets nothing: the server
+answers 409 and the page takes a new id.</p>
+<p>Sending something to a shared TV switches it to the sender: the TV is handed a one-time 128-bit
+code, for that TV only, and signs in with it (<code>POST /api/players/switch</code>), with what
+was sent waiting behind the switch. A TV in use asks first ("Sam wants to play something. Let
+him?"); no answer in fifteen seconds is a yes, a No holds that person off. A player's commands
+and its switch codes go only to the device that said hello as it, so nobody who once had the TV
+switched to them can read the next person's code from their own phone.</p>
+<p>The session such a switch makes is <strong>for playing only</strong>
+(<code>auth.PlaybackSessionFor</code>, <code>Session.Limited</code>). Anybody in the room has
+that person's music and films, never their account: <code>limitedMayChange</code> lets it keep
+places, count plays, change favorites and playlists and drive the player; every owner route, every
+other write, signing another TV in and allowing a new sign-in answer 403
+<code>{"limited": true}</code>. Choosing oneself in "Who's listening?" with one's PIN or
+password gives a full session.</p>
+
+<h3 id="demo">A demo account</h3>
+<p>On a public demo server, <code>SOUNDSTORM_DEMO_USER</code> names one account - never the
+owner's - that anybody may sign in as. It looks at and plays everything and changes only what a
+nightly reset puts back and nobody else sees: places, plays, favorites, playlists, albums of its
+own (not sharing them), its preferences, playing on a TV, signing a TV in. That is an allowlist
+(<code>demo.go</code>): a route added later is refused to the demo until somebody decides it is
+harmless. Everything else answers 403 <code>{"demo": true, "error": "This is a demo, so that
+can't be changed here."}</code>, and <code>/api/session</code>'s <code>demo</code> lets the page
+say it is a demo.</p>
+
 <h3>Per-member backend accounts</h3>
 <p>Two backends get an account per member, because what they remember is personal:</p>
 <ul>
@@ -245,8 +290,9 @@ fingerprint of their password's salt, so a new password takes them off every dev
   owner uses the shared administrator credential, or their own history would split in two.</li>
   <li><strong>Immich</strong> gives each member an account whose one library reads only their own
   photo folder (<code>provision.PhotoAccountFor</code>). Filtering one shared account would leak
-  faces, because Immich groups faces across every photo it can see. See
-  <a href="photos.html">photos</a>.</li>
+  faces, because Immich groups faces across every photo it can see. The owner keeps the
+  administrator's account, whose library leaves every other person's folder out, so the owner too
+  sees only their own and the household's shared photos. See <a href="photos.html">photos</a>.</li>
 </ul>
 <p>Navidrome and Jellyfin keep one shared account on purpose: favorites and watch positions are
 EmberStorm's own, so nothing surfaced from them differs per person. <code>source.WithUserID</code>
@@ -288,6 +334,15 @@ crash-loop on "permission denied". So the command stats the file <em>before</em>
 puts the ownership back afterwards. Sessions are left alone: recovering your own password is not
 evidence of a compromise, and signing every device in the house out would be its own small
 disaster.</p>
+<h3 id="button">On a box: the power button</h3>
+<p>A box sold to somebody has no terminal to run that in. There, the box's power button pressed
+five times quickly opens a fifteen-minute window (watched by the box's caretaker, not by
+EmberStorm) in which the sign-in screen can set the owner's password without the old one
+(<code>POST /api/reset/owner-password</code>). It also needs a code only somebody at the box has -
+the one the box's own screen shows, or the setup code on its label - checked, and the window
+closed, in one step by the caretaker; the new password must meet today's rules; and it is refused
+through the away-from-home name or from any connection that is not from the home network (on a
+box, one relayed from Docker's own networks does not count as home). Nothing is erased.</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

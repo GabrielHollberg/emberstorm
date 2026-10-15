@@ -10,8 +10,8 @@
 <body data-page="server/provisioning" data-root="..">
 <main>
 <h1>Provisioning with nobody logging in</h1>
-<p class="lede">A fresh install starts six media servers, every one of which normally wants a
-human to click through a setup wizard. Nobody does. <code>internal/provision</code> walks each
+<p class="lede">A fresh install starts six media servers (and two more programs for making
+books), every one of which normally wants a human to click through a setup wizard. Nobody does. <code>internal/provision</code> walks each
 backend's first run through its own API, keeps the credentials it made, and reconnects with them
 after every restart - without ever mistaking "not up yet" for "wrong password".</p>
 
@@ -26,6 +26,11 @@ without a human logging into a cloud service.</p>
 <code>targetsFromEnv</code> turns those into provisioning targets. Each gets its own goroutine in
 <code>Manager.Start</code>, so the server opens its port immediately and shows "Films and TV:
 Getting ready" while Jellyfin boots. Sources join the registry as each becomes ready.</p>
+<p>The compose file also keeps the backends apart from each other: each sits on a network of its
+own that only EmberStorm shares (AudioMuse also has Navidrome's, to read songs through it), each
+network on a fixed range so none can land on a home router's addresses, the databases on internal
+networks only their own app reaches, and every backend image pinned by digest, so a backend's new
+release reaches nobody until it has been tried and its digest put in the file.</p>
 
 <h2 id="backends">Each backend's first run</h2>
 <p>Every endpoint below was checked against a running server rather than taken from
@@ -72,9 +77,13 @@ on <code>/pictures</code>, mounted read-only, so Immich can never move, rename o
 Folder watching is switched on by reading <code>/api/system-config</code>, changing
 <code>library.watch.enabled</code> and sending the whole document back - a test holds that it
 changes nothing else. Members get an Immich account each whose one library is their own folder
-(<code>PhotoAccountFor</code>), made the first time they look, and the owner's library leaves every
-member's folder out by Immich's exclusion patterns (<code>SyncPhotoPrivacy</code>), kept in step as
-people come and go.</p>
+(<code>PhotoAccountFor</code>), made the first time they look - signed in to again, keeping its
+one library, if it is already there. The owner's library leaves every other person's folder out
+by Immich's exclusion patterns (<code>SyncPhotoPrivacy</code>), kept in step as people come and
+go, a minute after start and every ten minutes after. Nothing is put into somebody's own folder
+until the owner's library is known to leave it out (<code>PhotoFolderPrivate</code>): a photo
+library that is down or refusing holds a member's photos back rather than showing them in the
+owner's app.</p>
 
 <h3>Storyteller (read-along)</h3>
 <p>The first account is a Next.js server action on <code>/init</code>, which works as a plain
@@ -118,7 +127,9 @@ was refused as "already set up". Now every password, key and token a setup makes
 <code>Manager.secretsFor</code>: written to <code>state.json</code> (<code>SetupSecrets</code>)
 <em>before</em> the backend is told it, and the same one on every attempt. A retry that finds its own
 account already made signs in with the kept secret and carries on; <code>SetBackend</code> clears
-what was kept once the backend is saved. A backend that is already set up with <em>nothing</em> kept
+what was kept once the backend is saved. A backend set up again keeps each member's backend
+password as such an unfinished setup, so their account is signed in to if it is still there (a
+backend that only refused its key once) and made afresh if its data was reset. A backend that is already set up with <em>nothing</em> kept
 is still refused - carrying on is only for EmberStorm's own unfinished setup. Each person's own
 Audiobookshelf and Immich account works the same way, under its own name.</p>
 <div class="warn">Provisioning is not idempotent across a volume reset. If a backend's volume is

@@ -12,7 +12,11 @@
 <h1>Security</h1>
 <p class="lede">A media server for a household that can be reached from the internet, holding an
 administrator account on every backend behind it. This section says who it defends against, how,
-and what ten review passes found.</p>
+and what the review passes found.</p>
+<div class="note"><strong>Found a security problem?</strong> Please report it privately, not in a
+public issue: the repository's <strong>Security</strong> tab, <strong>Report a vulnerability</strong>
+(see <code>SECURITY.md</code>). Only the maintainer sees it, and a fix is made before the problem is
+described publicly.</div>
 
 <h2 id="shape">The shape of the problem</h2>
 <p>Three things make EmberStorm a bigger target than its size suggests:</p>
@@ -44,13 +48,19 @@ and what ten review passes found.</p>
   attacker would grow.</li>
   <li><strong>A background goroutine recovers.</strong> net/http protects only its own goroutines; every
   loop EmberStorm starts catches a panic, so one crafted file cannot take the server down.</li>
+  <li><strong>Only signed code runs on a computer.</strong> Installs and updates run only a release
+  whose list of files is signed with the release key, which lives on hardware keys; the server image
+  every release names is pinned by digest and its build provenance checked.</li>
+  <li><strong>Each backend is boxed in.</strong> Every media server runs in its own container on its
+  own network with only EmberStorm beside it, pinned by digest, with no new privileges allowed; only
+  EmberStorm's port is published.</li>
   <li><strong>A check that cannot see the failure is believed anyway.</strong> Tests go through the
   real route chain, and fixes are confirmed by reproducing the attack first.</li>
 </ul>
 
 <div class="cards">
   <a class="card" href="model.html"><b>Threat model</b><span>Who the attackers are, what each can reach, and the defence at each layer.</span></a>
-  <a class="card" href="reviews.html"><b>The review passes</b><span>Ten passes, most of them blind, and what each one found and fixed.</span></a>
+  <a class="card" href="reviews.html"><b>The review passes</b><span>Over a dozen passes, most of them blind, and what each one found and fixed.</span></a>
 </div>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>

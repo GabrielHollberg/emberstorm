@@ -1,19 +1,47 @@
-# SoundStorm for iPhone
+# EmberStorm for iPhone
 
-A native shell around the server's own web app, with background audio. Why
-it is built this way, and what comes next, is in `CLAUDE.md` under
-"The iPhone app".
+A native shell around the server's own web app, with its audio native. The
+page stays the one product, so every web change reaches the app at once; only
+what a web view cannot do well is native - music with the screen locked, the
+lock screen, photo backup, keeping downloads. More in the documentation site
+(`site/`). Anyone can try it through the public TestFlight beta:
+https://testflight.apple.com/join/b5st2jTN (on the App Store the listing is
+"EmberStorm Media"; the name under the icon is EmberStorm).
 
 Beyond showing the page, the iPhone app has:
 
+- **Its own player for songs and audiobooks** (`NativeAudio.swift`): the
+  page's `<audio>` is a stand-in that hands every song to an `AVQueuePlayer`,
+  so the lock screen, Control Center, headphones and a car work with the page
+  asleep, the songs ahead are handed over, the sleep timer and an
+  audiobook's place are kept by the app itself.
 - **Several saved servers.** The connect screen is **Your servers**: the latest
   used first, the one in use ticked, tap to switch, hold to rename or remove.
-  Each keeps its own sign-in. (`ios/Shared/ServerAddress.swift`, shared with the
-  Apple TV app.)
-- **Photo backup** (`PhotoBackup.swift`): the camera roll to the person's own
-  folder on the server, in a background `URLSession`, checking with the server
-  first so nothing is sent twice. Switched on in the page's Settings → Your
-  photos (Wi-Fi only, videos, only while charging), exactly as on Android.
+  Each keeps its own sign-in, carried between an install's home and away names.
+  (`ios/Shared/ServerAddress.swift`, shared with the Apple TV app.) Servers on
+  the home network are found (`ServerDiscovery.swift`), and a new box with no
+  owner yet offers **Set it up**, its setup code scanned or typed.
+- **Photo backup** (`PhotoBackup.swift`): the camera roll, Live Photos' moving
+  parts included, to the person's own folder on the server, handed ahead to a
+  background `URLSession` so it carries on with the phone locked, checking
+  with the server first so nothing is sent twice. A phone backs up to any
+  number of servers, one person each: the first to sign in to a server is
+  asked "Is this your iPhone?", and only whoever says yes gets the switch
+  there. Switched on in the page's Settings → Your photos (Wi-Fi only, videos,
+  only while charging), exactly as on Android; never for the public demo's
+  account.
+- **Downloads kept by the app** (`KeptFiles.swift`), in Application Support,
+  out of iCloud backups, never cleared by iOS; read back through
+  `emberstorm-kept://`. When the server cannot be reached the app opens its
+  kept copy of the page on the downloads, and loads the server again by itself
+  once it answers.
+- **Adding media** (`FileUploads.swift`): Add media picks from Photos or Files
+  and the app sends them in the background; a **Share extension**
+  (`SoundStormShare`) puts EmberStorm in the Share sheet.
+- **Links and the TV**: a TV's sign-in QR code, invitations and
+  `names.emberstorm.app/open` open the app (Universal Links, `AppLinks.swift`);
+  Settings scans a TV's code with the camera, and while the phone controls a TV
+  its volume buttons turn the TV's volume.
 
 ## Running it on your iPhone
 
@@ -30,25 +58,21 @@ Beyond showing the page, the iPhone app has:
 The bundle identifier is `dev.soundstorm.app`. If Xcode says it is taken,
 change it to something of your own under the target's **General** tab.
 
-## The thing to check first
+## The things to check on a real phone
 
-Play a song, lock the phone, and wait a minute:
+The simulator cannot answer these:
 
-- Does it keep playing?
-- Does the lock screen show the song, its cover, and working
-  play/pause/skip buttons?
-- Do headphone buttons and Control Center work?
-
-And for photo backup, which the simulator only partly answers: turn it on,
-take a few photos, put the app away overnight - did they all arrive?
-
-Stage two (native audio) is shaped by these answers. The simulator cannot
-answer them.
+- Play a song, lock the phone, and wait: does it keep playing and move on, and
+  do the lock screen, headphone buttons and Control Center work?
+- Photo backup: turn it on, take a few photos, put the app away overnight -
+  did they all arrive?
+- Download a song, then turn the network off and open the app: does it open
+  on the downloads, and come back to the server by itself once online?
 
 ## Apple TV
 
 The **SoundStormTV** scheme builds the Apple TV app, a native SwiftUI app in
-the same project (tvOS has no web view), with the same bundle id for Universal
+the same Xcode project (tvOS has no web view), with the same bundle id for Universal
 Purchase. It talks to the same `/api` the web page uses and follows the rules
 settled for Android TV. What it has: Home, Music (mixes, radio and moods,
 playlists, artists, albums, Now Playing with the twelve visualizers and
@@ -60,7 +84,12 @@ account's own categories in its order. Signing in can be done from a phone
 listening?** each time it opens, among the people kept on it, with their PINs.
 It waits for approval where new devices need it, asks to allow other devices'
 sign-ins, and shows the screen for choosing a new password when the account is
-held to one. Settings and anything that changes the library stay on the web.
+held to one. It finds servers on the home network, and moves from a plain
+address to the install's secure name by itself. A phone can control it (play
+on the TV, step its photos, choose its film's subtitles, audio and quality);
+switched to somebody from their phone, the TV only plays until that person
+chooses themselves there with their PIN or password. It is laid out like the
+Google TV app. Settings and anything that changes the library stay on the web.
 
 Run it on the Apple TV simulator from Xcode, or on a real Apple TV paired with
 Xcode (Settings → Remotes and Devices → Remote App and Devices on the TV).
@@ -83,7 +112,7 @@ A debug build takes launch arguments, for a simulator with no remote:
 | `-autophoto YES`, `-autostep YES` | opens the first photo, then steps and pauses the music |
 
 ```sh
-xcrun simctl launch booted dev.soundstorm.app -serverURL https://yourname.home.soundstorm.dev:8099 -autoplay YES
+xcrun simctl launch booted dev.soundstorm.app -serverURL https://yourname.home.emberstorm.app:8099 -autoplay YES
 ```
 
 ## TestFlight
@@ -108,8 +137,10 @@ issuer>` (the key the Mac app is notarized with; done so 2026-10-12).
 
 The build number is raised by the upload itself (`manageAppVersionAndBuildNumber`),
 so nobody edits it by hand. Apple takes 10-30 minutes to process a build
-before it shows in the TestFlight app. Uploads are internal-testing only
-until the app goes to review.
+before it shows in the TestFlight app. Every upload goes to the internal
+group; add it to the **Public beta** group for the public link to get it (a
+new version needs Apple's beta review again, a new build of the same version
+usually not).
 
 What blocked the first upload, in order, so it is quicker next time:
 "Failed to Use Accounts" (Xcode's sign-in had lapsed - sign in again under
@@ -147,7 +178,12 @@ xcodebuild test -project ios/SoundStorm.xcodeproj -scheme SoundStorm \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-The tests skip themselves when nothing answers at `localhost:8080`.
+The tests skip themselves when nothing answers at `localhost:8080`
+(`testSetUpANewBoxFromThePhone` wants a brand-new server on port 8099).
+`DemoReviewTests` walks Apple's reviewer's path through the public demo
+server; its address and account are passed in as `TEST_RUNNER_DEMO_ADDRESS`,
+`TEST_RUNNER_DEMO_USER` and `TEST_RUNNER_DEMO_PASSWORD`, never written here,
+and it skips itself without them.
 
 ## Icons
 

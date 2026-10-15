@@ -99,7 +99,11 @@ Details of the API's sharp edges - <code>progress</code> not derived from <code>
 <code>isFinished: false</code> resetting a book to zero - are on the
 <a href="../backends/audiobookshelf.html">Audiobookshelf page</a>.</p>
 <p>A book is its files on one clock: <code>source.TrackLister</code> reports each file with its
-<code>StartSeconds</code>, so "two hours in" converts to a file and an offset.
+<code>StartSeconds</code>, so "two hours in" converts to a file and an offset. Inside the Android
+and iPhone apps the app's own player saves the place itself - every ten seconds while playing and at
+every stop - because the phone sleeps the page while a book plays on with the screen off. A place
+carries when Audiobookshelf last recorded it, so a place kept offline on one device wins only when it
+is newer than the server's.
 <code>source.ChapterLister</code> sends Audiobookshelf's own chapter list, which names the marks inside
 a single m4b as well as one file per chapter - so a single-file book has navigation too. Without a
 chapter list, the files stand in. Books in progress appear in the Continue row through
@@ -109,7 +113,9 @@ Audible .m4b keeps its index at the end, and a long one's is big (33.5&nbsp;MB f
 a player fetched the whole index before a word - 33 seconds away from home. A file whose index is
 2&nbsp;MB or more is offered as HLS made from the file itself: an init segment and ten-second pieces
 holding the original bytes, remuxed, nothing transcoded. Measured on the 52-hour book: sound in
-0.7&nbsp;s, a jump to hour 50 in 0.6&nbsp;s. Downloads keep the file.</p>
+0.7&nbsp;s, a jump to hour 50 in 0.6&nbsp;s. Each piece is sized from the index before it is read
+and refused over 16&nbsp;MB, so a crafted file cannot make one enormous; more on the
+<a href="streaming.html#bookhls">streaming page</a>. Downloads keep the file.</p>
 
 <h2 id="pairs">Read Along: finding pairs</h2>
 <p><code>GET /api/books/pairs</code> lists what somebody has as both an ebook and an audiobook. It
@@ -171,10 +177,13 @@ and choosing between several versions of one book.</p>
 <h2 id="downloads">Downloads</h2>
 <p>Downloading is the web app's (the Cache API, with an index in local storage), but the server shapes
 it. Audiobooks, ebooks, documents and Read Along pairs download - both halves, plus a synced book's
-text without its copy of the audio, and its timeline. Everything is keyed by the address the app would
-ask the server for, so one index and one Remove serve every kind. Listening and reading positions are
-kept on the device too, marked unsynced until a save reaches the server, and an unsynced one wins on the
-next open. The reader reads a downloaded book from the cache before asking the server at all.</p>
+text without its copy of the audio, and its timeline. Inside the Android and iPhone apps the files are
+kept in the app's own folder instead, which the phone never clears. Everything is keyed by the address
+the app would ask the server for, so one index and one Remove serve every kind. Listening and reading
+positions are kept on the device too, marked unsynced until a save reaches the server; on the next
+open the device's copy is used, and sent, only when it is newer than the server's
+(<code>updatedAt</code>), so a book read further elsewhere since is never pulled back. The reader
+reads a downloaded book from the cache before asking the server at all.</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

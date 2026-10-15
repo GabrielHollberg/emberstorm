@@ -43,12 +43,31 @@ docker run --rm -v "//h/dev/soundstorm:/src" -w /src golang:1.27-alpine go test 
 
 Every push to `main` runs `.github/workflows/publish.yml`, which tests and
 builds multi-arch images (amd64 and arm64) to
-`ghcr.io/gabrielhollberg/soundstorm` as `:latest`. Releases are tags: pushing
-`vX.Y.Z` also publishes that version and makes the GitHub release.
-`EmberStorm.exe` is signed and attached by hand on the PC (and `EmberStorm.dmg`
-from the Mac); the README's download link is
-`/releases/latest/download/EmberStorm.exe`, so it always follows the newest
-release.
+`ghcr.io/gabrielhollberg/soundstorm` as `:latest`, and also tags each build
+`sha-<commit>` with a provenance attestation GitHub signs - a box's build and
+releases take EmberStorm's image only by that tag and digest, checked
+(`box/app-image.sh`), never `:latest`. Pushing a tag `vX.Y.Z` also publishes
+that version and makes the GitHub release. The commit hook
+(`scripts/private-check.sh`) refuses Go files gofmt would change, as CI does.
+
+**A computer release is a signed list, not the branch.**
+`scripts/desktop-release.sh` writes `desktop.json` - `install.ps1`,
+`install.sh`, the compose file with EmberStorm's image pinned by digest, and
+`EmberStorm.exe`, each by its SHA-256 and with a serial that only goes up - and
+the release key signs it on a YubiKey (`box/yubikey.py sign`, or from a phone
+with `android/signer/`). `EmberStorm.exe` (`cmd/emberstorm-setup`, signed by
+hand on the PC with a code-signing certificate), the Mac app and the Linux
+updater (`emberstorm-update.sh`, left by `install.sh`) all check that list
+against the keys built into them (`internal/desktoprelease`, the same keys as
+`box/release.pub`) and every file against it before running anything, and
+refuse a release older than the one installed. `EmberStorm.dmg` comes from the
+Mac and is carried over from release to release. The README's download links
+are `/releases/latest/download/EmberStorm.exe` and `.../EmberStorm.dmg`, so
+they always follow the newest release. `EmberStorm.exe` runs an `install.ps1`
+lying beside it only when `EMBERSTORM_LOCAL_INSTALLER=1` is set and a `.git`
+folder is there too (a developer's checkout); otherwise only the checked
+release. Android builds are GitHub pre-releases named `android-<version>`,
+never Latest.
 
 ## How it works
 
@@ -94,6 +113,8 @@ transcoding. Video never will be.
 ```
 cmd/soundstorm/        main, env config, subcommands (backup, restore, reset-password, train-looks)
 cmd/soundstorm-names/  the name service behind *.emberstorm.app
+cmd/soundstorm-caretaker/  the box's root helper (internal/caretaker)
+cmd/emberstorm-setup/  EmberStorm.exe, the signed Windows download
 internal/media/        Item, Query, Kind - the shared vocabulary
 internal/source/       the Source interface, optional interfaces, Registry
 internal/source/*/     one package per backend (subsonic, jellyfin, audiobookshelf,
@@ -124,11 +145,18 @@ internal/httpx/        the hardened HTTP client every adapter uses
 internal/qr/           QR codes for signing a TV in and inviting people, no dependency
 internal/voices/       making audiobooks (Kokoro) and ebooks (Whisper)
 internal/mp4hls/       long single-file audiobooks served in pieces (HLS)
-internal/caretaker/    the box's helper: updates, Start over, the power button
+internal/caretaker/    the box's helper: updates, Start over, the power button, USB drives
+internal/desktoprelease/  checking a signed computer release (desktop.json)
+internal/episodeguide/ TVmaze, for checking a show's episode numbering
+internal/version/      the build's commit and date, shown in Settings, About
 internal/starter/      the starter library bundled into the binary
 android/               the Android app (phones and TVs); see android/README.md
 ios/                   the iPhone and Apple TV apps; see ios/README.md
+mac/                   the Mac setup app; see mac/README.md
+box/                   the box's system image, USB stick and releases; see box/README.md
+install.ps1, install.sh   the Windows and the Mac and Linux installers
 site/                  the documentation website: how it all works, in depth
+web/                   the website, emberstorm.app
 ```
 
 ## Adding a backend
@@ -156,8 +184,12 @@ The second half is the one people skip, and the one that matters.
   which passes settings by name.
 - **Fail loudly at startup, degrade gracefully at runtime.**
 - `gofmt` clean, `go vet` clean, tests pass.
-- Backend images are pinned where their APIs move (Immich by major version,
-  Storyteller, AudioMuse-AI, Kokoro and Whisper by digest).
+- Every backend image is pinned by digest in `docker-compose.yml` (most with their
+  version in a comment); only EmberStorm's own is a tag. A new backend
+  version reaches nobody until it is tried and its digest put there.
+- Each backend has a network of its own with EmberStorm alone, on a fixed
+  /24 in 10.231.0.0/16. **Any new compose network needs a fixed subnet**:
+  Docker otherwise may hand out the home router's own range.
 
 ## API
 
@@ -168,15 +200,26 @@ sign-up, sign-in and sign-out, `/api/session`, `/api/remote-reachable`,
 anybody is signed in on it: waiting for a new device's approval
 (`/api/login/pending/{id}`), "Who's listening?" (`GET /api/profiles`,
 `POST /api/profiles/switch`), signing a TV in from a phone (`/api/link`),
-accepting an invitation (`/api/invite/{token}`), and, on a box, the power
+accepting an invitation (`/api/invite/{token}`), a phone handing a TV to its
+person (`/api/players/switch`, with a one-time code), and, on a box, the power
 button's password reset (`/api/reset/...`).
-Owner-only routes are mounted separately, and cross-site writes are refused.
+Owner-only routes are mounted separately (a route registered for the owner
+must also be mounted, or it answers 404), and cross-site requests are refused.
+A TV switched to somebody from their phone gets a playback-only session: owner
+routes and most writes answer 403 with `"limited": true` until that person
+chooses themselves there with their PIN or password. The demo account
+(`SOUNDSTORM_DEMO_USER`) may change only what an allowlist names; anything else
+answers 403 with `"demo": true`.
 An account held to choosing a new password gets a 403 with `"mustRenew": true`
 from every guarded route but `/api/account/password`. A search always answers 200: check
 `degraded` and `sources` for what was missing.
 
 ## Notes
 
+- Plain http answers only at home addresses (a LAN address, a name with no
+  dot, `.local` and the like): a request from the internet to the away name or
+  the public address is sent on to https (`servetls.OnlyHomeOverHTTP`), except
+  the names service's reachability check.
 - The module path is still `github.com/GabrielHollberg/soundstorm`, though the
   repository is now `github.com/GabrielHollberg/emberstorm`: internal names
   keep "soundstorm".

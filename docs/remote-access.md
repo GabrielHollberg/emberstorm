@@ -166,6 +166,22 @@ router that ignores what it was sent — remote access still works with a
 hand-forwarded port; the automatic step just does nothing, and the reachability
 probe reports the port closed until it is forwarded by hand.
 
+**Two servers in one house.** A router forwards an outside port to one machine
+only, so a second install asking for 8099 is refused. When UPnP says the port
+is already taken (error 718), the install asks for the next ports up, up to
+twenty, and keeps the one granted; PCP and NAT-PMP grant a port of their own,
+which is used the same way. The router's outside port is what the reachability
+probe checks and what the away address, invitations and Settings show, and the
+install tells the name service and the apps (`/healthz`'s `awayPort`), so a
+phone falling back to the away name uses it. Where nothing can be mapped
+automatically, the owner can forward another outside port (say 8100) to the
+server's 8099 by hand and enter it in Settings (Reach it from anywhere).
+
+**A working away name is not dropped on one failed check.** Found unreachable
+after it had been working (a restart, the router's port just reopening), the
+name is kept and checked again five minutes later, three times, before it
+leaves the certificate.
+
 The next piece is Stage 3 (IPv6), below.
 
 ### Stage 3 — IPv6
@@ -227,6 +243,15 @@ Since then: passwords must be at least 12 characters and not a common one, the
 owner can make every new device wait for approval from one already signed in
 (so a guessed or leaked password alone opens nothing), and the owner can ask
 everybody for a new password.
+
+**Plain http is for home addresses only.** The one port speaks http and https,
+and with remote access on the router forwards both. A plain-http request to an
+address that reaches the server from the internet - the away name, a chosen
+name, the public address - is sent on to https (`servetls.OnlyHomeOverHTTP`),
+and anything but GET and HEAD is refused, as its body has already crossed in
+the clear. LAN addresses and names only a home network answers stay on http
+(a new install is first opened that way), and so does the name service's
+reachability check, which asks over plain http and follows no redirect.
 
 ## Open questions
 

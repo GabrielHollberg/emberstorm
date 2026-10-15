@@ -11,7 +11,7 @@
 <main>
 <h1>iPhone</h1>
 <p class="lede">The iPhone app exists so EmberStorm can be on the App Store rather than only a
-home-screen web app (it is in TestFlight for now, not yet on the store). It is a native Swift shell
+home-screen web app (for now it is a public beta through TestFlight, not yet on the store). It is a native Swift shell
 around the server's own page, with songs and audiobooks played by the app's own native player - and
 a deliberate decision not to rewrite the app in Swift.</p>
 
@@ -70,7 +70,8 @@ moment it did. Not saving also closes a hole a security review found: from a pla
 anybody on the same Wi-Fi could otherwise have pinned the app to a server of their own. A move to
 a different name of the same install - its owner's chosen name, such as
 <code>yourname.home.emberstorm.app</code> - is followed only when both addresses' <code>/healthz</code>
-answer with the same install id.</p>
+answer with the same install id - and, from a plain-http address, only when both names resolve to the
+same machine, since an id is only what a server says of itself.</p>
 
 <h2 id="status-bar">The status bar in Now Playing</h2>
 <p>The status bar hides while Now Playing is open, and only then - the owner's choice. Android hides
@@ -79,11 +80,27 @@ the time, so everywhere else it stays. The app watches the page's body for the
 <code>np-open</code> class from its document-start script rather than being told by
 <code>app.js</code>, so the feature needed no change to the web app and no server deploy.</p>
 
-<h2 id="no-sw">No service worker, and what that costs</h2>
-<p>A <code>WKWebView</code> runs a service worker only for App-Bound Domains: a fixed list of at most
-ten, set when the app is built. Every install has its own address, so the list cannot name them. The
-practical result is that opening the app with no connection shows the "can't reach" screen rather
-than the downloads. That is expected, not a bug in the shell.</p>
+<h2 id="kept">Downloads kept by the app, and opening offline</h2>
+<p>A <code>WKWebView</code> runs a service worker only for App-Bound Domains, and listing the two
+zones there would have shut the app out of every other address (a new box's plain first page, a typed
+IP, a Tailscale name). And iOS may clear a web view's storage - where a browser keeps downloads - when
+the phone is short of space or a site goes unused. So the app keeps downloads itself
+(<code>KeptFiles.swift</code>), in its own folder (<code>Application Support/Kept/&lt;host_port&gt;/</code>),
+which iOS never clears and which is left out of iCloud backups:</p>
+<ul>
+  <li>The page hands every download to the app (<code>soundstormApp.keep</code>); the app fetches each
+  file in a background session with the session's cookies, never following a redirect off the server,
+  so a download finishes with the app put away.</li>
+  <li>The page reads a kept file back at <code>emberstorm-kept://&lt;host:port&gt;/&lt;path&gt;</code>, which
+  the app answers itself with the file's type and byte ranges.</li>
+  <li>A kept song or audiobook is played by the app's own player from its file, with the lock
+  screen.</li>
+  <li>When the server cannot be reached, the app opens the page's own kept copy on its downloads, with
+  an offline bar and Change server, from whichever of the install's addresses holds them. It looks for
+  the server by itself (every 15 seconds for two minutes, then every minute, and at once on coming to
+  the front or the network returning) and loads it again as soon as it answers. A certificate refused
+  or a crashed page reaches the same fallback.</li>
+</ul>
 
 <h2 id="stage-two">Stage two: native audio</h2>
 <p>Reported from a real iPhone: paused on the lock screen, the music could not be started again
@@ -99,8 +116,10 @@ behind a stand-in on the page's <code>&lt;audio id="audio-player"&gt;</code>, sp
   <li>The songs ahead are handed over, so the player moves into them by itself.</li>
   <li>A sleep timer is kept by the player too (<code>sleepAt</code>), since a phone sleeps a page
   whose screen is off.</li>
-  <li>A downloaded song (a <code>blob:</code> address) still plays in the page, and crossfade is off
-  in the app.</li>
+  <li>An audiobook's place is saved by the player itself (<code>soundstormApp.place</code>) every ten
+  seconds while playing and on pause, end and stop, so an hour listened with the screen off is not an
+  hour back on the next device.</li>
+  <li>Crossfade is off in the app.</li>
   <li>A playback log (<code>PlayerLog.swift</code>) can be sent from the developer's own install to
   diagnose dropouts.</li>
 </ul>
@@ -113,13 +132,22 @@ device.</p>
 <code>window.soundstormApp.backup(...)</code> messages with the same status fields the Android app
 reports, so the page has no iPhone code: the switch and its options (Wi-Fi only, videos, only while
 charging) are the same Settings card.</p>
+<p><strong>Whose iPhone it is.</strong> A phone can back up to several servers, one account on each. On
+each server the first person to sign in is asked once, <strong>"Is this your iPhone?"</strong> - yes only
+lets them turn backup on later in Settings - and from then nobody else on that server sees a switch on
+that phone; the person whose phone it is can let it go (<strong>This isn't my phone</strong>). Who is
+signed in is asked of the server (<code>/api/session</code>), never taken from the page, and each
+server's backup sends only while its own person is signed in there. The public demo account is never
+asked.</p>
 <ul>
   <li><strong>What it reads:</strong> the photo library, with full or limited access, asked for when
   backup is turned on. Newest first.</li>
-  <li><strong>Nothing twice:</strong> the phone keeps no list of what it sent. Each run asks
-  <code>POST /api/photos/backup/check</code> about every photo, by name, month and size (the size
-  Photos records, 0 for one held only in iCloud), so the server is the one record and a reinstall or
-  a new phone sends nothing it has.</li>
+  <li><strong>Nothing twice:</strong> the server is the one record. The phone asks
+  <code>POST /api/photos/backup/check</code> about photos by name, month and size (the size Photos
+  records, 0 for one held only in iCloud), so a reinstall or a new phone sends nothing the server has.
+  To keep each run light it remembers which photos the server confirmed, and the server's marker of
+  the person's photo folder (<code>/api/photos/backup/marker</code>): while the marker holds, only new
+  or edited photos are checked, with a full check once a day or whenever the marker moves.</li>
   <li><strong>How it sends:</strong> each original is written to a file
   (<code>PHAssetResourceManager</code>, iCloud allowed; a Live Photo as its still and its moving
   part) and handed ahead to a background <code>URLSession</code> - up to 200 files or 1&nbsp;GB
@@ -129,10 +157,8 @@ charging) are the same Settings card.</p>
   <li><strong>When:</strong> while the app is open, 30 seconds after a photo is added, and as a
   <code>BGProcessingTask</code> iOS starts when it chooses (needing power if "only while charging").
   Wi-Fi only means a connection that is not expensive or constrained.</li>
-  <li><strong>Where to:</strong> the page's secure address, its away-from-home twin, then the address
-  the app was opened with.</li>
-  <li><strong>On a shared phone:</strong> signing out, or another account signing in, turns backup
-  off; the page asks the next person afresh.</li>
+  <li><strong>Where to:</strong> only the server the backup was turned on for and its away-from-home
+  twin, over https; never a plain-http address, and a page's message cannot change it.</li>
 </ul>
 <p>Checked against a local server in the simulator: the six sample photos arrived in the right
 year and month, byte for byte. The background task and an upload finishing with the app closed
@@ -140,10 +166,18 @@ want a real iPhone over a night.</p>
 
 <p><strong>Add media</strong> in the app asks the app for files (Photos or Files,
 <code>soundstormApp.pickFiles</code>), since a web view keeps its own picker's files to itself; the
-page plans and asks as ever, and the app then sends them in the same kind of background session.</p>
+page plans and asks as ever, and the app then sends them in the same kind of background session,
+each to the server it was meant for. A <strong>Share extension</strong> puts EmberStorm in the system's
+Share sheet: what is shared is copied into a shared app-group folder, and the app hands it to the page
+for the same review the next time it opens (an extension may not open its app, so the sheet says to
+open EmberStorm).</p>
+<p>A TV's sign-in QR code opens the app itself (Universal Links on the install's names, and
+<code>soundstorm://link</code>), but only for a server the app already knows, and the app can scan a
+TV's code with its own scanner; a code that came by a link is typed, never accepted unseen. While the
+phone controls a TV, its volume buttons turn the TV's volume.</p>
 
 <h2 id="servers">Several saved servers</h2>
-<p>A phone may know several servers - its owner's, and a parent's. The connect screen is
+<p>A phone may know several servers - their own, and a relative's elsewhere. The connect screen is
 <strong>Your servers</strong>: the latest used first, the one in use ticked, a tap to switch, a hold
 for Rename and Remove, and a way to add another. The list (<code>ServerAddress.all</code>, in
 <code>ios/Shared</code> and used by the Apple TV app too) keeps each address and a name; a first name

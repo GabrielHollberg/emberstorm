@@ -22,11 +22,11 @@ options such as Photoview (closer to "the folder is the interface") for search b
 the feature people compare against Google Photos - at the price of four containers (server, machine
 learning, Postgres with vector search, Valkey), about 5 GB of images and 6-8 GB of RAM.</p>
 
-<h2 id="pinning">Pinned to a major version</h2>
+<h2 id="pinning">Pinned</h2>
 <p>Researched, not assumed: Immich 2.0 (October 2025) promised semver, and 3.0 (July 2026) then broke API
 endpoints "that affect only third-party tools" - which is what EmberStorm is. So every Immich image is
-pinned to its major version, <code>v3</code>, never <code>latest</code>, and moving to v4 is a deliberate
-change with an adapter update behind it.</p>
+pinned by digest (at 3.2.2), as every backend is, never a moving tag; moving to a new version, v4
+above all, is a deliberate change with an adapter update behind it.</p>
 
 <h2 id="provisioning">Provisioning</h2>
 <p>Every step was checked against a live 3.2.2:</p>
@@ -96,9 +96,8 @@ member deletes their account with <code>force</code> and keeps their folder. See
   Immich reads; checked with a Takeout photo whose sidecar put it in the right city and year.</li>
 </ul>
 <p>Uploads appear about four seconds after landing, through folder watching plus EmberStorm's rescan.
-Immich's Postgres uses a fixed default password reachable only on the compose network; generating one
-would require telling a fresh install from an existing database, whose password cannot change under it.
-That is recorded as a decision left open.</p>
+Immich's Postgres and Valkey sit on an internal network that only Immich's own containers reach, and
+on a box the database password is made for each box.</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

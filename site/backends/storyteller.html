@@ -69,14 +69,15 @@ because failure is usually Storyteller, not the match. "Not the same book" delet
 only; its delete touches nothing outside its own storage. An ebook EmberStorm made from an audiobook
 (Make an ebook) carries its own timeline, so that pair needs no Storyteller at all.</p>
 
-<h2 id="quirks">Quirks and open items</h2>
+<h2 id="quirks">Quirks</h2>
 <ul>
   <li>It downloads its transcription model on first use, into a volume of its own.</li>
   <li>It still syncs its changelog from GitLab on a daily schedule despite
   <code>STORYTELLER_SYNC_CHANGELOG=false</code>, which only stops the one at start.</li>
-  <li>Its secret key has a default, reachable only on the compose network - recorded as a decision left
-  open, like Immich's database password.</li>
-  <li>If its long-lived token was never issued, it re-provisions rather than signing in again.</li>
+  <li>It is reachable only on its own network beside EmberStorm; on a box its secret key is made for each
+  box.</li>
+  <li>Its password is kept from the moment it is made, so a setup cut short signs in again and
+  finishes rather than starting over.</li>
 </ul>
 <p>Verified end to end on an isolated stack with synthetic speech: an EPUB 3 with two MP3s and an EPUB 2
 with a chaptered M4B both synced through EmberStorm's API, each timeline ended exactly where its recording

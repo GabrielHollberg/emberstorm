@@ -57,7 +57,9 @@ first byte: a TLS handshake starts with <code>0x16</code> and no HTTP request do
 <code>net/http</code> a real <code>*tls.Conn</code>, not a wrapper, because that type check is what
 fills in <code>r.TLS</code> - and <code>r.TLS</code> is what makes the session cookie Secure. The
 certificate is a real Let's Encrypt one obtained through the <a href="../server/tls.html">names
-service</a>, or the local authority's as a fallback.</p>
+service</a>, or the local authority's as a fallback. Plain HTTP is answered only at home addresses:
+the same request in the clear to the away name would be redirected to https
+(<code>OnlyHomeOverHTTP</code>).</p>
 
 <h3>3. The outer middleware</h3>
 <p>Every route, signed in or not, passes through the same chain built at the end of

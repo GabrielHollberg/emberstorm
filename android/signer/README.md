@@ -10,7 +10,9 @@ EmberStorm server, and being on the developer's Tailscale is the pass.
 
 1. On the PC, a release is made (`box/release.sh -k yubikey`, or
    `scripts/desktop-release.sh`) and copied into a folder of its own under
-   `Desktop\emberstorm-signing\` (e.g. `box-2026101102\manifest.json`).
+   `Desktop\emberstorm-signing\` (e.g. `box-2026101102\manifest.json`, or
+   a folder holding a computer release's `desktop.json`). The helper finds the
+   Desktop where Windows keeps it, inside OneDrive too.
 2. On the PC: `py scripts\signing-helper.py`. It listens on the PC's
    Tailscale address alone (port 8098), refuses anything not from a
    Tailscale address, and stops by itself once everything waiting is signed.
@@ -26,6 +28,11 @@ EmberStorm server, and being on the developer's Tailscale is the pass.
    phone. The app checks the key is one of `box/release.pub`'s before
    signing; the helper checks the signature before keeping `<file>.sig`.
 5. On the PC, the signature is checked again and the release published.
+
+With the YubiKey plugged into the PC instead, `py box\yubikey.py sign FILE`
+signs the same way (the PIN and a touch). The YubiKey signs about 3,000 bytes
+at most, so release lists are written compactly and a box release's notes are
+kept short.
 
 Built with the EmberStorm app: `./gradlew :signer:assembleDebug`. Installed
 from a release of the private repository, never this one.

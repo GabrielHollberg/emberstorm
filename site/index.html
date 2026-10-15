@@ -84,7 +84,7 @@ and photo passes through it, signed in as the person asking.</div>
   <a class="card" href="server/index.html"><b>The server</b><span>The Go program at the centre: its API, sign-in, streaming, the library, music, photos, books.</span></a>
   <a class="card" href="backends/index.html"><b>Backends</b><span>Each media server EmberStorm sets up and drives, and what it learnt about each one's API.</span></a>
   <a class="card" href="clients/index.html"><b>Apps</b><span>The web app, Now Playing and its visualizers, the reader, Android, iPhone and TVs.</span></a>
-  <a class="card" href="security/index.html"><b>Security</b><span>Who it defends against, and ten review passes of what was found and fixed.</span></a>
+  <a class="card" href="security/index.html"><b>Security</b><span>Who it defends against, and the review passes of what was found and fixed.</span></a>
   <a class="card" href="operations/index.html"><b>Running it</b><span>Installing, updating, moving computers, reaching it away from home, fixing problems.</span></a>
   <a class="card" href="development/index.html"><b>Development</b><span>Two machines, one branch, how it is tested, and the traps worth knowing.</span></a>
 </div>
@@ -95,9 +95,9 @@ and photo passes through it, signed in as the person asking.</div>
   <tr><th>Backends</th><td>Navidrome, Jellyfin, Audiobookshelf, Immich, Storyteller, AudioMuse-AI, plus Kokoro and Whisper for making books - all provisioned with nobody logging in</td></tr>
   <tr><th>Apps</th><td>Web app (installable), Android (phones and Google/Android/Fire TV; installed from GitHub releases), iPhone and Apple TV (in TestFlight, not yet on the App Store)</td></tr>
   <tr><th>Install</th><td>Docker Compose behind a double-click installer on Windows, a one-line script on Mac and Linux</td></tr>
-  <tr><th>Outside services</th><td>No account and no telemetry. A small name service gives each install a trusted certificate (Let's Encrypt); lyrics, music discovery and scrobbling are opt-in. Some backends go online by themselves - film posters and details, model downloads, version checks.</td></tr>
+  <tr><th>Outside services</th><td>No account and no telemetry. A small name service gives each install a trusted certificate (Let's Encrypt); lyrics, music discovery and scrobbling are opt-in. A computer install looks at GitHub twice a day for a newer signed release (<code>SOUNDSTORM_UPDATE_CHECK=off</code> stops it). Some backends go online by themselves - film posters and details, model downloads, version checks.</td></tr>
   <tr><th>License</th><td>AGPL-3.0 (versions before 2026-10-04 stay MIT); the source is at <code>github.com/GabrielHollberg/emberstorm</code>, the website at emberstorm.app</td></tr>
-  <tr><th>Needs</th><td>16 GB of RAM recommended (five media servers; Immich alone wants 6-8 GB), and about 20 GB of disk for EmberStorm itself (most of it the programs), plus room for the media</td></tr>
+  <tr><th>Needs</th><td>16 GB of RAM recommended (five media servers; Immich alone wants 6-8 GB), and about 30 GB of free disk for the download (EmberStorm's programs are near 19 GB), plus room for the media</td></tr>
 </table>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>

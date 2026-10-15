@@ -23,7 +23,7 @@ knowing the cost: three containers (web, worker, Postgres) and a 1.9 GB image. A
 unmodified.</p>
 
 <h2 id="pinning">Pinned by digest</h2>
-<p>AudioMuse-AI releases weekly, so it is pinned by digest (to 3.6.3).</p>
+<p>AudioMuse-AI releases weekly, so it is pinned by digest (to 3.6.3), as every backend is.</p>
 
 <h2 id="provisioning">Provisioned with nobody logging in</h2>
 <p>Checked live against 3.6.3 in a throwaway stack:</p>
@@ -70,7 +70,8 @@ it falls back to similar artists and genres.</p>
 <p>Verified end to end on the preview: EmberStorm provisioned a fresh AudioMuse-AI on its first attempt,
 the 14 test songs were heard, all six mood stations appeared, and song radio came back "Songs that sound
 like it". Its song-path and text-to-sound search ("rainy day piano") are there for later. Its Postgres
-password, like Immich's, has a fixed default reachable only on the compose network.</p>
+database sits on an internal network that only AudioMuse's own containers reach, and on a box its
+password is made for each box.</p>
 </main>
 <footer class="site-footer">EmberStorm. This site is written from the code and its working notes.</footer>
 <script src="../assets/nav.js"></script>

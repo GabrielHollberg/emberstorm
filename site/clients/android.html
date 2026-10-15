@@ -12,8 +12,9 @@
 <h1>Android</h1>
 <p class="lede">A small Kotlin app around the server's own web page. The page still decides
 everything; the app adds what Android's web view cannot do - a real music player that survives
-alarms, calls and a locked screen, photo backup, the full screen - and the same app installs on
-Google TV, Android TV and Fire TV.</p>
+alarms, calls and a locked screen, downloads the system never clears, photo backup, the full
+screen - and the same app installs on Google TV, Android TV and Fire TV. It needs Android 9 or
+later.</p>
 
 <h2 id="shell">A web view shell</h2>
 <p>The app lives in <code>android/</code>: a handful of Kotlin files, no Compose and no AppCompat.
@@ -28,7 +29,8 @@ when a load fails, and hands file pickers and a film's full screen to the platfo
   <tr><td><code>PageScript.kt</code></td><td>Script run in the page before its own, on the server's origin only</td></tr>
   <tr><td><code>NativeAudio.kt</code>, <code>AudioService.kt</code></td><td>Songs played natively by Media3</td></tr>
   <tr><td><code>PlaybackService.kt</code>, <code>MediaBridge.kt</code></td><td>The lock-screen player for what the page plays itself</td></tr>
-  <tr><td><code>PhotoBackup.kt</code></td><td>Phone photo backup</td></tr>
+  <tr><td><code>PhotoBackup.kt</code></td><td>Phone photo backup, per server</td></tr>
+  <tr><td><code>KeptFiles.kt</code></td><td>Downloads kept in the app's own folder, and the page kept for opening offline</td></tr>
   <tr><td><code>Uploads.kt</code>, <code>Shared.kt</code></td><td>Sending Add media's files in the background; EmberStorm in the system's Share sheet</td></tr>
   <tr><td><code>WebCookies.kt</code>, <code>ServerAddress.kt</code>, <code>ServerDiscovery.kt</code></td><td>Cookies for native requests; the saved servers; finding a server on the home network</td></tr>
   <tr><td><code>PlayerLog.kt</code></td><td>A playback log, for chasing sound that cuts out</td></tr>
@@ -73,8 +75,10 @@ messages to <code>NativeAudio</code>, and the player's state comes back every ha
 element's own events - <code>playing</code>, <code>pause</code>, <code>timeupdate</code>,
 <code>ended</code>. The lyrics, the looks and the timeline keep reading <code>currentTime</code> as
 before and never know the difference.</p>
-<p>What stays in the page: downloads (they are <code>blob:</code> addresses the native player cannot
-read) and crossfade's second element, which is why crossfade is off in the app. For those,
+<p>A downloaded song or audiobook is handed to the native player by its server address like any
+other, and the player plays the app's own kept copy of it (see <a href="#kept">Downloads</a>), so it
+has the lock screen and plays with the screen off too. What stays in the page is crossfade's second
+element, which is why crossfade is off in the app; for anything the page plays itself,
 <code>PlaybackService</code> still provides the lock-screen player from the page's media session.
 The player also keeps a sleep timer of its own, since Android sleeps a page whose screen is off, and
 picks a paused song up again after Android has ended its idle service.</p>
@@ -101,11 +105,40 @@ finished ExoPlayer must be sent back to the start, and the same song asked for a
 loaded"), and after the player moved into the next song by itself, the stand-in kept reporting the
 old one until it started afresh on <code>ended</code>.</p>
 
+<h2 id="kept">Downloads the system never clears</h2>
+<p>In a browser, downloads live in web storage, which a phone may clear when it is short of space.
+In the app the page hands every download to the app instead (<code>soundstormApp.keep</code>,
+answered through <code>window.__soundstormKeep</code>): <code>KeptFiles.kt</code> fetches each file,
+one at a time and only from the server itself, with the session's cookies and no redirect off it, into
+<code>files/kept/&lt;host_port&gt;/</code>, and keeps the download list there too. The page reads a kept
+file back from the server's own origin at <code>/__emberstorm-kept/&lt;path&gt;</code>, which the app
+answers itself, byte ranges included. Downloads made in the web view before are moved to the app
+quietly, one file at a time. The kept files are left out of Android's backups: a restored phone
+downloads again rather than filling a backup with films.</p>
+<p>The app also keeps a copy of the page at every open, so it is <strong>never a black page</strong>:
+whatever way a load fails - no connection, the server off, a certificate the phone does not trust, a
+service worker's error page - it tries the away-from-home name, then opens the kept page. With
+downloads it opens on them, with a bar saying it is offline and Change server in reach; without, a
+card saying the server cannot be reached. Either way the server is looked for by itself (every 15
+seconds for two minutes, then once a minute, and at once on coming back online), and the app loads it
+afresh when it answers. Among the install's addresses (its code and chosen names, at home and away),
+the one holding the downloads is preferred. Inside the apps the page registers no service worker: the
+app's kept copy is the offline page there.</p>
+
 <h2 id="backup">Photo backup with WorkManager</h2>
 <p>A phone's photos and videos are sent to the person's own photo folder on the server
 (<code>PhotoBackup.kt</code>). The page decides nothing about the mechanics: Settings &rarr; Your
 photos has the switch and options and talks to the app through
 <code>soundstormApp.backup(...)</code>; the app does the work.</p>
+<p><strong>Whose phone it is.</strong> A phone can back up to several servers, one account on each,
+each with its own switch, options and progress. On each server the phone belongs to one person: the
+first to sign in there is asked once, natively, <strong>"Is this your phone?"</strong> - saying yes
+backs nothing up, it only lets that person turn backup on in Settings later. Once claimed, nobody else
+on that server sees a switch on that phone, only who backs it up; the owner of the phone can let it go
+(<strong>This isn't my phone</strong>). Who is signed in comes from the server
+(<code>/api/session</code>, with the web view's cookie), never from the page, and a server's backup
+sends only while its own person is the one signed in there. The public demo account is never
+asked.</p>
 <ul>
   <li><strong>WorkManager jobs</strong>, so Android decides when, and backup carries on with the app
   closed: one when a photo or video is added, one every six hours. Wi-Fi only unless turned off, and
@@ -127,12 +160,10 @@ photos has the switch and options and talks to the app through
   <li><strong>Plain reasons when it stops</strong>: a refused permission, a full photo space, a full
   disk or an ended sign-in are shown until the next job.</li>
 </ul>
-<p>After signing in on a phone with Pictures, the page asks once, "Back up this phone's photos?",
-and tells a member plainly that the owner of the server can see them. It is not offered on a TV.
-On a shared phone, signing out (or another account appearing) turns backup off, the phone sends
-the account it was turned on for, and the server refuses photos meant for somebody else; the next
-person is asked afresh. Backup goes to the secure name the page was on, never plain http on the
-Wi-Fi when a secure name exists.</p>
+<p>It is not offered on a TV. The phone sends the account each backup was turned on for, and the
+server refuses photos meant for somebody else. Backup goes only to the server it was turned on for and
+its away-from-home name, over https, never to a plain-http address; a page's message cannot point it
+anywhere else.</p>
 
 <h2 id="servers">Several saved servers</h2>
 <p>Since 0.19 the connect screen lists <strong>Your servers</strong> above the address box: the
@@ -142,7 +173,11 @@ own sign-in, since cookies belong to an address, so switching back asks for noth
 Apple TV apps have the same list.</p>
 <p>The connect screen also looks for a server on the home network (<code>ServerDiscovery</code>, Wi-Fi
 and wired networks only) and shows servers by their name; a new box with no owner yet is offered as
-<strong>Set it up</strong>, with the setup code scanned or typed.</p>
+<strong>Set it up</strong>, with the setup code scanned or typed. The setup code goes into the page's
+address only at the box's secure name, after checking it is the same install; over plain http the
+person types it on the page. Where a router gave the install a different outside port (two servers in
+one house), the app learns it from <code>/healthz</code>'s <code>awayPort</code> and uses it for the
+away-from-home name.</p>
 
 <h2 id="uploads">Add media and Share</h2>
 <p>In the app, Add media's files are sent by the app rather than the page (0.30,
@@ -184,13 +219,19 @@ same job.</p>
   cookie handler and answers each address, redirects included, with that address's own cookies only.</li>
   <li><strong>Trusted controllers.</strong> A media session lets any app on the phone control playback
   and read what is playing unless told otherwise. <code>onConnect</code> now accepts only the system,
-  the app itself, and known car, watch and assistant apps.</li>
+  the app itself, and known car, watch and assistant apps. Before Android 9 a controller could not be
+  told apart, so since 0.68 the app needs Android 9 or later.</li>
   <li><strong>Nothing off-server in the app's window</strong>, and other apps or new windows open
   only from a link the person actually tapped.</li>
   <li><strong>The secure-name move is followed, not saved.</strong> From a plain-http address the page
   moves to the install's https name; someone on the same Wi-Fi could once have pinned the app to their
-  own server that way. Now a move from an emberstorm.app name is accepted only to its own twin (the
-  same install id), and never written as the saved address.</li>
+  own server that way. Now the move is followed only to another name of the same install - the same id
+  answering <code>/healthz</code> at both, and both names resolving to the same address - and never
+  written as the saved address.</li>
+  <li><strong>Links from outside.</strong> A TV sign-in link (<code>soundstorm://link</code>, or the QR
+  code's <code>https://&lt;name&gt;/link/&lt;code&gt;</code> App Link) opens only a server the app already
+  knows, and a code that arrived by a link is typed by the person, never accepted unseen; a code read by
+  the app's own scanner is.</li>
   <li><strong>No backups of the session</strong> (<code>allowBackup="false"</code> and data extraction
   rules), <code>taskAffinity=""</code> against task hijacking, a non-debuggable build, and a checksum
   on the Gradle wrapper.</li>
@@ -204,12 +245,16 @@ focus, outputs, the page's commands) - for chasing sound that cuts out mid-song 
 install shows it.</p>
 
 <h2 id="releases">Releases</h2>
-<p>The app is not on Google Play: it is installed from the project's GitHub releases. APKs are built on the Windows development machine from <code>android/</code> on main
-(<code>gradlew assembleDebug</code>), with <code>versionCode</code> raised every time so a phone
-installs over the last one. They are published as GitHub pre-releases named
-<code>android-&lt;version&gt;</code> and never marked Latest, because the Latest release is where the
-server's Windows installer lives. Nothing updates an installed copy by itself; each release is
-installed over the last.</p>
+<p>The app is installed from the project's GitHub releases (as <code>EmberStorm-&lt;version&gt;.apk</code>);
+a Google Play listing is being prepared. APKs are built on the Windows development machine from
+<code>android/</code> on main (<code>gradlew assembleDebug</code>), with <code>versionCode</code> raised
+every time so a phone installs over the last one. They are published as GitHub pre-releases named
+<code>android-&lt;version&gt;</code> and never marked Latest, because the Latest release is the computer
+release (EmberStorm.exe, the Mac app and the signed list of files). Nothing updates an installed copy by
+itself; each release is installed over the last. Release builds for Google Play
+(<code>gradlew bundleRelease</code>, an app bundle) are signed with an upload key kept off the
+repository, and Google keeps the key phones see; a phone with the GitHub version uninstalls it once to
+install Play's, as the two are signed differently.</p>
 
 <h2 id="tv">The same app on a TV</h2>
 <p>Google TV, Android TV and Fire TV run this same app, not a second one. The manifest adds the

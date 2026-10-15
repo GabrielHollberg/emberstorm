@@ -14,28 +14,41 @@
 one file that cannot be regenerated, getting back in after a forgotten password, carrying the whole
 thing to another computer, and removing it without touching anybody's media.</p>
 
-<h2 id="update">Updating is installing again</h2>
-<p>There is no separate update path. Running the installer again pulls newer images and restarts,
-keeping the library, accounts and settings. Windows gets an <strong>Update EmberStorm</strong>
-shortcut in the Start menu that does exactly that; on Mac and Linux the install command is run again;
-by hand it is <code>docker compose pull &amp;&amp; docker compose up -d</code>. EmberStorm never checks
-for updates by itself; nothing changes until somebody runs the installer. (A box sold with EmberStorm
-on it is different: its caretaker checks a signed update channel and installs releases, putting
-everything back if one is not healthy.) The phone apps do not update themselves either: an Android
-release is installed over the last by hand.</p>
-<div class="why">EmberStorm cannot update itself, and should not learn how. It has no access to the
-Docker socket, which is the reason a compromised EmberStorm cannot reach the host. An in-app update
-button would mean handing it that socket.</div>
-
-<h3 id="self-update">The installer updates itself first</h3>
-<p>For a while, "Update EmberStorm" ran the copy of the script saved by the <em>previous</em> install,
-so a fix to the installer only took effect on the update after the one that fetched it. Now a saved
-copy fetches the newest script first and, when it differs, hands over to it with the same arguments.
-A local checkout runs as it is. If the new copy fails, the run ends rather than falling back to the old
-copy. The newest script is fetched by commit, not by branch, because the raw file host caches branch
-addresses and ignores query strings.</p>
+<h2 id="update">Updating is installing again, from a signed release</h2>
+<p>There is no separate update path: an update is the installer run again from the newest signed
+release, which pulls the newer images and restarts, keeping the library, accounts and settings. Every
+way of updating checks the release's signed list of files first (see
+<a href="install.html#setup-file">Installing</a>), so nothing the release key did not sign is ever run:</p>
+<ul>
+  <li><strong>Windows:</strong> the Start menu's <strong>Update EmberStorm</strong> hands over to the
+  signed EmberStorm.exe kept in the install folder (or the release's), and only once Windows confirms
+  its signature.</li>
+  <li><strong>Mac:</strong> Update in the menu bar's cloud.</li>
+  <li><strong>Linux:</strong> <code>sh emberstorm-update.sh</code> in the install folder (or the
+  install command again, which hands over to it).</li>
+</ul>
+<p><strong>Computers update themselves at night</strong>, on unless turned off: Windows has a
+scheduled task of the person's own, "EmberStorm update", the Mac a LaunchAgent with a switch in its
+menu, Linux a cron line - each at a time chosen once between 2 and 5 in the morning. The night's run
+does nothing unless the install is finished, the setting (<code>SOUNDSTORM_AUTO_UPDATE</code>) is not
+off, and the signed release is newer than the one installed; it asks nothing and opens no window. If
+the new version does not start and answer, the compose file from before is put back and the old
+version started again. Settings &rarr; About tells the owner when a newer release is out (the server
+looks at the signed list twice a day; <code>SOUNDSTORM_UPDATE_CHECK=off</code> stops it) and says
+which build the server is. The card for the computer EmberStorm runs on says how to turn the night's
+update off.</p>
+<p>A box with EmberStorm preinstalled updates differently: its caretaker installs signed releases from
+its own channel between 2 and 5 at night, snapshotting the data first and putting everything back if a
+release is not healthy, and the owner can check and update from Settings. The phone apps do not
+update themselves: an Android release is installed over the last by hand, and the Apple apps come
+through TestFlight.</p>
+<div class="why">EmberStorm itself cannot update itself, and should not learn how. It has no access to
+the Docker socket, which is the reason a compromised EmberStorm cannot reach the host; the updates
+above are run by the installers on the host, never by the server. An in-app update button would mean
+handing it that socket.</div>
 <p>An update whose image download fails - a registry rate limit, a dropped connection - starts the
-version already installed instead of stopping, since nothing about the install is broken.</p>
+version already installed with the compose file it had, instead of stopping, since nothing about the
+install is broken.</p>
 
 <h2 id="backup">Backup and restore</h2>
 <p>One file holds every account, sessions, everyone's favorites and playlists (as one extra field),
@@ -122,13 +135,20 @@ because a trailing backslash escaped the closing quote.</p>
 
 <h2 id="uninstall">Uninstalling: never touch <code>library/</code></h2>
 <p>Windows registers EmberStorm under the current user's uninstall key, so it appears in Settings &rarr;
-Apps like anything else, with no administrator needed. On a Mac set up with the EmberStorm app, the
-cloud it keeps in the menu bar has <strong>Uninstall EmberStorm&hellip;</strong> (and so does the app's
-own menu); otherwise, on Mac and Linux, it is <code>install.sh --uninstall</code>.</p>
-<p>The uninstaller takes a backup, runs <code>docker compose down -v</code> - which removes the named
-volumes: accounts and each media server's database - and removes the compose file, the
-<code>.env</code>, the saved script and the shortcuts. It then prints where the media was left. Docker
-itself stays installed.</p>
+Apps like anything else, with no administrator needed - from the moment setup starts, so a setup
+stopped part way can be removed the same way. On a Mac set up with the EmberStorm app, the cloud it
+keeps in the menu bar has <strong>Uninstall EmberStorm&hellip;</strong>; on Linux it is
+<code>sh emberstorm-uninstall.sh</code> in the install folder, Uninstall in the app-menu entry's
+right-click menu, or <code>install.sh --uninstall</code>, which finds the install from any folder.</p>
+<p>The aim is to leave only what the person keeps. The uninstaller asks first, one choice per change
+the setup made and recorded: <strong>keep a copy of the accounts</strong> (ticked), remove the
+downloaded programs (ticked; Windows always removes them), and, unticked, remove Docker (offered only when the setup installed it), let the
+computer sleep on its own again, put the lid setting back, and on Windows ask for a password at sign-in
+again. With no window to ask in, it takes those defaults. It then runs <code>docker compose down -v</code>
+- which removes the named volumes: accounts and each media server's database - removes the compose
+file, the <code>.env</code>, the saved scripts, the shortcuts and its own firewall rules, and says
+where the media was left. If EmberStorm cannot be stopped, nothing else is taken back, so it keeps
+working and uninstalling again can finish.</p>
 <div class="warn">The install folder itself is never deleted, because the library is inside it by
 default. Deleting the folder wholesale would take somebody's media with it. A test puts a marker file in
 <code>library/music</code> and requires it to be readable after uninstalling.</div>

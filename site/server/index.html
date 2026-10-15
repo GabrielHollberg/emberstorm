@@ -62,11 +62,15 @@ background afterwards.</p>
   <li><strong>The real certificate</strong> is fetched in the background too, in auto mode.</li>
   <li><strong>A setup code</strong> is printed to the log while no account exists - the first
   sign-up needs it.</li>
-  <li><strong>Background loops</strong> start: automatic read-along syncing, sending plays to
-  ListenBrainz, hearing every song's beats ahead of time, and sorting imported photo
-  downloads.</li>
+  <li><strong>Background loops</strong> start: keeping the owner's photo library from showing
+anybody else's own photos (a minute after start, then every ten minutes), automatic read-along
+syncing, sending plays to ListenBrainz, hearing every song's beats ahead of time, sorting imported
+photo downloads, and making the audiobooks and ebooks people asked for, one at a time. On a computer
+install the server also looks twice a day for a newer signed release, to tell the owner in
+Settings.</li>
   <li><strong>The listener opens</strong> - on one port that speaks both plain HTTP and TLS
-  in auto mode, told apart by the first byte of each connection.</li>
+in auto mode, told apart by the first byte of each connection; plain HTTP is answered only at
+addresses that work inside the house, anything else sent on to https.</li>
 </ol>
 <div class="why">Every goroutine started once and left running is wrapped in
 <code>recover()</code>. Go's <code>net/http</code> protects only the goroutine serving a request;
@@ -115,7 +119,7 @@ everything past it speaks <code>media.Item</code>.</p>
 <table>
   <tr><th>Package</th><th>What it owns</th></tr>
   <tr><td><code>httpapi</code></td><td>Every route, the middleware chain, rate limits, and the handlers that tie the rest together.</td></tr>
-  <tr><td><code>auth</code></td><td>Password hashing, sessions and their cookies, device tokens, the sign-in throttle, per-kind access.</td></tr>
+  <tr><td><code>auth</code></td><td>Password hashing, sessions and their cookies (full or for playing only), device tokens, the sign-in throttle, people kept on a device and their PINs, per-kind access.</td></tr>
   <tr><td><code>state</code></td><td>The one JSON file: backend credentials, accounts, hashed sessions, reading positions, a few owner decisions.</td></tr>
   <tr><td><code>source</code>, <code>source/*</code></td><td>The <code>Source</code> interface and its optional extras, the registry that enforces access, and one adapter each for Navidrome, Jellyfin, Audiobookshelf, Immich, Storyteller, AudioMuse-AI, OPDS and the local book folders.</td></tr>
   <tr><td><code>federate</code></td><td>Asking every source at once with a deadline each, and merging the answers into one ordered page.</td></tr>
@@ -129,7 +133,11 @@ everything past it speaks <code>media.Item</code>.</p>
   <tr><td><code>tags</code>, <code>epub</code>, <code>pdf</code>, <code>photoimport</code></td><td>Small readers that answer one question each - where to file a file, what a book is called, when a photo was taken.</td></tr>
   <tr><td><code>lyrics</code>, <code>discover</code>, <code>scrobble</code>, <code>plex</code></td><td>The opt-in outside services: LRCLIB, MusicBrainz and friends, ListenBrainz, and Plex playlist import.</td></tr>
   <tr><td><code>voices</code>, <code>mp4hls</code></td><td>Making an audiobook from an ebook and an ebook from an audiobook (through Kokoro and Whisper); serving a long audiobook as HLS pieces cut from the file itself.</td></tr>
-  <tr><td><code>starter</code>, <code>webui</code></td><td>The embedded starter library and web app.</td></tr>
+  <tr><td><code>episodeguide</code>, <code>qr</code></td><td>TVmaze's free episode guide, asked only when the owner checks a show's numbering; QR codes for signing a TV in and for invitations.</td></tr>
+<tr><td><code>desktoprelease</code>, <code>version</code></td><td>Checking a signed release for computers (to say a newer one is out), and which build this is - the commit and date shown in Settings, About.</td></tr>
+<tr><td><code>training</code></td><td>Learning the looks from the developer's taps; used only by <code>train-looks</code> on one install.</td></tr>
+<tr><td><code>caretaker</code></td><td>Not part of this program: a separate root helper that runs only on an EmberStorm box, for its updates, resets, power button and USB drives. The server reaches it over a socket on a box only.</td></tr>
+<tr><td><code>starter</code>, <code>webui</code></td><td>The embedded starter library and web app.</td></tr>
 </table>
 
 <h2 id="parts">The parts, one page each</h2>

@@ -20,14 +20,16 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>cmd/soundstorm/</code></td><td>The server's <code>main</code>, plus its subcommands: <code>backup</code>, <code>restore</code>, <code>reset-password</code>, <code>train-looks</code>. Any argument it does not know is an error, never a second server.</td></tr>
   <tr><td><code>cmd/soundstorm-names/</code></td><td>The names service: gives each install a name under <code>emberstorm.app</code> and publishes ACME challenges. Deployed separately, with its own Dockerfile.</td></tr>
   <tr><td><code>cmd/soundstorm-caretaker/</code></td><td>The box's caretaker: signed updates, snapshots and roll-back, Start over and the power button. Only on a box.</td></tr>
+  <tr><td><code>cmd/emberstorm-setup/</code></td><td>EmberStorm.exe, the Windows download: checks the signed release and starts its installer with no console.</td></tr>
   <tr><td><code>internal/</code></td><td>Every server package (below).</td></tr>
-  <tr><td><code>android/</code></td><td>The Android app (Kotlin): phones, Google TV, Android TV and Fire TV.</td></tr>
-  <tr><td><code>ios/</code></td><td>The Xcode project: the iPhone app, the Apple TV app (<code>SoundStormTV/</code>), shared code and UI tests.</td></tr>
-  <tr><td><code>box/</code></td><td>The system image for selling EmberStorm preinstalled on a small computer (being tried), and its scripts.</td></tr>
+  <tr><td><code>android/</code></td><td>The Android app (Kotlin): phones, Google TV, Android TV and Fire TV. <code>android/signer/</code> is a separate small app for signing releases with a hardware key held to a phone; it is never published.</td></tr>
+  <tr><td><code>ios/</code></td><td>The Xcode project: the iPhone app, its Share extension, the Apple TV app (<code>SoundStormTV/</code>), shared code and UI tests.</td></tr>
+  <tr><td><code>mac/</code></td><td>The Mac setup app (SwiftUI): installs and runs EmberStorm from the signed release with no terminal, updates it at night and removes it.</td></tr>
+  <tr><td><code>box/</code></td><td>The system image for EmberStorm preinstalled on a small computer (being tried, not for sale), its USB installer stick and its scripts. A box has one drive (the system in its first 64&nbsp;GiB, the library partition after it; a repair rewrites only the system) or two (system and library apart).</td></tr>
   <tr><td><code>web/</code></td><td>The public website, emberstorm.app.</td></tr>
   <tr><td><code>library/</code></td><td>The folder skeleton with a <code>README.txt</code> per shelf, so a fresh clone has somewhere to put media. Contents are ignored by git.</td></tr>
   <tr><td><code>scripts/</code></td><td>Development tools (below).</td></tr>
-  <tr><td><code>docs/</code></td><td>Older Markdown guides and the README's screenshots. Some of it predates later changes; the working notes and the code are the reference.</td></tr>
+  <tr><td><code>docs/</code></td><td>Older Markdown guides and the README's screenshots. Some of it predates later changes; this site and the code are the reference.</td></tr>
   <tr><td><code>site/</code></td><td>This documentation site: plain HTML, one stylesheet, one script, no build step.</td></tr>
   <tr><td><code>docker-compose.yml</code></td><td>The install: EmberStorm and every backend, naming a published image and containing no <code>build:</code> key, so it works alone in an empty folder.</td></tr>
   <tr><td><code>docker-compose.dev.yml</code></td><td>Adds <code>build: .</code> back for development.</td></tr>
@@ -37,7 +39,7 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>tailscale-serve.json</code></td><td>The Tailscale sidecar's proxy config, written on every install because compose bind-mounts it.</td></tr>
   <tr><td><code>.github/workflows/publish.yml</code></td><td>CI: checks, then publishes the image to the GitHub container registry.</td></tr>
   <tr><td><code>.github/workflows/website.yml</code></td><td>Publishes the website, with this site under <code>/docs</code>; run by hand.</td></tr>
-  <tr><td><code>CLAUDE.md</code></td><td>The project's working notes: every decision, reversal and trap, in detail. The main source for this site.</td></tr>
+  <tr><td><code>SECURITY.md</code></td><td>How to report a security problem privately (the repository's Security tab).</td></tr>
 </table>
 
 <h2 id="internal">Server packages</h2>
@@ -51,7 +53,9 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>servetls</code></td><td>TLS without anybody running openssl: a local authority, one port for HTTP and TLS, real certificates in auto mode.</td></tr>
   <tr><td><code>acme</code></td><td>Gets a certificate from Let's Encrypt over DNS-01 - RFC 8555 for one account and one name.</td></tr>
   <tr><td><code>names</code></td><td>Gives every install a real name, so it can have a real certificate (the service's logic).</td></tr>
-  <tr><td><code>portmap</code></td><td>Opens one inbound port on a home router (UPnP) for remote access, and reads its WAN address.</td></tr>
+  <tr><td><code>portmap</code></td><td>Opens one inbound port on a home router (PCP, NAT-PMP or UPnP) for remote access, and reads its WAN address.</td></tr>
+  <tr><td><code>desktoprelease</code></td><td>Checks a signed computer release: <code>desktop.json</code>, its signature against the release keys, and every file's SHA-256.</td></tr>
+  <tr><td><code>version</code></td><td>Which build this is - the commit and its date, stamped in by the image build, shown in Settings, About.</td></tr>
 </table>
 
 <h3>Backends</h3>
@@ -83,6 +87,7 @@ folder and every server package, each in a line, so you know where to look.</p>
   <tr><td><code>photoimport</code></td><td>Brings a photo library in from Google, Apple and others: dates, places, duplicates.</td></tr>
   <tr><td><code>starter</code></td><td>Ships one item per shelf inside the binary, unpacked once.</td></tr>
   <tr><td><code>qr</code></td><td>Draws the QR code a TV shows for signing in from a phone - byte mode, level M, no dependency.</td></tr>
+  <tr><td><code>episodeguide</code></td><td>Asks TVmaze (free, no key) for a show's episodes, when the owner numbers a ripped disc.</td></tr>
 </table>
 
 <h3>Per person, and music</h3>
@@ -109,12 +114,13 @@ the CSP forbids inline script), and <code>vendor/</code>. It is embedded in the 
 web view, system bars, back), <code>PageScript</code> (injected before the page's own scripts),
 <code>NativeAudio</code> and <code>AudioService</code> (songs through Media3 ExoPlayer),
 <code>PlaybackService</code> and <code>MediaBridge</code> (media session),
-<code>PhotoBackup</code> and <code>Uploads</code> (WorkManager jobs), <code>Shared</code> (the
-Share sheet), <code>ServerAddress</code> and <code>ServerDiscovery</code>, <code>PlayerLog</code>,
-<code>WebCookies</code>.</p>
+<code>PhotoBackup</code> and <code>Uploads</code> (WorkManager jobs), <code>KeptFiles</code>
+(downloads and the offline page), <code>Shared</code> (the Share sheet), <code>ServerAddress</code> and
+<code>ServerDiscovery</code>, <code>PlayerLog</code>, <code>WebCookies</code>.</p>
 <p><strong>iOS</strong> (<code>ios/</code>): <code>SoundStorm/</code> is the iPhone shell
 (<code>ConnectViewController</code>, <code>WebViewController</code>, <code>NativeAudio</code>,
-<code>PhotoBackup</code>); <code>SoundStormTV/</code> the
+<code>PhotoBackup</code>, <code>KeptFiles</code>, <code>FileUploads</code>, <code>AppLinks</code>);
+<code>SoundStormShare/</code> the Share extension; <code>SoundStormTV/</code> the
 native Apple TV app (player, reader, photo viewer, all twelve visualizers, song analysis);
 <code>Shared/</code> what both use; <code>SoundStormUITests/</code> the XCUITest that drives the
 phone app.</p>
@@ -132,6 +138,13 @@ phone app.</p>
   <tr><td><code>mkepub</code></td><td>Generates test EPUBs without Calibre.</td></tr>
   <tr><td><code>mobile-check.js</code></td><td>Playwright: mobile layouts and overflow.</td></tr>
   <tr><td><code>reader-swipe-check.js</code></td><td>Playwright: swiping the reader turns pages exactly as the arrows do.</td></tr>
+  <tr><td><code>reader-css-check.js</code></td><td>Checks the reader's stylesheet cleaning against crafted references.</td></tr>
+  <tr><td><code>desktop-release.sh</code></td><td>Makes a computer release: the files and <code>desktop.json</code>, for the release key to sign.</td></tr>
+  <tr><td><code>signing-helper.py</code></td><td>Hands releases waiting on the PC to the signer app on a phone, over the developer's own private network only.</td></tr>
+  <tr><td><code>vmtest-linux.sh</code></td><td>The Linux install tested end to end on a fresh throwaway virtual machine of a given distribution.</td></tr>
+  <tr><td><code>demo-stack.sh</code></td><td>A separate public demo install with free media, put back every night.</td></tr>
+  <tr><td><code>store-media.py</code></td><td>Made-up albums for app-store pictures, never real music.</td></tr>
+  <tr><td><code>private-check.sh</code></td><td>A commit hook that refuses private details and unformatted Go code.</td></tr>
   <tr><td><code>calibreweb-init</code></td><td>Support for the opt-in external Calibre server.</td></tr>
 </table>
 

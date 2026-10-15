@@ -19,7 +19,7 @@ what it sends to a phone away from home.</p>
 <h2 id="addresses">Three addresses</h2>
 <table>
   <tr><th>Address</th><th>Where it works</th><th>Certificate</th></tr>
-  <tr><td><code>http://192.168.1.50:8099</code></td><td>The home network</td><td>None (plain http)</td></tr>
+  <tr><td><code>http://192.168.0.50:8099</code></td><td>The home network</td><td>None (plain http)</td></tr>
   <tr><td><code>https://&lt;id&gt;.home.emberstorm.app:8099</code></td><td>The home network</td><td>Let's Encrypt, trusted everywhere</td></tr>
   <tr><td><code>https://&lt;id&gt;.net.emberstorm.app:8099</code></td><td>Anywhere, once remote access is on</td><td>The same certificate, carrying both names</td></tr>
 </table>
@@ -29,6 +29,13 @@ Your web address - <code>yourname.home.emberstorm.app</code> and <code>yourname.
 <a href="../server/tls.html#chosen">Certificates and names</a>). All three are served on the same port: EmberStorm's listener tells
 a TLS connection from a plain HTTP request by its first byte (<code>servetls.Listener</code>), so the
 address people already have keeps working while the secure one is added.</p>
+<p><strong>Plain http answers only at home addresses</strong> (<code>OnlyHomeOverHTTP</code>): a private,
+loopback or link-local address, a Tailscale address, or a name only a home network answers. A plain
+http request to the away name or the home's public address - what the internet can reach once the
+router forwards the port - is sent on to https, and anything but a read is refused, since its body has
+already crossed in the clear. It goes by the address typed, as under Docker Desktop every connection
+seems to come from Docker's own gateway. A new install's first visit at its LAN address still works
+over http, before it has a certificate.</p>
 
 <h2 id="home-name">The home name and its certificate</h2>
 <p>A trusted certificate needs a name on the internet, and a home server has neither a domain nor a

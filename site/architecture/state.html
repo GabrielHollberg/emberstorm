@@ -55,17 +55,23 @@ backed by the <code>soundstorm-state</code> named volume.</p>
   (Audiobookshelf for listening positions, Immich for each member's own photos).</li>
   <li><strong>Sessions</strong>, keyed by a SHA-256 hash of the token. They used to be keyed by the
   token itself, which made a backup or an abandoned volume enough to sign in as anyone; the
-  migration hashed the keys in place, so nobody was signed out. Capped at 50 per account.</li>
+  migration hashed the keys in place, so nobody was signed out. Capped at 50 per account. A session
+  given to a TV switched from a phone is marked <code>limited</code>: it may only play.</li>
   <li><strong>Progress</strong> - ebook positions (an EPUB CFI) and film and episode positions
   (<code>t=1234.5</code>), kept only for items that exist and rate limited.</li>
   <li><strong>Setup secrets</strong> - each password, key and token a backend's setup makes, kept
   before the backend is told it, so a setup that fails half way finishes on the next attempt;
   cleared once the backend is saved.</li>
   <li><strong>Devices</strong> - who may be switched to on each shared device ("Who's listening?"),
-  keyed by a hash of the device's profile cookie.</li>
-  <li><strong>Decisions</strong>: the starter library has unpacked, new devices need approval, remote access on or off,
-  online lyrics and discovery allowed, read-along syncing manual, wrong read-along matches
-  (<code>notPairs</code>) and hand-made ones, and the key that signs device cookies.</li>
+  keyed by a hash of the device's profile cookie; and the TVs the owner has shared with the house,
+  each tied to the device it was shared from.</li>
+  <li><strong>Invitations</strong> still waiting, stored only as hashes of their tokens (twenty at
+  most).</li>
+  <li><strong>Decisions</strong>: the starter library has unpacked, new devices need approval, remote access on or off
+  (and an outside port forwarded by hand), the server's name and chosen web address, whether it may be
+  found from emberstorm.app, the household's default photo space, online lyrics and discovery allowed,
+  read-along syncing manual, wrong read-along matches (<code>notPairs</code>) and hand-made ones, and
+  the key that signs device cookies.</li>
 </ul>
 <div class="why">Why is "the starter library has unpacked" in here rather than a marker file? An
 emptied shelf and a never-used one look identical on disk, so without the flag somebody who
@@ -143,9 +149,12 @@ are left out of a move to another computer.</p>
 <ul>
   <li><strong>Downloads</strong> live in the Cache API (<code>soundstorm-offline-v1</code>), with an
   index in localStorage, keyed by the address the app would ask the server for. Songs, books,
-  films (as a file, or as an HLS playlist and its pieces) and photos.</li>
-  <li><strong>The offline shell</strong> (<code>soundstorm-offline-shell-v1</code>) lets the app open
-  with no connection, only on <code>*.emberstorm.app</code> names with a trusted certificate.</li>
+  films (as a file, or as an HLS playlist and its pieces) and photos. <strong>In the phone apps</strong>
+  they are kept by the app instead, in its own folder, which the system never clears, together with
+  a copy of the page for opening offline.</li>
+  <li><strong>The offline shell</strong> (<code>soundstorm-offline-shell-v1</code>) lets a browser open
+  the app with no connection, only on <code>*.emberstorm.app</code> names with a trusted
+  certificate.</li>
   <li><strong>Per-device settings</strong> in localStorage: streaming quality, film quality,
   visualizer timing, the station tuner, keep-the-screen-on.</li>
   <li><strong>Heard songs</strong>, the last 500 analyses, so a song played before follows its beats

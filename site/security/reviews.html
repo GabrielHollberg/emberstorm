@@ -10,8 +10,8 @@
 <body data-page="security/reviews" data-root="..">
 <main>
 <h1>The review passes</h1>
-<p class="lede">Security was reviewed ten times as the project grew, most passes by several reviewers
-at once. The later ones were run <em>blind</em>: reviewers saw the code and nothing else, because the
+<p class="lede">Security was reviewed over and over as the project grew - thirteen whole-project
+passes, and separate reviews of the installers and the box - most passes by several reviewers at once. The later ones were run <em>blind</em>: reviewers saw the code and nothing else, because the
 eyes that had not absorbed the project's reasoning were the ones that found the real bugs.</p>
 
 <div class="why">Every finding was checked against the code before anything changed, and the serious
@@ -76,7 +76,34 @@ defences are layered:</p>
   writes and unlimited video conversions; quota bypass by an upload without a length.</li>
 </ul>
 
-<h2 id="guessing">Then: guessing from many addresses</h2>
+<h2 id="eleven">Passes eleven to thirteen</h2>
+<p>After the rename, chosen names, the box and USB drives. The thirteenth was blind twice over: even its
+plan - how to split the project and what each reviewer should look for - was made by a reviewer shown
+only the code.</p>
+<ul>
+  <li><strong>Eleventh:</strong> the box's power-button password reset trusted the address a request
+  named; a few kilobytes of crafted audiobook index could exhaust memory; a PDF of unclosed titles
+  pinned a processor; a pretend TV could be used to take over a member; Open my EmberStorm followed
+  whatever address it was given. Fuzz tests for every file reader came out of it.</li>
+  <li><strong>Twelfth:</strong> the names service's sweep would have released chosen names of installs
+  without remote access; a planted profile cookie from another install; one member seeing another's
+  camera details; updates that never refreshed the compose file; a page able to point the apps' photo
+  backup at itself.</li>
+  <li><strong>Thirteenth:</strong> a member could have reached the owner's account through a shared
+  TV's commands; a photo zip that understated its entries; the button's code readable where the app's
+  container could see it; CSS references reaching the server's own addresses from inside a book.</li>
+</ul>
+
+<h2 id="setup-box">The installers and the box</h2>
+<p>The Windows setup was reviewed four times blind, each time by fresh reviewers who also walked
+real runs through the code (a fresh PC needing a restart, every permission refused, a standard
+account, an uninstall). The box was reviewed twice: its scripts, its caretaker, its build and the
+USB stick that installs it. Among what they changed: Docker's installer checked as Docker's twice
+before it runs, folders the setup makes locked to their owner, an uninstall that can always be
+finished, a box that refuses to start rather than look new when its library drive is missing, and
+updates and resets that survive a power cut.</p>
+
+<h2 id="guessing">After the tenth: guessing from many addresses</h2>
 <p>Asked about afterwards as Tor. The throttle already counts guesses per account whatever the
 address - about 1,400 a day - so many addresses buy a guesser little, but 1,400 a day is plenty
 against "password1". Three things followed (see <a href="../server/accounts.html#passwords">accounts</a>):</p>
@@ -87,6 +114,17 @@ against "password1". Three things followed (see <a href="../server/accounts.html
   the account has never used waits until a device already signed in allows it.</li>
   <li><strong>Asking everybody for a new password</strong>, and the same request made of anybody
   who signs in with a password today's rules would refuse.</li>
+</ul>
+
+<h2 id="recent">The latest review</h2>
+<ul>
+  <li>A TV switched to somebody from their phone now gets a playback-only session.</li>
+  <li>Plain http answers only at home addresses; from the internet it is sent on to https.</li>
+  <li>The setup refuses the old 0.12 Windows program, which fetched its script unchecked, and runs a
+  script beside it only when a developer asks.</li>
+  <li>The Android app needs Android 9, where an app controlling the music can be told apart.</li>
+  <li>An audiobook's pieces are sized from the file's index before they are sent, so a crafted file
+  claiming a gigantic piece is refused (16&nbsp;MB at most).</li>
 </ul>
 
 <h2 id="lessons">What the passes taught</h2>

@@ -19,7 +19,7 @@ the repository is laid out.</p>
 <div class="diagram" role="img" aria-label="Apps call the EmberStorm server over one API. The server calls each backend with an admin account it created, and each backend reads one folder of the library.">
   <div class="label">1. Apps</div>
   <div class="row">
-    <a class="box" href="../clients/web.html">Web app<small>browser, installable</small></a>
+    <a class="box" href="../clients/web.html">Web app<small>any browser</small></a>
     <a class="box" href="../clients/android.html">Android<small>phones and TVs</small></a>
     <a class="box" href="../clients/iphone.html">iPhone<small>web app in a shell</small></a>
     <a class="box" href="../clients/tv.html">Apple TV<small>native SwiftUI</small></a>
@@ -57,8 +57,8 @@ the repository is laid out.</p>
 <h3>Apps</h3>
 <p>The web app (<code>internal/webui/assets</code>) is the product: one page, <code>app.js</code>,
 covering every kind of media. The Android and iPhone apps are native shells around that same
-page, adding only what a web page cannot do - native audio for songs and books, the lock screen, hiding
-system bars, photo backup. The Apple TV has no web view, so it is the one app written natively,
+page, adding only what a web page cannot do - native audio for songs and books, the lock screen,
+downloads the system never clears, hiding system bars, photo backup. The Apple TV has no web view, so it is the one app written natively,
 against the same API the page uses.</p>
 
 <h3>The server</h3>
@@ -69,7 +69,8 @@ first start - so nobody ever logs into one.</p>
 
 <h3>Backends</h3>
 <p>Each kind of media belongs to exactly one mature open-source server, running in its own
-container on a private compose network. Only EmberStorm's port is published. Ebooks and
+container on a Docker network of its own with only EmberStorm beside it, pinned by digest. Only
+EmberStorm's port is published. Ebooks and
 documents are the exception: they need no transcoding and describe themselves, so EmberStorm
 reads those folders itself.</p>
 

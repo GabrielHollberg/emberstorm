@@ -118,9 +118,10 @@ fix, with the same repeat the user saw.</p>
 
 <h2 id="home">Home</h2>
 <p>Home is a front page, not "everything, alphabetically". The app builds most of it from
-existing calls - Continue, recently played, favorites, new music - plus <code>GET /api/home</code>,
-the newest items per shelf. That asks every source at once through
-<code>source.RecentLister</code>, five seconds each, and leaves out a shelf that fails: the
+existing calls - Continue, recently played, favorites - plus <code>GET /api/home</code>: the
+newest albums (<code>source.MusicBrowser</code>, newest first) and the newest twelve items per
+shelf. That asks every source at once through <code>source.RecentLister</code>, five seconds in
+all, and leaves out a shelf that fails: the
 search's rule again. Each backend orders by its own record of arrival:</p>
 <ul>
   <li>Jellyfin by <code>DateCreated</code>, and a series by <code>DateLastContentAdded</code>, so
@@ -146,7 +147,10 @@ places know, and neither is new:</p>
 <p>A position under half a percent is "not started" and over 98.5% is "finished"; for a film or
 episode the top is 93%, because the credits are the end. <code>source.ItemGetter</code> turns a
 stored id back into a card, through the registry - so a shelf an account can no longer see drops
-out of the row.</p>
+out of the row. Ebook places carry when they were saved, so the reader's own copy on a device is
+used only when it is newer than the server's: a place kept offline on one device never pulls back
+one read further elsewhere since. Audiobook places carry Audiobookshelf's own
+<code>lastUpdate</code> for the same reason.</p>
 <div class="why">Film positions are kept by EmberStorm, not Jellyfin, because the house shares
 one Jellyfin account: a position kept there would be everybody's - one person's half-watched
 film in another's row. Per-member Jellyfin accounts would fix that at the cost of a second
@@ -154,6 +158,19 @@ provisioning path, and buy nothing, since nobody ever sees Jellyfin's own resume
 made-up id growing the state file, a position is accepted only for an item that exists
 (<code>HasBook</code> for local books, the cached <code>HasItem</code> ownership check for
 Jellyfin).</div>
+
+<h2 id="shows">Television, show by show</h2>
+<p>Browsing the TV shelf lists shows only; a search still finds an episode by name. A show opens
+its page (<code>GET /api/tv/show</code>, <code>source.ShowBrowser</code> over Jellyfin's
+<code>/Shows/{id}/Episodes</code>): the episodes season by season, each with this person's place
+from <code>state.Progress</code> (part-watched, or finished past 93%), and what to watch now -
+carry on, the one after the last finished, or the first. <code>GET /api/tv/next</code> is the
+episode after one, for Up next. An episode Jellyfin found nothing about is named after its file.
+The owner can number a ripped disc's episodes from the show's page
+(<code>GET|POST /api/tv/numbering</code>: episodes, extras, play-alls, in rip order, renamed
+<code>Show/Season 01/Show S01E01</code> and the shelf rescanned), and check them against a free
+episode guide (<code>GET /api/tv/guide</code>, TVmaze, asked only on that tap and kept a day;
+nothing is renamed by the guide).</p>
 
 <h2 id="genres">Genres</h2>
 <p><code>GET /api/genres?kinds=</code> groups the shelves the server already lists and caches,

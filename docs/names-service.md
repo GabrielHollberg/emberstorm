@@ -1,9 +1,14 @@
 # Deploying the name service
 
 `soundstorm-names` gives every install a real name and, through it, a real
-certificate. Why it exists and what it refuses to do is in CLAUDE.md under
-"Real certificates, and the one service EmberStorm runs". This page is the
-setup, which happens once.
+certificate. It never carries media and holds no state of its own: an
+install's token is an HMAC of its id, and the DNS records at the registrar are
+the only record of anything, so once a name resolves it resolves without the
+service. It only ever points a home name at a private address, and an away
+name (`net`) at a public one only after reaching the install there to prove
+it (see `docs/remote-access.md`). It also answers "Open my EmberStorm" on the
+website, serves the apps' link files, and keeps the names owners choose. This
+page is the setup, which happens once.
 
 It needs three things: the domain at Porkbun, somewhere to run one small
 container (Railway here), and about fifteen minutes.
@@ -37,9 +42,11 @@ live under `home.emberstorm.app`, and, with remote access on,
    | `PORKBUN_API_KEY` | the `pk1_...` half |
    | `PORKBUN_SECRET_API_KEY` | the `sk1_...` half |
    | `NAMES_CLIENT_IP_HEADER` | `X-Real-IP` - the header Railway's proxy puts the caller's address in, used for rate limiting. Measured, not assumed: see below. |
-   | `NAMES_ZONE` | `emberstorm.app` - the code's default is still the old `soundstorm.dev`. |
+   | `NAMES_ZONE` | `emberstorm.app` (the default). Installs still accept names under the old `soundstorm.dev` as well, and move themselves to `emberstorm.app`. |
    | `NAMES_SITE_ORIGINS` | `https://emberstorm.app,https://www.emberstorm.app` - the website, the only page allowed to ask which installs are on a visitor's connection ("Open my EmberStorm"). |
    | `NAMES_HELD_CODES` | Optional, secret: `name=code,name=code`, for giving out a held name (a single first or last name) to somebody. |
+   | `NAMES_ANDROID_CERTS` | Optional: the Android app's signing-key fingerprints for `assetlinks.json`, comma separated. The default is the debug key the GitHub builds use and Google Play's app signing key; setting it replaces both. |
+   | `NAMES_APPLE_APPS` | Optional: the iPhone app's id for `apple-app-site-association` (default `LZA2K5LLDS.dev.soundstorm.app`). |
 
 3. **Settings → Deploy → Healthcheck path:** `/healthz`, if the setting is
    there. Optional; it lets Railway tell a working deploy from a broken one.
@@ -111,6 +118,26 @@ then real: open `http://localhost:8099` and the page should move itself to
 the router is refusing to resolve a public name that points at a home address
 (DNS rebinding protection); that is a fallback working, not a failure.
 
+## What it answers
+
+Besides registering installs and publishing their addresses and challenges:
+
+- **Open my EmberStorm** (`GET /v1/find`, for the website's origins only):
+  the installs that announced from the visitor's own internet connection, kept
+  in memory only (installs say they are still here every quarter hour,
+  `PUT /v1/here`, so a restart refills it). An owner can turn it off.
+- **`/open?to=<server>`**, which the Android and iPhone apps claim as an app
+  link; without the app it sends the browser on, but only to an install's own
+  home or away name.
+- **Chosen names** (`PUT`/`DELETE /v1/name`): `yourname.emberstorm.app`, kept
+  as a TXT claim record holding the install's id, with `yourname.home` and
+  `yourname.net` pointed at the install's own names so it can carry them on its
+  certificate. Single first and last names are held back (the Census and
+  baby-name lists built in) and say only "That name isn't available"; a name
+  let go waits a month for the install that let it go.
+- **The apps' link files** (`/.well-known/assetlinks.json`,
+  `apple-app-site-association`) on `home`, `net` and `names`.
+
 ## Limits worth knowing before there are many installs
 
 - **Let's Encrypt allows about fifty new certificates a week per registered
@@ -145,8 +172,11 @@ the router is refusing to resolve a public name that points at a home address
   in all - each can hold a record, and the zone holds 2,500. Addresses 20 an
   hour per install; the remote-access probe (`/v1/public`, which first reaches
   the install from outside to prove it is really there) 20 an hour; clearing
-  records 30 an hour. IPv6 clients are counted per /64, or one host would be a
-  fresh limit per address.
+  records 30 an hour; looking up and claiming chosen names have limits of their
+  own. IPv6 clients are counted per /64, or one host would be a fresh limit
+  per address. What anybody may ask without an install's key (finding,
+  opening, registering) is counted in a table of its own, so filling it can
+  never refuse an install's renewal.
 
 ## Abandoned installs are swept, and come back by themselves
 
@@ -162,8 +192,13 @@ a server comes back: its registration is not a record but an id and a token,
 valid for ever, so its first announce recreates the record under **the same
 name**, and a certificate that expired meanwhile renews within a minute.
 
+The same sweep lets go of a chosen name whose install is gone (no record under
+any label), of all but the newest when one install holds several, and of a
+released name once its month is up - with its home and away names.
+
 It only ever touches names shaped exactly like an install's under
-`home.emberstorm.app` and `net.emberstorm.app` - never the apex, a website, `names`, or anything else -
+`home.emberstorm.app` and `net.emberstorm.app`, and chosen names' claim records
+- never the apex, a website, `names`, or anything else -
 and skips any record without a date, such as one written before dates
 existed; that install's next announce dates it. It **refuses to run** if it
 would delete more than a quarter of all installs at once (or twenty, for a

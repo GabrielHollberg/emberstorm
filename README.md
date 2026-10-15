@@ -77,8 +77,11 @@ but yourself, and nothing to set up by hand.
   sets how much space each person gets.
 - **Send photos and videos to someone in the house.** They choose whether to
   add them, and get a copy of their own.
-- **Back up your phone** automatically with the Android app (and the iPhone
-  app, once it is out).
+- **Albums** of your own photos, and **shared albums**: invite someone in the
+  house to look, or to add their own photos too.
+- **Back up your phone** automatically with the Android or iPhone app. A phone
+  belongs to one person on each server: the app asks once, "Is this your
+  phone?", and only that person's backup runs on it.
 - **Bring your photos in from anywhere**: Google Photos, iCloud, Facebook,
   Instagram, Snapchat, Flickr, WhatsApp and Telegram downloads, cloud drives,
   SD cards and old computers. Dates and places are kept, and a photo you
@@ -96,15 +99,18 @@ but yourself, and nothing to set up by hand.
 - **Invite family with a QR code**: they scan it and choose their own password.
 - Choose which shelves each person can see, so the kids can have no films, for
   example.
-- An app for **Android** (phones, Google TV, Android TV, Fire TV), or install
-  the web app on any phone with its own icon. Apps for **iPhone** and **Apple
-  TV** are in testing and coming to the App Store.
+- An app for **Android** (phones, Google TV, Android TV and Fire TV), and apps
+  for **iPhone** and **Apple TV** in a [public beta on
+  TestFlight](https://testflight.apple.com/join/b5st2jTN). Any other phone or
+  computer uses EmberStorm in its web browser.
 - Secure (HTTPS) automatically, with nothing to set up. Reaching it from outside
   the house is optional and off until you turn it on. Passwords must be strong,
   and you can make every new device wait for approval from one already signed
   in.
-- The apps can remember **several servers** (yours and your parents', say) and
+- The apps can remember **several servers** (yours and a friend's, say) and
   switch between them.
+- **It updates itself at night** with each new signed release, and puts the old
+  version back if the new one doesn't start.
 
 <p align="center">
   <img src="web/shots/tv.png" width="780" alt="EmberStorm playing music on a TV, with a storm animation">
@@ -121,10 +127,11 @@ but yourself, and nothing to set up by hand.
 
 Phones, tablets and other computers need nothing installed: they use EmberStorm
 in their web browser. There is also
-an Android app (from the [releases page](https://github.com/GabrielHollberg/emberstorm/releases),
-the `android-` ones, which also run on Google TV, Android TV and Fire TV). The
-iPhone and Apple TV apps are in testing and not in the App Store yet; until
-then, an iPhone uses the web app.
+an Android app for Android 9 or later (from the [releases page](https://github.com/GabrielHollberg/emberstorm/releases),
+the `android-` ones, which also run on Google TV, Android TV and Fire TV;
+Google Play is coming). The iPhone and Apple TV apps are in a
+[public beta on TestFlight](https://testflight.apple.com/join/b5st2jTN) until
+they reach the App Store.
 
 ## Install
 
@@ -137,8 +144,9 @@ It is signed, so Windows lets it run. While the signature is new to
 Windows, it may still show **Windows protected your PC**: click **More info**,
 then **Run anyway**.
 
-A setup window walks you through the rest. Expect **10 to 30 minutes**, mostly
-downloading, and keep the window open until it says it's finished. Along the way:
+A setup window walks you through the rest. It asks its questions first, then
+needs nothing more from you. Expect **10 to 30 minutes**, mostly downloading,
+and keep the window open until it says it's finished. Along the way:
 
 - **Windows asks for permission** to install Docker (the engine EmberStorm runs
   on) and sometimes Windows Subsystem for Linux. Click **Yes**. The setup
@@ -147,12 +155,17 @@ downloading, and keep the window open until it says it's finished. Along the way
   Docker account is needed.
 - **You choose where to keep your library.** Keep the suggested folder, or pick
   one on another drive.
-- **"Windows Security Alert"** for Docker Desktop Backend: click **Allow access**.
-  If it asks **"Is this your home network?"**, click **Yes** at home, so your
-  phone and TV can reach EmberStorm.
+- **A PC that has never had Docker may need one restart.** The setup says so,
+  offers **Restart now**, and carries on by itself once you sign in again.
+- If it asks **"Is this your home network?"**, click **Yes** at home, so your
+  phone and TV can reach EmberStorm. If a **"Windows Security Alert"** for
+  Docker Desktop Backend appears, click **Allow access**.
 
 When it's done, click **Open EmberStorm** in the setup window. There's an
 EmberStorm icon on your desktop for next time.
+
+The program installs the newest release only after checking it is the one we
+signed; a release that fails the check is never run.
 
 <details>
 <summary>Rather paste a command? (PowerShell)</summary>
@@ -175,7 +188,9 @@ powershell -ExecutionPolicy Bypass -File "$env:TEMP\soundstorm.ps1"
    your network: click **Allow**.
 
 Afterwards the app opens EmberStorm, and the cloud it keeps in the menu bar has
-Update and Uninstall. The Terminal command below works on a Mac too.
+Update, Uninstall and **Update by itself at night**. Like the Windows program,
+it runs only a release that passes the signature check. The Terminal command
+below works on a Mac too.
 
 ### Linux
 
@@ -191,7 +206,8 @@ it all up and prints the address to open. Your computer asks for your password
 once, to install Docker. On a Mac, a Docker window may open the first time:
 click **Skip**, no Docker account is needed. On a Linux desktop it opens
 EmberStorm in your browser when it is done and adds **EmberStorm** to your app
-menu, which starts it if needed and opens it.
+menu, which starts it if needed and opens it. Later updates are checked
+against the release signature before anything runs.
 
 <details>
 <summary>Already use Docker Compose? Install by hand</summary>
@@ -240,13 +256,15 @@ like.
 
 **3. Put it on your phone.** Open **Settings → Use on your phone or TV** on the
 computer. It shows the address to type on your phone (your phone must be on the
-same Wi-Fi). Then get the app (Android: the newest `android-` file on
-the [releases page](https://github.com/GabrielHollberg/emberstorm/releases)),
-which also backs up the phone's photos. The iPhone app is coming to the App
-Store; until then an iPhone uses EmberStorm in Safari.
+same Wi-Fi). Then get the app - Android: the newest `android-` file on
+the [releases page](https://github.com/GabrielHollberg/emberstorm/releases);
+iPhone: the [TestFlight beta](https://testflight.apple.com/join/b5st2jTN) -
+which finds the server on your Wi-Fi by itself and can back up the phone's
+photos. Without the app, a phone uses EmberStorm in its browser.
 
-**4. Add your family.** **Settings → People**: give each person a name and a
-password, tick which shelves they may see, and set their photo space if you
+**4. Add your family.** **Settings → People → Invite someone** makes a QR code
+they scan to choose their own password (or give a person a name and password
+yourself). Tick which shelves each may see, and set their photo space if you
 like (100 GB each unless you change it).
 
 **5. Bring your photos in.** **Settings → Your photos → Bring your photos in
@@ -279,18 +297,21 @@ Details are in the [user guide](docs/guide.md#away-from-home).
 
 | | Windows | Mac and Linux |
 | --- | --- | --- |
-| **Update** | Start menu → **Update EmberStorm** | The Mac app: the cloud in the menu bar → Update. Otherwise run the install command again |
+| **Update** | By itself at night; or Start menu → **Update EmberStorm** | By itself at night; or the Mac app's cloud in the menu bar → Update. Linux: `sh ~/soundstorm/emberstorm-update.sh` |
 | **Start / stop** | The desktop icon starts it; it also starts with Windows | `docker compose up -d` / `docker compose down` in the install folder |
 | **Move to a new computer** | Start menu → **Move EmberStorm to another computer** | `install.sh` with `--export` ([guide](docs/guide.md#moving-to-another-computer)) |
 | **Uninstall** | Settings → Apps → EmberStorm → Uninstall | The Mac app: the cloud in the menu bar → Uninstall. Linux: right-click EmberStorm in the app menu → Uninstall EmberStorm, or `sh ~/soundstorm/emberstorm-uninstall.sh` |
 
-Updating keeps your library, accounts and settings. **Uninstalling never deletes
-your media**: the `library` folder is left where it is.
+Updating keeps your library, accounts and settings. **Settings → About** says
+when a newer release is out, and **Settings → The computer EmberStorm runs on**
+says how to turn night updates off. **Uninstalling never deletes your media**:
+the `library` folder is left where it is, and it asks before putting back
+anything the setup changed (Docker, sleep settings and so on).
 
 **Back it up.** One small file holds every account and the passwords
 EmberStorm made for the media servers inside it. See
-[Backing up](docs/guide.md#backing-it-up). The uninstaller saves one for you
-automatically.
+[Backing up](docs/guide.md#backing-it-up). The uninstaller offers to save one for you
+before it removes anything.
 
 **Forgot your password?** See [Getting back in](docs/guide.md#forgotten-your-password).
 
@@ -336,13 +357,25 @@ contacts the internet for:
   [Let's Encrypt](https://letsencrypt.org). It knows your server's *home
   network* address, and its internet address only if you turn on remote
   access. It never carries your media.
-- **Updates**, only when you run them: the programs are downloaded from
-  GitHub's and Docker's registries. EmberStorm does not check for updates by
-  itself.
+- **Finding it from emberstorm.app.** Unless you turn off *Open from
+  emberstorm.app at home* (Settings → Your web address), the name service also
+  notes which internet connection your server is on, kept in memory only, so
+  the website's **Open my EmberStorm** button can take anyone on that
+  connection straight to it.
+- **Updates.** Twice a day the server looks at the newest signed release on
+  GitHub and tells the owner in **Settings → About** when there is a newer one
+  (`SOUNDSTORM_UPDATE_CHECK=off` stops it looking). A computer install then
+  updates itself at night, downloading the release from GitHub's and Docker's
+  registries, unless night updates are turned off
+  (`SOUNDSTORM_AUTO_UPDATE=off`).
 - **Things you switch on**, all off by default: finding missing lyrics online
   ([LRCLIB](https://lrclib.net)), artist bios and similar artists
   ([MusicBrainz](https://musicbrainz.org), [ListenBrainz](https://listenbrainz.org),
-  Wikipedia), remote access, scrobbling, and importing from Plex.
+  Wikipedia), remote access, and scrobbling, which sends each person's plays to
+  the ListenBrainz account they connected themselves.
+- **Things you tap**, only when you do: importing playlists from Plex, and
+  checking a show's episodes against the free [TVmaze](https://www.tvmaze.com)
+  episode guide, which tells it which show you are looking at.
 
 The media servers it runs also go online on their own, for their usual jobs:
 Jellyfin looks up film and show details and posters (from TheMovieDb and
@@ -386,8 +419,9 @@ EmberStorm is designed and run by one person, and most of its code is written
 with an AI assistant ([Claude](https://www.anthropic.com/claude)), working to
 that person's decisions. Each change is checked on a running server before it
 ships, the code has had several rounds of security review, and the reasons
-behind each design choice are written down in [`site/`](site/index.html) and
-[`CLAUDE.md`](CLAUDE.md), so anyone can see why it is built the way it is.
+behind each design choice are written down in [`site/`](site/index.html), so
+anyone can see why it is built the way it is. Found a security problem? See
+[SECURITY.md](SECURITY.md).
 
 ## Support EmberStorm
 

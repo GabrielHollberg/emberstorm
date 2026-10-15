@@ -27,9 +27,10 @@ Everything beyond the [README](../README.md)'s getting-started steps.
 
 The tabs are along the bottom of a phone and down the side of a computer:
 **Home**, **Music**, **Watch** (films and TV), **Books** (audiobooks, ebooks,
-documents) and **Photos**. A tab with nothing in it is hidden. **Settings** is
-in the menu under your picture (or initial) at the top right; on a TV it heads
-the side bar.
+documents) and **Photos**, then **Settings**. A tab with nothing in it is
+hidden. On a TV, Settings heads the side bar. Your picture (or initial) at the
+top right opens a menu with your picture, **Change person**, **Change server**
+(in the phone apps) and **Sign out**.
 
 **Home** starts with what you're part way through (**Continue**), then what you
 played recently, what's new on every shelf, and your favorites. Typing in the
@@ -204,6 +205,13 @@ the default), *Always original*, *Standard* (about 20 Mbps) or *Data saver*
 watching, and the next episode. **Downloading** a film asks which quality, and
 which audio language when there's more than one.
 
+**Fixing how a film or show looks**, from its hold menu: anybody can **Change
+cover** for themselves. The owner also has **Find the right film** (or show)
+when the wrong one was recognised, **Choose a poster** from the online
+databases, and for a show ripped from a disc, **Number the episodes**, which
+puts the files in order and names them so they are recognised (with an
+optional check against the free TVmaze episode guide).
+
 ## Books
 
 **Books** has **Audiobooks**, **Ebooks** and **Documents**, plus **Authors**
@@ -218,21 +226,29 @@ and **Series** across both kinds of book.
   kept, and it's the same place the Audiobookshelf phone app uses.
 - **Ebooks** (EPUB and PDF) open in the reader. Swipe or tap the sides to turn
   pages. Your place is kept across devices. You can read while music plays.
+  In an EPUB, **double-tap** to switch between the pages, one line of text
+  gliding by, and a word at a time; with no audiobook, a bar sets your own
+  speed in words a minute.
 - **Make an audiobook** (an ebook's hold menu) reads it aloud with an AI
   voice, and **Make an ebook** (an audiobook's) writes one from the recording,
   both on your own server, in the background. The owner can do it, and anyone
   given permission under **People**.
 - **Read along** lists every book you have both as an ebook and as an
   audiobook. Tap one: the audiobook plays and the book opens, turning the pages
-  and highlighting the sentence being read. Each book is prepared once in the
+  and highlighting the sentence being read (double-tap for the line or
+  word-at-a-time views, following the narrator). Each book is prepared once in the
   background (about 40 minutes for a 10-hour book). The screen stays on while
   it follows. If a book and an audiobook weren't matched, the owner can pair
   them from the book's hold menu; a wrong match can be undone the same way.
 
 ## Photos
 
-**Photos** shows your pictures newest first, with **People**, **Places** and
-**On this day**. Search by what's in a picture. Tap one to open it:
+**Photos** is a timeline of months and days, newest first: drag the handle at
+the right edge to fly through the years, pinch to fit more or fewer in a row,
+and the video nearest the middle plays a silent preview as you scroll. Its
+categories are **Photos** (stills), **Photos & videos**, **Albums**,
+**People**, **Places**, **Videos**, **Live photos** and **Favorites**; **On
+this day** is on Home. Search by what's in a picture. Tap one to open it:
 
 - **Phone:** swipe between photos, swipe down to close, and pinch or
   double-tap to zoom.
@@ -249,14 +265,28 @@ shared ones outside `Personal/`, but not other people's. **Settings → Your pho
 how much space you've used. The owner sets each person's space under
 **Settings → People** (100 GB unless changed); the owner's own has no limit.
 
-**Phone backup.** In the Android and iPhone apps, **Settings → Your photos →
-Back up this phone's photos** sends new photos and videos to your folder in the
-background: on Wi-Fi only unless you untick it, videos too unless you untick
-that, and only while charging if you ask. The app asks once, after you sign in.
-It shows how far it has got, down to the file it's sending ("Sending a video:
-240 of 600 MB"), and photos already on the server are never sent twice, even
-after reinstalling the app or on a new phone. On a shared phone, signing out
-turns backup off, so the next person's photos never go into your folder.
+**Albums.** Hold a photo, choose **Select**, pick some and choose **Add to
+album...**, or make one under **Albums**. An album's **Share** invites others
+in the house, to look only or to add their own photos too; they accept or
+decline from a card in their Photos. Photos in a shared album stay the owner's;
+**Save to my photos** makes your own copies.
+
+**Send to...** (a photo's or a selection's menu) sends photos and videos to
+someone else in the house. They choose **Add to my photos** or **No thanks**,
+and what they add becomes a copy of their own.
+
+**Phone backup.** In the Android and iPhone apps, **Settings → Your photos**
+can send new photos and videos to your folder in the background: on Wi-Fi only
+unless you untick it, videos too unless you untick that, and only while
+charging if you ask. A phone backs up for one person on each server: the first
+time someone signs in there, the app asks **"Is this your phone?"** Saying yes
+only lets you turn backup on later in Settings; nobody else on that server sees
+the switch, and backup waits while someone else is signed in. **This isn't my
+phone** lets it go (a card offers **This is my phone** while nobody has claimed
+it). A phone can back up to several servers, one account on each. It shows how
+far it has got, down to the file it's sending ("Sending a video: 240 of 600
+MB"), and photos already on the server are never sent twice, even after
+reinstalling the app or on a new phone.
 
 **Bring your photos in from anywhere.** Under **Settings → Your photos**, each
 place your photos might be has its own steps: Google Photos (Takeout), iCloud,
@@ -314,11 +344,15 @@ Favorites, playlists and history belong to each person.
 **Download** songs, albums, playlists, audiobooks, ebooks, films, episodes and
 photos from their menus. **Settings → Downloads** has **Download all** for a
 whole shelf, and manages what's on the device. Downloaded things always play
-from the device, and show a small green tick.
+from the device, and show a small green tick. In the Android and iPhone apps,
+downloads are kept by the app itself, so the phone never clears them to make
+room; only you remove them.
 
 Without a connection, EmberStorm keeps working and shows only what's downloaded.
-On the secure `….emberstorm.app` address it even opens with no connection at
-all. Signing out removes downloads from that device.
+The apps, and a browser on the secure `….emberstorm.app` address, even open with
+no connection at all, saying "Offline: showing what's downloaded on this
+device", and switch back by themselves when the server answers again. Signing
+out removes downloads from that device.
 
 ## Deleting things
 
@@ -376,9 +410,8 @@ household default can be changed too).
   **Keep me on this device** when signing in (ticked already on a TV), and
   next time pick yourself instead of typing a password. A TV asks every time
   it opens; elsewhere, tap your picture at the top right and choose **Change
-  person** (that menu also has **Change server** in the phone apps, and
-  **Sign out**), or **Settings → On this device → Switch person**. Settings
-  itself is the last tab (on a TV, the top of the side bar). Set a PIN there and switching to you asks for it - without one, anybody at a
+  person**, or **Settings → On this device → Switch person**. Set a PIN there
+  and switching to you asks for it - without one, anybody at a
   device you're kept on can switch to you. The owner always needs their PIN,
   or their password if they have none. **Sign out** takes you off that device;
   a new password takes you off every device.
@@ -393,28 +426,44 @@ household default can be changed too).
 ## On your phone, TV or another computer
 
 Use the computer's address with port 8099, for example
-`http://192.168.1.50:8099`. **Settings → Use on your phone or TV** shows it with
-a Copy button.
+`http://192.168.0.50:8099`. **Settings → Use on your phone or TV** shows it with
+a Copy button. The apps find the server on your Wi-Fi by themselves.
 
 Within a minute of starting, EmberStorm also gets a secure address like
 `https://k3x9m2p7qa.home.emberstorm.app:8099`, which it moves to by itself.
 The owner can choose an easier one under **Settings → Your web address**
-(`yourname.home.emberstorm.app`).
+(`yourname.home.emberstorm.app`). With no bookmark, **Open my EmberStorm** on
+[emberstorm.app](https://emberstorm.app) finds your server from any device on
+your home internet (switch that off with *Open from emberstorm.app at home*).
 
 **The apps:**
-- **Android** (phones, and Google TV, Android TV and Fire TV): the newest
-  `android-` file on the [releases page](https://github.com/GabrielHollberg/emberstorm/releases).
+- **Android** (phones, and Google TV, Android TV and Fire TV; Android 9 or
+  later): the newest `android-` file on the
+  [releases page](https://github.com/GabrielHollberg/emberstorm/releases).
+  Google Play is coming.
   Music plays like any music app's, with the lock screen, Bluetooth and car
   controls, and it can back up the phone's photos. On a TV it's driven by the
   remote: the arrows move, OK plays, Back goes back.
-- **iPhone** and **Apple TV**: EmberStorm apps, in testing on TestFlight (not
+- **iPhone** and **Apple TV**: EmberStorm apps, in a
+  [public beta on TestFlight](https://testflight.apple.com/join/b5st2jTN) (not
   in the App Store yet). The iPhone app can
   back up the phone's photos. The Apple TV app plays music with every
   visualizer, radio and lyrics, films and TV with subtitles and audio
   languages, audiobooks by chapter, photos, ebooks and Read along.
 
+**Playing on the TV from your phone.** The device button at the top of the
+app lists this phone and the TVs in the house. Choose a TV and what you play
+goes there, while your phone's own Now Playing, film player or photo viewer
+controls it (the phone's volume buttons too, in the apps). Choose the phone
+again and the TV plays on. A TV signed in as the owner is shared with the house
+by itself; anyone else's the owner shares once, from that list (**Settings →
+Shared TVs** stops sharing). Sending to a shared TV switches it to you,
+asking whoever is using it first. A TV switched to you this way is signed in
+for **playing only**: your People, passwords and settings stay off it until you
+choose yourself there in **Who's listening?** with your PIN or password.
+
 **More than one server.** The apps remember every server you connect to - your
-own, and a parent's, say - under **Your servers** on the connect screen
+own, and a friend's, say - under **Your servers** on the connect screen
 (**Change server** in Settings gets you there). The newest is at the top, tap
 one to switch, and hold one to rename or remove it. You stay signed in to each,
 so switching back asks for nothing.
@@ -430,7 +479,8 @@ Worth doing:
 ## Away from home
 
 The secure `….home.emberstorm.app` address only works on your own Wi-Fi, on
-purpose. For everywhere else there are two ways.
+purpose, and so does the plain `http://` address: a visit from the internet is
+sent on to https. For everywhere else there are two ways.
 
 ### Remote access
 
@@ -446,7 +496,7 @@ the link and people reach your sign-in page, with no app to install.
 - **Where forwarding is impossible**, because your provider shares one address
   between many homes (carrier-grade NAT), it says so and points you to
   Tailscale.
-- **Two EmberStorms in one house** (say a box and a computer) can both be
+- **Two EmberStorms in one house** (say on two computers) can both be
   reached. The second gets the next outside port (8100 and up) by itself when
   the router opens ports automatically, and its away address carries that
   port. Without automatic port opening, forward another outside port to the
@@ -496,15 +546,25 @@ emptied library. Network drives can't be used on Windows.
 
 ## Updating
 
-- **Windows:** Start menu → **Update EmberStorm**.
+**EmberStorm updates itself at night**, between 2 and 5, with the newest
+release - and only a release whose list of files is signed with the release
+key and checks out. If the new version doesn't start, the old one is put back.
+**Settings → About** tells the owner when a newer release is out (the server
+looks twice a day). **Settings → The computer EmberStorm runs on** says how to
+turn night updates off on each kind of computer.
+
+To update now:
+
+- **Windows:** Start menu → **Update EmberStorm**. (Night updates are a task,
+  "EmberStorm update", in Task Scheduler.)
 - **Mac, set up with the EmberStorm app:** the cloud in the menu bar → **Update
-  EmberStorm…**.
-- **Mac and Linux, set up from Terminal:** run the install command again.
+  EmberStorm…**; **Update by itself at night** is ticked in the same menu.
+- **Linux:** `sh ~/soundstorm/emberstorm-update.sh` (`--auto-off` and
+  `--auto-on` turn night updates off and on), or run the install command again.
 - **By hand:** `docker compose pull && docker compose up -d` in the install
   folder.
 
-Your library, accounts and settings are kept. EmberStorm doesn't check for
-updates by itself: an update is whenever you run one of these.
+Your library, accounts and settings are kept.
 
 ## Backing it up
 
@@ -536,7 +596,7 @@ docker compose up -d
 ```
 
 Restoring refuses anything that isn't an EmberStorm backup, and keeps what it
-replaced as `state.json.bak`. The uninstaller saves a backup automatically before
+replaced as `state.json.bak`. The uninstaller offers to save one (ticked) before
 removing anything.
 
 ## Forgotten your password
@@ -579,14 +639,19 @@ computer** (`site/operations/move.html`).
 - **Mac, set up with the EmberStorm app:** click the cloud in the menu bar (top
   right of the screen) → **Uninstall EmberStorm…**. The app's own menu
   (EmberStorm → Uninstall EmberStorm…) does the same.
+- **Linux:** right-click **EmberStorm** in the app menu → **Uninstall
+  EmberStorm**, or `sh ~/soundstorm/emberstorm-uninstall.sh`.
 - **Mac and Linux, set up from Terminal:**
   ```sh
   curl -fsSL https://raw.githubusercontent.com/GabrielHollberg/emberstorm/main/install.sh | sh -s -- --uninstall
   ```
 
 This removes EmberStorm and the media servers' data. **Your media is never
-touched**: the `library` folder stays, and the uninstaller says where. Docker
-stays installed.
+touched**: the `library` folder stays, and the uninstaller says where. It asks
+first: whether to keep a copy of the accounts (ticked), and, one by one,
+whether to put back what the setup changed. Removing Docker (offered only when
+the setup installed it) and letting the computer sleep again are left unticked,
+as you may rely on them by now.
 
 ## Security and HTTPS
 
@@ -598,17 +663,20 @@ access). Your media, searches and passwords never go near it. If it's ever
 down, EmberStorm carries on with the certificate it has.
 
 **What goes online.** EmberStorm sends no usage data, and switches off the
-music server's. Beyond the name service and Let's Encrypt, it only goes out for
-what the owner turns on (online lyrics, music discovery, scrobbling, a Plex
-import when you run one). The media servers behind it do go online by
+music server's. Beyond the name service, Let's Encrypt and looking for new
+releases, it only goes out for what the owner turns on (online lyrics, music
+discovery, scrobbling) or what somebody taps (a Plex import, the TVmaze episode
+guide). The media servers behind it do go online by
 themselves: the film server fetches posters and details, the photo server
 downloads its recognition models and checks for new versions, and the
 read-along and transcription helpers fetch their models or changelog.
 Installing and updating download the programs from GitHub's and Docker's
-registries.
+registries, and every release's list of files is signed and checked before
+anything runs.
 
 If your router refuses the name (some do), EmberStorm simply stays on the plain
-address.
+address. Plain `http://` answers only at home; from the internet, visitors are
+sent on to https.
 
 **Other choices**, set in the `.env` file in the install folder, then
 `docker compose up -d`:
@@ -623,8 +691,9 @@ address.
 If the server's address changes, update `SOUNDSTORM_TLS_HOSTS` in `.env` (the
 installer does this for you on Windows), or give the computer a fixed address.
 
-EmberStorm hasn't had an independent security audit. Its own security reviews
-are recorded in the repository. Putting any home server on the internet is a
+EmberStorm hasn't had an independent security audit, though it has had several
+rounds of its own security review. To report a problem, see
+[SECURITY.md](../SECURITY.md). Putting any home server on the internet is a
 decision worth making deliberately, which is why remote access is off until you
 turn it on.
 
@@ -643,6 +712,8 @@ it, run `docker compose up -d`.
 | `SOUNDSTORM_REMOTE_ACCESS` | `on` to reach it from anywhere (also a switch in Settings) |
 | `SOUNDSTORM_TRUST_PROXY` | `true` behind your own reverse proxy that terminates HTTPS |
 | `SOUNDSTORM_IMAGE` | Which EmberStorm image to run, to hold a specific version |
+| `SOUNDSTORM_AUTO_UPDATE` | `off` stops the computer updating itself at night |
+| `SOUNDSTORM_UPDATE_CHECK` | `off` stops the server looking for new releases |
 
 Useful commands, in the install folder:
 
@@ -657,7 +728,10 @@ Docker on Linux, Docker Desktop on a Mac, asking for the computer's password
 once) and starts it when it is stopped. On a Mac a Docker window may open the
 first time: click Skip, no account is needed.
 
-Windows specifics: the setup installs Docker Desktop with `winget` and tries
-to answer its first questions for you (no account is needed; if a Docker window
-does ask something, Accept its terms and Skip the rest), starts it when needed, picks the next free port if 8099 is taken, and adds desktop, Start
-menu and start-up shortcuts. It keeps a log at `%TEMP%\EmberStorm-setup.log`.
+Windows specifics: the setup installs Docker Desktop from Docker's own
+installer, checked as signed by Docker, and tries to answer its first questions
+for you (no account is needed; if a Docker window does ask something, Accept
+its terms and Skip the rest). It starts Docker when needed, keeps Docker's data
+on the library's drive when that is another drive inside the PC, picks the next
+free port if 8099 is taken, and adds desktop, Start menu and start-up
+shortcuts. It keeps a log at `%TEMP%\EmberStorm-setup.log`.
