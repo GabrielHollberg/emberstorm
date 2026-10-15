@@ -14,8 +14,8 @@ Jellyfin's work, not EmberStorm's. EmberStorm owns login, search, playback and
 the bytes, and deliberately does **not** own transcoding, metadata scraping or
 library scanning.
 
-`CLAUDE.md` in the repository root is the long-form design record: every
-decision, and the reason for it, including the ones that were reversed.
+The documentation site (`site/`, under Architecture) is the design record:
+the decisions, and the reasons for them, including the ones that were reversed.
 
 ## Building and running
 

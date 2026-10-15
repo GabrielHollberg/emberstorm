@@ -1,6 +1,6 @@
 #!/bin/sh
 # Boots box/out/soundstorm-box.qcow2 as a pretend box: UEFI, the image as the
-# system disk, and a blank second disk as the data drive - the ME Mini's
+# system disk, and a blank second disk as the data drive - the test mini PC's
 # eMMC and NVMe drive. Run as root where box/build.sh ran:
 #
 #   wsl -d Debian -u root -- sh box/run-vm.sh          start it
@@ -17,7 +17,7 @@
 # SoundStorm answers at http://localhost:8399, SSH (a DEV_SSH build) at
 # localhost port 2222, and the console is written to box/out/vm/console.log.
 #
-# The box has a USB controller, as the ME Mini does, and QEMU's monitor
+# The box has a USB controller, as the test mini PC does, and QEMU's monitor
 # listens on box/out/vm/monitor.sock - which is how a USB drive is plugged in
 # and pulled out, and the power button pressed:
 #
@@ -98,7 +98,7 @@ if [ -f "$vm/qemu.pid" ] && kill -0 "$(cat "$vm/qemu.pid")" 2>/dev/null; then
 fi
 
 # The system disk is a layer over the built image, so the image stays as
-# built; 64G like the ME Mini's eMMC (it only takes what is written).
+# built; 64G like an eMMC (it only takes what is written).
 [ -f "$vm/system.qcow2" ] ||
 	qemu-img create -q -f qcow2 -b "$out/soundstorm-box.qcow2" -F qcow2 "$vm/system.qcow2" "$sysize"
 [ -z "$datadev" ] || [ -f "$vm/data.qcow2" ] || qemu-img create -q -f qcow2 "$vm/data.qcow2" 1T

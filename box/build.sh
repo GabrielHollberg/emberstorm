@@ -19,7 +19,7 @@
 #   RELEASES=URL     where this box looks for updates (a development box's
 #                    own test channel; the default is the published one)
 #   SIZE=28G         the system disk's size; it grows to fill the real disk
-#                    (the ME Mini's 64GB eMMC) on first boot
+#                    (a 64GB eMMC) on first boot
 #   SERIAL=N         the release the box's images are (box/release.sh's
 #                    serial): the box never installs one not newer
 #   PRODUCTION=1     a box to sell: refuses DEV_SSH, another release channel,
