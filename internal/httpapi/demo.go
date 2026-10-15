@@ -68,3 +68,15 @@ func demoMayChange(r *http.Request) bool {
 	}
 	return false
 }
+
+// limitedMayChange is what a TV switched to somebody from their phone may
+// change (auth.PlaybackSessionFor): what playing does, as the demo may - not
+// signing another TV in or allowing a new sign-in, which would hand on the
+// account it holds only to play. Anything else is the account's, asked for
+// by choosing oneself in "Who's listening?".
+func limitedMayChange(r *http.Request) bool {
+	if strings.HasPrefix(r.URL.Path, "/api/link/code/") || strings.HasPrefix(r.URL.Path, "/api/devices/pending/") {
+		return r.Method == http.MethodGet || r.Method == http.MethodHead
+	}
+	return demoMayChange(r)
+}

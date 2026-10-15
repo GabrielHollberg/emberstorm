@@ -716,7 +716,9 @@ func (s *Server) handlePlayerSwitch(w http.ResponseWriter, r *http.Request) {
 	}
 	h.mu.Unlock()
 	s.auth.Revoke(r)
-	token, expiry, err := s.auth.SessionFor(user)
+	// For playing only: whoever is at the TV gets this person's music and
+	// films, not their account (auth.PlaybackSessionFor).
+	token, expiry, err := s.auth.PlaybackSessionFor(user)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not switch")
 		return

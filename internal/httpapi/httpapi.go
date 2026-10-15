@@ -803,6 +803,13 @@ func (s *Server) withUserContext(next http.Handler) http.Handler {
 			})
 			return
 		}
+		if auth.IsLimited(r.Context()) && !limitedMayChange(r) {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"error":   auth.LimitedMessage,
+				"limited": true,
+			})
+			return
+		}
 		if s.isDemo(user) && !demoMayChange(r) {
 			writeJSON(w, http.StatusForbidden, map[string]any{
 				"error": "This is a demo, so that can't be changed here.",
@@ -915,6 +922,17 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		s.auth.RefreshCookie(w, r)
 		answer["signedIn"] = true
 		answer["user"] = s.withPicture(publicUser(user), user.ID)
+		// A TV switched to this person from a phone: it plays, and the page
+		// offers nothing an owner or account holder changes.
+		if s.auth.Limited(r) {
+			answer["limited"] = true
+			if u, ok := answer["user"].(map[string]any); ok {
+				u["owner"] = false
+			}
+			// And nothing below that only the owner is told: this answer's
+			// copy of the account is a member's.
+			user.Role = state.RoleMember
+		}
 		// Remote-access state, for the account panel: whether it can be offered
 		// at all, whether it is on, and the address to reach the server by from
 		// away once it is up. Only to a signed-in account - it is config, not

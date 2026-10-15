@@ -72,6 +72,7 @@ async function api(path, options = {}) {
   if (resp.status === 403 && body && body.mustRenew) showRenew();
   // The public demo refused a change (demo.go): said, wherever it was asked.
   if (resp.status === 403 && body && body.demo) showToast(body.error || 'This is a demo.');
+  if (resp.status === 403 && body && body.limited) showToast(body.error || 'This TV is signed in for playing only.');
   return { ok: resp.ok, status: resp.status, body };
 }
 
@@ -1121,6 +1122,7 @@ async function showApp(me) {
   if (me && !state.sessionRead) {
     const s = await api('/api/session');
     document.body.classList.toggle('demo-account', Boolean(s.ok && s.body && s.body.demo === true));
+    document.body.classList.toggle('playing-only', Boolean(s.ok && s.body && s.body.limited === true));
   }
   state.sessionRead = false;
   // An invitation opened while signed in: it is for somebody else.
@@ -6682,6 +6684,8 @@ async function moveToSecureName(name) {
       state.approveNewDevices = Boolean(body.approveNewDevices);
       // The public demo's account (demo.go): the strip under the header.
       document.body.classList.toggle('demo-account', body.demo === true);
+      // A TV switched to this person from their phone: playing only.
+      document.body.classList.toggle('playing-only', body.limited === true);
       state.sessionRead = true;
       showApp(body.user);
       setTimeout(adoptNativePlayback, 0);

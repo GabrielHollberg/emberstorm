@@ -378,6 +378,9 @@ func (u User) IsOwner() bool { return u.Role == RoleOwner }
 type Session struct {
 	UserID  string    `json:"userId"`
 	Expires time.Time `json:"expires"`
+	// Limited is a TV switched to its person from a phone: it plays, and
+	// changes nothing but what playing does (httpapi's limitedMayChange).
+	Limited bool `json:"limited,omitempty"`
 }
 
 // UnmarshalJSON accepts both the current shape and the one that came before
@@ -1438,12 +1441,31 @@ func (s *Store) SetProgress(key string, p Progress, prefix string, maxKeys int) 
 // The token itself is never written - only its hash. See
 // hashSessionTokensLocked for why.
 func (s *Store) AddSession(token, userID string, expiry time.Time) error {
+	return s.addSession(token, Session{UserID: userID, Expires: expiry})
+}
+
+// AddLimitedSession records a session that may only play (Session.Limited).
+func (s *Store) AddLimitedSession(token, userID string, expiry time.Time) error {
+	return s.addSession(token, Session{UserID: userID, Expires: expiry, Limited: true})
+}
+
+func (s *Store) addSession(token string, session Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pruneLocked()
-	s.capSessionsLocked(userID, maxSessionsPerUser-1)
-	s.d.Sessions[hashSessionToken(token)] = Session{UserID: userID, Expires: expiry}
+	s.capSessionsLocked(session.UserID, maxSessionsPerUser-1)
+	s.d.Sessions[hashSessionToken(token)] = session
 	return s.save()
+}
+
+// SessionLimited reports whether a live session may only play.
+func (s *Store) SessionLimited(token string) bool {
+	if token == "" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.d.Sessions[hashSessionToken(token)].Limited
 }
 
 // maxSessionsPerUser bounds how many signed-in devices one account keeps. Each

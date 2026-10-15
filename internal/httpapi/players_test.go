@@ -303,3 +303,79 @@ func TestATVsCommandsAreOnlyTheTVs(t *testing.T) {
 		t.Fatalf("mallory's phone used the TV's switch code: %d", resp.StatusCode)
 	}
 }
+
+// A shared TV switched to somebody from their phone plays as them and does
+// nothing else of their account's: the owner's People, passwords and
+// settings stay off it - a family-room TV, or a browser pretending to be one
+// - until they choose themselves there with their password or PIN.
+func TestATVSwitchedFromAPhoneOnlyPlays(t *testing.T) {
+	h := newHarness(t)
+	h.signUp(t) // gabe, the owner
+	if resp, body := h.do(t, http.MethodPost, "/api/users", `{"username":"mallory","password":"violet tractor glacier"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("adding mallory: %d %s", resp.StatusCode, body)
+	}
+	_, body := h.do(t, http.MethodGet, "/api/session", "")
+	var me struct {
+		User struct{ ID string } `json:"user"`
+	}
+	_ = json.Unmarshal(body, &me)
+	tvDevice := h.another(t)
+	signInAs(t, tvDevice, "gabe", "correct horse")
+	tv := "aaaaaaaaaaaaaaaa7777"
+	tvDevice.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+tv+`","name":"Living room TV","tv":true}`)
+	switchTV := func(from *harness) {
+		t.Helper()
+		if resp, body := from.do(t, http.MethodPost, "/api/players/"+tv+"/command", `{"type":"claim"}`); resp.StatusCode != http.StatusOK {
+			t.Fatalf("claiming the TV: %d %s", resp.StatusCode, body)
+		}
+		_, body := tvDevice.do(t, http.MethodGet, "/api/players/"+tv+"/next", "")
+		var next struct {
+			Commands []map[string]any `json:"commands"`
+		}
+		_ = json.Unmarshal(body, &next)
+		if len(next.Commands) == 0 || next.Commands[0]["type"] != "switch" {
+			t.Fatalf("the TV should be told to switch: %s", body)
+		}
+		code := next.Commands[0]["code"].(string)
+		if resp, _ := tvDevice.do(t, http.MethodPost, "/api/players/switch", `{"code":"`+code+`","id":"`+tv+`"}`); resp.StatusCode != http.StatusOK {
+			t.Fatalf("the TV switches: %d", resp.StatusCode)
+		}
+	}
+	phone := h.another(t)
+	signInAs(t, phone, "mallory", "violet tractor glacier")
+	switchTV(phone) // to mallory
+	switchTV(h)     // and back to the owner, from the owner's phone
+
+	_, body = tvDevice.do(t, http.MethodGet, "/api/session", "")
+	if !strings.Contains(string(body), `"limited": true`) || !strings.Contains(string(body), `"owner": false`) {
+		t.Fatalf("the TV's session should say it only plays: %s", body)
+	}
+	limited := func(method, path, body string) {
+		t.Helper()
+		resp, got := tvDevice.do(t, method, path, body)
+		if resp.StatusCode != http.StatusForbidden || !strings.Contains(string(got), "limited") {
+			t.Errorf("%s %s from the TV: %d %s, want refused as playing only", method, path, resp.StatusCode, got)
+		}
+	}
+	limited(http.MethodGet, "/api/users", "")
+	limited(http.MethodPost, "/api/users", `{"username":"eve","password":"violet tractor glacier"}`)
+	limited(http.MethodPut, "/api/remote", `{"enabled":false}`)
+	limited(http.MethodPost, "/api/account/password", `{"current":"correct horse","password":"a whole new tractor"}`)
+	limited(http.MethodPost, "/api/link/code/ABC123", "")
+	limited(http.MethodPost, "/api/devices/pending/x", `{"allow":true}`)
+	limited(http.MethodPost, "/api/delete", `{"items":[]}`)
+	// Playing goes on: the library, and what playing changes.
+	if resp, got := tvDevice.do(t, http.MethodGet, "/api/library", ""); resp.StatusCode != http.StatusOK {
+		t.Errorf("the library from the TV: %d %s", resp.StatusCode, got)
+	}
+	if resp, got := tvDevice.do(t, http.MethodPost, "/api/players/hello", `{"id":"`+tv+`","name":"Living room TV","tv":true}`); resp.StatusCode != http.StatusOK {
+		t.Errorf("the TV says hello: %d %s", resp.StatusCode, got)
+	}
+	// Choosing himself there, with his password, gives the owner his account.
+	if resp, got := tvDevice.do(t, http.MethodPost, "/api/profiles/switch", `{"id":"`+me.User.ID+`","password":"correct horse"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("the owner chooses himself on the TV: %d %s", resp.StatusCode, got)
+	}
+	if resp, got := tvDevice.do(t, http.MethodGet, "/api/users", ""); resp.StatusCode != http.StatusOK {
+		t.Fatalf("People after choosing himself: %d %s", resp.StatusCode, got)
+	}
+}

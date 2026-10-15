@@ -2884,6 +2884,12 @@ body.offline-mode .offline-strip {
 }
 body.offline-mode .item-more { display: none; }
 /* The public demo's account: one quiet line under the header. */
+/* A TV switched to somebody from their phone plays only (auth.PlaybackSessionFor). */
+.playing-only { display: none; }
+body.playing-only .playing-only {
+  display: block; margin: 0 0 14px; padding: 10px 14px; font-size: 14px;
+  color: var(--muted, #aab3c2); background: #121822; border-radius: 10px;
+}
 .demo-strip { display: none; }
 body.demo-account .demo-strip {
   display: block; padding: 6px 14px; font-size: 13px; text-align: center;

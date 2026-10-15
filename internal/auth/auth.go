@@ -135,6 +135,22 @@ func WithUser(ctx context.Context, u state.User) context.Context {
 	return context.WithValue(ctx, contextKey{}, u)
 }
 
+type limitedKey struct{}
+
+// WithLimited marks a request's session as one that may only play.
+func WithLimited(ctx context.Context) context.Context {
+	return context.WithValue(ctx, limitedKey{}, true)
+}
+
+// IsLimited reports whether the request's session may only play.
+func IsLimited(ctx context.Context) bool {
+	v, _ := ctx.Value(limitedKey{}).(bool)
+	return v
+}
+
+// LimitedMessage is what a playing-only session is told when it asks for more.
+const LimitedMessage = "This TV is signed in for playing only. To change that here, choose yourself in Who's listening? and enter your PIN or password."
+
 // --- accounts ---------------------------------------------------------------
 
 // HasAccount reports whether anybody has signed up yet.
@@ -636,6 +652,32 @@ func (m *Manager) SessionFor(user state.User) (string, time.Time, error) {
 	return token, expiry, nil
 }
 
+// PlaybackSessionFor starts a session that may only play: a shared TV switched
+// to somebody because they sent it something from their phone. Anybody at the
+// TV then has that person's music and films, never their account - People,
+// settings, deleting, passwords - and a browser pretending to be a TV gains
+// no more than that (the security review, 2026-10-14). Choosing oneself in
+// "Who's listening?" there, with the PIN or password it asks, gives a full
+// session.
+func (m *Manager) PlaybackSessionFor(user state.User) (string, time.Time, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", time.Time{}, fmt.Errorf("generate session token: %w", err)
+	}
+	token := hex.EncodeToString(raw)
+	expiry := time.Now().Add(sessionTTL)
+	if err := m.store.AddLimitedSession(token, user.ID, expiry); err != nil {
+		return "", time.Time{}, err
+	}
+	return token, expiry, nil
+}
+
+// Limited reports whether the request's session may only play.
+func (m *Manager) Limited(r *http.Request) bool {
+	token, _, ok := m.liveSession(r)
+	return ok && m.store.SessionLimited(token)
+}
+
 // iterationsOr keeps a decoy hash the same cost as a real one.
 func iterationsOr(n int) int {
 	if n <= 0 {
@@ -813,12 +855,16 @@ func expireCookie(w http.ResponseWriter, name string, secure bool) {
 // open would make the login decorative.
 func (m *Manager) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, ok := m.UserFor(r)
+		token, user, ok := m.liveSession(r)
 		if !ok {
 			deny(w, http.StatusUnauthorized, "not signed in")
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), user)))
+		ctx := WithUser(r.Context(), user)
+		if m.store.SessionLimited(token) {
+			ctx = WithLimited(ctx)
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -829,6 +875,12 @@ func (m *Manager) RequireOwner(next http.Handler) http.Handler {
 		user, ok := FromContext(r.Context())
 		if !ok {
 			deny(w, http.StatusUnauthorized, "not signed in")
+			return
+		}
+		if IsLimited(r.Context()) {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprintf(w, `{"error":%q,"limited":true}`, LimitedMessage)
 			return
 		}
 		if !user.IsOwner() {
