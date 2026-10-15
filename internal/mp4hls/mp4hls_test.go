@@ -128,3 +128,34 @@ func TestABookClaimingBillionsOfSamplesIsRefused(t *testing.T) {
 		t.Fatal("a book of four billion samples was planned")
 	}
 }
+
+// A fragment's length is known from the index before it is read, exactly what
+// WriteSegment writes; and one the file says is larger than any real one is
+// refused before a byte is written (the security review, 2026-10-14).
+func TestAFragmentIsSizedFirstAndKeptSmall(t *testing.T) {
+	b, err := Open("testdata/short.m4b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < b.Segments(); i++ {
+		want, err := b.SegmentLength(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var seg bytes.Buffer
+		if err := b.WriteSegment(&seg, i); err != nil {
+			t.Fatal(err)
+		}
+		if int64(seg.Len()) != want {
+			t.Fatalf("segment %d: %d bytes written, %d said", i, seg.Len(), want)
+		}
+	}
+	b.stszFixed = 4 << 20 // every sample 4 MB: a fragment of hundreds of them
+	if _, err := b.SegmentLength(0); err != ErrSegmentTooBig {
+		t.Fatalf("an oversized fragment's length: %v", err)
+	}
+	var seg bytes.Buffer
+	if err := b.WriteSegment(&seg, 0); err != ErrSegmentTooBig || seg.Len() != 0 {
+		t.Fatalf("an oversized fragment was written: %v, %d bytes", err, seg.Len())
+	}
+}

@@ -46,7 +46,15 @@ const (
 	maxSamples        = 50_000_000
 	maxSegmentSamples = 20_000
 	maxSegments       = 200_000
+	// maxSegmentBytes is the most one fragment may be. Ten seconds of a
+	// book is about 100-400 KB (lossless, under 2 MB); what a fragment holds
+	// is the file's own word, and a crafted file could claim gigabytes for
+	// one (the security review, 2026-10-14).
+	maxSegmentBytes = 16 << 20
 )
+
+// ErrSegmentTooBig is a fragment the file says is larger than any real one.
+var ErrSegmentTooBig = errors.New("mp4: a fragment larger than any real one")
 
 type box struct {
 	typ  string
@@ -499,11 +507,30 @@ func (b *Book) chunkOf(s uint32) int {
 	return lo
 }
 
-// WriteSegment writes fragment i: a moof describing its samples and an mdat
-// of their bytes, copied from the file.
-func (b *Book) WriteSegment(w io.Writer, i int) error {
+// SegmentLength is fragment i's length in bytes, as WriteSegment writes it,
+// worked out from the file's index before anything is read.
+func (b *Book) SegmentLength(i int) (int64, error) {
 	if i < 0 || i >= b.Segments() {
-		return errors.New("no such segment")
+		return 0, errors.New("no such segment")
+	}
+	a, z := b.segSample[i], b.segSample[i+1]
+	var total uint64
+	for s := a; s < z; s++ {
+		total += uint64(b.size(s))
+	}
+	if total > maxSegmentBytes {
+		return 0, ErrSegmentTooBig
+	}
+	// moof: its header 8, mfhd 16, traf 8, tfhd 16, tfdt 20, and a trun of
+	// 20 plus 8 a sample; then the mdat's 8-byte header and the samples.
+	return int64(88 + 8*uint64(z-a) + 8 + total), nil
+}
+
+// WriteSegment writes fragment i: a moof describing its samples and an mdat
+// of their bytes, copied from the file as they are written.
+func (b *Book) WriteSegment(w io.Writer, i int) error {
+	if _, err := b.SegmentLength(i); err != nil {
+		return err
 	}
 	a, z := b.segSample[i], b.segSample[i+1]
 	n := z - a

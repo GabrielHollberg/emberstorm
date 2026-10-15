@@ -256,15 +256,20 @@ func (s *Server) handleBookHLS(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "no such fragment", http.StatusNotFound)
 			return
 		}
-		w.Header().Set("Content-Type", "audio/mp4")
-		var buf bytes.Buffer
-		if err := ob.book.WriteSegment(&buf, i); err != nil {
+		// Its length from the file's index, and then straight from the file
+		// as it is read: never held whole in memory, and never larger than
+		// a real fragment (mp4hls.SegmentLength), whatever the file claims.
+		length, err := ob.book.SegmentLength(i)
+		if err != nil {
 			s.log.Warn("book fragment", "err", err)
-			http.Error(w, "could not read the fragment", http.StatusInternalServerError)
+			http.Error(w, "could not read the fragment", http.StatusUnprocessableEntity)
 			return
 		}
-		w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
-		_, _ = buf.WriteTo(w)
+		w.Header().Set("Content-Type", "audio/mp4")
+		w.Header().Set("Content-Length", strconv.FormatInt(length, 10))
+		if err := ob.book.WriteSegment(w, i); err != nil {
+			s.log.Warn("book fragment", "err", err)
+		}
 	default:
 		http.Error(w, "no such file", http.StatusNotFound)
 	}
