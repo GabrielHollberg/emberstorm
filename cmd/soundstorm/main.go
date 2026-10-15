@@ -456,8 +456,10 @@ func run(log *slog.Logger) error {
 	go api.RunVoices(ctx)
 
 	srv := &http.Server{
-		Addr:              listen,
-		Handler:           api.Routes(),
+		Addr: listen,
+		// Plain http answers only home addresses; anything reaching the
+		// server from the internet is sent on to https.
+		Handler:           tlsServer.OnlyHomeOverHTTP(api.Routes()),
 		ReadHeaderTimeout: 10 * time.Second,
 		// No WriteTimeout: it would cut off a film mid-playback. No
 		// ReadTimeout either, for the same film: a read deadline that expires
