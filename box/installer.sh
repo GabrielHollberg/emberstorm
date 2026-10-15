@@ -74,6 +74,7 @@ virt-customize -a "$stick" \
 	--run-command 'growpart /dev/sda 1 && resize2fs /dev/sda1' \
 	$copy_args \
 	--run-command 'chmod 755 /usr/local/lib/emberstorm-install/install.sh' \
+	--run-command 'chmod 644 /etc/default/grub.d/90_emberstorm.cfg && update-grub' \
 	--run-command 'chmod 644 /etc/systemd/system/emberstorm-install.service' \
 	--run-command 'systemctl enable emberstorm-install' \
 	--run-command 'systemctl disable unattended-upgrades apt-daily.timer apt-daily-upgrade.timer || true' \

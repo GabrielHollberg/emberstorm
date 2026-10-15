@@ -45,7 +45,12 @@ cat > /etc/grub.d/10_linux <<'EOF'
 EOF
 chmod 755 /etc/grub.d/10_linux
 
-printf 'GRUB_DISABLE_RECOVERY=true\n' > /etc/default/grub.d/90_emberstorm.cfg
+# The screen is the console, the serial port only a second one: Debian's cloud
+# image makes ttyS0 the console (the last one named), and on a real PC every
+# line systemd writes then waited about 30 seconds on a serial port with
+# nothing on it - the test unit took over 20 minutes to start (2026-10-15). A
+# VM still records the kernel's messages from the serial port.
+printf 'GRUB_DISABLE_RECOVERY=true\nGRUB_CMDLINE_LINUX="console=ttyS0,115200 console=tty0 consoleblank=0"\n' > /etc/default/grub.d/90_emberstorm.cfg
 update-grub
 grep -q '^set superusers=' /boot/grub/grub.cfg || { echo "lock-grub: grub.cfg has no lock" >&2; exit 1; }
 grep -q '^menuentry .*--unrestricted' /boot/grub/grub.cfg || { echo "lock-grub: the normal entry is not left open" >&2; exit 1; }
