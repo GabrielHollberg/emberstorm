@@ -190,6 +190,7 @@ unit_record() {
 		case "${i##*/}" in en* | eth*) mac=$(cat "$i/address"); break ;; esac
 	done
 	storage=""
+	[ "$mode" = plain ] || storage="one drive: system and library"
 	for d in $(lsblk -dno NAME,TYPE,TRAN | awk '$2=="disk" && ($3=="nvme" || $3=="sata" || $3=="ata") {print $1}'); do
 		[ "$d" = "$self" ] || [ "$d" = "$target" ] && continue
 		storage="$storage${storage:+; }$(lsblk -dno MODEL "/dev/$d" | tr -s ' ') $(($(blockdev --getsize64 "/dev/$d") / 1000000000))GB"

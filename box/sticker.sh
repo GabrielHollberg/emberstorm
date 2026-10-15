@@ -35,6 +35,8 @@
 #   sh box/sticker.sh drives [BOXES] [OUTDIR] [--test]
 #           Avery 5267, 1/2" x 1-3/4", 80 a sheet: a SYSTEM DRIVE and a
 #           LIBRARY DRIVE label for each box, stuck along each M.2 drive.
+#           ONE_DRIVE=1: a box with one drive gets one label, SYSTEM AND
+#           LIBRARY, 80 boxes a sheet.
 #
 # units.csv (unit,setup_code,made) is a factory stick's record of the boxes
 # it set up. The codes are each box's own: keep it with the factory's
@@ -184,6 +186,8 @@ drive_label() {
 	[ "$TEST" = 1 ] && echo '<rect width="1.75" height="0.5" rx="0.06" fill="none" stroke="#999" stroke-width="0.01"/>'
 	if [ "$kind" = system ]; then
 		head="SYSTEM DRIVE" l1="EmberStorm's own system. Your media is not on it." l2="Leave in this box. Switch off before removing."
+	elif [ "$kind" = one ]; then
+		head="SYSTEM AND LIBRARY" l1="EmberStorm, your media and accounts. Leave in box." l2="Never plug into Windows: it offers to erase it."
 	else
 		head="LIBRARY DRIVE" l1="Your media and accounts. Leave in this box." l2="Never plug into Windows: it offers to erase it."
 	fi
@@ -303,20 +307,27 @@ drives)
 	{
 		html_open
 		n=0
+		per=40
+		[ "${ONE_DRIVE:-}" = 1 ] && per=80
 		while [ $n -lt "$boxes" ]; do
-			[ $((n % 40)) = 0 ] && page_open
-			spot=$((n % 40))
-			row=$((spot / 2))
-			pair=$((spot % 2))
-			y=$(awk -v r="$row" 'BEGIN { printf "%.3f", 0.5 + r * 0.5 }')
-			drive_label "$(echo $DCOLS | cut -d' ' -f$((pair * 2 + 1)))" "$y" system
-			drive_label "$(echo $DCOLS | cut -d' ' -f$((pair * 2 + 2)))" "$y" library
+			[ $((n % per)) = 0 ] && page_open
+			spot=$((n % per))
+			if [ "$per" = 80 ]; then
+				y=$(awk -v r="$((spot / 4))" 'BEGIN { printf "%.3f", 0.5 + r * 0.5 }')
+				drive_label "$(echo $DCOLS | cut -d' ' -f$((spot % 4 + 1)))" "$y" one
+			else
+				row=$((spot / 2))
+				pair=$((spot % 2))
+				y=$(awk -v r="$row" 'BEGIN { printf "%.3f", 0.5 + r * 0.5 }')
+				drive_label "$(echo $DCOLS | cut -d' ' -f$((pair * 2 + 1)))" "$y" system
+				drive_label "$(echo $DCOLS | cut -d' ' -f$((pair * 2 + 2)))" "$y" library
+			fi
 			n=$((n + 1))
-			[ $((n % 40)) = 0 ] && page_close
+			[ $((n % per)) = 0 ] && page_close
 		done
-		[ $((n % 40)) = 0 ] || page_close
+		[ $((n % per)) = 0 ] || page_close
 	} >"$out/drive-labels.html"
-	echo "  $out/drive-labels.html: drive labels for $boxes box(es), $(( (boxes + 39) / 40 )) sheet(s) of Avery 5267"
+	echo "  $out/drive-labels.html: drive labels for $boxes box(es), $(( (boxes + per - 1) / per )) sheet(s) of Avery 5267"
 	;;
 cards)
 	KX=$(stretch 5.75 "${MEASURED_X:-}"); KY=$(stretch 7.625 "${MEASURED_Y:-}")

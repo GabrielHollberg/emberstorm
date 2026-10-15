@@ -2,8 +2,9 @@
 # Mounts the box's data drive at /srv/soundstorm, preparing it the first time.
 #
 # The data drive is the internal disk that is not the system disk (the NVMe
-# drive beside the eMMC, or beside the small system SSD on a box with none).
-# It is known by its label, SSDATA.
+# drive beside the eMMC, or beside the small system SSD on a box with none) -
+# or, on a box with one drive, the partition after the system's 64 GiB, which
+# the stick makes. It is known by its label, SSDATA.
 # A disk is only ever formatted when it is blank - no partition table, no
 # filesystem, nothing a probe recognises. A disk holding anything at all is
 # left alone, whatever it is: losing somebody's files to a wrong guess here is

@@ -1,6 +1,7 @@
 #!/bin/sh
 # Grows the system partition to fill the system disk: the image is built
-# small, and the ME Mini's eMMC is 64GB. Safe to run every boot - once it
+# small, and the ME Mini's eMMC is 64GB. On a one-drive box it grows up to
+# the library's partition, which starts at 64 GiB. Safe to run every boot - once it
 # fills the disk there is nothing to grow.
 set -eu
 src=$(findmnt -no SOURCE /)
