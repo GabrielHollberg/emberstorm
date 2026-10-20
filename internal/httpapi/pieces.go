@@ -205,6 +205,7 @@ func (s *Server) handlePiece(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.ContentLength <= 0 || r.ContentLength > pieceMax || offset+r.ContentLength > u.req.Size {
+		s.log.Warn("upload piece refused: the wrong size", "offset", offset, "length", r.ContentLength, "size", u.req.Size, "proto", r.Proto)
 		writeError(w, http.StatusBadRequest, "that piece is the wrong size")
 		return
 	}
@@ -225,6 +226,9 @@ func (s *Server) handlePiece(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInsufficientStorage, err.Error())
 			return
 		}
+		// Said only to the browser until 2026-10-20, when pieces of every
+		// audiobook dropped failed and nothing here said why.
+		s.log.Warn("upload piece failed", "offset", offset, "got", n, "length", r.ContentLength, "proto", r.Proto, "err", desensitizeFSError(err))
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": desensitizeFSError(err), "received": u.received})
 		return
 	}
