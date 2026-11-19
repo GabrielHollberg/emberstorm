@@ -1939,6 +1939,7 @@ async function loadPeople() {
     // The owner is not removable and neither are you: the server refuses both,
     // and offering a button that always fails is worse than offering none.
     if (!person.owner && person.id !== (state.me && state.me.id)) {
+      choices.append(...personPassword(person));
       const remove = document.createElement('button');
       remove.className = 'ghost';
       remove.type = 'button';
@@ -1948,6 +1949,77 @@ async function loadPeople() {
     }
     list.append(li);
   }
+}
+
+// personPassword is the owner giving somebody a new password: the way back in
+// for a forgotten one, as there is no email to send a reset to. The old one is
+// not needed and never shown. The server signs them out everywhere, since the
+// other reason to do this is that somebody else knows it. Returns the button
+// and its form, which opens filled with a made-up password the owner may keep
+// or replace; the server's rules (12 characters, not a common one) still apply.
+function personPassword(person) {
+  const open = document.createElement('button');
+  open.className = 'ghost';
+  open.type = 'button';
+  open.textContent = 'Reset password';
+
+  const form = document.createElement('form');
+  form.className = 'person-password hidden';
+  const field = document.createElement('input');
+  field.type = 'text';
+  field.autocomplete = 'off';
+  field.spellcheck = false;
+  field.minLength = 12;
+  field.required = true;
+  field.setAttribute('aria-label', `New password for ${person.name}`);
+  const set = document.createElement('button');
+  set.type = 'submit';
+  set.textContent = 'Set';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'ghost';
+  cancel.textContent = 'Cancel';
+  form.append(field, set, cancel);
+
+  open.addEventListener('click', () => {
+    field.value = readablePassword();
+    show(form, true);
+    show(open, false);
+    field.focus();
+    field.select();
+  });
+  cancel.addEventListener('click', () => {
+    show(form, false);
+    show(open, true);
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = field.value;
+    if (!window.confirm(`Give ${person.name} this new password? Their old one stops working and they are signed out on every device.`)) return;
+    set.disabled = true;
+    const { ok, body } = await api(`/api/users/${encodeURIComponent(person.id)}/password`,
+      { method: 'POST', body: JSON.stringify({ password }) });
+    set.disabled = false;
+    if (!ok) {
+      note($('people-note'), (body && body.error) || 'Could not change it.', true);
+      return;
+    }
+    show(form, false);
+    show(open, true);
+    note($('people-note'),
+      `${person.name}'s new password is ${password} - tell them, and they can change it under Account. They are signed out everywhere until they sign in with it.`,
+      false);
+  });
+  return [open, form];
+}
+
+// readablePassword makes one that can be read off a screen and typed into a
+// phone, as the reset-password command does: no l/1/O/0, in groups of four.
+function readablePassword() {
+  const alphabet = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const out = [];
+  for (const b of crypto.getRandomValues(new Uint8Array(16))) out.push(alphabet[b % alphabet.length]);
+  return out.join('').match(/.{4}/g).join('-');
 }
 
 // personMakeBooks is the owner's switch letting a member make audiobooks

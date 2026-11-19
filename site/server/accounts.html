@@ -319,6 +319,15 @@ EmberStorm account drops the record of which Audiobookshelf or Immich user belon
 after that nothing knows what to clean up. It is best effort: a backend that is down must not
 stop somebody being removed. Their photo folder is kept, for the owner to decide about.</p>
 
+<h2 id="owner-reset">A member's forgotten password</h2>
+<p>There is no email to send a reset to, so the owner gives a new one: Settings, People, the
+person, <strong>Reset password</strong> (<code>POST /api/users/{id}/password</code>, owner only).
+The form opens with a made-up password in the <code>reset-password</code> command's alphabet
+(16 characters, no l/1/O/0), which the owner may keep or replace; the usual rules apply. The old
+password is never needed or shown. Unlike the command, this signs the person out everywhere,
+since the other reason to do it is that somebody else knows the old one. It refuses the owner's
+own account, which changes only with its current password.</p>
+
 <h2 id="reset-password">Getting back in: <code>reset-password</code></h2>
 <p>Because sign-up closes forever, a forgotten owner password used to mean hand-editing
 <code>state.json</code> inside a container. <code>soundstorm reset-password</code> is the

@@ -601,7 +601,13 @@ removing anything.
 
 ## Forgotten your password
 
-In the install folder:
+Somebody else's: as the owner, open **Settings → People**, tap their name, then
+**Reset password**. It suggests a new one (keep it or type your own, at least 12
+characters and not a common one); tell them it. Their old password is not
+needed, and they are signed out on every device until they sign in with the new
+one.
+
+Your own, as the owner: in the install folder:
 
 ```sh
 docker compose down
